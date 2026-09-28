@@ -779,14 +779,14 @@ class HandDrawnSourceTests(unittest.TestCase):
 # people.json draws (a key, a swatch, a track) re-pins these, and says so in its commit.
 DENSITY_ONE_SHEETS = {
     "straight": {
-        "front": "9963f7e6ee7b1f4ae3f9593b1ddc35272497837de4c03b9bde1eeaa838e804c4",
-        "back": "57b93962fa943159df01041fd09d3b559304cd9739d28cacd2ec935d218aebc2",
-        "side": "2979db078cd9a5207b4e0ba34ff5d35ea27752ce86a6f243196fd4c108b57303",
+        "front": "cf38f6cf2cf447faeb45b25b168a7830768c2e9195b5dc5c5b17a695b4f8f4fe",
+        "back": "e4e11e834eeaee09eeeef8d6e77ae8c87926a37d3955b8ef9ab2a292dabc4a38",
+        "side": "17c379ee381be9a791fecf49e1aeac1b21b217271e2a9c11f49ed980b4f76ebc",
     },
     "bent": {
-        "front": "22149f6dc00f8a77721d67fdba63849305a748d02ec6c0fc781cad3371b7d040",
-        "back": "09cf04c68ddae99638399819dc982af85ba04cb896ea659fa780105befae616c",
-        "side": "9ac40e0773b446dbd86798d5ff066cfb86ac2b0d700a1bd89c4de2dbe89bd1a3",
+        "front": "16a4536189040a32b36d9336c1bcad1a1850bbec097f63f956c9e310c9b83a1e",
+        "back": "f9179a9c7ee88b1588aef733034e13592d30a17eb0afb33ead88c0c45b397ce5",
+        "side": "61464b193c37e5b3fae2c9e2b2ce3046c13b5aaa6ff064c0efe5d262b4dddf60",
     },
 }
 RAISED_HANDS = ("straight", "bent")
@@ -1352,9 +1352,9 @@ class SkinTests(unittest.TestCase):
     def test_every_part_has_a_canvas_its_cells_times_the_density(self):
         parts = skin_parts(self.spec)
         self.assertEqual(parts, ["head", "torso", "hair_short", "hair_curl", "hair_long", "headwear_cap", "headwear_hood"])
-        self.assertEqual(skin_size(self.spec, "front", "head"), (20, 20))
+        self.assertEqual(skin_size(self.spec, "front", "head"), (16, 16))
         self.assertEqual(skin_size(self.spec, "side", "torso"), (16, 22))
-        self.assertEqual(skin_size(self.spec, "side", "headwear_cap"), (28, 8))
+        self.assertEqual(skin_size(self.spec, "side", "headwear_cap"), (24, 8))
 
 
 class SkinCutTests(unittest.TestCase):

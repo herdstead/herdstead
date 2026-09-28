@@ -335,8 +335,8 @@ A station is not one composite image: chair and worker sort by their own foot po
 table, badge and selection float above the world, and cabinet branch labels and dynamic text are separate nodes.
 Seat, laptop, divider and chair offsets live only in `scripts/world/table.gd` (0 = the table's near edge); plate
 and badge offsets in `scripts/world/station.gd`. Those were measured on every frame of the pixel people: seated
-head top −33; standing head −38..−25; width −9..9; a raised hand reaches −40 with the straight arm (side out to
-10) and −38 with the bent arm (side out to 12; see `raised_hand` in "Pixel people"). If figures change height or
+head top −31; standing head −37..−25; width −8..8; a raised hand reaches −38 with the straight arm (side out to
+9) and −36 with the bent arm (side out to 12; see `raised_hand` in "Pixel people"). If figures change height or
 raised hand, measure again; `tools/test_office_geometry.gd` catches a plate that covers a face or drifts away.
 
 ## People and herdr agents
@@ -633,7 +633,7 @@ per-facing index sheets keeps one draw call per person.
   front, the inner corner from the back; in the waving frame forearm and hand are one cell higher. From the side
   (only `stand_blocked`) the arm is behind the head and only cuff, mitten and thumb show above the hair, as high as
   the straight hand. Both: the hand is more than a unit above every hair style and hat; seated it reaches at most
-  −40 and 12 wide (units from the pivot, ink included; the bent arm −38..−37 and 12); the bent arm is never higher
+  −38 and 9 wide (units from the pivot, ink included; the bent arm −36..−35 and 12); the bent arm is never higher
   than the straight one (`RaisedHandTests`, both built at the shipped density and ring, wearing the shipped skins;
   each has pinned density-1 hashes). "3×3 hand, 1 thumb" are cells: a density-2 cell is 2×2 texels.
 - Recolouring is an exact per-pixel substitution (`derive_theme.repaint()`); each product strip maps only its own
@@ -652,7 +652,7 @@ the skin.
   names are accepted). Parts (`SKIN_PARTS`): `head` (body layer: skin keys + fixed colours), `torso` (top),
   `hair_<style>` (hair), `headwear_<shape>` (headwear). Limbs, shoes, held paper and cup, and glasses take no skin:
   a limb is a polyline no single picture fits, and three tones suffice at 2×2 texels per cell.
-- Canvas = the part's cell envelope × density (head 10×10 cells, 20×20 at density 2; torso front 10×11 cells; hair
+- Canvas = the part's cell envelope × density (head 8×8 cells, 16×16 at density 2; torso front 8×11 cells; hair
   and hats by shape), the same for every frame: the skin's top-left sits at the envelope's top-left. Seated, the
   torso loses its last cell row and the skin's last density texel rows go unused.
 - Hard constraints (file, coordinate and rule on refusal): exact canvas size; alpha 0 / 255; only this layer's role
@@ -660,8 +660,8 @@ the skin.
   corners, not on the torso front's two neckline cells (body-layer skin), not on the ink ring. **`eye` and
   `catchlight` are forbidden**: only the white model paints eyes, and either colour in a skin would count as an
   extra eye in the colour-counting tests; the builder and `cut` refuse it. Pixelize with `--only` omitting those
-  two; `cut` leaves the head's eye cells empty. So the real pixel envelope (seated head −33, raised hand −40, width
-  ±9) and the offsets in `scripts/world/station.gd` stand.
+  two; `cut` leaves the head's eye cells empty. So the real pixel envelope (seated head −31, raised hand −38, width
+  ±8) and the offsets in `scripts/world/station.gd` stand.
 - A transparent skin texel keeps the white model's tone; the ink ring is always the white model's; **the eyes are
   painted after the skin**, covering whatever it holds there. Hat-over-hair still holds by the brim check: a skin
   changes fill, never which cells a hat covers.

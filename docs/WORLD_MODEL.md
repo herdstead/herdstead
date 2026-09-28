@@ -407,8 +407,8 @@ kept is the plan and the view, not the people's nodes or animation clocks across
 ## Seating and the chair asset boundary
 
 - Sitting and standing are different tracks in the same pixel-people strip (`desk_*` / `stand_*`): same strip, same
-  nodes. Measured over every frame: seated, the head reaches y = −33 above the feet (a blocked worker's raised hand
-  −38); standing, the head spans −38..−25; every figure is x −9..9 (18 wide, ±12 with a raised hand). A hood is
+  nodes. Measured over every frame: seated, the head reaches y = −31 above the feet (a blocked worker's raised hand
+  −36); standing, the head spans −37..−25; every figure is x −8..8 (16 wide, ±12 with a raised hand). A hood is
   headwear that hides the hair layer while worn.
 - `chair_front` / `chair_back` are built from one front/back source image: a low-lumbar office chair with an open
   back and casters. `CHAIR_OFFSET.near = 6` only keeps the front/back order; there is no large offset to dodge the

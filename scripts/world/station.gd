@@ -55,36 +55,36 @@ const PERSON_SCENE := preload("res://scenes/people/pixel_person.tscn")
 ##
 ## The lens line (OfficeLens, while `L` is held): how long this agent has been
 ## in its state, one line of it. Far: left of the badge, level with its top
-## rows and right over the plate (x -30..18, y -65..-53; the badge is drawn at
+## rows and right over the plate (x -30..18, y -63..-51; the badge is drawn at
 ## x 18..34), where the bubble would be and is not drawn meanwhile; table-local
-## it starts at -133, inside the -150 the decor is planned around. Near: under
+## it starts at -131, inside the -150 the decor is planned around. Near: under
 ## the plate, as wide (y 34..46, table-local 56..68, inside the 72). Over a
 ## worker resting away: above their badge (y -75..-63 over the feet; the badge
 ## is drawn at -63..-47).
-const LENS_AT := {"far": Vector2(-30, -65), "near": Vector2(-38, 34)}
+const LENS_AT := {"far": Vector2(-30, -63), "near": Vector2(-38, 34)}
 const LENS_SIZE := {"far": Vector2(48, 12), "near": Vector2(76, 12)}
 const AWAY_LENS_AT := Vector2(-24, -75)
 const AWAY_LENS_SIZE := Vector2(48, 12)
 ## Measured on the pixel people (every frame of the track, both layers, x and y
-## from the feet): seated, the head reaches y = -33 and a blocked worker's
-## raised hand -38 (the bent arm); standing
-## (in the pantry), the head spans y -38..-25; every figure is x -9..9 (12
+## from the feet): seated, the head reaches y = -31 and a blocked worker's
+## raised hand -36 (the bent arm); standing
+## (in the pantry), the head spans y -37..-25; every figure is x -8..8 (12
 ## with a raised hand). The plate's
 ## text is 11 units from its top to the baseline at this font. A far plate's
 ## baseline sits 9 above the seated head: 4 above a raised hand, which it never
 ## touches. The far badge rests on the plate's row; near labels hang off the
 ## chair, not the head.
 const PLATE_SIZE := Vector2(76, 12)
-const PLATE_AT := {"far": Vector2(-38, -53), "near": Vector2(-38, 22)}
-const BADGE_AT := {"far": Vector2(26, -53), "near": Vector2(30, 20)}
-## The mark's top corners run level with the far plate's text, 14 above the
-## seated head, as they did; its foot follows, 17 below the seat.
+const PLATE_AT := {"far": Vector2(-38, -51), "near": Vector2(-38, 22)}
+const BADGE_AT := {"far": Vector2(26, -51), "near": Vector2(30, 20)}
+## The mark has not moved: its top corners ran level with the far plate's
+## text, which now sits 2 lower; its foot is 17 below the seat.
 const SELECTION_AT := Vector2(0, 13)
 ## The click target of each side, as scenes/world/station.tscn places it: a far
 ## worker's labels float above the head, a near worker's sit below the chair.
-## The far one reaches up to -70, over the badge (drawn at x 18..34, y -69..-53:
-## its pivot is its foot), except while the bubble shows: then it stops at the
-## plate's top row (-53), FAR_UNDER_BUBBLE, and the bubble's own rectangle,
+## The far one reaches up to -70, over the badge (drawn at x 18..34, y -67..-51:
+## its pivot is its foot), except while the bubble shows: then it stops at
+## -53, 2 over the plate's top row, FAR_UNDER_BUBBLE, and the bubble's own rectangle,
 ## which the badge's area lies in, answers above it. Never both under a point.
 const TARGET_OF := {"far": ^"Target/Far", "near": ^"Target/Near"}
 const FAR_AT := Vector2(0, -31)

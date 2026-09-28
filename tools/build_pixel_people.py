@@ -851,40 +851,38 @@ BENT_SIDE_THUMB_UP = 8
 BENT_ELBOW_X = 25
 BENT_ELBOW_UP = 3
 SEAT = 5
-HEAD = (11, 11)
+HEAD = (12, 13)
 TORSO_TOP = 22
 LEGS_TOP = 34
 SHOE_TOP = 42
 
 # The eyes sit a row below every fringe's ink line, with a cell of skin on
-# both sides, so no hair outline ever touches them.
+# both sides, so no hair outline ever touches them. The head is 8 cells wide
+# over a 10-wide torso: the shoulders are wider than the head, about three
+# heads tall with the hair.
 HEAD_FRONT = (
-    "..ssssss..",
-    ".ssssssss.",
-    "ssssssssss",
-    "ssssssssss",
-    "ssssssssss",
-    "ssessssess",
-    "ssessssess",
-    "ssssssssss",
-    ".ssssssss.",
-    "..ssssss..",
+    ".ssssss.",
+    "ssssssss",
+    "ssssssss",
+    "ssssssss",
+    "ssessess",
+    "ssessess",
+    "ssssssss",
+    ".ssssss.",
 )
 HEAD_BACK = tuple(line.replace("e", "s") for line in HEAD_FRONT)
 HEAD_SIDE = (
-    "..ssssss...",
-    ".ssssssss..",
-    "ssssssssss.",
-    "ssssssssss.",
-    "ssssssssss.",
-    "sssssssess.",
-    "sssssssess.",
-    "sssssssssss",
-    ".ssssssss..",
-    "..ssssss...",
+    ".ssssss..",
+    "ssssssss.",
+    "ssssssss.",
+    "ssssssss.",
+    "sssssses.",
+    "sssssses.",
+    "sssssssss",
+    ".sssssss.",
 )
-TORSO_FRONT = (".tttssttt.",) + ("tttttttttt",) * 10
-TORSO_BACK = (".tttttttt.",) + ("tttttttttt",) * 10
+TORSO_FRONT = (".ttsstt.",) + ("tttttttt",) * 10
+TORSO_BACK = (".tttttt.",) + ("tttttttt",) * 10
 TORSO_SIDE = (".tttttt.",) + ("tttttttt",) * 10
 SHOE_FRONT = ("OOOO", "oooo", "oooo")
 # Seated, from the front: the thighs come at the viewer as a lap wider than the
@@ -920,144 +918,136 @@ SHOE_SIDE = ("OOOOO.", "oooooo", "oooooo")
 # A mug of coffee, and where it and the holding (right) hand sit from the
 # front, relative to the shoulder row: at the chest, at the chin, at the mouth.
 CUP = ("cfc", "ccC", "ccC")
-CUPS = {"cup0": ((17, 3), (20, 4)), "cup1": ((16, 0), (19, 1)), "cup2": ((15, -5), (18, -4))}
+CUPS = {"cup0": ((16, 3), (19, 4)), "cup1": ((15, 0), (18, 1)), "cup2": ((15, -3), (18, -2))}
 # From the side, how far each drink frame lifts the cup (and the hand) above
 # the chest.
 CUP_LIFTS = {"cup0": 0, "cup1": 4, "cup2": 8}
 # The sleeve of that arm (drawn on the left, mirrored), a polyline of cells
 # relative to the shoulder: down and in, bent up to the chin, up to the mouth.
 CUP_SLEEVES = {
-    "cup0": ((8, 0), (8, 3)),
-    "cup1": ((8, 0), (8, 3), (10, 2)),
-    "cup2": ((8, 0), (11, -3)),
+    "cup0": ((9, 0), (9, 3)),
+    "cup1": ((9, 0), (9, 3), (11, 2)),
+    "cup2": ((9, 0), (12, -3)),
 }
 
 # Hair, by style and facing, placed with its top-left one cell left of and two
 # above the head's; lowercase letters take ramps, '.' shows the face below.
 HAIR = {
     ("short", "front"): (
-        "..hhhhhhhh..",
-        ".hhhhhhhhhh.",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhh.hhhhhhh",
-        "hh........hh",
+        "..hhhhhh..",
+        ".hhhhhhhh.",
+        "hhhhhhhhhh",
+        "hhhh.hhhhh",
+        "hh......hh",
     ),
     ("short", "back"): (
-        "..hhhhhhhh..",
-        ".hhhhhhhhhh.",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        ".hhhhhhhhhh.",
+        "..hhhhhh..",
+        ".hhhhhhhh.",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        ".hhhhhhhh.",
     ),
     ("short", "side"): (
-        "..hhhhhhh...",
-        ".hhhhhhhhhh.",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhh...hhh.",
-        "hhhh........",
-        "hhhh........",
-        "hhh.........",
-        ".hh.........",
+        "..hhhhhh..",
+        ".hhhhhhhh.",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhh......",
+        "hhhh......",
+        "hhh.......",
+        ".hh.......",
     ),
+    # A round mop: bumps on the crown inside every hat's top, the sides out
+    # past the cheeks and down to the chin.
     ("curl", "front"): (
-        "..h.hhhh.h..",
-        ".hhhhhhhhhh.",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhh.hhhhhh",
-        "hhh......hhh",
-        "hh........hh",
-        "h..........h",
-        "h..........h",
-        "hh........hh",
-        "hhh......hhh",
-        "hhh......hhh",
-        ".h........h.",
+        "..h.hh.h..",
+        ".hhhhhhhh.",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hh......hh",
+        "h........h",
+        "h........h",
+        "h........h",
+        "hh......hh",
+        "hh......hh",
+        ".h......h.",
     ),
     ("curl", "back"): (
-        "..h.hhhh.h..",
-        ".hhhhhhhhhh.",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        ".h.hhhhhh.h.",
+        "..h.hh.h..",
+        ".hhhhhhhh.",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        ".h.hhhh.h.",
     ),
     ("curl", "side"): (
-        "..h.hhhhh...",
-        ".hhhhhhhhhh.",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhh.hhh.",
-        "hhhhhh......",
-        "hhhhh.......",
-        "hhhhh.......",
-        "hhhhh.......",
-        "hhhhh.......",
-        "hhhh........",
-        "hhhh........",
-        ".h.h........",
+        "..h.hhh...",
+        ".hhhhhhhh.",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhh.....",
+        "hhhhh.....",
+        "hhhhh.....",
+        "hhhhh.....",
+        "hhhhh.....",
+        "hhhh......",
+        ".h.h......",
     ),
-    # Straight to the shoulders, parted at the crown.
+    # Straight past the shoulders, parted at the crown; one cell of hair on
+    # each side of the face, so the whole face shows.
     ("long", "front"): (
-        "..hhhhhhhh..",
-        ".hhhhhhhhhh.",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhh.hhhhhh",
-        "hh........hh",
-        "hh........hh",
-        "hh........hh",
-        "hh........hh",
-        "hh........hh",
-        "hh........hh",
-        "hhh......hhh",
-        "hhh......hhh",
-        ".hh......hh.",
+        "..hhhhhh..",
+        ".hhhhhhhh.",
+        "hhhhhhhhhh",
+        "hhhh.hhhhh",
+        "h........h",
+        "h........h",
+        "h........h",
+        "h........h",
+        "h........h",
+        "h........h",
+        "hh......hh",
+        "hh......hh",
+        ".h......h.",
     ),
     ("long", "back"): (
-        "..hhhhhhhh..",
-        ".hhhhhhhhhh.",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        ".hhhhhhhhhh.",
+        "..hhhhhh..",
+        ".hhhhhhhh.",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        ".hhhhhhhh.",
     ),
     ("long", "side"): (
-        "..hhhhhhh...",
-        ".hhhhhhhhhh.",
-        "hhhhhhhhhhhh",
-        "hhhhhhhhhhhh",
-        "hhhhh...hhh.",
-        "hhhh........",
-        "hhhh........",
-        "hhhh........",
-        "hhhh........",
-        "hhhh........",
-        "hhhh........",
-        "hhhh........",
-        ".hh.........",
+        "..hhhhhh..",
+        ".hhhhhhhh.",
+        "hhhhhhhhhh",
+        "hhhhhhhhhh",
+        "hhhh......",
+        "hhhh......",
+        "hhhh......",
+        "hhhh......",
+        "hhhh......",
+        "hhhh......",
+        "hhhh......",
+        "hhh.......",
+        ".hh.......",
     ),
 }
 
@@ -1067,118 +1057,109 @@ HAIR = {
 # head below) and hides the hair layer.
 HEADWEAR = {
     ("cap", "front"): (
-        "..aaaaaaaa..",
-        ".aaaaaaaaaa.",
-        "aaaaaaaaaaaa",
-        "aaaaaaaaaaaa",
+        "..aaaaaa..",
+        ".aaaaaaaa.",
+        "aaaaaaaaaa",
+        "aaaaaaaaaa",
     ),
     ("cap", "back"): (
-        "..aaaaaaaa..",
-        ".aaaaaaaaaa.",
-        "aaaaaaaaaaaa",
-        "aaaaaaaaaaaa",
+        "..aaaaaa..",
+        ".aaaaaaaa.",
+        "aaaaaaaaaa",
+        "aaaaaaaaaa",
     ),
     ("cap", "side"): (
-        "..aaaaaaa.....",
-        ".aaaaaaaaaa...",
-        "aaaaaaaaaaaa..",
-        "aaaaaaaaaaaaaa",
+        "..aaaaaa....",
+        ".aaaaaaaa...",
+        "aaaaaaaaaa..",
+        "aaaaaaaaaaaa",
     ),
     ("hood", "front"): (
-        "..aaaaaaaa..",
-        ".aaaaaaaaaa.",
-        "aaaaaaaaaaaa",
-        "aa........aa",
-        "aa........aa",
-        "aa........aa",
-        "aa........aa",
-        "a..........a",
-        "a..........a",
-        "aa........aa",
-        "aaa......aaa",
-        "aaaa....aaaa",
-        ".aaaaaaaaaa.",
+        "..aaaaaa..",
+        ".aaaaaaaa.",
+        "aaaaaaaaaa",
+        "a........a",
+        "a........a",
+        "a........a",
+        "a........a",
+        "a........a",
+        "aa......aa",
+        "aaa....aaa",
+        ".aaaaaaaa.",
     ),
     ("hood", "back"): (
-        "..aaaaaaaa..",
-        ".aaaaaaaaaa.",
-        "aaaaaaaaaaaa",
-        "aaaaaaaaaaaa",
-        "aaaaaaaaaaaa",
-        "aaaaaaaaaaaa",
-        "aaaaaaaaaaaa",
-        "aaaaaaaaaaaa",
-        "aaaaaaaaaaaa",
-        "aaaaaaaaaaaa",
-        "aaaaaaaaaaaa",
-        "aaaaaaaaaaaa",
-        ".aaaaaaaaaa.",
+        "..aaaaaa..",
+        ".aaaaaaaa.",
+        "aaaaaaaaaa",
+        "aaaaaaaaaa",
+        "aaaaaaaaaa",
+        "aaaaaaaaaa",
+        "aaaaaaaaaa",
+        "aaaaaaaaaa",
+        "aaaaaaaaaa",
+        "aaaaaaaaaa",
+        ".aaaaaaaa.",
     ),
     ("hood", "side"): (
-        "..aaaaaaaa..",
-        ".aaaaaaaaaa.",
-        "aaaaaaaaaaaa",
-        "aaaaaaa.....",
-        "aaaaaa......",
-        "aaaaaa......",
-        "aaaaaa......",
-        "aaaaaa......",
-        "aaaaaa......",
-        "aaaaaa......",
-        "aaaaaaa.....",
-        "aaaaaaaa....",
-        ".aaaaaaaaa..",
+        "..aaaaaa..",
+        ".aaaaaaaa.",
+        "aaaaaaaaaa",
+        "aaaaa.....",
+        "aaaa......",
+        "aaaa......",
+        "aaaa......",
+        "aaaa......",
+        "aaaa......",
+        "aaaaa.....",
+        ".aaaaaa...",
     ),
 }
 
 # Glasses, placed on the head's top-left: a thin frame (the fixed `frame`
 # colour, a mid grey: an ink frame against the near-black eye read as one dark
-# band) round each eye (head
-# columns 2 and 7, rows 5 and 6) and a bridge between them. Nothing opaque sits
-# over an eye, so each eye's own pixels show through the frame; there is no lens
-# pixel (the fixed `lens` colour is for a painter's glint, not the placeholder).
-# Square frames keep their corners, round ones do not. From the side, one frame
-# and the arm back to the ear; from behind, nothing shows.
+# band) at each eye (head columns 2 and 5, rows 4 and 5), never a full ring:
+# on an 8-cell face a full frame reads as a mask. Round: the bridge and a rim
+# under each eye. Square: browline, a bar over each eye, the outer sides and
+# the bridge. Nothing opaque sits over an eye, so each eye's own pixels show
+# through; there is no lens pixel (the fixed `lens` colour is for a painter's
+# glint, not the placeholder). From the side, one frame and the arm back to
+# the ear; from behind, nothing shows.
 GLASSES = {
     ("round", "front"): (
-        "..........",
-        "..........",
-        "..........",
-        "..........",
-        "..r....r..",
-        ".r.rrrr.r.",
-        ".r.r..r.r.",
-        "..r....r..",
+        "........",
+        "........",
+        "........",
+        "........",
+        "...rr...",
+        "........",
+        "..r..r..",
     ),
     ("square", "front"): (
-        "..........",
-        "..........",
-        "..........",
-        "..........",
-        ".rrr..rrr.",
-        ".r.rrrr.r.",
-        ".r.r..r.r.",
-        ".rrr..rrr.",
+        "........",
+        "........",
+        "........",
+        "..r..r..",
+        ".r.rr.r.",
+        "........",
+        "........",
     ),
     ("round", "side"): (
-        "...........",
-        "...........",
-        "...........",
-        "...........",
-        ".......r...",
-        "..rrrrr.r..",
-        "......r.r..",
-        ".......r...",
+        ".........",
+        ".........",
+        ".........",
+        "......r..",
+        "..rrrr.r.",
+        ".....r.r.",
+        "......r..",
     ),
     ("square", "side"): (
-        "...........",
-        "...........",
-        "...........",
-        "...........",
-        "......rrr..",
-        "..rrrrr.r..",
-        "......r.r..",
-        "......rrr..",
+        ".........",
+        ".........",
+        ".........",
+        ".....rrr.",
+        "..rrrr.r.",
+        ".....r.r.",
+        ".....rrr.",
     ),
 }
 
@@ -1327,7 +1308,7 @@ class Figure:
         if part == "head":
             return self.head
         if part == "torso":
-            return (12 if self.facing == SIDE else 11, TORSO_TOP + self.upper)
+            return (12, TORSO_TOP + self.upper)
         # Hair and headwear sit one cell left of and two above the head.
         return (self.head[0] - 1, self.head[1] - 2)
 
@@ -1377,9 +1358,9 @@ class Figure:
             feet["right" if self.pose.lead == 0 else "left"] = SHOE_TOP - 1
         elif self.pose.legs == "passing":
             feet["right" if self.pose.lead == 0 else "left"] = SHOE_TOP - 2
-        cells = block(12, top, 19, 38, "l")
+        cells = block(12, top, 19, top + 1, "l")
         for side, foot in feet.items():
-            leg = block(12, 39, 14, foot - 1, "l")
+            leg = block(12, top + 2, 14, foot - 1, "l")
             leg.update(cells_of(SHOE_FRONT, 11, foot))
             cells.update(leg if side == "left" else mirrored(leg, self.width))
         return cells
@@ -1389,8 +1370,8 @@ class Figure:
         shoulder = TORSO_TOP + 1 + self.upper
         if pose in ("down", "breath", "short"):
             reach = shoulder + (5 if pose == "short" else 6)
-            arm = limb([(8, shoulder), (8, reach)], "t")
-            arm.update(block(8, reach + 2, 9, reach + 3, "s"))
+            arm = limb([(9, shoulder), (9, reach)], "t")
+            arm.update(block(9, reach + 2, 10, reach + 3, "s"))
             return arm
         if pose in ("rest", "type", "lap"):
             rows = DESK_ARMS[pose]
@@ -1398,29 +1379,29 @@ class Figure:
                 # From behind, the forearms reach away under the shoulders:
                 # only the upper arm shows, a cell shorter while it types.
                 rows = tuple(line[:2] for line in rows if line.startswith("tt"))
-            return cells_of(rows, 8, shoulder)
+            return cells_of(rows, 9, shoulder)
         if pose in ("raised", "waved"):
             if self.hand != STRAIGHT_HAND:
                 return self._bent_front_arm(pose, back, shoulder)
             top = self.head[1] - (9 if pose == "waved" else 8)
-            arm = limb([(22, shoulder), (23, shoulder - 3), (23, top + 2)], "t")
-            arm.update(block(23, top, 24, top + 1, "s"))
+            arm = limb([(21, shoulder), (22, shoulder - 3), (22, top + 2)], "t")
+            arm.update(block(22, top, 23, top + 1, "s"))
             return arm
         if pose == "clasp":
-            arm = limb([(8, shoulder), (8, shoulder + 5), (11, shoulder + 7)], "t")
+            arm = limb([(9, shoulder), (9, shoulder + 5), (12, shoulder + 7)], "t")
             if not back:
-                arm.update(block(13, shoulder + 7, 15, shoulder + 8, "s"))
+                arm.update(block(14, shoulder + 7, 15, shoulder + 8, "s"))
             return arm
         if pose == "carry":
-            arm = limb([(8, shoulder), (8, shoulder + 4), (10, shoulder + 6)], "t")
+            arm = limb([(9, shoulder), (9, shoulder + 4), (11, shoulder + 6)], "t")
             if not back:
-                arm.update(block(12, shoulder + 5, 13, shoulder + 6, "s"))
+                arm.update(block(13, shoulder + 5, 14, shoulder + 6, "s"))
             return arm
         if pose in CUP_SLEEVES:
             # Held in the right hand: the sleeve is drawn here as the left one,
             # then mirrored; the hand goes on with the cup (_front_prop).
             return limb([(x, shoulder + y) for x, y in CUP_SLEEVES[pose]], "t")
-        return limb([(8, shoulder), (8, shoulder + 6)], "t")
+        return limb([(9, shoulder), (9, shoulder + 6)], "t")
 
     def _bent_front_arm(self, pose: str, back: bool, shoulder: int) -> Cells:
         """The bent raised hand from the front or back, on the screen-right side
@@ -1434,7 +1415,7 @@ class Figure:
         thumb_top = self.head[1] - (BENT_THUMB_UP + (1 if pose == "waved" else 0))
         top = thumb_top + 1
         elbow = (BENT_ELBOW_X, shoulder - BENT_ELBOW_UP)
-        arm = limb([(BENT_ELBOW_X - BENT_ELBOW_UP, shoulder), elbow, (BENT_ELBOW_X, top + 4)], "t")
+        arm = limb([(BENT_ELBOW_X - BENT_ELBOW_UP - 1, shoulder), elbow, (BENT_ELBOW_X, top + 4)], "t")
         arm.update(block(BENT_ELBOW_X, top + 3, BENT_ELBOW_X + 1, top + 3, CUFF))
         arm.update(block(BENT_ELBOW_X - 1, top, BENT_ELBOW_X + 1, top + 2, "s"))
         arm[(BENT_ELBOW_X - 1 if back else BENT_ELBOW_X + 1, thumb_top)] = "s"
@@ -1447,7 +1428,7 @@ class Figure:
         if self.pose.prop == "paper":
             paper = cells_of(("pppppp", "pPPPPp", "pppppp", "pPPPpp", "pppppp", "pPPPPp"), 13, shoulder)
             painter.stamp(paper)
-            for hand in (block(11, shoulder + 4, 12, shoulder + 5, "s"), block(19, shoulder + 4, 20, shoulder + 5, "s")):
+            for hand in (block(12, shoulder + 4, 13, shoulder + 5, "s"), block(18, shoulder + 4, 19, shoulder + 5, "s")):
                 painter.stamp(hand)
         elif self.pose.prop in CUPS:
             # Over the head and inside the face's opening, so neither the
