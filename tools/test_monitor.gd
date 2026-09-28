@@ -207,7 +207,9 @@ func test_esc_and_the_key_map_go_to_the_terminal() -> void:
 	)
 	await _press_key(KEY_HOME)
 	_check(monitor.message_text().contains("Home/End/PgUp/PgDn/Insert/Delete can't be sent"), monitor.message_text())
-	await _press_key(KEY_V, 0x76, KEY_MASK_CTRL | KEY_MASK_SHIFT)
+	# The other system's paste chord is not a key here: Ctrl+Shift+V on macOS, Cmd+V elsewhere.
+	var not_paste := KEY_MASK_CTRL | KEY_MASK_SHIFT if OS.get_name() == "macOS" else KEY_MASK_META
+	await _press_key(KEY_V, 0x76, not_paste)
 	await _press_key(KEY_S, 0x73, KEY_MASK_META)
 	await _wait(0.4)
 	_eq(_inputs("control-b").size(), 10, "nothing more was sent")

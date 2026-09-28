@@ -109,6 +109,16 @@ jobs:
         # --export-pack needs no export templates; it proves the preset ships the art pack.
         run: timeout 300 make pack
 
+      - name: System packages
+        # fonts-noto-cjk: workspace and tab labels are often Chinese, and the
+        # runner has no CJK font, so they would come out as boxes; the art
+        # tests check the fallback covers them. The rest is for the captures:
+        # the software renderer gets a display.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1 libglx-mesa0 libgl1-mesa-dri \
+            libxcursor1 libxinerama1 libxrandr2 libxi6 fonts-noto-cjk
+
       - name: Client tests
         # The script and pack load checks ran as steps of their own above.
         env:
@@ -118,13 +128,7 @@ jobs:
       - name: Screenshot the showroom and the live office
         # Capturing needs a viewport, so the software renderer gets a display.
         # A picture of what the PR changed, on every PR. No golden compare yet.
-        run: |
-          sudo apt-get update
-          # fonts-noto-cjk: workspace and tab labels are often Chinese, and the
-          # runner has no CJK font, so they would come out as boxes.
-          sudo apt-get install -y xvfb libgl1 libglx-mesa0 libgl1-mesa-dri \
-            libxcursor1 libxinerama1 libxrandr2 libxi6 fonts-noto-cjk
-          timeout 300 make capture OUT="$RUNNER_TEMP/captures"
+        run: timeout 300 make capture OUT="$RUNNER_TEMP/captures"
 
       - name: Upload the screenshots
         uses: actions/upload-artifact@v4
