@@ -1,0 +1,191 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/people_showroom.gd" id="1_showroom"]
+
+[node name="PeopleShowroom" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_showroom")
+
+[node name="Backdrop" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_type_variation = &"ShowroomBackdrop"
+
+[node name="Page" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_type_variation = &"ShowroomMargin"
+
+[node name="Column" type="VBoxContainer" parent="Page"]
+layout_mode = 2
+theme_type_variation = &"ShowroomColumn"
+
+[node name="Controls" type="HBoxContainer" parent="Page/Column"]
+layout_mode = 2
+theme_type_variation = &"ShowroomRow"
+
+[node name="ViewLabel" type="Label" parent="Page/Column/Controls"]
+layout_mode = 2
+text = "view"
+
+[node name="View" type="OptionButton" parent="Page/Column/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"AttentionFilter"
+
+[node name="TrackLabel" type="Label" parent="Page/Column/Controls"]
+layout_mode = 2
+text = "track"
+
+[node name="Track" type="OptionButton" parent="Page/Column/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"AttentionFilter"
+
+[node name="FacingLabel" type="Label" parent="Page/Column/Controls"]
+layout_mode = 2
+text = "facing"
+
+[node name="Facing" type="OptionButton" parent="Page/Column/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"AttentionFilter"
+
+[node name="Play" type="Button" parent="Page/Column/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"AttentionAction"
+text = "pause"
+
+[node name="Status" type="Label" parent="Page/Column/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"ShowroomNote"
+horizontal_alignment = 2
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Wear" type="HBoxContainer" parent="Page/Column"]
+layout_mode = 2
+theme_type_variation = &"ShowroomRow"
+
+[node name="SkinLabel" type="Label" parent="Page/Column/Wear"]
+layout_mode = 2
+text = "skin"
+
+[node name="Skin" type="OptionButton" parent="Page/Column/Wear"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"AttentionFilter"
+
+[node name="HairStyleLabel" type="Label" parent="Page/Column/Wear"]
+layout_mode = 2
+text = "hair style"
+
+[node name="HairStyle" type="OptionButton" parent="Page/Column/Wear"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"AttentionFilter"
+
+[node name="HairColourLabel" type="Label" parent="Page/Column/Wear"]
+layout_mode = 2
+text = "hair colour"
+
+[node name="HairColour" type="OptionButton" parent="Page/Column/Wear"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"AttentionFilter"
+
+[node name="TopLabel" type="Label" parent="Page/Column/Wear"]
+layout_mode = 2
+text = "top"
+
+[node name="Top" type="OptionButton" parent="Page/Column/Wear"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"AttentionFilter"
+
+[node name="LegsLabel" type="Label" parent="Page/Column/Wear"]
+layout_mode = 2
+text = "legs"
+
+[node name="Legs" type="OptionButton" parent="Page/Column/Wear"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"AttentionFilter"
+
+[node name="HeadwearLabel" type="Label" parent="Page/Column/Wear"]
+layout_mode = 2
+text = "headwear"
+
+[node name="Headwear" type="OptionButton" parent="Page/Column/Wear"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"AttentionFilter"
+
+[node name="HeadwearColourLabel" type="Label" parent="Page/Column/Wear"]
+layout_mode = 2
+text = "headwear colour"
+
+[node name="HeadwearColour" type="OptionButton" parent="Page/Column/Wear"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"AttentionFilter"
+
+[node name="GlassesLabel" type="Label" parent="Page/Column/Wear"]
+layout_mode = 2
+text = "glasses"
+
+[node name="Glasses" type="OptionButton" parent="Page/Column/Wear"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"AttentionFilter"
+
+[node name="Stage" type="PanelContainer" parent="Page/Column"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_type_variation = &"ShowroomStage"
+
+[node name="StageScroll" type="ScrollContainer" parent="Page/Column/Stage"]
+layout_mode = 2
+
+[node name="StageMargin" type="MarginContainer" parent="Page/Column/Stage/StageScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"ShowroomMargin"
+
+[node name="Grid" type="GridContainer" parent="Page/Column/Stage/StageScroll/StageMargin"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 0
+theme_type_variation = &"ShowroomGrid"
+columns = 12
+
+[node name="Frames" type="HFlowContainer" parent="Page/Column/Stage/StageScroll/StageMargin"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_type_variation = &"ShowroomFlow"
+
+[node name="Options" type="HFlowContainer" parent="Page/Column/Stage/StageScroll/StageMargin"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_type_variation = &"ShowroomFlow"

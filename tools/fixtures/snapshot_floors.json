@@ -1,0 +1,388 @@
+{
+ "_comment": "One machine, many floors: five workspaces out of number order, several tabs, herdr focus on floor 1 while blocked and UNREAD agents sit on floors 2 and 3, a floor without agents (notes), a CJK label and a launch_pending agent. Floor 1 names its open tab, floor 3 stands in a linked worktree and has its second tab open, and floor 2 names no open tab at all. Synthetic.",
+ "snapshot": {
+  "version": "0.9.0",
+  "protocol": 22,
+  "focused_workspace_id": "api",
+  "focused_tab_id": "api:t1",
+  "focused_pane_id": "api:p1",
+  "workspaces": [
+   {
+    "workspace_id": "web",
+    "number": 2,
+    "label": "web",
+    "focused": false
+   },
+   {
+    "workspace_id": "api",
+    "number": 1,
+    "label": "api",
+    "focused": true,
+    "active_tab_id": "api:t1",
+    "worktree": {
+     "repo_key": "fixture/herdstead",
+     "repo_name": "herdstead",
+     "repo_root": "/home/tester/herdstead",
+     "checkout_path": "/home/tester/herdstead",
+     "is_linked_worktree": false
+    }
+   },
+   {
+    "workspace_id": "infra",
+    "number": 3,
+    "label": "infra",
+    "focused": false,
+    "active_tab_id": "infra:t2",
+    "worktree": {
+     "repo_key": "fixture/ops-tools",
+     "repo_name": "ops-tools",
+     "repo_root": "/home/tester/ops-tools",
+     "checkout_path": "/home/tester/.worktrees/lane-a",
+     "is_linked_worktree": true
+    }
+   },
+   {
+    "workspace_id": "notes",
+    "number": 4,
+    "label": "notes",
+    "focused": false
+   },
+   {
+    "workspace_id": "data",
+    "number": 5,
+    "label": "数据 pipeline",
+    "focused": false
+   }
+  ],
+  "tabs": [
+   {
+    "tab_id": "api:t1",
+    "workspace_id": "api",
+    "number": 1,
+    "label": "main"
+   },
+   {
+    "tab_id": "api:t2",
+    "workspace_id": "api",
+    "number": 2,
+    "label": "tests"
+   },
+   {
+    "tab_id": "web:t2",
+    "workspace_id": "web",
+    "number": 2,
+    "label": "logs"
+   },
+   {
+    "tab_id": "web:t1",
+    "workspace_id": "web",
+    "number": 1,
+    "label": "ui"
+   },
+   {
+    "tab_id": "infra:t1",
+    "workspace_id": "infra",
+    "number": 1,
+    "label": "deploy"
+   },
+   {
+    "tab_id": "infra:t2",
+    "workspace_id": "infra",
+    "number": 2,
+    "label": "review"
+   },
+   {
+    "tab_id": "notes:t1",
+    "workspace_id": "notes",
+    "number": 1,
+    "label": "scratch"
+   },
+   {
+    "tab_id": "data:t1",
+    "workspace_id": "data",
+    "number": 1,
+    "label": "etl"
+   }
+  ],
+  "panes": [
+   {
+    "pane_id": "api:p1",
+    "workspace_id": "api",
+    "tab_id": "api:t1",
+    "cwd": "/home/tester/api",
+    "agent": "claude",
+    "agent_status": "working",
+    "terminal_title_stripped": "refactor the fleet",
+    "terminal_id": "term-api-p1"
+   },
+   {
+    "pane_id": "api:p2",
+    "workspace_id": "api",
+    "tab_id": "api:t1",
+    "cwd": "/home/tester/api",
+    "agent": "codex",
+    "agent_status": "idle",
+    "terminal_title_stripped": "codex",
+    "terminal_id": "term-api-p2"
+   },
+   {
+    "pane_id": "api:p3",
+    "workspace_id": "api",
+    "tab_id": "api:t1",
+    "cwd": "/home/tester/api",
+    "agent": null,
+    "agent_status": "idle",
+    "terminal_title_stripped": "zsh",
+    "terminal_id": "term-api-p3"
+   },
+   {
+    "pane_id": "api:p4",
+    "workspace_id": "api",
+    "tab_id": "api:t2",
+    "cwd": "/home/tester/api",
+    "agent": "pi",
+    "agent_status": "working",
+    "terminal_title_stripped": "pi",
+    "terminal_id": "term-api-p4"
+   },
+   {
+    "pane_id": "web:p1",
+    "workspace_id": "web",
+    "tab_id": "web:t1",
+    "cwd": "/home/tester/web",
+    "agent": "claude",
+    "agent_status": "blocked",
+    "terminal_title_stripped": "needs approval",
+    "terminal_id": "term-web-p1"
+   },
+   {
+    "pane_id": "web:p2",
+    "workspace_id": "web",
+    "tab_id": "web:t1",
+    "cwd": "/home/tester/web",
+    "agent": "codex",
+    "agent_status": "done",
+    "terminal_title_stripped": "codex",
+    "terminal_id": "term-web-p2"
+   },
+   {
+    "pane_id": "web:p3",
+    "workspace_id": "web",
+    "tab_id": "web:t2",
+    "cwd": "/home/tester/web",
+    "agent": null,
+    "agent_status": "idle",
+    "terminal_title_stripped": "zsh",
+    "terminal_id": "term-web-p3"
+   },
+   {
+    "pane_id": "infra:p1",
+    "workspace_id": "infra",
+    "tab_id": "infra:t1",
+    "cwd": "/home/tester/infra",
+    "agent": "pi",
+    "agent_status": "blocked",
+    "terminal_title_stripped": "pi",
+    "terminal_id": "term-infra-p1"
+   },
+   {
+    "pane_id": "infra:p2",
+    "workspace_id": "infra",
+    "tab_id": "infra:t2",
+    "cwd": "/home/tester/infra",
+    "agent": "codex",
+    "agent_status": "done",
+    "terminal_title_stripped": "codex",
+    "terminal_id": "term-infra-p2"
+   },
+   {
+    "pane_id": "infra:p3",
+    "workspace_id": "infra",
+    "tab_id": "infra:t2",
+    "cwd": "/home/tester/infra",
+    "agent": "claude",
+    "agent_status": "idle",
+    "terminal_title_stripped": "claude",
+    "terminal_id": "term-infra-p3"
+   },
+   {
+    "pane_id": "notes:p1",
+    "workspace_id": "notes",
+    "tab_id": "notes:t1",
+    "cwd": "/home/tester/notes",
+    "agent": null,
+    "agent_status": "idle",
+    "terminal_title_stripped": "zsh",
+    "terminal_id": "term-notes-p1"
+   },
+   {
+    "pane_id": "data:p1",
+    "workspace_id": "data",
+    "tab_id": "data:t1",
+    "cwd": "/home/tester/data",
+    "agent": "claude",
+    "agent_status": "working",
+    "terminal_title_stripped": "claude",
+    "terminal_id": "term-data-p1"
+   },
+   {
+    "pane_id": "data:p2",
+    "workspace_id": "data",
+    "tab_id": "data:t1",
+    "cwd": "/home/tester/data",
+    "agent": "codex",
+    "agent_status": "idle",
+    "terminal_title_stripped": "codex",
+    "terminal_id": "term-data-p2"
+   }
+  ],
+  "layouts": [
+   {
+    "workspace_id": "api",
+    "tab_id": "api:t1",
+    "panes": [
+     {
+      "pane_id": "api:p1",
+      "rect": {
+       "x": 0,
+       "y": 0,
+       "width": 80,
+       "height": 80
+      }
+     },
+     {
+      "pane_id": "api:p2",
+      "rect": {
+       "x": 80,
+       "y": 0,
+       "width": 80,
+       "height": 40
+      }
+     },
+     {
+      "pane_id": "api:p3",
+      "rect": {
+       "x": 80,
+       "y": 40,
+       "width": 80,
+       "height": 40
+      }
+     }
+    ]
+   }
+  ],
+  "agents": [
+   {
+    "pane_id": "api:p1",
+    "workspace_id": "api",
+    "tab_id": "api:t1",
+    "cwd": "/home/tester/api",
+    "agent": "claude",
+    "agent_status": "working",
+    "terminal_title_stripped": "refactor the fleet",
+    "terminal_id": "term-api-p1",
+    "state_change_seq": 1
+   },
+   {
+    "pane_id": "api:p2",
+    "workspace_id": "api",
+    "tab_id": "api:t1",
+    "cwd": "/home/tester/api",
+    "agent": "codex",
+    "agent_status": "idle",
+    "terminal_title_stripped": "codex",
+    "terminal_id": "term-api-p2",
+    "state_change_seq": 1
+   },
+   {
+    "pane_id": "api:p4",
+    "workspace_id": "api",
+    "tab_id": "api:t2",
+    "cwd": "/home/tester/api",
+    "agent": "pi",
+    "agent_status": "working",
+    "terminal_title_stripped": "pi",
+    "terminal_id": "term-api-p4",
+    "state_change_seq": 1
+   },
+   {
+    "pane_id": "web:p1",
+    "workspace_id": "web",
+    "tab_id": "web:t1",
+    "cwd": "/home/tester/web",
+    "agent": "claude",
+    "agent_status": "blocked",
+    "terminal_title_stripped": "needs approval",
+    "terminal_id": "term-web-p1",
+    "state_change_seq": 1
+   },
+   {
+    "pane_id": "web:p2",
+    "workspace_id": "web",
+    "tab_id": "web:t1",
+    "cwd": "/home/tester/web",
+    "agent": "codex",
+    "agent_status": "done",
+    "terminal_title_stripped": "codex",
+    "terminal_id": "term-web-p2",
+    "state_change_seq": 1
+   },
+   {
+    "pane_id": "infra:p1",
+    "workspace_id": "infra",
+    "tab_id": "infra:t1",
+    "cwd": "/home/tester/infra",
+    "agent": "pi",
+    "agent_status": "blocked",
+    "terminal_title_stripped": "pi",
+    "terminal_id": "term-infra-p1",
+    "state_change_seq": 1
+   },
+   {
+    "pane_id": "infra:p2",
+    "workspace_id": "infra",
+    "tab_id": "infra:t2",
+    "cwd": "/home/tester/infra",
+    "agent": "codex",
+    "agent_status": "done",
+    "terminal_title_stripped": "codex",
+    "terminal_id": "term-infra-p2",
+    "state_change_seq": 1
+   },
+   {
+    "pane_id": "infra:p3",
+    "workspace_id": "infra",
+    "tab_id": "infra:t2",
+    "cwd": "/home/tester/infra",
+    "agent": "claude",
+    "agent_status": "idle",
+    "terminal_title_stripped": "claude",
+    "terminal_id": "term-infra-p3",
+    "state_change_seq": 1
+   },
+   {
+    "pane_id": "data:p1",
+    "workspace_id": "data",
+    "tab_id": "data:t1",
+    "cwd": "/home/tester/data",
+    "agent": "claude",
+    "agent_status": "working",
+    "terminal_title_stripped": "claude",
+    "terminal_id": "term-data-p1",
+    "state_change_seq": 1
+   },
+   {
+    "pane_id": "data:p2",
+    "workspace_id": "data",
+    "tab_id": "data:t1",
+    "cwd": "/home/tester/data",
+    "agent": "codex",
+    "agent_status": "idle",
+    "terminal_title_stripped": "codex",
+    "terminal_id": "term-data-p2",
+    "state_change_seq": 1,
+    "launch_pending": true
+   }
+  ]
+ }
+}

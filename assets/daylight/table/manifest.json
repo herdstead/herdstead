@@ -1,0 +1,173 @@
+{
+  "schema_version": 2,
+  "density": 2,
+  "filter": "nearest",
+  "id": "daylight-shared-table",
+  "name": "Daylight Studio shared table",
+  "modules": {
+    "surface_left": {
+      "path": "surface_left.png",
+      "size": [
+        32,
+        80
+      ]
+    },
+    "surface_mid_a": {
+      "path": "surface_mid_a.png",
+      "size": [
+        32,
+        80
+      ]
+    },
+    "surface_mid_b": {
+      "path": "surface_mid_b.png",
+      "size": [
+        32,
+        80
+      ]
+    },
+    "surface_right": {
+      "path": "surface_right.png",
+      "size": [
+        32,
+        80
+      ]
+    },
+    "apron_left": {
+      "path": "apron_left.png",
+      "size": [
+        32,
+        3
+      ]
+    },
+    "apron_mid": {
+      "path": "apron_mid.png",
+      "size": [
+        32,
+        3
+      ]
+    },
+    "apron_right": {
+      "path": "apron_right.png",
+      "size": [
+        32,
+        3
+      ]
+    },
+    "divider_left": {
+      "path": "divider_left.png",
+      "size": [
+        32,
+        24
+      ]
+    },
+    "divider_mid": {
+      "path": "divider_mid.png",
+      "size": [
+        32,
+        24
+      ]
+    },
+    "divider_right": {
+      "path": "divider_right.png",
+      "size": [
+        32,
+        24
+      ]
+    },
+    "leg": {
+      "path": "leg.png",
+      "size": [
+        20,
+        40
+      ]
+    },
+    "bracket": {
+      "path": "bracket.png",
+      "size": [
+        12,
+        10
+      ]
+    },
+    "chair_front": {
+      "path": "chair_front.png",
+      "size": [
+        32,
+        48
+      ]
+    },
+    "chair_back": {
+      "path": "chair_back.png",
+      "size": [
+        32,
+        48
+      ]
+    },
+    "monitor_rear": {
+      "path": "monitor_rear.png",
+      "size": [
+        32,
+        32
+      ]
+    },
+    "monitor_front": {
+      "path": "monitor_front.png",
+      "size": [
+        32,
+        32
+      ]
+    },
+    "shell_rear": {
+      "path": "shell_rear.png",
+      "size": [
+        32,
+        32
+      ]
+    },
+    "shell_front": {
+      "path": "shell_front.png",
+      "size": [
+        32,
+        32
+      ]
+    }
+  },
+  "furniture": {
+    "chair": {
+      "size": [
+        32,
+        48
+      ],
+      "pivot": [
+        16,
+        46
+      ],
+      "views": {
+        "front": "chair_front",
+        "back": "chair_back"
+      }
+    },
+    "monitor": {
+      "size": [
+        32,
+        32
+      ],
+      "pivot": [
+        16,
+        30
+      ],
+      "views": {
+        "rear_shell": "monitor_rear",
+        "front_privacy": "monitor_front",
+        "shell_rear": "shell_rear",
+        "shell_front": "shell_front"
+      }
+    }
+  },
+  "assembly": {
+    "module_width": 32,
+    "surface_depth": 80,
+    "divider_height": 24,
+    "apron_height": 3
+  }
+}

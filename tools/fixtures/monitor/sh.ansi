@@ -1,0 +1,3 @@
+host1:spike-monitor viewer$ echo hello from sh
+hello from sh
+host1:spike-monitor viewer$ 

@@ -1,0 +1,39 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/bubble.gd" id="1_bubble"]
+
+[node name="Bubble" type="Node2D"]
+script = ExtResource("1_bubble")
+
+[node name="Frame" type="NinePatchRect" parent="."]
+unique_name_in_owner = true
+visible = false
+offset_right = 60.0
+offset_bottom = 28.0
+mouse_filter = 2
+
+[node name="Wait" type="Label" parent="."]
+unique_name_in_owner = true
+offset_left = 4.0
+offset_right = 48.0
+offset_bottom = 20.0
+mouse_filter = 2
+clip_text = true
+
+[node name="Track" type="ColorRect" parent="."]
+unique_name_in_owner = true
+visible = false
+offset_left = 4.0
+offset_top = 19.0
+offset_right = 44.0
+offset_bottom = 23.0
+mouse_filter = 2
+
+[node name="Fill" type="ColorRect" parent="."]
+unique_name_in_owner = true
+visible = false
+offset_left = 4.0
+offset_top = 19.0
+offset_right = 44.0
+offset_bottom = 23.0
+mouse_filter = 2

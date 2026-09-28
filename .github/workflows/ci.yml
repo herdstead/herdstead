@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Bump both together; the checksum comes from the release's SHA512-SUMS.txt.
+  GODOT_VERSION: 4.7.2-stable
+  GODOT_LINUX_SHA512: 9aa00f7a605200940bce3027a567b782f49bd8e940dd06ae9e987bd65aee1b1467edd56ed84fcdcbdd44354bf613bdbb4e5d2913e925850368e150c59ed54c65
+  # The Makefile is the one place the commands live; CI has no .venv.
+  PYTHON: python
+  GODOT: godot
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        # requirements-dev.txt pulls in requirements.txt plus gdtoolkit (gdlint).
+        run: pip install -r tools/requirements-dev.txt
+
+      - name: Lint GDScript
+        run: make lint
+
+      - name: Docs name only files and make targets that exist
+        # The entry docs; tools/check_docs.py lists them and says what counts.
+        run: make docs-check
+
+      - name: Rebuild every art pack and compare with the commit
+        # PNGs compare by pixels: Pillow's zlib output differs across platforms.
+        run: make art
+
+      - name: Art contract tests
+        run: make test-art
+
+      - name: Cache the Godot download
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/godot
+          # Bumping the version or the checksum above starts a new entry.
+          key: godot-${{ env.GODOT_VERSION }}-linux-x86_64-${{ env.GODOT_LINUX_SHA512 }}
+
+      - name: Install Godot ${{ env.GODOT_VERSION }} (headless)
+        run: |
+          archive="Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+          cached="$HOME/.cache/godot/$archive"
+          mkdir -p "$HOME/.cache/godot"
+          # The cache is not trusted: a restored archive is checked like a
+          # download, and one that does not match is fetched again.
+          if [ -f "$cached" ] && ! echo "${GODOT_LINUX_SHA512}  $cached" | sha512sum -c --quiet -; then
+            rm -f "$cached"
+          fi
+          if [ ! -f "$cached" ]; then
+            curl -fsSL --retry 3 -o "$cached" \
+              "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/${archive}"
+          fi
+          echo "${GODOT_LINUX_SHA512}  $cached" | sha512sum -c -
+          unzip -q "$cached" -d "$RUNNER_TEMP/godot"
+          sudo install -m 755 "$RUNNER_TEMP/godot/Godot_v${GODOT_VERSION}_linux.x86_64" /usr/local/bin/godot
+          godot --version
+
+      - name: Import project
+        run: |
+          timeout 300 make import 2>&1 | tee "$RUNNER_TEMP/import.log"
+          if grep -E 'SCRIPT ERROR|Parse Error' "$RUNNER_TEMP/import.log"; then exit 1; fi
+
+      - name: Every script and scene loads
+        # Also the gate for project.godot's warnings-as-errors: a warning set to
+        # Error makes the script fail to compile, and this is what loads them all.
+        run: |
+          timeout 120 make check-scripts 2>&1 | tee "$RUNNER_TEMP/scripts.log"
+          if grep -E 'SCRIPT ERROR|Parse Error' "$RUNNER_TEMP/scripts.log"; then exit 1; fi
+          grep -q SCRIPTS_OK "$RUNNER_TEMP/scripts.log"
+
+      - name: Run main scene once
+        # No herdr on CI: the office starts OFFLINE and --quit exits after the
+        # first frame. The target fails on any script error in the log.
+        run: timeout 120 make smoke
+
+      - name: Every art pack dresses the scenes
+        # The semantic IDs the scenes draw with live in scripts/art/art_contract.gd;
+        # this loads every pack in assets/ and checks it against them.
+        run: |
+          timeout 120 make check-packs 2>&1 | tee "$RUNNER_TEMP/packs.log"
+          if grep -E 'SCRIPT ERROR|Parse Error' "$RUNNER_TEMP/packs.log"; then exit 1; fi
+          grep -q PACKS_OK "$RUNNER_TEMP/packs.log"
+
+      - name: Export PCK and check its contents
+        # --export-pack needs no export templates; it proves the preset ships the art pack.
+        run: timeout 300 make pack
+
+      - name: Client tests
+        # The script and pack load checks ran as steps of their own above.
+        env:
+          HERDSTEAD_SKIP_LOAD_CHECKS: "1"
+        run: make test
+
+      - name: Screenshot the showroom and the live office
+        # Capturing needs a viewport, so the software renderer gets a display.
+        # A picture of what the PR changed, on every PR. No golden compare yet.
+        run: |
+          sudo apt-get update
+          # fonts-noto-cjk: workspace and tab labels are often Chinese, and the
+          # runner has no CJK font, so they would come out as boxes.
+          sudo apt-get install -y xvfb libgl1 libglx-mesa0 libgl1-mesa-dri \
+            libxcursor1 libxinerama1 libxrandr2 libxi6 fonts-noto-cjk
+          timeout 300 make capture OUT="$RUNNER_TEMP/captures"
+
+      - name: Upload the screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: captures
+          path: ${{ runner.temp }}/captures
+          if-no-files-found: warn

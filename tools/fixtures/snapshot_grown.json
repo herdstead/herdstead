@@ -1,0 +1,400 @@
+{
+ "_comment": "snapshot_basic after alpha:p2 closed and alpha:p4 / bravo:p2 opened. Synthetic.",
+ "snapshot": {
+  "version": "0.9.0",
+  "protocol": 22,
+  "focused_workspace_id": "alpha",
+  "focused_tab_id": "alpha:t1",
+  "focused_pane_id": "alpha:p1",
+  "workspaces": [
+   {
+    "workspace_id": "alpha",
+    "number": 1,
+    "label": "alpha lab",
+    "focused": true,
+    "pane_count": 3,
+    "tab_count": 1,
+    "active_tab_id": "alpha:t1",
+    "agent_status": "idle",
+    "worktree": {
+     "repo_key": "fixture/sample-repo",
+     "repo_name": "sample-repo",
+     "repo_root": "/home/tester/sample-repo",
+     "checkout_path": "/home/tester/sample-repo",
+     "is_linked_worktree": false
+    }
+   },
+   {
+    "workspace_id": "bravo",
+    "number": 2,
+    "label": "bravo desk",
+    "focused": false,
+    "pane_count": 2,
+    "tab_count": 1,
+    "active_tab_id": "bravo:t1",
+    "agent_status": "idle",
+    "worktree": null
+   }
+  ],
+  "tabs": [
+   {
+    "tab_id": "alpha:t1",
+    "workspace_id": "alpha",
+    "number": 1,
+    "label": "main",
+    "focused": true,
+    "pane_count": 3,
+    "agent_status": "idle"
+   },
+   {
+    "tab_id": "bravo:t1",
+    "workspace_id": "bravo",
+    "number": 1,
+    "label": "notes",
+    "focused": false,
+    "pane_count": 2,
+    "agent_status": "idle"
+   }
+  ],
+  "panes": [
+   {
+    "pane_id": "alpha:p1",
+    "terminal_id": "term-alpha-1",
+    "workspace_id": "alpha",
+    "tab_id": "alpha:t1",
+    "focused": true,
+    "cwd": "/home/tester/alpha",
+    "foreground_cwd": "/home/tester/alpha",
+    "agent": "claude",
+    "terminal_title": "claude session",
+    "terminal_title_stripped": "claude session",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "claude",
+     "kind": "session_id",
+     "value": "fake-session-alpha-1"
+    },
+    "agent_status": "working",
+    "scroll": {
+     "offset_from_bottom": 0,
+     "max_offset_from_bottom": 0,
+     "viewport_rows": 40
+    },
+    "revision": 1
+   },
+   {
+    "pane_id": "alpha:p3",
+    "terminal_id": "term-alpha-3",
+    "workspace_id": "alpha",
+    "tab_id": "alpha:t1",
+    "focused": false,
+    "cwd": "/home/tester/alpha",
+    "foreground_cwd": "/home/tester/alpha",
+    "agent": "codex",
+    "terminal_title": "codex session",
+    "terminal_title_stripped": "codex session",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "codex",
+     "kind": "session_id",
+     "value": "fake-session-alpha-3"
+    },
+    "agent_status": "idle",
+    "scroll": {
+     "offset_from_bottom": 0,
+     "max_offset_from_bottom": 0,
+     "viewport_rows": 40
+    },
+    "revision": 1
+   },
+   {
+    "pane_id": "alpha:p4",
+    "terminal_id": "term-alpha-4",
+    "workspace_id": "alpha",
+    "tab_id": "alpha:t1",
+    "focused": false,
+    "cwd": "/home/tester/alpha",
+    "foreground_cwd": "/home/tester/alpha",
+    "agent": "claude",
+    "terminal_title": "claude session",
+    "terminal_title_stripped": "claude session",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "claude",
+     "kind": "session_id",
+     "value": "fake-session-alpha-4"
+    },
+    "agent_status": "idle",
+    "scroll": {
+     "offset_from_bottom": 0,
+     "max_offset_from_bottom": 0,
+     "viewport_rows": 40
+    },
+    "revision": 1
+   },
+   {
+    "pane_id": "bravo:p1",
+    "terminal_id": "term-bravo-1",
+    "workspace_id": "bravo",
+    "tab_id": "bravo:t1",
+    "focused": false,
+    "cwd": "/home/tester/bravo",
+    "foreground_cwd": "/home/tester/bravo",
+    "agent": "pi",
+    "terminal_title": "pi session",
+    "terminal_title_stripped": "pi session",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "pi",
+     "kind": "session_id",
+     "value": "fake-session-bravo-1"
+    },
+    "agent_status": "blocked",
+    "scroll": {
+     "offset_from_bottom": 0,
+     "max_offset_from_bottom": 0,
+     "viewport_rows": 40
+    },
+    "revision": 1
+   },
+   {
+    "pane_id": "bravo:p2",
+    "terminal_id": "term-bravo-2",
+    "workspace_id": "bravo",
+    "tab_id": "bravo:t1",
+    "focused": false,
+    "cwd": "/home/tester/bravo",
+    "foreground_cwd": "/home/tester/bravo",
+    "agent": "codex",
+    "terminal_title": "codex session",
+    "terminal_title_stripped": "codex session",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "codex",
+     "kind": "session_id",
+     "value": "fake-session-bravo-2"
+    },
+    "agent_status": "working",
+    "scroll": {
+     "offset_from_bottom": 0,
+     "max_offset_from_bottom": 0,
+     "viewport_rows": 40
+    },
+    "revision": 1
+   }
+  ],
+  "layouts": [
+   {
+    "workspace_id": "alpha",
+    "tab_id": "alpha:t1",
+    "zoomed": false,
+    "area": {
+     "x": 0,
+     "y": 0,
+     "width": 160,
+     "height": 80
+    },
+    "focused_pane_id": "alpha:p1",
+    "panes": [
+     {
+      "pane_id": "alpha:p1",
+      "focused": true,
+      "rect": {
+       "x": 0,
+       "y": 0,
+       "width": 80,
+       "height": 40
+      }
+     },
+     {
+      "pane_id": "alpha:p3",
+      "focused": false,
+      "rect": {
+       "x": 80,
+       "y": 0,
+       "width": 80,
+       "height": 40
+      }
+     },
+     {
+      "pane_id": "alpha:p4",
+      "focused": false,
+      "rect": {
+       "x": 80,
+       "y": 40,
+       "width": 80,
+       "height": 40
+      }
+     }
+    ],
+    "splits": [
+     {
+      "id": "alpha:t1:s1",
+      "direction": "vertical",
+      "ratio": 0.5,
+      "rect": {
+       "x": 0,
+       "y": 0,
+       "width": 160,
+       "height": 80
+      }
+     }
+    ]
+   },
+   {
+    "workspace_id": "bravo",
+    "tab_id": "bravo:t1",
+    "zoomed": false,
+    "area": {
+     "x": 0,
+     "y": 0,
+     "width": 160,
+     "height": 80
+    },
+    "focused_pane_id": "bravo:p1",
+    "panes": [
+     {
+      "pane_id": "bravo:p2",
+      "focused": false,
+      "rect": {
+       "x": 80,
+       "y": 0,
+       "width": 80,
+       "height": 40
+      }
+     },
+     {
+      "pane_id": "bravo:p1",
+      "focused": false,
+      "rect": {
+       "x": 0,
+       "y": 0,
+       "width": 80,
+       "height": 40
+      }
+     }
+    ],
+    "splits": [
+     {
+      "id": "bravo:t1:s1",
+      "direction": "vertical",
+      "ratio": 0.5,
+      "rect": {
+       "x": 0,
+       "y": 0,
+       "width": 160,
+       "height": 80
+      }
+     }
+    ]
+   }
+  ],
+  "agents": [
+   {
+    "terminal_id": "term-alpha-1",
+    "agent": "claude",
+    "terminal_title": "claude session",
+    "terminal_title_stripped": "claude session",
+    "agent_status": "working",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "claude",
+     "kind": "session_id",
+     "value": "fake-session-alpha-1"
+    },
+    "workspace_id": "alpha",
+    "tab_id": "alpha:t1",
+    "pane_id": "alpha:p1",
+    "focused": true,
+    "cwd": "/home/tester/alpha",
+    "foreground_cwd": "/home/tester/alpha",
+    "revision": 1,
+    "state_change_seq": 1
+   },
+   {
+    "terminal_id": "term-alpha-3",
+    "agent": "codex",
+    "terminal_title": "codex session",
+    "terminal_title_stripped": "codex session",
+    "agent_status": "idle",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "codex",
+     "kind": "session_id",
+     "value": "fake-session-alpha-3"
+    },
+    "workspace_id": "alpha",
+    "tab_id": "alpha:t1",
+    "pane_id": "alpha:p3",
+    "focused": false,
+    "cwd": "/home/tester/alpha",
+    "foreground_cwd": "/home/tester/alpha",
+    "revision": 1,
+    "state_change_seq": 1
+   },
+   {
+    "terminal_id": "term-alpha-4",
+    "agent": "claude",
+    "terminal_title": "claude session",
+    "terminal_title_stripped": "claude session",
+    "agent_status": "idle",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "claude",
+     "kind": "session_id",
+     "value": "fake-session-alpha-4"
+    },
+    "workspace_id": "alpha",
+    "tab_id": "alpha:t1",
+    "pane_id": "alpha:p4",
+    "focused": false,
+    "cwd": "/home/tester/alpha",
+    "foreground_cwd": "/home/tester/alpha",
+    "revision": 1,
+    "state_change_seq": 1
+   },
+   {
+    "terminal_id": "term-bravo-1",
+    "agent": "pi",
+    "terminal_title": "pi session",
+    "terminal_title_stripped": "pi session",
+    "agent_status": "blocked",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "pi",
+     "kind": "session_id",
+     "value": "fake-session-bravo-1"
+    },
+    "workspace_id": "bravo",
+    "tab_id": "bravo:t1",
+    "pane_id": "bravo:p1",
+    "focused": false,
+    "cwd": "/home/tester/bravo",
+    "foreground_cwd": "/home/tester/bravo",
+    "revision": 1,
+    "state_change_seq": 1
+   },
+   {
+    "terminal_id": "term-bravo-2",
+    "agent": "codex",
+    "terminal_title": "codex session",
+    "terminal_title_stripped": "codex session",
+    "agent_status": "working",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "codex",
+     "kind": "session_id",
+     "value": "fake-session-bravo-2"
+    },
+    "workspace_id": "bravo",
+    "tab_id": "bravo:t1",
+    "pane_id": "bravo:p2",
+    "focused": false,
+    "cwd": "/home/tester/bravo",
+    "foreground_cwd": "/home/tester/bravo",
+    "revision": 1,
+    "state_change_seq": 1
+   }
+  ]
+ }
+}

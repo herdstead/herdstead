@@ -1,0 +1,20 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/people/pixel_person.tscn" id="1_person"]
+
+[node name="ShowroomCell" type="VBoxContainer"]
+theme_type_variation = &"ShowroomCell"
+
+[node name="Figure" type="Control" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Stage" type="Node2D" parent="Figure"]
+
+[node name="Person" parent="Figure/Stage" instance=ExtResource("1_person")]
+
+[node name="Caption" type="Label" parent="."]
+layout_mode = 2
+horizontal_alignment = 1
+clip_text = true
+text_overrun_behavior = 3

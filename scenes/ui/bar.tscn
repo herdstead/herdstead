@@ -1,0 +1,117 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/bar.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/ui/counter.tscn" id="2_counter"]
+
+[node name="Bar" type="Control"]
+anchor_right = 1.0
+offset_bottom = 32.0
+grow_horizontal = 2
+script = ExtResource("1")
+
+[node name="Background" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_type_variation = &"BarBackground"
+
+[node name="Wordmark" type="Label" parent="."]
+unique_name_in_owner = true
+offset_left = 16.0
+offset_top = 7.0
+offset_right = 116.0
+offset_bottom = 27.0
+mouse_filter = 2
+theme_type_variation = &"Heading16Paper"
+text = "HERDSTEAD"
+
+[node name="Counters" type="HBoxContainer" parent="."]
+unique_name_in_owner = true
+anchor_right = 1.0
+offset_left = 120.0
+offset_top = 3.0
+offset_right = -152.0
+offset_bottom = 29.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/separation = 3
+
+[node name="Machines" parent="Counters" instance=ExtResource("2_counter")]
+unique_name_in_owner = true
+layout_mode = 2
+id = &"machines"
+title = "MACHINES"
+
+[node name="Blocked" parent="Counters" instance=ExtResource("2_counter")]
+unique_name_in_owner = true
+layout_mode = 2
+id = &"blocked"
+title = "BLOCKED"
+
+[node name="Done" parent="Counters" instance=ExtResource("2_counter")]
+unique_name_in_owner = true
+layout_mode = 2
+id = &"done"
+title = "DONE"
+
+[node name="Working" parent="Counters" instance=ExtResource("2_counter")]
+unique_name_in_owner = true
+layout_mode = 2
+id = &"working"
+title = "WORKING"
+
+[node name="Idle" parent="Counters" instance=ExtResource("2_counter")]
+unique_name_in_owner = true
+layout_mode = 2
+id = &"idle"
+title = "IDLE"
+
+[node name="Panes" parent="Counters" instance=ExtResource("2_counter")]
+unique_name_in_owner = true
+layout_mode = 2
+id = &"panes"
+title = "PANES"
+
+[node name="Chime" type="Button" parent="Counters"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Chime when an agent needs you while Herdstead is in the background"
+focus_mode = 0
+theme_type_variation = &"BarSwitch"
+text = "CHIME OFF"
+
+[node name="Lines" type="VBoxContainer" parent="."]
+unique_name_in_owner = true
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -148.0
+offset_top = 2.0
+offset_right = -16.0
+offset_bottom = 30.0
+grow_horizontal = 0
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="ThemeLine" type="Label" parent="Lines"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"LabelMuted"
+horizontal_alignment = 2
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="StatusLine" type="Label" parent="Lines"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"LabelCream"
+horizontal_alignment = 2
+clip_text = true
+text_overrun_behavior = 3

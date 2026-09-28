@@ -1,0 +1,30 @@
+# gdlint (gdtoolkit 4.5.0) config: gdtoolkit's defaults, minus what this project
+# deliberately does differently. `make lint` and CI run gdlint over scripts/ and
+# tools/. Everything not listed here keeps its default, so a new rule in a later
+# gdtoolkit version starts switched on.
+#
+# Dump the full default set with `.venv/bin/gdlint -d` (it writes a gdlintrc).
+
+# Default 100. The code is formatted by `gdformat --line-length=120` (`make fmt`,
+# checked by `make lint`). What is left over 120 is string literals gdformat
+# cannot break: assertion messages and one showroom caption, 147 at the longest.
+max-line-length: 150
+
+# Default 20. Test cases discover themselves by being public `test_` methods
+# (tools/test_base.gd), so a suite's method count is at least its case count,
+# and the suites carry their typed node and JSON helpers besides.
+# scripts/art/art_pack.gd is over the default too, because the pack is still the
+# one door to the art a scene asks for by semantic ID; the two companion
+# families and the entries themselves are classes of their own.
+# 60, not 50: the pixel people suite has more than 50 cases.
+max-public-methods: 60
+
+# Default 1000. Every test suite is over it and none is near 2000; exact counts
+# are not repeated here because they move with every change. A suite is split
+# when it nears the cap (as tools/test_bubbles.gd and tools/test_raw_input.gd
+# were), its cases moved unchanged, each new suite with its own fakes and
+# closing case. Splitting one is a real change with its own risk, not a lint fix.
+# The incremental suite's helpers (the office it drives, the rebuild it compares
+# with, input events, typed lookups) live in tools/office_test_base.gd for the
+# same reason, and every case stayed in the suite.
+max-file-lines: 2000

@@ -1,0 +1,56 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/agent_list_group.gd" id="1"]
+
+[node name="AgentListGroup" type="Button"]
+custom_minimum_size = Vector2(0, 16)
+offset_right = 128.0
+offset_bottom = 16.0
+size_flags_horizontal = 3
+focus_mode = 0
+theme_type_variation = &"ListGroup"
+script = ExtResource("1")
+
+[node name="Line" type="HBoxContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 1.0
+offset_right = -2.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Indent" type="PanelContainer" parent="Line"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"ListIndent0"
+
+[node name="Chevron" type="Label" parent="Line"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(9, 12)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_type_variation = &"ListChevron"
+text = "▼"
+
+[node name="Title" type="Label" parent="Line"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+mouse_filter = 2
+theme_type_variation = &"LabelWoodDark"
+text_overrun_behavior = 3
+
+[node name="Count" type="Label" parent="Line"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_type_variation = &"LabelSlate"

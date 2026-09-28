@@ -1,0 +1,600 @@
+{
+  "schema_version": 2,
+  "density": 2,
+  "filter": "nearest",
+  "id": "daylight",
+  "name": "Daylight Studio",
+  "tile_size": 32,
+  "atlas_size": [
+    256,
+    128
+  ],
+  "palette": {
+    "ink": "26363b",
+    "deep": "1b252b",
+    "slate": "4d5b61",
+    "cream": "f6e8c8",
+    "paper": "fff4dc",
+    "plaster": "e6d5b3",
+    "cream_shadow": "c6b590",
+    "wood_light": "e4b779",
+    "wood": "c58d55",
+    "wood_shadow": "916441",
+    "wood_dark": "664b37",
+    "floor": "cda36e",
+    "floor_light": "d5ad7b",
+    "floor_dark": "bc935f",
+    "sage": "82947a",
+    "sage_light": "a8b295",
+    "sage_dark": "627861",
+    "sky": "9ec8d5",
+    "sky_light": "cae3df",
+    "sky_dark": "6e969e",
+    "terra": "bf7052",
+    "terra_light": "df9270",
+    "teal": "4b8e90",
+    "teal_light": "76afab",
+    "teal_dark": "32646c",
+    "lilac": "9183a6",
+    "lilac_light": "b2a1c6",
+    "lilac_dark": "675d84",
+    "skin": "eab783",
+    "skin_shadow": "be835b",
+    "skin_light": "f6d4a1",
+    "hair": "624c3f",
+    "hair_dark": "433b35",
+    "hair_light": "88644a",
+    "jacket": "535e66",
+    "jacket_light": "7c878d",
+    "working": "69a393",
+    "blocked": "e8b74a",
+    "unread": "71ade0",
+    "muted": "a0a9ad",
+    "leaf": "637b43",
+    "leaf_light": "92a154",
+    "leaf_dark": "445d3e",
+    "brick": "9d6546",
+    "task_light": "f5c36a",
+    "contact_shadow": "7b583d",
+    "brass_light": "ccb266",
+    "brass": "a58c3e",
+    "brass_dark": "6c5c2b"
+  },
+  "tiles": {
+    "floor.wood_a": {
+      "cell": [
+        0,
+        0
+      ]
+    },
+    "floor.wood_b": {
+      "cell": [
+        1,
+        0
+      ]
+    },
+    "floor.wood_c": {
+      "cell": [
+        2,
+        0
+      ]
+    },
+    "floor.walkway": {
+      "cell": [
+        3,
+        0
+      ]
+    },
+    "rug.top_left": {
+      "cell": [
+        4,
+        0
+      ]
+    },
+    "rug.top_center": {
+      "cell": [
+        5,
+        0
+      ]
+    },
+    "rug.top_right": {
+      "cell": [
+        6,
+        0
+      ]
+    },
+    "rug.middle_left": {
+      "cell": [
+        7,
+        0
+      ]
+    },
+    "rug.middle_center": {
+      "cell": [
+        0,
+        1
+      ]
+    },
+    "rug.middle_right": {
+      "cell": [
+        1,
+        1
+      ]
+    },
+    "rug.bottom_left": {
+      "cell": [
+        2,
+        1
+      ]
+    },
+    "rug.bottom_center": {
+      "cell": [
+        3,
+        1
+      ]
+    },
+    "rug.bottom_right": {
+      "cell": [
+        4,
+        1
+      ]
+    },
+    "wall.cap_left": {
+      "cell": [
+        5,
+        1
+      ]
+    },
+    "wall.cap_center": {
+      "cell": [
+        6,
+        1
+      ]
+    },
+    "wall.cap_right": {
+      "cell": [
+        7,
+        1
+      ]
+    },
+    "wall.face_left": {
+      "cell": [
+        0,
+        2
+      ]
+    },
+    "wall.face_center": {
+      "cell": [
+        1,
+        2
+      ]
+    },
+    "wall.face_right": {
+      "cell": [
+        2,
+        2
+      ]
+    },
+    "wall.side_left": {
+      "cell": [
+        3,
+        2
+      ]
+    },
+    "wall.side_right": {
+      "cell": [
+        4,
+        2
+      ]
+    },
+    "wall.front_left": {
+      "cell": [
+        5,
+        2
+      ]
+    },
+    "wall.front_center": {
+      "cell": [
+        6,
+        2
+      ]
+    },
+    "wall.front_right": {
+      "cell": [
+        7,
+        2
+      ]
+    },
+    "wall.threshold": {
+      "cell": [
+        0,
+        3
+      ]
+    },
+    "wall.cap_t_left": {
+      "cell": [
+        1,
+        3
+      ]
+    },
+    "wall.face_t_left": {
+      "cell": [
+        2,
+        3
+      ]
+    },
+    "wall.cap_end_right": {
+      "cell": [
+        3,
+        3
+      ]
+    },
+    "wall.face_end_right": {
+      "cell": [
+        4,
+        3
+      ]
+    }
+  },
+  "props": {
+    "cabinet": {
+      "path": "props/cabinet.png",
+      "size": [
+        48,
+        64
+      ],
+      "pivot": [
+        24,
+        60
+      ]
+    },
+    "window": {
+      "path": "props/window.png",
+      "size": [
+        64,
+        48
+      ],
+      "pivot": [
+        32,
+        44
+      ]
+    },
+    "door": {
+      "path": "props/door.png",
+      "size": [
+        48,
+        80
+      ],
+      "pivot": [
+        24,
+        76
+      ]
+    },
+    "plant": {
+      "path": "props/plant.png",
+      "size": [
+        32,
+        48
+      ],
+      "pivot": [
+        16,
+        46
+      ]
+    },
+    "plant_b": {
+      "path": "props/plant_b.png",
+      "size": [
+        32,
+        48
+      ],
+      "pivot": [
+        16,
+        46
+      ]
+    },
+    "wall_frame": {
+      "path": "props/wall_frame.png",
+      "size": [
+        40,
+        32
+      ],
+      "pivot": [
+        20,
+        30
+      ]
+    },
+    "sign": {
+      "path": "props/sign.png",
+      "size": [
+        64,
+        24
+      ],
+      "pivot": [
+        32,
+        22
+      ]
+    },
+    "desk_mug": {
+      "path": "props/desk_mug.png",
+      "size": [
+        24,
+        24
+      ],
+      "pivot": [
+        12,
+        22
+      ]
+    },
+    "desk_notebook": {
+      "path": "props/desk_notebook.png",
+      "size": [
+        24,
+        24
+      ],
+      "pivot": [
+        12,
+        22
+      ]
+    },
+    "desk_papers": {
+      "path": "props/desk_papers.png",
+      "size": [
+        24,
+        24
+      ],
+      "pivot": [
+        12,
+        22
+      ]
+    },
+    "desk_plant": {
+      "path": "props/desk_plant.png",
+      "size": [
+        24,
+        24
+      ],
+      "pivot": [
+        12,
+        22
+      ]
+    },
+    "desk_headphones": {
+      "path": "props/desk_headphones.png",
+      "size": [
+        24,
+        24
+      ],
+      "pivot": [
+        12,
+        22
+      ]
+    },
+    "cat_loaf": {
+      "path": "props/cat_loaf.png",
+      "size": [
+        24,
+        24
+      ],
+      "pivot": [
+        12,
+        22
+      ]
+    },
+    "cat_sleep": {
+      "path": "props/cat_sleep.png",
+      "size": [
+        24,
+        24
+      ],
+      "pivot": [
+        12,
+        22
+      ]
+    },
+    "cat_sit": {
+      "path": "props/cat_sit.png",
+      "size": [
+        24,
+        24
+      ],
+      "pivot": [
+        12,
+        22
+      ]
+    },
+    "done_stack": {
+      "path": "props/done_stack.png",
+      "size": [
+        24,
+        24
+      ],
+      "pivot": [
+        12,
+        22
+      ]
+    },
+    "reception": {
+      "path": "props/reception.png",
+      "size": [
+        48,
+        32
+      ],
+      "pivot": [
+        24,
+        30
+      ]
+    },
+    "pantry": {
+      "path": "props/pantry.png",
+      "size": [
+        64,
+        48
+      ],
+      "pivot": [
+        32,
+        46
+      ]
+    }
+  },
+  "ui": {
+    "working": {
+      "path": "ui/working.png",
+      "size": [
+        16,
+        16
+      ],
+      "pivot": [
+        8,
+        16
+      ]
+    },
+    "blocked": {
+      "path": "ui/blocked.png",
+      "size": [
+        16,
+        16
+      ],
+      "pivot": [
+        8,
+        16
+      ]
+    },
+    "unread": {
+      "path": "ui/unread.png",
+      "size": [
+        16,
+        16
+      ],
+      "pivot": [
+        8,
+        16
+      ]
+    },
+    "idle": {
+      "path": "ui/idle.png",
+      "size": [
+        16,
+        16
+      ],
+      "pivot": [
+        8,
+        16
+      ]
+    },
+    "unknown": {
+      "path": "ui/unknown.png",
+      "size": [
+        16,
+        16
+      ],
+      "pivot": [
+        8,
+        16
+      ]
+    },
+    "offline": {
+      "path": "ui/offline.png",
+      "size": [
+        16,
+        16
+      ],
+      "pivot": [
+        8,
+        16
+      ]
+    },
+    "starting": {
+      "path": "ui/starting.png",
+      "size": [
+        16,
+        16
+      ],
+      "pivot": [
+        8,
+        16
+      ]
+    },
+    "branch": {
+      "path": "ui/branch.png",
+      "size": [
+        16,
+        16
+      ],
+      "pivot": [
+        8,
+        16
+      ]
+    },
+    "connected": {
+      "path": "ui/connected.png",
+      "size": [
+        16,
+        16
+      ],
+      "pivot": [
+        8,
+        8
+      ]
+    },
+    "panel": {
+      "path": "ui/panel.png",
+      "size": [
+        32,
+        32
+      ],
+      "pivot": [
+        0,
+        0
+      ],
+      "nine_patch": [
+        4,
+        4,
+        4,
+        4
+      ]
+    },
+    "selection": {
+      "path": "ui/selection.png",
+      "size": [
+        64,
+        64
+      ],
+      "pivot": [
+        32,
+        60
+      ]
+    }
+  },
+  "states": {
+    "working": {
+      "animation": "working",
+      "badge": "working",
+      "label": "WORKING"
+    },
+    "blocked": {
+      "animation": "blocked",
+      "badge": "blocked",
+      "label": "NEEDS INPUT"
+    },
+    "done": {
+      "animation": "idle",
+      "badge": "unread",
+      "label": "UNREAD"
+    },
+    "idle": {
+      "animation": "idle",
+      "badge": "idle",
+      "label": "IDLE"
+    },
+    "unknown": {
+      "animation": "idle",
+      "badge": "unknown",
+      "label": "UNKNOWN"
+    }
+  },
+  "font": {
+    "path": "fonts/NunitoSans.ttf",
+    "license": "fonts/NunitoSans-OFL.txt"
+  },
+  "atlas": "terrain.png"
+}

@@ -1,0 +1,164 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/floor_plate.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/hd_panel.gd" id="2"]
+
+[node name="FloorPlate" type="Control"]
+custom_minimum_size = Vector2(160, 32)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 160.0
+offset_bottom = 32.0
+mouse_filter = 2
+script = ExtResource("1")
+title_share = 0.5
+repo_width = 96.0
+worktree_width = 80.0
+note_width = 240.0
+source_width = 96.0
+machine_width = 96.0
+
+[node name="Band" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 24.0
+mouse_filter = 2
+theme_type_variation = &"PlateBand"
+script = ExtResource("2")
+
+[node name="Line" type="HBoxContainer" parent="Band"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 10
+
+[node name="Heading" type="HBoxContainer" parent="Band/Line"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="Accent" type="Panel" parent="Band/Line/Heading"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(4, 12)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_type_variation = &"PlateAccent0"
+
+[node name="Title" type="Label" parent="Band/Line/Heading"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"PlateTitle"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Meta" type="MarginContainer" parent="Band/Line"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/margin_left = 0
+theme_override_constants/margin_top = 3
+theme_override_constants/margin_right = 0
+theme_override_constants/margin_bottom = 0
+
+[node name="Row" type="HBoxContainer" parent="Band/Line/Meta"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 16
+
+[node name="Items" type="HBoxContainer" parent="Band/Line/Meta/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 10
+
+[node name="WorktreeOf" type="Label" parent="Band/Line/Meta/Row/Items"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"LabelMuted"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Repo" type="HBoxContainer" parent="Band/Line/Meta/Row/Items"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="Branch" type="Control" parent="Band/Line/Meta/Row/Items/Repo"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(16, 0)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Mark" type="Sprite2D" parent="Band/Line/Meta/Row/Items/Repo/Branch"]
+unique_name_in_owner = true
+position = Vector2(8, 13)
+
+[node name="RepoLine" type="Label" parent="Band/Line/Meta/Row/Items/Repo"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"LabelWoodDark"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Note" type="Label" parent="Band/Line/Meta/Row/Items"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Machine" type="HBoxContainer" parent="Band/Line/Meta/Row/Items"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="MachineLine" type="Label" parent="Band/Line/Meta/Row/Items/Machine"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"LabelWoodDark"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="State" type="Label" parent="Band/Line/Meta/Row/Items/Machine"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"LabelWorking"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Counts" type="Label" parent="Band/Line/Meta/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"LabelSlate"
+horizontal_alignment = 2
+
+[node name="Problem" type="Label" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 8.0
+offset_top = 36.0
+offset_right = -8.0
+offset_bottom = 56.0
+mouse_filter = 2
+theme_type_variation = &"LabelBlocked"
+clip_text = true
+text_overrun_behavior = 3

@@ -1,0 +1,47 @@
+{
+ "_comment": "Pane ids as herdr may spell them, with C0 characters in them: a BEL and a vertical tab. Godot's JSON.stringify() leaves the first raw and writes the second as the invalid escape \\v, so a subscription naming them is valid JSON only through HerdrClient.request_line(). The office cleans them out of the ids it draws (ctl:p1, ctl:p2); herdr's own spelling is what requests carry.",
+ "snapshot": {
+  "focused_pane_id": "ctl:p3",
+  "workspaces": [
+   {
+    "workspace_id": "ctl",
+    "number": 1,
+    "label": "control ids",
+    "active_tab_id": "ctl:t1"
+   }
+  ],
+  "tabs": [
+   {
+    "tab_id": "ctl:t1",
+    "workspace_id": "ctl",
+    "number": 1,
+    "label": "main"
+   }
+  ],
+  "panes": [
+   {
+    "pane_id": "ctl:p1\u0007",
+    "terminal_id": "term-ctl-1",
+    "tab_id": "ctl:t1",
+    "workspace_id": "ctl",
+    "agent": "claude",
+    "agent_status": "working"
+   },
+   {
+    "pane_id": "ctl:p2\u000b",
+    "terminal_id": "term-ctl-2",
+    "tab_id": "ctl:t1",
+    "workspace_id": "ctl",
+    "agent_status": "idle"
+   },
+   {
+    "pane_id": "ctl:p3",
+    "terminal_id": "term-ctl-3",
+    "tab_id": "ctl:t1",
+    "workspace_id": "ctl",
+    "agent": "codex",
+    "agent_status": "idle"
+   }
+  ]
+ }
+}

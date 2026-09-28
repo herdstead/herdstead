@@ -1,0 +1,7 @@
+.godot/
+.venv/
+__pycache__/
+*.pyc
+build/
+.amp/portals/*
+.claude/worktrees/

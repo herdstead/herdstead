@@ -1,0 +1,234 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/floor_row.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/status_badge.gd" id="2_badge"]
+
+[node name="FloorRow" type="Button"]
+custom_minimum_size = Vector2(0, 26)
+offset_right = 112.0
+offset_bottom = 26.0
+focus_mode = 0
+theme_type_variation = &"FloorRow"
+script = ExtResource("1")
+
+[node name="Body" type="HBoxContainer" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_right = -2.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="Indent" type="Control" parent="Body"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(6, 0)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Stack" type="VBoxContainer" parent="Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="Line" type="HBoxContainer" parent="Body/Stack"]
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="Chip" type="Panel" parent="Body/Stack/Line"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(23, 14)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_type_variation = &"RowChip"
+
+[node name="Number" type="Label" parent="Body/Stack/Line/Chip"]
+unique_name_in_owner = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_top = 1.0
+offset_right = -1.0
+offset_bottom = -1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_type_variation = &"RowNumber"
+horizontal_alignment = 1
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="ChipGap" type="Control" parent="Body/Stack/Line"]
+custom_minimum_size = Vector2(5, 0)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="FloorLabel" type="Label" parent="Body/Stack/Line"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+mouse_filter = 2
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="IconGap" type="Control" parent="Body/Stack/Line"]
+custom_minimum_size = Vector2(3, 0)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Icons" type="HBoxContainer" parent="Body/Stack/Line"]
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_override_constants/separation = 1
+
+[node name="BlockedIcon" type="Control" parent="Body/Stack/Line/Icons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Sprite" type="Sprite2D" parent="Body/Stack/Line/Icons/BlockedIcon"]
+position = Vector2(8, 16)
+script = ExtResource("2_badge")
+
+[node name="BlockedCount" type="Label" parent="Body/Stack/Line/Icons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+
+[node name="MiddleGap" type="Control" parent="Body/Stack/Line/Icons"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+
+[node name="DoneIcon" type="Control" parent="Body/Stack/Line/Icons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(16, 16)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Sprite" type="Sprite2D" parent="Body/Stack/Line/Icons/DoneIcon"]
+position = Vector2(8, 16)
+script = ExtResource("2_badge")
+
+[node name="DoneCount" type="Label" parent="Body/Stack/Line/Icons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+
+[node name="Lights" type="HBoxContainer" parent="Body/Stack"]
+custom_minimum_size = Vector2(0, 9)
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="Pad" type="Control" parent="Body/Stack/Lights"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(28, 0)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Facade" type="PanelContainer" parent="Body/Stack/Lights"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 0
+mouse_filter = 2
+theme_type_variation = &"SectionFacade"
+
+[node name="Windows" type="HBoxContainer" parent="Body/Stack/Lights/Facade"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 1
+
+[node name="W0" type="Panel" parent="Body/Stack/Lights/Facade/Windows"]
+visible = false
+custom_minimum_size = Vector2(4, 5)
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"WindowDark"
+
+[node name="W1" type="Panel" parent="Body/Stack/Lights/Facade/Windows"]
+visible = false
+custom_minimum_size = Vector2(4, 5)
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"WindowDark"
+
+[node name="W2" type="Panel" parent="Body/Stack/Lights/Facade/Windows"]
+visible = false
+custom_minimum_size = Vector2(4, 5)
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"WindowDark"
+
+[node name="W3" type="Panel" parent="Body/Stack/Lights/Facade/Windows"]
+visible = false
+custom_minimum_size = Vector2(4, 5)
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"WindowDark"
+
+[node name="W4" type="Panel" parent="Body/Stack/Lights/Facade/Windows"]
+visible = false
+custom_minimum_size = Vector2(4, 5)
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"WindowDark"
+
+[node name="W5" type="Panel" parent="Body/Stack/Lights/Facade/Windows"]
+visible = false
+custom_minimum_size = Vector2(4, 5)
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"WindowDark"
+
+[node name="W6" type="Panel" parent="Body/Stack/Lights/Facade/Windows"]
+visible = false
+custom_minimum_size = Vector2(4, 5)
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"WindowDark"
+
+[node name="W7" type="Panel" parent="Body/Stack/Lights/Facade/Windows"]
+visible = false
+custom_minimum_size = Vector2(4, 5)
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"WindowDark"
+
+[node name="MoreGap" type="Control" parent="Body/Stack/Lights"]
+custom_minimum_size = Vector2(2, 0)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="MoreSlot" type="Control" parent="Body/Stack/Lights"]
+custom_minimum_size = Vector2(16, 9)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="More" type="Label" parent="Body/Stack/Lights/MoreSlot"]
+unique_name_in_owner = true
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_vertical = 2
+mouse_filter = 2
+theme_type_variation = &"WindowMore"
+vertical_alignment = 1

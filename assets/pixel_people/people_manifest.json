@@ -1,0 +1,524 @@
+{
+  "schema_version": 2,
+  "density": 2,
+  "filter": "nearest",
+  "frame_size": [
+    32,
+    48
+  ],
+  "pivot": [
+    16,
+    46
+  ],
+  "columns": 27,
+  "facings": [
+    "front",
+    "back",
+    "side"
+  ],
+  "side_faces": "right",
+  "layers": [
+    "legs",
+    "top",
+    "body",
+    "glasses",
+    "hair",
+    "headwear"
+  ],
+  "tracks": {
+    "stand_idle": {
+      "start": 0,
+      "facings": [
+        "front",
+        "back",
+        "side"
+      ],
+      "durations": [
+        0.9,
+        0.6
+      ],
+      "loop": true
+    },
+    "walk": {
+      "start": 2,
+      "facings": [
+        "front",
+        "back",
+        "side"
+      ],
+      "durations": [
+        0.14,
+        0.14,
+        0.14,
+        0.14
+      ],
+      "loop": true
+    },
+    "desk_idle": {
+      "start": 6,
+      "facings": [
+        "front",
+        "back"
+      ],
+      "durations": [
+        1.1,
+        0.7
+      ],
+      "loop": true
+    },
+    "desk_work": {
+      "start": 8,
+      "facings": [
+        "front",
+        "back"
+      ],
+      "durations": [
+        0.13,
+        0.13,
+        0.13,
+        0.13
+      ],
+      "loop": true
+    },
+    "desk_blocked": {
+      "start": 12,
+      "facings": [
+        "front",
+        "back"
+      ],
+      "durations": [
+        0.45,
+        0.45
+      ],
+      "loop": true
+    },
+    "stand_blocked": {
+      "start": 14,
+      "facings": [
+        "front",
+        "side"
+      ],
+      "durations": [
+        0.45,
+        0.45
+      ],
+      "loop": true
+    },
+    "desk_start": {
+      "start": 16,
+      "facings": [
+        "front",
+        "back"
+      ],
+      "durations": [
+        0.5,
+        0.5
+      ],
+      "loop": true
+    },
+    "stand_start": {
+      "start": 18,
+      "facings": [
+        "front",
+        "back"
+      ],
+      "durations": [
+        0.5,
+        0.5
+      ],
+      "loop": true
+    },
+    "carry_walk": {
+      "start": 20,
+      "facings": [
+        "front",
+        "back",
+        "side"
+      ],
+      "durations": [
+        0.15,
+        0.15,
+        0.15,
+        0.15
+      ],
+      "loop": true
+    },
+    "drink": {
+      "start": 24,
+      "facings": [
+        "front",
+        "side"
+      ],
+      "durations": [
+        1.0,
+        0.25,
+        0.9
+      ],
+      "loop": true
+    }
+  },
+  "state_tracks": {
+    "stand": {
+      "idle": "stand_idle",
+      "done": "stand_idle",
+      "unknown": "stand_idle",
+      "working": "stand_idle",
+      "blocked": "stand_blocked",
+      "starting": "stand_start"
+    },
+    "desk": {
+      "idle": "desk_idle",
+      "done": "desk_idle",
+      "unknown": "desk_idle",
+      "working": "desk_work",
+      "blocked": "desk_blocked",
+      "starting": "desk_start"
+    }
+  },
+  "slots": {
+    "skin": {
+      "layer": "body",
+      "role": "skin",
+      "swatches": {
+        "porcelain": [
+          "fbe4d2",
+          "efc6aa",
+          "d09c80"
+        ],
+        "fair": [
+          "f5d3b4",
+          "e2ae8a",
+          "bb7f60"
+        ],
+        "tan": [
+          "e2b48c",
+          "c68d65",
+          "9c6446"
+        ],
+        "brown": [
+          "b57c56",
+          "92603f",
+          "6d432b"
+        ],
+        "deep": [
+          "87583c",
+          "6b422b",
+          "52301f"
+        ]
+      }
+    },
+    "hair_style": {
+      "layer": "hair",
+      "shapes": {
+        "short": {},
+        "curl": {},
+        "long": {}
+      },
+      "none": true
+    },
+    "hair_colour": {
+      "layer": "hair",
+      "role": "hair",
+      "swatches": {
+        "brown": [
+          "85604a",
+          "684a39",
+          "4f372b"
+        ],
+        "auburn": [
+          "b0683f",
+          "88492c",
+          "5f311e"
+        ],
+        "umber": [
+          "735442",
+          "5c4435",
+          "4d392b"
+        ],
+        "black": [
+          "5d5868",
+          "4a4556",
+          "3f3a4b"
+        ],
+        "blonde": [
+          "ecd08a",
+          "cfae62",
+          "a5843f"
+        ],
+        "grey": [
+          "c4c0bc",
+          "a29d99",
+          "7e7975"
+        ]
+      }
+    },
+    "top": {
+      "layer": "top",
+      "role": "top",
+      "swatches": {
+        "slate": [
+          "8c9bb4",
+          "66758f",
+          "485269"
+        ],
+        "cream": [
+          "efe0bd",
+          "d3bf93",
+          "ad9567"
+        ],
+        "terra": [
+          "e58a64",
+          "c0643f",
+          "8e452c"
+        ],
+        "teal": [
+          "5fb6b0",
+          "3e8f8c",
+          "2a6866"
+        ],
+        "lilac": [
+          "c2a3e0",
+          "9a7cc0",
+          "705993"
+        ]
+      }
+    },
+    "legs": {
+      "layer": "legs",
+      "role": "legs",
+      "swatches": {
+        "charcoal": [
+          "62667a",
+          "4c4f61",
+          "3b3d4c"
+        ],
+        "brown": [
+          "85705a",
+          "685644",
+          "4e4033"
+        ],
+        "taupe": [
+          "74615d",
+          "5d4c49",
+          "4a3d3a"
+        ],
+        "denim": [
+          "5a6f9c",
+          "43547a",
+          "2f3b58"
+        ],
+        "plum": [
+          "6a607c",
+          "524a63",
+          "40394e"
+        ]
+      }
+    },
+    "headwear": {
+      "layer": "headwear",
+      "shapes": {
+        "cap": {},
+        "hood": {
+          "hides_hair": true
+        }
+      },
+      "none": true
+    },
+    "headwear_colour": {
+      "layer": "headwear",
+      "role": "hat",
+      "swatches": {
+        "slate": [
+          "8c9bb4",
+          "66758f",
+          "485269"
+        ],
+        "cream": [
+          "efe0bd",
+          "d3bf93",
+          "ad9567"
+        ],
+        "terra": [
+          "e58a64",
+          "c0643f",
+          "8e452c"
+        ],
+        "teal": [
+          "5fb6b0",
+          "3e8f8c",
+          "2a6866"
+        ],
+        "lilac": [
+          "c2a3e0",
+          "9a7cc0",
+          "705993"
+        ],
+        "sea": [
+          "4fa6a8",
+          "357e82",
+          "235a5e"
+        ]
+      }
+    },
+    "glasses": {
+      "layer": "glasses",
+      "shapes": {
+        "round": {},
+        "square": {}
+      },
+      "none": true
+    }
+  },
+  "default_look": {
+    "skin": "fair",
+    "hair_style": "short",
+    "hair_colour": "brown",
+    "top": "slate",
+    "legs": "charcoal",
+    "headwear": "none",
+    "headwear_colour": "sea",
+    "glasses": "none"
+  },
+  "variation": {
+    "skin": [
+      "porcelain",
+      "fair",
+      "tan",
+      "brown",
+      "deep"
+    ],
+    "hair_style": [
+      "short",
+      "curl",
+      "long"
+    ],
+    "hair_colour": [
+      "brown",
+      "auburn",
+      "umber",
+      "black",
+      "blonde",
+      "grey"
+    ],
+    "glasses": [
+      "none",
+      "none",
+      "none",
+      "none",
+      "none",
+      "none",
+      "none",
+      "none",
+      "none",
+      "none",
+      "round",
+      "square"
+    ]
+  },
+  "keys": {
+    "skin": [
+      "7ff5ff",
+      "2fd0e0",
+      "1690a0"
+    ],
+    "top": [
+      "8ff08a",
+      "4fc84a",
+      "2e8a2c"
+    ],
+    "legs": [
+      "8aa8ff",
+      "4d6fe0",
+      "2f45a0"
+    ],
+    "hair": [
+      "ff8ae0",
+      "d24fb0",
+      "8e2c78"
+    ],
+    "hat": [
+      "ffd76a",
+      "e0a93a",
+      "a8741c"
+    ]
+  },
+  "fixed": {
+    "ink": "2a2231",
+    "eye": "1b1624",
+    "catchlight": "f0f4fa",
+    "shoe": "4a3a3b",
+    "shoe_light": "6d5856",
+    "paper": "f6f2e6",
+    "paper_line": "b9b3a6",
+    "cup": "efebe3",
+    "cup_shade": "c2baae",
+    "coffee": "6b4430",
+    "lens": "cfe0e8",
+    "frame": "7d7c86"
+  },
+  "strips": [
+    "legs_charcoal",
+    "legs_brown",
+    "legs_taupe",
+    "legs_denim",
+    "legs_plum",
+    "top_slate",
+    "top_cream",
+    "top_terra",
+    "top_teal",
+    "top_lilac",
+    "body_porcelain",
+    "body_fair",
+    "body_tan",
+    "body_brown",
+    "body_deep",
+    "glasses_round",
+    "glasses_square",
+    "hair_short_brown",
+    "hair_short_auburn",
+    "hair_short_umber",
+    "hair_short_black",
+    "hair_short_blonde",
+    "hair_short_grey",
+    "hair_curl_brown",
+    "hair_curl_auburn",
+    "hair_curl_umber",
+    "hair_curl_black",
+    "hair_curl_blonde",
+    "hair_curl_grey",
+    "hair_long_brown",
+    "hair_long_auburn",
+    "hair_long_umber",
+    "hair_long_black",
+    "hair_long_blonde",
+    "hair_long_grey",
+    "headwear_cap_slate",
+    "headwear_cap_cream",
+    "headwear_cap_terra",
+    "headwear_cap_teal",
+    "headwear_cap_lilac",
+    "headwear_cap_sea",
+    "headwear_hood_slate",
+    "headwear_hood_cream",
+    "headwear_hood_terra",
+    "headwear_hood_teal",
+    "headwear_hood_lilac",
+    "headwear_hood_sea"
+  ],
+  "files": [
+    "front.png",
+    "back.png",
+    "side.png"
+  ],
+  "mock_files": [
+    "back/glasses_round.png",
+    "back/glasses_square.png",
+    "back/legs.png",
+    "front/glasses_round.png",
+    "front/glasses_square.png",
+    "front/legs.png",
+    "side/glasses_round.png",
+    "side/glasses_square.png",
+    "side/legs.png"
+  ]
+}

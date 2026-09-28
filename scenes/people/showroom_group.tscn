@@ -1,0 +1,12 @@
+[gd_scene format=3]
+
+[node name="ShowroomGroup" type="VBoxContainer"]
+theme_type_variation = &"ShowroomGroup"
+
+[node name="Title" type="Label" parent="."]
+layout_mode = 2
+theme_type_variation = &"ShowroomNote"
+
+[node name="Row" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_type_variation = &"ShowroomRow"

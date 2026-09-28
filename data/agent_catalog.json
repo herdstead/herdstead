@@ -1,0 +1,218 @@
+{
+  "schema_version": 1,
+  "source": {
+    "herdr_version": "0.9.1",
+    "registry": "https://github.com/herdrdev/herdr/blob/master/src/detect/mod.rs",
+    "screen_manifest_catalog": "https://herdr.dev/agent-detection/index.toml",
+    "logo_policy": "Third-party logos are kept as separate badges with source and license metadata; unsupported brands use project-generated monograms."
+  },
+  "agents": [
+    {
+      "id": "pi",
+      "name": "Pi",
+      "command": "pi",
+      "logo_source": "dashboard-icons",
+      "logo_url": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/pi-coding-agent.svg",
+      "logo_license": "Apache-2.0",
+      "look": { "top": "lilac", "legs": "plum", "headwear": "hood", "headwear_colour": "lilac" }
+    },
+    {
+      "id": "claude",
+      "name": "Claude Code",
+      "command": "claude",
+      "logo_source": "dashboard-icons",
+      "logo_url": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/claude-ai.svg",
+      "logo_license": "Apache-2.0",
+      "look": { "top": "terra", "legs": "taupe", "headwear": "none" }
+    },
+    {
+      "id": "codex",
+      "name": "Codex",
+      "command": "codex",
+      "logo_source": "dashboard-icons",
+      "logo_url": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/codex.svg",
+      "logo_license": "Apache-2.0",
+      "look": { "top": "teal", "legs": "denim", "headwear": "cap", "headwear_colour": "sea" }
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini CLI",
+      "command": "gemini",
+      "logo_source": "dashboard-icons",
+      "logo_url": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/google-gemini.svg",
+      "logo_license": "Apache-2.0",
+      "look": { "top": "cream", "legs": "brown", "headwear": "none" }
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor Agent CLI",
+      "command": "cursor-agent",
+      "logo_source": "simple-icons",
+      "logo_url": "https://cdn.simpleicons.org/cursor",
+      "logo_license": "Simple Icons project / see DISCLAIMER.md",
+      "look": { "top": "slate", "legs": "charcoal", "headwear": "none" }
+    },
+    {
+      "id": "devin",
+      "name": "Devin CLI",
+      "command": "devin",
+      "logo_source": "generated-monogram",
+      "logo_url": null,
+      "logo_license": "Herdstead-generated artwork",
+      "look": { "top": "slate", "legs": "charcoal", "headwear": "none" }
+    },
+    {
+      "id": "agy",
+      "name": "Antigravity CLI",
+      "command": "agy",
+      "logo_source": "generated-monogram",
+      "logo_url": null,
+      "logo_license": "Herdstead-generated artwork",
+      "look": { "top": "lilac", "legs": "plum", "headwear": "hood", "headwear_colour": "lilac" }
+    },
+    {
+      "id": "cline",
+      "name": "Cline",
+      "command": "cline",
+      "logo_source": "simple-icons",
+      "logo_url": "https://cdn.simpleicons.org/cline",
+      "logo_license": "Simple Icons project / see DISCLAIMER.md",
+      "look": { "top": "terra", "legs": "taupe", "headwear": "none" }
+    },
+    {
+      "id": "omp",
+      "name": "OMP",
+      "command": "omp",
+      "logo_source": "generated-monogram",
+      "logo_url": null,
+      "logo_license": "Herdstead-generated artwork",
+      "look": { "top": "teal", "legs": "denim", "headwear": "cap", "headwear_colour": "sea" }
+    },
+    {
+      "id": "opencode",
+      "name": "OpenCode",
+      "command": "opencode",
+      "logo_source": "dashboard-icons",
+      "logo_url": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/opencode.svg",
+      "logo_license": "Apache-2.0",
+      "look": { "top": "slate", "legs": "charcoal", "headwear": "none" }
+    },
+    {
+      "id": "copilot",
+      "name": "GitHub Copilot CLI",
+      "command": "copilot",
+      "logo_source": "dashboard-icons",
+      "logo_url": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/github-copilot.svg",
+      "logo_license": "Apache-2.0",
+      "look": { "top": "teal", "legs": "denim", "headwear": "cap", "headwear_colour": "sea" }
+    },
+    {
+      "id": "kimi",
+      "name": "Kimi Code CLI",
+      "command": "kimi",
+      "logo_source": "dashboard-icons",
+      "logo_url": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/kimi-ai.svg",
+      "logo_license": "Apache-2.0",
+      "look": { "top": "lilac", "legs": "plum", "headwear": "hood", "headwear_colour": "lilac" }
+    },
+    {
+      "id": "kiro",
+      "name": "Kiro CLI",
+      "command": "kiro-cli",
+      "logo_source": "generated-monogram",
+      "logo_url": null,
+      "logo_license": "Herdstead-generated artwork",
+      "look": { "top": "slate", "legs": "charcoal", "headwear": "none" }
+    },
+    {
+      "id": "droid",
+      "name": "Droid",
+      "command": "droid",
+      "logo_source": "generated-monogram",
+      "logo_url": null,
+      "logo_license": "Herdstead-generated artwork",
+      "look": { "top": "teal", "legs": "denim", "headwear": "cap", "headwear_colour": "sea" }
+    },
+    {
+      "id": "amp",
+      "name": "Amp",
+      "command": "amp",
+      "logo_source": "simple-icons",
+      "logo_url": "https://cdn.simpleicons.org/amp",
+      "logo_license": "Simple Icons project / see DISCLAIMER.md",
+      "look": { "top": "terra", "legs": "taupe", "headwear": "none" }
+    },
+    {
+      "id": "grok",
+      "name": "Grok CLI",
+      "command": "grok",
+      "logo_source": "dashboard-icons",
+      "logo_url": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/grok.svg",
+      "logo_license": "Apache-2.0",
+      "look": { "top": "slate", "legs": "charcoal", "headwear": "none" }
+    },
+    {
+      "id": "hermes",
+      "name": "Hermes Agent",
+      "command": "hermes",
+      "logo_source": "dashboard-icons",
+      "logo_url": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/hermes-icon.svg",
+      "logo_license": "Apache-2.0",
+      "look": { "top": "lilac", "legs": "plum", "headwear": "hood", "headwear_colour": "lilac" }
+    },
+    {
+      "id": "kilo",
+      "name": "Kilo Code CLI",
+      "command": "kilo",
+      "logo_source": "generated-monogram",
+      "logo_url": null,
+      "logo_license": "Herdstead-generated artwork",
+      "look": { "top": "teal", "legs": "denim", "headwear": "cap", "headwear_colour": "sea" }
+    },
+    {
+      "id": "qodercli",
+      "name": "Qoder CLI",
+      "command": "qodercli",
+      "logo_source": "generated-monogram",
+      "logo_url": null,
+      "logo_license": "Herdstead-generated artwork",
+      "look": { "top": "slate", "legs": "charcoal", "headwear": "none" }
+    },
+    {
+      "id": "qwen",
+      "name": "Qwen Code",
+      "command": "qwen",
+      "logo_source": "dashboard-icons",
+      "logo_url": "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/svg/qwen.svg",
+      "logo_license": "Apache-2.0",
+      "look": { "top": "lilac", "legs": "plum", "headwear": "hood", "headwear_colour": "lilac" }
+    },
+    {
+      "id": "letta",
+      "name": "Letta Code",
+      "command": "letta",
+      "logo_source": "generated-monogram",
+      "logo_url": null,
+      "logo_license": "Herdstead-generated artwork",
+      "look": { "top": "terra", "legs": "taupe", "headwear": "none" }
+    },
+    {
+      "id": "maki",
+      "name": "Maki",
+      "command": "maki",
+      "logo_source": "generated-monogram",
+      "logo_url": null,
+      "logo_license": "Herdstead-generated artwork",
+      "look": { "top": "slate", "legs": "charcoal", "headwear": "none" }
+    },
+    {
+      "id": "muse",
+      "name": "Muse",
+      "command": "muse",
+      "logo_source": "generated-monogram",
+      "logo_url": null,
+      "logo_license": "Herdstead-generated artwork",
+      "look": { "top": "terra", "legs": "taupe", "headwear": "none" }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+host1:spike-monitor viewer$ python3 /private/tmp/claude-000/-Users-viewer-space-herdstead/00000000-0000-0000-0000-000000
+000000/scratchpad/spike-monitor/torture.py
+16: ████████████████ bg
+256: ████████████████████████████████████████████████
+true: ████████████████████████████████████████████████
+bold dim italic under reverse strike combo
+CJK: 中文宽字符测试｜日本語かな｜한국어 end
+emoji: 😀 👍🏽 👨‍👩‍👧 🇨🇳 ✔ ⚠ end
+combining: é ä ñ end
+box: ┌─┬─┐ │ │ │ ╔═╗ ║x║ ╚═╝ ▁▂▃▄▅▆▇█
+tab:    A       B       C
+long: 012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123
+45678901234567890123456789012345678901234567890123456789012345678901234567890123456789
+host1:spike-monitor viewer$

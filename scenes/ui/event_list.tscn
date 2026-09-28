@@ -1,0 +1,60 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/event_list.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/ui/event_row.tscn" id="2"]
+
+[node name="EventList" type="PanelContainer"]
+offset_right = 144.0
+offset_bottom = 268.0
+theme_type_variation = &"HdPanel"
+script = ExtResource("1")
+row_scene = ExtResource("2")
+
+[node name="Frame" type="MarginContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 0
+theme_override_constants/margin_bottom = 5
+
+[node name="Body" type="VBoxContainer" parent="Frame"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 3
+
+[node name="Since" type="Label" parent="Frame/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"LabelSlate"
+text_overrun_behavior = 3
+
+[node name="Scroll" type="ScrollContainer" parent="Frame/Body"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 4
+
+[node name="RowsGap" type="MarginContainer" parent="Frame/Body/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_type_variation = &"DrawerRowsGap"
+
+[node name="Rows" type="VBoxContainer" parent="Frame/Body/Scroll/RowsGap"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="Empty" type="Label" parent="Frame/Body"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"LabelSlate"
+text = "No events yet."

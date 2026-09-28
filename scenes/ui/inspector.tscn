@@ -1,0 +1,875 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/inspector.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/status_badge.gd" id="2_badge"]
+[ext_resource type="Script" path="res://scripts/ui/launch_block.gd" id="3_launch"]
+[ext_resource type="Script" path="res://scripts/ui/card_details.gd" id="4_details"]
+
+[node name="Inspector" type="PanelContainer"]
+theme_type_variation = &"HdPanel"
+script = ExtResource("1")
+details_beside_launch_from = 640.0
+
+[node name="Frame" type="MarginContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 6
+theme_override_constants/margin_top = 2
+theme_override_constants/margin_right = 4
+theme_override_constants/margin_bottom = 2
+
+[node name="Row" type="HBoxContainer" parent="Frame"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="Stack" type="Control" parent="Frame/Row"]
+unique_name_in_owner = true
+clip_contents = true
+layout_mode = 2
+mouse_filter = 2
+size_flags_horizontal = 3
+
+[node name="Detail" type="HBoxContainer" parent="Frame/Row/Stack"]
+unique_name_in_owner = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+mouse_filter = 2
+grow_vertical = 2
+theme_override_constants/separation = 6
+script = ExtResource("4_details")
+
+[node name="Left" type="VBoxContainer" parent="Frame/Row/Stack/Detail"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="Title" type="Label" parent="Frame/Row/Stack/Detail/Left"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+mouse_filter = 1
+text = "AGENT"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Header" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Left"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 3
+
+[node name="PortraitArea" type="Control" parent="Frame/Row/Stack/Detail/Left/Header"]
+unique_name_in_owner = true
+clip_contents = true
+custom_minimum_size = Vector2(26, 48)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="PortraitHolder" type="Node2D" parent="Frame/Row/Stack/Detail/Left/Header/PortraitArea"]
+unique_name_in_owner = true
+position = Vector2(13, 47)
+
+[node name="Who" type="VBoxContainer" parent="Frame/Row/Stack/Detail/Left/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="NameRow" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Left/Header/Who"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="Provider" type="Label" parent="Frame/Row/Stack/Detail/Left/Header/Who/NameRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_type_variation = &"Heading16"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="BadgeSlot" type="Control" parent="Frame/Row/Stack/Detail/Left/Header/Who/NameRow"]
+custom_minimum_size = Vector2(16, 20)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Badge" type="Sprite2D" parent="Frame/Row/Stack/Detail/Left/Header/Who/NameRow/BadgeSlot"]
+unique_name_in_owner = true
+position = Vector2(8, 19)
+script = ExtResource("2_badge")
+
+[node name="CaptionRow" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Left/Header/Who"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="Caption" type="Label" parent="Frame/Row/Stack/Detail/Left/Header/Who/CaptionRow"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"LabelWoodShadow"
+
+[node name="Duration" type="Label" parent="Frame/Row/Stack/Detail/Left/Header/Who/CaptionRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_type_variation = &"LabelWoodShadow"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Place" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Left/Header/Who"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="Seat" type="Label" parent="Frame/Row/Stack/Detail/Left/Header/Who/Place"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 1
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Machine" type="Label" parent="Frame/Row/Stack/Detail/Left/Header/Who/Place"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.6
+mouse_filter = 1
+theme_type_variation = &"LabelWoodDark"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Footnote" type="Label" parent="Frame/Row/Stack/Detail/Left"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"LabelSlate"
+autowrap_mode = 3
+max_lines_visible = 2
+
+[node name="Middle" type="HBoxContainer" parent="Frame/Row/Stack/Detail"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="PreviewColumn" type="VBoxContainer" parent="Frame/Row/Stack/Detail/Middle"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="PreviewCaption" type="Label" parent="Frame/Row/Stack/Detail/Middle/PreviewColumn"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"LabelSlate"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="PreviewScreen" type="PanelContainer" parent="Frame/Row/Stack/Detail/Middle/PreviewColumn"]
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"PreviewScreen"
+
+[node name="Preview" type="Label" parent="Frame/Row/Stack/Detail/Middle/PreviewColumn/PreviewScreen"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"PreviewText"
+text = "
+
+
+
+
+
+
+
+
+
+
+
+"
+clip_text = true
+
+[node name="Answer" type="VBoxContainer" parent="Frame/Row/Stack/Detail/Middle"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 1
+
+[node name="Digits" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Middle/Answer"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 1
+
+[node name="Key1" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "1"
+
+[node name="Key2" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "2"
+
+[node name="Key3" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "3"
+
+[node name="Key4" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "4"
+
+[node name="Key5" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "5"
+
+[node name="Key6" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "6"
+
+[node name="Key7" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "7"
+
+[node name="Key8" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "8"
+
+[node name="Key9" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "9"
+
+[node name="Choices" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Middle/Answer"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 1
+
+[node name="KeyY" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Choices"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "y"
+
+[node name="KeyN" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Choices"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "n"
+
+[node name="KeyEnter" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Choices"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "⏎"
+
+[node name="Apart" type="Control" parent="Frame/Row/Stack/Detail/Middle/Answer/Choices"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+
+[node name="SendEsc" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Choices"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "Send Esc"
+
+[node name="Reply" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Middle/Answer"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="ReplyBox" type="LineEdit" parent="Frame/Row/Stack/Detail/Middle/Answer/Reply"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+focus_neighbor_left = NodePath(".")
+focus_neighbor_top = NodePath(".")
+focus_neighbor_right = NodePath(".")
+focus_neighbor_bottom = NodePath(".")
+focus_next = NodePath(".")
+focus_previous = NodePath(".")
+theme_type_variation = &"CardReply"
+placeholder_text = "Reply"
+keep_editing_on_text_submit = true
+context_menu_enabled = false
+emoji_menu_enabled = false
+middle_mouse_paste_enabled = false
+caret_blink = true
+
+[node name="SendLine" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Reply"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Send one line of text to this terminal, then Enter"
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "Send line"
+
+[node name="BestEffort" type="Label" parent="Frame/Row/Stack/Detail/Middle/Answer"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Before it sends, the card reads this terminal again and sends only if it still reads exactly as the preview you pressed on. That narrows the time in which the screen can change under you; it does not close it: between that re-read and the keys arriving, the question can still change to another one that ends the same way. herdr has no \"send only if the screen still reads so\"."
+mouse_filter = 1
+theme_type_variation = &"CardNote"
+text = "Checks the screen first; it can still change"
+autowrap_mode = 3
+max_lines_visible = 2
+
+[node name="Launch" type="VBoxContainer" parent="Frame/Row/Stack/Detail/Middle"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(108, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+script = ExtResource("3_launch")
+
+[node name="LaunchTitle" type="Label" parent="Frame/Row/Stack/Detail/Middle/Launch"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"LabelSlate"
+text = "START AGENT"
+autowrap_mode = 3
+text_overrun_behavior = 3
+max_lines_visible = 2
+
+[node name="LaunchKinds" type="HFlowContainer" parent="Frame/Row/Stack/Detail/Middle/Launch"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/h_separation = 1
+theme_override_constants/v_separation = 1
+
+[node name="Kind0" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchKinds"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+
+[node name="Kind1" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchKinds"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+
+[node name="Kind2" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchKinds"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+
+[node name="Kind3" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchKinds"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+
+[node name="Kind4" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchKinds"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+
+[node name="Kind5" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchKinds"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+
+[node name="Kind6" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchKinds"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+
+[node name="Kind7" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchKinds"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+
+[node name="SplitButton" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "New pane →"
+
+[node name="LaunchNote" type="Label" parent="Frame/Row/Stack/Detail/Middle/Launch"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"CardNote"
+text = "Types the kind + Enter in this terminal"
+autowrap_mode = 3
+max_lines_visible = 2
+
+[node name="LaunchScreen" type="PanelContainer" parent="Frame/Row/Stack/Detail/Middle/Launch"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"PreviewScreen"
+
+[node name="LaunchLine" type="Label" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchScreen"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"PreviewText"
+clip_text = true
+
+[node name="ManageRow" type="HFlowContainer" parent="Frame/Row/Stack/Detail/Middle/Launch"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/h_separation = 1
+theme_override_constants/v_separation = 1
+
+[node name="CloseButton" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/ManageRow"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "Close pane"
+
+[node name="SpaceButton" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/ManageRow"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "New space"
+
+[node name="WorktreeRow" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Middle/Launch"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 1
+
+[node name="BranchBox" type="LineEdit" parent="Frame/Row/Stack/Detail/Middle/Launch/WorktreeRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(36, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+focus_neighbor_left = NodePath(".")
+focus_neighbor_top = NodePath(".")
+focus_neighbor_right = NodePath(".")
+focus_neighbor_bottom = NodePath(".")
+focus_next = NodePath(".")
+focus_previous = NodePath(".")
+theme_type_variation = &"CardReply"
+placeholder_text = "branch"
+max_length = 64
+keep_editing_on_text_submit = true
+context_menu_enabled = false
+emoji_menu_enabled = false
+middle_mouse_paste_enabled = false
+caret_blink = true
+
+[node name="WorktreeButton" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/WorktreeRow"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_type_variation = &"CardKey"
+disabled = true
+text = "New worktree"
+
+[node name="ManageNote" type="Label" parent="Frame/Row/Stack/Detail/Middle/Launch"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"CardNote"
+text_overrun_behavior = 3
+max_lines_visible = 1
+
+[node name="More" type="Control" parent="Frame/Row/Stack/Detail"]
+unique_name_in_owner = true
+clip_contents = true
+layout_mode = 2
+mouse_filter = 2
+custom_minimum_size = Vector2(88, 0)
+
+[node name="MoreList" type="VBoxContainer" parent="Frame/Row/Stack/Detail/More"]
+unique_name_in_owner = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 1
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="PaneHeading" type="Label" parent="Frame/Row/Stack/Detail/More/MoreList"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+mouse_filter = 2
+text = "PANE"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="PaneId" type="Label" parent="Frame/Row/Stack/Detail/More/MoreList"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"LabelSlate"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="PaneLabel" type="Label" parent="Frame/Row/Stack/Detail/More/MoreList"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"LabelWoodDark"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Cwd" type="Label" parent="Frame/Row/Stack/Detail/More/MoreList"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"LabelSlate"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="ForegroundCwd" type="Label" parent="Frame/Row/Stack/Detail/More/MoreList"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"LabelSlate"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Session" type="Label" parent="Frame/Row/Stack/Detail/More/MoreList"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"LabelSlate"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="TitleHolder" type="Control" parent="Frame/Row/Stack/Detail/More/MoreList"]
+unique_name_in_owner = true
+clip_contents = true
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="TerminalTitle" type="Label" parent="Frame/Row/Stack/Detail/More/MoreList/TitleHolder"]
+unique_name_in_owner = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+autowrap_mode = 3
+autowrap_trim_flags = 3
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="Actions" type="VBoxContainer" parent="Frame/Row/Stack/Detail"]
+custom_minimum_size = Vector2(96, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 2
+
+[node name="TopRow" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="MonitorButton" type="Button" parent="Frame/Row/Stack/Detail/Actions/TopRow"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+tooltip_text = "M: open this pane's terminal in the monitor: its live screen, and every key you press goes to it (Ctrl+] closes)."
+focus_mode = 0
+theme_type_variation = &"CardHint"
+text = "Monitor ⤢"
+
+[node name="FoldButton" type="Button" parent="Frame/Row/Stack/Detail/Actions/TopRow"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_horizontal = 10
+tooltip_text = "Esc: fold the panel back to its one line. It reads nothing while folded; Enter opens it again."
+focus_mode = 0
+theme_type_variation = &"CardHint"
+text = "▾ Esc"
+
+[node name="AnswerButton" type="Button" parent="Frame/Row/Stack/Detail/Actions"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+tooltip_text = "Enter: answer this agent. Opens the answer keys and the reply box; nothing is sent until you press one of them."
+focus_mode = 0
+theme_type_variation = &"CardHint"
+text = "Answer ⏎"
+
+[node name="ActionGap" type="Control" parent="Frame/Row/Stack/Detail/Actions"]
+custom_minimum_size = Vector2(0, 2)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="FocusButton" type="Button" parent="Frame/Row/Stack/Detail/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "Switches the shared view of herdr to this pane: every terminal attached to it follows.
+It also clears UNREAD for every pane on this table, not just this one."
+focus_mode = 0
+theme_type_variation = &"CardAction"
+disabled = true
+text = "Switch herdr here"
+
+[node name="FocusNote" type="Label" parent="Frame/Row/Stack/Detail/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+tooltip_text = "herdr's focus is shared, and it marks the whole tab seen: switching here clears UNREAD for every pane on this table."
+mouse_filter = 1
+theme_type_variation = &"LabelSlate"
+text = "Clears table's UNREAD"
+
+[node name="Outcome" type="Label" parent="Frame/Row/Stack/Detail/Actions"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"CardOutcome"
+autowrap_mode = 3
+text_overrun_behavior = 3
+max_lines_visible = 2
+
+[node name="CompactRow" type="HBoxContainer" parent="Frame/Row/Stack"]
+unique_name_in_owner = true
+visible = false
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="CompactLine" type="Label" parent="Frame/Row/Stack/CompactRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 1
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="CompactWait" type="Label" parent="Frame/Row/Stack/CompactRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(36, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"LabelWoodShadow"
+clip_text = true
+
+[node name="StepBack" type="Button" parent="Frame/Row/Stack/CompactRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "The one before in NEXT's queue: picks them and shows their desk. It opens nothing and answers nothing."
+focus_mode = 0
+theme_type_variation = &"CardHint"
+disabled = true
+text = "‹"
+
+[node name="StepOn" type="Button" parent="Frame/Row/Stack/CompactRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "The one after in NEXT's queue: picks them and shows their desk. It opens nothing and answers nothing."
+focus_mode = 0
+theme_type_variation = &"CardHint"
+disabled = true
+text = "›"
+
+[node name="CompactMonitor" type="Button" parent="Frame/Row/Stack/CompactRow"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "M: open this pane's terminal in the monitor: its live screen, and every key you press goes to it (Ctrl+] closes)."
+focus_mode = 0
+theme_type_variation = &"CardHint"
+text = "Monitor ⤢"
+
+[node name="CompactOpen" type="Button" parent="Frame/Row/Stack/CompactRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+tooltip_text = "Enter: open the panel: the terminal's preview, the switch and the pane's details. It only opens; nothing is sent."
+focus_mode = 0
+theme_type_variation = &"CardHint"
+text = "Open ⏎"
+
+[node name="Empty" type="VBoxContainer" parent="Frame/Row/Stack"]
+unique_name_in_owner = true
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+grow_vertical = 2
+
+[node name="NoPane" type="Label" parent="Frame/Row/Stack/Empty"]
+custom_minimum_size = Vector2(0, 26)
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"Heading16Slate"
+text = "NO PANE"
+unique_name_in_owner = true
+
+[node name="Message" type="Label" parent="Frame/Row/Stack/Empty"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+theme_type_variation = &"LabelSlate"
+autowrap_mode = 3
+
+[node name="NextSlot" type="VBoxContainer" parent="Frame/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(128, 0)
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="NextButton" type="Button" parent="Frame/Row/NextSlot"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+tooltip_text = "N: the next agent who needs you: the blocked, longest wait first; the done once nobody is blocked. It picks them, shows their desk and opens their panel; a blocked one opens its answer keys; nothing is sent until you press one."
+focus_mode = 0
+theme_type_variation = &"NextAction"
+clip_text = true
+
+[node name="NextRow" type="HBoxContainer" parent="Frame/Row/NextSlot/NextButton"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 6.0
+offset_right = -4.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="NextText" type="BoxContainer" parent="Frame/Row/NextSlot/NextButton/NextRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 4
+alignment = 1
+vertical = true
+
+[node name="NextTitle" type="Label" parent="Frame/Row/NextSlot/NextButton/NextRow/NextText"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_type_variation = &"LabelSlate"
+text = "NEXT:"
+
+[node name="NextLine" type="Label" parent="Frame/Row/NextSlot/NextButton/NextRow/NextText"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+mouse_filter = 2
+theme_type_variation = &"Heading13"
+autowrap_mode = 3
+text_overrun_behavior = 3
+max_lines_visible = 2
+
+[node name="NextWait" type="Label" parent="Frame/Row/NextSlot/NextButton/NextRow/NextText"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"LabelWoodShadow"
+
+[node name="Chevron" type="Label" parent="Frame/Row/NextSlot/NextButton/NextRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_type_variation = &"Heading16"
+text = "›"

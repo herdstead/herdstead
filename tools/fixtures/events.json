@@ -1,0 +1,207 @@
+{
+ "_comment": "Stream envelopes as herdr 0.9.0 sends them: global events use underscores and repeat the name in data.type; the per-pane status event keeps its dotted method spelling. 'observed' shapes were seen on a real socket, 'assumed' ones follow the same pattern. All values are synthetic.",
+ "pane_status": {
+  "shape": "observed",
+  "envelope": {
+   "event": "pane.agent_status_changed",
+   "data": {
+    "pane_id": "alpha:p1",
+    "workspace_id": "alpha",
+    "agent_status": "blocked",
+    "agent": "claude"
+   }
+  }
+ },
+ "pane_status_no_agent": {
+  "shape": "observed",
+  "envelope": {
+   "event": "pane.agent_status_changed",
+   "data": {
+    "pane_id": "alpha:p3",
+    "workspace_id": "alpha",
+    "agent_status": "unknown"
+   }
+  }
+ },
+ "pane_updated": {
+  "shape": "observed",
+  "envelope": {
+   "event": "pane_updated",
+   "data": {
+    "type": "pane_updated",
+    "pane": {
+     "pane_id": "alpha:p1",
+     "terminal_id": "term-alpha-1",
+     "workspace_id": "alpha",
+     "tab_id": "alpha:t1",
+     "focused": true,
+     "cwd": "/home/tester/alpha",
+     "foreground_cwd": "/home/tester/alpha",
+     "agent": "claude",
+     "terminal_title": "claude session",
+     "terminal_title_stripped": "claude session",
+     "agent_session": {
+      "source": "fixture",
+      "agent": "claude",
+      "kind": "session_id",
+      "value": "fake-session-alpha-1"
+     },
+     "agent_status": "working",
+     "scroll": {
+      "offset_from_bottom": 0,
+      "max_offset_from_bottom": 0,
+      "viewport_rows": 40
+     },
+     "revision": 1
+    }
+   }
+  }
+ },
+ "layout_updated": {
+  "shape": "observed",
+  "envelope": {
+   "event": "layout_updated",
+   "data": {
+    "type": "layout_updated",
+    "layout": {
+     "workspace_id": "alpha",
+     "tab_id": "alpha:t1",
+     "zoomed": false,
+     "area": {
+      "x": 0,
+      "y": 0,
+      "width": 160,
+      "height": 80
+     },
+     "focused_pane_id": "alpha:p1",
+     "panes": [
+      {
+       "pane_id": "alpha:p3",
+       "focused": false,
+       "rect": {
+        "x": 80,
+        "y": 0,
+        "width": 80,
+        "height": 40
+       }
+      },
+      {
+       "pane_id": "alpha:p1",
+       "focused": true,
+       "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 80,
+        "height": 40
+       }
+      },
+      {
+       "pane_id": "alpha:p2",
+       "focused": false,
+       "rect": {
+        "x": 0,
+        "y": 40,
+        "width": 80,
+        "height": 40
+       }
+      }
+     ],
+     "splits": [
+      {
+       "id": "alpha:t1:s1",
+       "direction": "vertical",
+       "ratio": 0.5,
+       "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 160,
+        "height": 80
+       }
+      }
+     ]
+    }
+   }
+  }
+ },
+ "pane_exited": {
+  "shape": "observed",
+  "envelope": {
+   "event": "pane_exited",
+   "data": {
+    "type": "pane_exited",
+    "pane_id": "alpha:p2",
+    "workspace_id": "alpha"
+   }
+  }
+ },
+ "pane_agent_detected": {
+  "shape": "observed",
+  "envelope": {
+   "event": "pane_agent_detected",
+   "data": {
+    "type": "pane_agent_detected",
+    "pane_id": "alpha:p3",
+    "workspace_id": "alpha",
+    "agent": "codex",
+    "final_status": "idle",
+    "released": true
+   }
+  }
+ },
+ "pane_created": {
+  "shape": "assumed",
+  "envelope": {
+   "event": "pane_created",
+   "data": {
+    "type": "pane_created",
+    "pane": {
+     "pane_id": "alpha:p4",
+     "terminal_id": "term-alpha-4",
+     "workspace_id": "alpha",
+     "tab_id": "alpha:t1",
+     "focused": false,
+     "cwd": "/home/tester/alpha",
+     "foreground_cwd": "/home/tester/alpha",
+     "agent": "claude",
+     "terminal_title": "claude session",
+     "terminal_title_stripped": "claude session",
+     "agent_session": {
+      "source": "fixture",
+      "agent": "claude",
+      "kind": "session_id",
+      "value": "fake-session-alpha-4"
+     },
+     "agent_status": "idle",
+     "scroll": {
+      "offset_from_bottom": 0,
+      "max_offset_from_bottom": 0,
+      "viewport_rows": 40
+     },
+     "revision": 1
+    }
+   }
+  }
+ },
+ "workspace_focused": {
+  "shape": "assumed",
+  "envelope": {
+   "event": "workspace_focused",
+   "data": {
+    "type": "workspace_focused",
+    "workspace_id": "bravo"
+   }
+  }
+ },
+ "tab_renamed": {
+  "shape": "assumed",
+  "envelope": {
+   "event": "tab_renamed",
+   "data": {
+    "type": "tab_renamed",
+    "tab_id": "alpha:t1",
+    "workspace_id": "alpha",
+    "label": "renamed"
+   }
+  }
+ }
+}

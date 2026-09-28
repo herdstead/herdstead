@@ -1,0 +1,39 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/table.gd" id="1_table"]
+
+[node name="Table" type="StaticBody2D"]
+collision_mask = 0
+script = ExtResource("1_table")
+
+[node name="Supports" type="Node2D" parent="."]
+
+[node name="Surface" type="Node2D" parent="."]
+
+[node name="Apron" type="Node2D" parent="."]
+
+[node name="Grommets" type="Node2D" parent="."]
+
+[node name="TaskLights" type="Node2D" parent="."]
+
+[node name="FarMonitors" type="Node2D" parent="."]
+
+[node name="Divider" type="Node2D" parent="."]
+
+[node name="NearMonitors" type="Node2D" parent="."]
+
+[node name="Decorations" type="Node2D" parent="."]
+unique_name_in_owner = true
+
+[node name="Papers" type="Node2D" parent="."]
+
+[node name="Seats" type="Node2D" parent="."]
+
+[node name="Standing" type="Node2D" parent="."]
+
+[node name="Footprint" type="CollisionShape2D" parent="."]
+
+[node name="Overlay" type="Node2D" parent="."]
+
+[node name="Frame" type="Node2D" parent="Overlay"]
+visible = false

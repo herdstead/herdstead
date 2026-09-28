@@ -1,0 +1,607 @@
+{
+ "_comment": "Synthetic session.snapshot payload (result.snapshot). Field shapes follow herdr 0.9.0 / protocol 22; every value is invented. Worktree groups: herdstead (1) is the source space of two linked worktrees (2, 3); notes (4) has no worktree; ops lane (5) is a linked worktree of ops-tools whose source space is not open. Rects are terminal cells of a 200x50 client.",
+ "snapshot": {
+  "version": "0.9.0",
+  "protocol": 22,
+  "focused_workspace_id": "hs",
+  "focused_tab_id": "hs:t1",
+  "focused_pane_id": "hs:p1",
+  "workspaces": [
+   {
+    "workspace_id": "hs",
+    "number": 1,
+    "label": "herdstead",
+    "focused": true,
+    "pane_count": 3,
+    "tab_count": 1,
+    "active_tab_id": "hs:t1",
+    "agent_status": "idle",
+    "worktree": {
+     "repo_key": "fixture/herdstead",
+     "repo_name": "herdstead",
+     "repo_root": "/home/tester/herdstead",
+     "checkout_path": "/home/tester/herdstead",
+     "is_linked_worktree": false
+    }
+   },
+   {
+    "workspace_id": "hud",
+    "number": 2,
+    "label": "hud lane",
+    "focused": false,
+    "pane_count": 1,
+    "tab_count": 1,
+    "active_tab_id": "hud:t1",
+    "agent_status": "idle",
+    "worktree": {
+     "repo_key": "fixture/herdstead",
+     "repo_name": "herdstead",
+     "repo_root": "/home/tester/herdstead",
+     "checkout_path": "/home/tester/.worktrees/herdstead/hud-lane",
+     "is_linked_worktree": true
+    }
+   },
+   {
+    "workspace_id": "data",
+    "number": 3,
+    "label": "data lane",
+    "focused": false,
+    "pane_count": 2,
+    "tab_count": 1,
+    "active_tab_id": "data:t1",
+    "agent_status": "idle",
+    "worktree": {
+     "repo_key": "fixture/herdstead",
+     "repo_name": "herdstead",
+     "repo_root": "/home/tester/herdstead",
+     "checkout_path": "/home/tester/.worktrees/herdstead/data-lane",
+     "is_linked_worktree": true
+    }
+   },
+   {
+    "workspace_id": "notes",
+    "number": 4,
+    "label": "notes",
+    "focused": false,
+    "pane_count": 1,
+    "tab_count": 1,
+    "active_tab_id": "notes:t1",
+    "agent_status": "idle",
+    "worktree": null
+   },
+   {
+    "workspace_id": "ops",
+    "number": 5,
+    "label": "ops lane",
+    "focused": false,
+    "pane_count": 1,
+    "tab_count": 1,
+    "active_tab_id": "ops:t1",
+    "agent_status": "idle",
+    "worktree": {
+     "repo_key": "fixture/ops-tools",
+     "repo_name": "ops-tools",
+     "repo_root": "/home/tester/ops-tools",
+     "checkout_path": "/home/tester/.worktrees/ops-tools/ops-lane",
+     "is_linked_worktree": true
+    }
+   }
+  ],
+  "tabs": [
+   {
+    "tab_id": "hs:t1",
+    "workspace_id": "hs",
+    "number": 1,
+    "label": "main",
+    "focused": true,
+    "pane_count": 3,
+    "agent_status": "idle"
+   },
+   {
+    "tab_id": "hud:t1",
+    "workspace_id": "hud",
+    "number": 1,
+    "label": "main",
+    "focused": false,
+    "pane_count": 1,
+    "agent_status": "idle"
+   },
+   {
+    "tab_id": "data:t1",
+    "workspace_id": "data",
+    "number": 1,
+    "label": "main",
+    "focused": false,
+    "pane_count": 2,
+    "agent_status": "idle"
+   },
+   {
+    "tab_id": "notes:t1",
+    "workspace_id": "notes",
+    "number": 1,
+    "label": "main",
+    "focused": false,
+    "pane_count": 1,
+    "agent_status": "idle"
+   },
+   {
+    "tab_id": "ops:t1",
+    "workspace_id": "ops",
+    "number": 1,
+    "label": "main",
+    "focused": false,
+    "pane_count": 1,
+    "agent_status": "idle"
+   }
+  ],
+  "panes": [
+   {
+    "pane_id": "hs:p1",
+    "terminal_id": "term-hs-1",
+    "workspace_id": "hs",
+    "tab_id": "hs:t1",
+    "focused": true,
+    "cwd": "/home/tester/herdstead",
+    "foreground_cwd": "/home/tester/herdstead",
+    "agent": "claude",
+    "terminal_title": "claude session",
+    "terminal_title_stripped": "claude session",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "claude",
+     "kind": "session_id",
+     "value": "fake-session-hs-1"
+    },
+    "agent_status": "working",
+    "scroll": {
+     "offset_from_bottom": 0,
+     "max_offset_from_bottom": 0,
+     "viewport_rows": 50
+    },
+    "revision": 1
+   },
+   {
+    "pane_id": "hs:p2",
+    "terminal_id": "term-hs-2",
+    "workspace_id": "hs",
+    "tab_id": "hs:t1",
+    "focused": false,
+    "cwd": "/home/tester/herdstead",
+    "foreground_cwd": "/home/tester/herdstead",
+    "agent": "codex",
+    "terminal_title": "codex session",
+    "terminal_title_stripped": "codex session",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "codex",
+     "kind": "session_id",
+     "value": "fake-session-hs-2"
+    },
+    "agent_status": "idle",
+    "scroll": {
+     "offset_from_bottom": 0,
+     "max_offset_from_bottom": 0,
+     "viewport_rows": 25
+    },
+    "revision": 1
+   },
+   {
+    "pane_id": "hs:p3",
+    "terminal_id": "term-hs-3",
+    "workspace_id": "hs",
+    "tab_id": "hs:t1",
+    "focused": false,
+    "cwd": "/home/tester/herdstead",
+    "foreground_cwd": "/home/tester/herdstead",
+    "agent_status": "unknown",
+    "scroll": {
+     "offset_from_bottom": 0,
+     "max_offset_from_bottom": 0,
+     "viewport_rows": 25
+    },
+    "revision": 1
+   },
+   {
+    "pane_id": "hud:p1",
+    "terminal_id": "term-hud-1",
+    "workspace_id": "hud",
+    "tab_id": "hud:t1",
+    "focused": false,
+    "cwd": "/home/tester/.worktrees/herdstead/hud-lane",
+    "foreground_cwd": "/home/tester/.worktrees/herdstead/hud-lane",
+    "agent": "claude",
+    "terminal_title": "claude session",
+    "terminal_title_stripped": "claude session",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "claude",
+     "kind": "session_id",
+     "value": "fake-session-hud-1"
+    },
+    "agent_status": "blocked",
+    "scroll": {
+     "offset_from_bottom": 0,
+     "max_offset_from_bottom": 0,
+     "viewport_rows": 50
+    },
+    "revision": 1
+   },
+   {
+    "pane_id": "data:p1",
+    "terminal_id": "term-data-1",
+    "workspace_id": "data",
+    "tab_id": "data:t1",
+    "focused": false,
+    "cwd": "/home/tester/.worktrees/herdstead/data-lane",
+    "foreground_cwd": "/home/tester/.worktrees/herdstead/data-lane",
+    "agent": "codex",
+    "terminal_title": "codex session",
+    "terminal_title_stripped": "codex session",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "codex",
+     "kind": "session_id",
+     "value": "fake-session-data-1"
+    },
+    "agent_status": "done",
+    "scroll": {
+     "offset_from_bottom": 0,
+     "max_offset_from_bottom": 0,
+     "viewport_rows": 50
+    },
+    "revision": 1
+   },
+   {
+    "pane_id": "data:p2",
+    "terminal_id": "term-data-2",
+    "workspace_id": "data",
+    "tab_id": "data:t1",
+    "focused": false,
+    "cwd": "/home/tester/.worktrees/herdstead/data-lane",
+    "foreground_cwd": "/home/tester/.worktrees/herdstead/data-lane",
+    "agent": "pi",
+    "terminal_title": "pi session",
+    "terminal_title_stripped": "pi session",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "pi",
+     "kind": "session_id",
+     "value": "fake-session-data-2"
+    },
+    "agent_status": "working",
+    "scroll": {
+     "offset_from_bottom": 0,
+     "max_offset_from_bottom": 0,
+     "viewport_rows": 50
+    },
+    "revision": 1
+   },
+   {
+    "pane_id": "notes:p1",
+    "terminal_id": "term-notes-1",
+    "workspace_id": "notes",
+    "tab_id": "notes:t1",
+    "focused": false,
+    "cwd": "/home/tester/notes",
+    "foreground_cwd": "/home/tester/notes",
+    "agent_status": "unknown",
+    "scroll": {
+     "offset_from_bottom": 0,
+     "max_offset_from_bottom": 0,
+     "viewport_rows": 50
+    },
+    "revision": 1
+   },
+   {
+    "pane_id": "ops:p1",
+    "terminal_id": "term-ops-1",
+    "workspace_id": "ops",
+    "tab_id": "ops:t1",
+    "focused": false,
+    "cwd": "/home/tester/.worktrees/ops-tools/ops-lane",
+    "foreground_cwd": "/home/tester/.worktrees/ops-tools/ops-lane",
+    "agent": "claude",
+    "terminal_title": "claude session",
+    "terminal_title_stripped": "claude session",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "claude",
+     "kind": "session_id",
+     "value": "fake-session-ops-1"
+    },
+    "agent_status": "idle",
+    "scroll": {
+     "offset_from_bottom": 0,
+     "max_offset_from_bottom": 0,
+     "viewport_rows": 50
+    },
+    "revision": 1
+   }
+  ],
+  "layouts": [
+   {
+    "workspace_id": "hs",
+    "tab_id": "hs:t1",
+    "zoomed": false,
+    "area": {
+     "x": 0,
+     "y": 0,
+     "width": 200,
+     "height": 50
+    },
+    "focused_pane_id": "hs:p1",
+    "panes": [
+     {
+      "pane_id": "hs:p1",
+      "focused": true,
+      "rect": {
+       "x": 0,
+       "y": 0,
+       "width": 120,
+       "height": 50
+      }
+     },
+     {
+      "pane_id": "hs:p2",
+      "focused": false,
+      "rect": {
+       "x": 120,
+       "y": 0,
+       "width": 80,
+       "height": 25
+      }
+     },
+     {
+      "pane_id": "hs:p3",
+      "focused": false,
+      "rect": {
+       "x": 120,
+       "y": 25,
+       "width": 80,
+       "height": 25
+      }
+     }
+    ],
+    "splits": []
+   },
+   {
+    "workspace_id": "hud",
+    "tab_id": "hud:t1",
+    "zoomed": false,
+    "area": {
+     "x": 0,
+     "y": 0,
+     "width": 200,
+     "height": 50
+    },
+    "focused_pane_id": "hud:p1",
+    "panes": [
+     {
+      "pane_id": "hud:p1",
+      "focused": false,
+      "rect": {
+       "x": 0,
+       "y": 0,
+       "width": 200,
+       "height": 50
+      }
+     }
+    ],
+    "splits": []
+   },
+   {
+    "workspace_id": "data",
+    "tab_id": "data:t1",
+    "zoomed": false,
+    "area": {
+     "x": 0,
+     "y": 0,
+     "width": 200,
+     "height": 50
+    },
+    "focused_pane_id": "data:p1",
+    "panes": [
+     {
+      "pane_id": "data:p1",
+      "focused": false,
+      "rect": {
+       "x": 0,
+       "y": 0,
+       "width": 100,
+       "height": 50
+      }
+     },
+     {
+      "pane_id": "data:p2",
+      "focused": false,
+      "rect": {
+       "x": 100,
+       "y": 0,
+       "width": 100,
+       "height": 50
+      }
+     }
+    ],
+    "splits": []
+   },
+   {
+    "workspace_id": "notes",
+    "tab_id": "notes:t1",
+    "zoomed": false,
+    "area": {
+     "x": 0,
+     "y": 0,
+     "width": 200,
+     "height": 50
+    },
+    "focused_pane_id": "notes:p1",
+    "panes": [
+     {
+      "pane_id": "notes:p1",
+      "focused": false,
+      "rect": {
+       "x": 0,
+       "y": 0,
+       "width": 200,
+       "height": 50
+      }
+     }
+    ],
+    "splits": []
+   },
+   {
+    "workspace_id": "ops",
+    "tab_id": "ops:t1",
+    "zoomed": false,
+    "area": {
+     "x": 0,
+     "y": 0,
+     "width": 200,
+     "height": 50
+    },
+    "focused_pane_id": "ops:p1",
+    "panes": [
+     {
+      "pane_id": "ops:p1",
+      "focused": false,
+      "rect": {
+       "x": 0,
+       "y": 0,
+       "width": 200,
+       "height": 50
+      }
+     }
+    ],
+    "splits": []
+   }
+  ],
+  "agents": [
+   {
+    "terminal_id": "term-hs-1",
+    "agent": "claude",
+    "terminal_title": "claude session",
+    "terminal_title_stripped": "claude session",
+    "agent_status": "working",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "claude",
+     "kind": "session_id",
+     "value": "fake-session-hs-1"
+    },
+    "workspace_id": "hs",
+    "tab_id": "hs:t1",
+    "pane_id": "hs:p1",
+    "focused": true,
+    "cwd": "/home/tester/herdstead",
+    "foreground_cwd": "/home/tester/herdstead",
+    "revision": 1,
+    "state_change_seq": 1
+   },
+   {
+    "terminal_id": "term-hs-2",
+    "agent": "codex",
+    "terminal_title": "codex session",
+    "terminal_title_stripped": "codex session",
+    "agent_status": "idle",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "codex",
+     "kind": "session_id",
+     "value": "fake-session-hs-2"
+    },
+    "workspace_id": "hs",
+    "tab_id": "hs:t1",
+    "pane_id": "hs:p2",
+    "focused": false,
+    "cwd": "/home/tester/herdstead",
+    "foreground_cwd": "/home/tester/herdstead",
+    "revision": 1,
+    "state_change_seq": 1
+   },
+   {
+    "terminal_id": "term-hud-1",
+    "agent": "claude",
+    "terminal_title": "claude session",
+    "terminal_title_stripped": "claude session",
+    "agent_status": "blocked",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "claude",
+     "kind": "session_id",
+     "value": "fake-session-hud-1"
+    },
+    "workspace_id": "hud",
+    "tab_id": "hud:t1",
+    "pane_id": "hud:p1",
+    "focused": false,
+    "cwd": "/home/tester/.worktrees/herdstead/hud-lane",
+    "foreground_cwd": "/home/tester/.worktrees/herdstead/hud-lane",
+    "revision": 1,
+    "state_change_seq": 1
+   },
+   {
+    "terminal_id": "term-data-1",
+    "agent": "codex",
+    "terminal_title": "codex session",
+    "terminal_title_stripped": "codex session",
+    "agent_status": "done",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "codex",
+     "kind": "session_id",
+     "value": "fake-session-data-1"
+    },
+    "workspace_id": "data",
+    "tab_id": "data:t1",
+    "pane_id": "data:p1",
+    "focused": false,
+    "cwd": "/home/tester/.worktrees/herdstead/data-lane",
+    "foreground_cwd": "/home/tester/.worktrees/herdstead/data-lane",
+    "revision": 1,
+    "state_change_seq": 1
+   },
+   {
+    "terminal_id": "term-data-2",
+    "agent": "pi",
+    "terminal_title": "pi session",
+    "terminal_title_stripped": "pi session",
+    "agent_status": "working",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "pi",
+     "kind": "session_id",
+     "value": "fake-session-data-2"
+    },
+    "workspace_id": "data",
+    "tab_id": "data:t1",
+    "pane_id": "data:p2",
+    "focused": false,
+    "cwd": "/home/tester/.worktrees/herdstead/data-lane",
+    "foreground_cwd": "/home/tester/.worktrees/herdstead/data-lane",
+    "revision": 1,
+    "state_change_seq": 1
+   },
+   {
+    "terminal_id": "term-ops-1",
+    "agent": "claude",
+    "terminal_title": "claude session",
+    "terminal_title_stripped": "claude session",
+    "agent_status": "idle",
+    "agent_session": {
+     "source": "fixture",
+     "agent": "claude",
+     "kind": "session_id",
+     "value": "fake-session-ops-1"
+    },
+    "workspace_id": "ops",
+    "tab_id": "ops:t1",
+    "pane_id": "ops:p1",
+    "focused": false,
+    "cwd": "/home/tester/.worktrees/ops-tools/ops-lane",
+    "foreground_cwd": "/home/tester/.worktrees/ops-tools/ops-lane",
+    "revision": 1,
+    "state_change_seq": 1
+   }
+  ]
+ }
+}

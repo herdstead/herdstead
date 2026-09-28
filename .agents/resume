@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Fast wake-up check for an agent sandbox set up by .agents/setup: Godot and
+# the art-pack venv must already be on disk. Do not install anything here.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+export PATH="/usr/local/bin:${PATH}"
+
+if ! command -v godot >/dev/null; then
+	echo "resume: godot is not on PATH; rerun .agents/setup" >&2
+	exit 1
+fi
+got="$(godot --version 2>/dev/null | head -1 || true)"
+if [[ "$got" != 4.7.2.stable* ]]; then
+	echo "resume: expected Godot 4.7.2, got ${got:-nothing}; rerun .agents/setup" >&2
+	exit 1
+fi
+if [[ ! -x .venv/bin/python ]]; then
+	echo "resume: .venv is missing; rerun .agents/setup" >&2
+	exit 1
+fi
+echo "RESUME_OK godot=${got}"
