@@ -152,9 +152,7 @@ Copy the approved PNG into `art/daylight/<category>/` under its semantic ID, add
 entry if new, then `make art` and `make check` (or at least `make test-art` + `make check-packs`).
 A new palette colour is added, never changed (changing one recolours every sprite that uses it):
 name it as a ramp (`<name>_light / <name> / <name>_dark`), keep it at least 12 apart (RGB Manhattan)
-from every other palette colour, stay within 64 colours, and give its dusk value in
-`tools/palettes/dusk.json` in the same change (`tools/test_assets.py` fails a recipe that misses a key).
-`art/dusk/` is derived — never paint into it. Art commits are separate from code commits, and only
+from every other palette colour, and stay within 64 colours. Art commits are separate from code commits, and only
 one change at a time touches `art/` and `assets/`. Keep the `request.json` of the chosen image with the
 review notes (not in the repo) and say in the commit message that the source was painted by
 GPT Image 2.5 and pixelized; if the source line in `docs/ASSET_SPEC.md` (fonts, sources and delivery limits) no

@@ -154,7 +154,7 @@ func test_every_status_fits_the_lines_at_every_width() -> void:
 			statuses.append(OfficeScene.bar_status(read_only, machines.x, machines.y))
 	_check(statuses.has("OFFLINE / RECONNECTING"), "the longest one is among them")
 	_check(statuses.has("99 OFFLINE / READ ONLY"), "and a two-digit outage")
-	for manifest: String in MANIFESTS:
+	for manifest: String in [MANIFESTS[0], _second_pack()]:
 		var hud := await _bare_hud(Vector2(480, 320), manifest)
 		var name := ArtPack.from_manifest(manifest).display_name.to_upper() + "  [T]"
 		var status_line: Label = hud.bar.get_node("%StatusLine")
@@ -348,9 +348,9 @@ func test_clearing_a_filter_leaves_a_closed_drawer_closed() -> void:
 
 
 ## The showroom's top bar is the office's own: its pack name and its status
-## fit the right-hand lines in both packs, with no ellipsis.
+## fit the right-hand lines in both packs (the shipped one and a second), with no ellipsis.
 func test_the_showroom_status_fits_the_lines() -> void:
-	for manifest: String in MANIFESTS:
+	for manifest: String in [MANIFESTS[0], _second_pack()]:
 		var showroom: Node = (load("res://scenes/preview.tscn") as PackedScene).instantiate()
 		showroom.set("manifest_path", manifest)
 		root.add_child(showroom)

@@ -122,7 +122,7 @@ func test_thin_front_joins_supports_without_moving_the_floor() -> void:
 
 func test_desktop_decor_survives_growth_state_updates_and_theme_rebuilds() -> void:
 	var table := _table()
-	var dusk := ArtPack.from_manifest("res://assets/dusk/manifest.json")
+	var other := ArtPack.from_manifest(_second_pack_at(_work_dir().path_join("geometry-pack-second")))
 	for sample in 12:
 		var identity := "machine-a/workspace-a/tab-%d" % sample
 		_check(table.setup(art, 160, [48.0, 112.0]), "start with two columns")
@@ -148,7 +148,7 @@ func test_desktop_decor_survives_growth_state_updates_and_theme_rebuilds() -> vo
 		_check(table.resize(2), "shrink back to the original columns")
 		table.decorate(identity)
 		_eq(holder.get_children(), original, "shrink removes only additions; refresh never replaces old objects")
-		_check(table.setup(dusk, 160, [48.0, 112.0]), "switch theme in place")
+		_check(table.setup(other, 160, [48.0, 112.0]), "switch theme in place")
 		for child in original:
 			var image := child as Sprite2D
 			var reference := copy_holder.get_node(NodePath(image.name)) as Sprite2D
@@ -158,7 +158,9 @@ func test_desktop_decor_survives_growth_state_updates_and_theme_rebuilds() -> vo
 				if reference.texture == art.sprite_texture(art.prop_sprite(id)):
 					matched = true
 					_eq(
-						image.texture, dusk.sprite_texture(dusk.prop_sprite(id)), "theme keeps the chosen semantic item"
+						image.texture,
+						other.sprite_texture(other.prop_sprite(id)),
+						"theme keeps the chosen semantic item"
 					)
 			_check(matched, "every decoration comes from the reusable library")
 		rebuilt.free()
@@ -167,8 +169,10 @@ func test_desktop_decor_survives_growth_state_updates_and_theme_rebuilds() -> vo
 func test_desktop_library_varies_without_covering_equipment_or_leaving_the_top() -> void:
 	var table := _table()
 	_check(table.resize(6), "include new columns and both sides")
-	for theme: String in ["daylight", "dusk"]:
-		var pack := ArtPack.from_manifest("res://assets/%s/manifest.json" % theme)
+	for manifest: String in [
+		"res://assets/daylight/manifest.json", _second_pack_at(_work_dir().path_join("geometry-pack-second"))
+	]:
+		var pack := ArtPack.from_manifest(manifest)
 		_check(table.setup(pack, table.width, table.columns), "check actual pixels in both themes")
 		var seen: Dictionary[StringName, bool] = {}
 		var cat_count := 0
@@ -221,7 +225,7 @@ func test_desktop_library_varies_without_covering_equipment_or_leaving_the_top()
 				pixels.position += stack.offset
 				var bounds := stack.transform * pixels
 				var plane := Rect2(0, -80, table.width, 28) if side == "far" else Rect2(0, -28, table.width, 20)
-				_check(plane.encloses(bounds), "%s %d %s: the paper stays on its side's wood" % [theme, column, side])
+				_check(plane.encloses(bounds), "%s %d %s: the paper stays on its side's wood" % [pack.id, column, side])
 				table.show_papers(column, side, false)
 		_check(cat_count > 0 and cat_count < 32, "cats occur, but most tables have no cat")
 		_check(far_count > 0 and near_count > 0, "items are scattered on both working planes")
@@ -246,8 +250,10 @@ func test_laptops_align_with_workers_on_both_sides_after_growth() -> void:
 
 func test_shell_laptop_changes_in_place_and_survives_growth() -> void:
 	var table := _table()
-	for theme: String in ["daylight", "dusk"]:
-		var pack := ArtPack.from_manifest("res://assets/%s/manifest.json" % theme)
+	for manifest: String in [
+		"res://assets/daylight/manifest.json", _second_pack_at(_work_dir().path_join("geometry-pack-second"))
+	]:
+		var pack := ArtPack.from_manifest(manifest)
 		_check(table.setup(pack, table.width, table.columns), "dress table in each theme")
 		var drawing := OfficeDraw.new(pack)
 		var piece := pack.table.piece(ArtContract.FURNITURE_MONITOR)

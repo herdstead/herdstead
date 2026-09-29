@@ -6,7 +6,7 @@ extends "res://tools/test_base.gd"
 
 ## What herdr 0.9.0 sends in a pane's AgentInfo record and never in its PaneInfo.
 const AGENT_RECORD_ONLY: Array[String] = ["launch_pending", "name", "interactive_ready"]
-const MANIFESTS := ["res://assets/daylight/manifest.json", "res://assets/dusk/manifest.json"]
+const MANIFESTS := ["res://assets/daylight/manifest.json"]
 const LOCAL := HerdrFleet.LOCAL
 ## The live office with a viewport size this suite decides; see the file.
 const OfficeDouble := preload("res://tools/office_double.gd")
@@ -610,50 +610,12 @@ func _world_ids(office: OfficeDouble) -> Array:
 ## Named apart from tools/test_art.gd's table-less fixtures in the same
 ## directory: run_tests.sh gives every suite one work directory.
 func _dense_pack(density: int, filter := "nearest") -> String:
-	var root_dir: String = args.work.path_join("office-pack-x%d-%s" % [density, filter])
-	var manifest_path := root_dir.path_join("manifest.json")
-	if FileAccess.file_exists(manifest_path):
-		return manifest_path
-	var base: String = MANIFESTS[0].get_base_dir()
-	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(MANIFESTS[0]))
-	var images: Array = [data.atlas]
-	for category: String in ["props", "ui"]:
-		for id: String in data[category]:
-			images.append(data[category][id].path)
-	var source_density := int(_number(data, "density", 1))
-	for path: String in images:
-		# get_image() can be the texture's own image: resize a copy.
-		var image: Image = (load(base.path_join(path)) as Texture2D).get_image().duplicate()
-		var target_size := Vector2i(
-			image.get_width() / source_density * density, image.get_height() / source_density * density
-		)
-		image.resize(target_size.x, target_size.y, Image.INTERPOLATE_NEAREST)
-		DirAccess.make_dir_recursive_absolute(root_dir.path_join(path).get_base_dir())
-		image.save_png(root_dir.path_join(path))
-	# The shared table is a companion manifest at its own density: copy it as is.
-	var table_target := root_dir.path_join("table")
-	DirAccess.make_dir_recursive_absolute(table_target)
-	var table_data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(base.path_join("table/manifest.json")))
-	for id: String in table_data.modules:
-		var module_path: String = table_data.modules[id].path
-		(load(base.path_join("table").path_join(module_path)) as Texture2D).get_image().save_png(
-			table_target.path_join(module_path)
-		)
-	var table_file := FileAccess.open(table_target.path_join("manifest.json"), FileAccess.WRITE)
-	table_file.store_string(JSON.stringify(table_data))
-	table_file.close()
-	var font_path := str(_dict(data, "font").get("path", ""))
-	DirAccess.make_dir_recursive_absolute(root_dir.path_join(font_path).get_base_dir())
-	var font := FileAccess.open(root_dir.path_join(font_path), FileAccess.WRITE)
-	font.store_buffer(FileAccess.get_file_as_bytes(base.path_join(font_path)))
-	font.close()
-	data.schema_version = 2
-	data.density = density
-	data.filter = filter
-	var file := FileAccess.open(manifest_path, FileAccess.WRITE)
-	file.store_string(JSON.stringify(data))
-	file.close()
-	return manifest_path
+	return _copied_pack(MANIFESTS[0], args.work.path_join("office-pack-x%d-%s" % [density, filter]), density, filter)
+
+
+## The second pack the pack-switching cases switch to (test_base.gd).
+func _second_pack() -> String:
+	return _second_pack_at(args.work.path_join("office-pack-second"))
 
 
 func _row_count(office: OfficeDouble) -> int:

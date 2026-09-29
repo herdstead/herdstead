@@ -247,7 +247,7 @@ When a floor disappears the view falls back at once to one that exists. The `doo
 - It needs no new art. The steps are table geometry, constants only in `scripts/world/table.gd` (invariant 5), scaled by the pack's
   `task_lights: soft / strong`.
 - Measured (`OfficeTable.LAMP_ALPHA = [0, 0.10, 0.22, 0.52]`, ×1.4 in a strong pack, against unlit desk wood): daylight DIM +5 / ON +11 /
-  FOCUS +25 levels, dusk +13 / +28 / +66. A single +3 step is invisible in a full capture.
+  FOCUS +25 levels, the retired dusk pack +13 / +28 / +66. A single +3 step is invisible in a full capture.
 - **DIM cannot be read as disconnected**: disconnection makes the desk 68–69 levels **darker** (`stale_tint`); DIM is a few levels **brighter**.
 - When `active_tab_id` is missing, every tab of that workspace is unknown (`RoomModel.Active.UNKNOWN`) and drawn ON, not DIM: not said is not no.
 - Floor-level focus is not drawn: only one floor is drawn at a time, and the minimap's current-row highlight already means "the floor I am looking at".
@@ -295,15 +295,15 @@ a full person canvas), so a validated floor is a walkable floor ([World model](W
 | Laptop screens coloured by state | Needs screen rectangles in the table manifest; hard-coding them would break "table geometry only in `table.gd`, assets only by semantic ID". Add a `screen` field when the table art is next rebuilt. |
 | Idle wandering | People walk only on observed changes. With no change nobody moves: walking is not a channel for any field. |
 | `layout.zoomed`, pane `scroll` | No drawing without new art that would not clash with existing channels. `HerdrSnapshot.from_wire()` drops them (invariant 2: no field nobody draws). |
-| Dusk as a runtime palette-swap shader | Tables are drawn from the palette by their builder and pixel people are one family shared by both packs, so a LUT would cover only tiles / props / UI. Dusk is derived at build time instead. |
+| Dusk as a runtime palette-swap shader | Tables are drawn from the palette by their builder and pixel people are one family shared by every pack, so a LUT would cover only tiles / props / UI. Dusk was derived at build time instead, and then retired (2026-09-29): night is to be a light over the one pack, a modulate, not a palette swap. |
 | A floor minimap scaled from plan coordinates | Floors are tall (80 panes ≈ 800 × 4320 units), the world area wide (≈ 820 × 360 at 2×): at 400 panes a row would be 7 units, and aisles, pantry and furniture would read as signals. The strategic view keeps only order, columns and side. |
 | Zoom below 2 to see a whole floor | Zoom is the window's content scale (`OfficeScene.fit_window()`, `ZOOM_MIN := 2`); at 1× density-2 nearest families lose half their outlines, and a large floor still does not fit. |
 | Provider initials in strategic cells | Of 23 providers five start with C and three with K; initials are ambiguous and break "one concept, one channel". Provider stays in the hover tip. |
 
 ## Asset pipeline
 
-- `make art` rebuilds every pack: it derives dusk from daylight plus its recipe (`tools/palettes/dusk.json`), rebuilds `assets/`, and
-  `tools/check_build_clean.py` proves the result matches the commit (CI does the same). `art/dusk/` is derived; only `art/daylight/` is edited.
+- `make art` rebuilds every pack: it rebuilds `assets/`, and `tools/check_build_clean.py` proves the result matches the commit (CI does
+  the same). Only `art/daylight/` is edited.
 - Semantic IDs and sizes have one source, `art/daylight/pack.json`; Python checks only that PNGs and the manifest agree.
 - `make check-packs` reports IDs in a pack that `scripts/art/art_contract.gd` does not require as `PACK_UNUSED` (today `wall.front_*` and
   `wall.threshold`). The builder prunes generated images the manifest no longer declares.

@@ -477,8 +477,8 @@ socket as a machine. Forwarding, cleanup, target validation, the debug hook and 
 
 ## Themes and art
 
-**Packs.** Two themes ship: Daylight Studio (`daylight`) and Dusk Shift (`dusk`, a night palette derived from Daylight
-by palette remapping). Each runtime pack has 29 logical 32×32 tiles (wood floor, open corridor, nine-slice rug, walls,
+**Packs.** One theme ships: Daylight Studio (`daylight`). Dusk Shift, a palette derived from it by a recipe, was
+retired on 2026-09-29: night is to be a light over the one pack, not a second pack. Each runtime pack has 29 logical 32×32 tiles (wood floor, open corridor, nine-slice rug, walls,
 thresholds) at density 2 (64×64 texels per tile, nearest-neighbour; the build doubles 1× sources into 2×2 blocks),
 5 standalone props (code cabinet, window, door, plant, blank sign), a desk-item library of 5 everyday objects and 3 white
 cats, the shared long-table family (table, chair, monitor), 11 state and UI icons (herdr's five states, starting, lost
@@ -486,8 +486,8 @@ and connected), a native TileSet, four single-image SpriteFrames (for export onl
 The full spec is [ASSET_SPEC](ASSET_SPEC.md), the painter's brief is [ARTIST_BRIEF](ARTIST_BRIEF.md), and depth and
 collision rules are in [WORLD_MODEL](WORLD_MODEL.md).
 
-**Switching at run time.** The office scans `res://assets/*/manifest.json` at start, sorted by pack id; `T` cycles
-through them. Switching rebuilds the backdrop and floor; the HUD re-dresses in place (a new Theme, new textures, no node
+**Switching at run time.** The office scans `res://assets/*/manifest.json` at start, sorted by pack id; with more than
+one, `T` cycles through them. Switching rebuilds the backdrop and floor; the HUD re-dresses in place (a new Theme, new textures, no node
 rebuilt). The herdr connection is untouched: camera, selection, pixel scale and online state stay. The choice is saved in
 `user://herdstead.cfg` and restored; precedence is `--pack=` > saved > the scene default (daylight). A saved path that no
 longer exists falls back to the default with a warning. Capture runs do not write the file. An exported build only sees
@@ -500,26 +500,24 @@ make setup           # python3 -m venv .venv + tools/requirements-dev.txt
 
 # Edit PNGs under art/daylight/, keeping size, pivot and palette rules.
 # A new image = the PNG + one entry in pack.json + make art; there is no second ID list in Python.
-.venv/bin/python tools/derive_theme.py      # derived packs such as art/dusk
 .venv/bin/python tools/build_assets.py      # rebuilds every pack.json under art/
 .venv/bin/python tools/build_table_assets.py
 .venv/bin/python tools/build_pixel_people.py
 make test-art        # the three Python contract tests
 
-# The contract tests can run against any theme source (default art/daylight).
-.venv/bin/python tools/test_assets.py --source art/dusk -v
-HERDSTEAD_PACK_SOURCE=art/dusk .venv/bin/python tools/test_assets.py -v
+# The contract tests can run against any pack source (default art/daylight).
+.venv/bin/python tools/test_assets.py --source /path/to/pack -v
+HERDSTEAD_PACK_SOURCE=/path/to/pack .venv/bin/python tools/test_assets.py -v
 
 make import          # godot --headless --editor --import --quit (GODOT=… for another binary)
 make check-packs     # validate every pack under assets/ against scripts/art/art_contract.gd
 make run
 ```
 
-`make art` is those four builders plus `tools/check_build_clean.py`, the same chain CI runs: it requires the rebuild to
-match the commit exactly (`assets/` and the derived `art/dusk/`), so it passes only after the new PNGs are committed.
+`make art` is those three builders plus `tools/check_build_clean.py`, the same chain CI runs: it requires the rebuild to
+match the commit exactly (`assets/`), so it passes only after the new PNGs are committed.
 
-- `art/daylight/` is the only hand-edited source; `assets/<id>/` and derived `art/<id>/` are build products, and the
-  build never writes back. Remove an entry from `pack.json` and `make art` prunes the orphan PNG (with its `.import`),
+- `art/daylight/` is the only hand-edited source; `assets/<id>/` is a build product, and the build never writes back. Remove an entry from `pack.json` and `make art` prunes the orphan PNG (with its `.import`),
   printing `PRUNED:`, so a deletion shows up as drift to commit.
 - The builder rejects wrong sizes, soft alpha, pivots out of bounds, duplicate atlas cells and references to missing
   badges or animations. **Which semantic IDs a pack has, and their sizes, is decided by `pack.json` alone; which ones the
@@ -530,7 +528,7 @@ match the commit exactly (`assets/` and the derived `art/dusk/`), so it passes o
 
 ```sh
 .venv/bin/python tools/artist_templates.py --source art/daylight --output docs/templates --density 2
-.venv/bin/python tools/artist_templates.py --source art/dusk --output /tmp/dusk-templates --blank
+.venv/bin/python tools/artist_templates.py --source art/daylight --output /tmp/blank-templates --blank
 ```
 
 Pixel people have their own tools: `make people-templates OUT=/abs/new-dir` exports the painter's canvases, guide layers
@@ -547,20 +545,9 @@ godot --path . -- --pack=res://assets/my-theme/manifest.json
 godot --path . scenes/preview.tscn -- --pack=res://assets/my-theme/manifest.json
 ```
 
-**A palette-only theme** needs no copy of the sources: write a recipe and the theme becomes a build product.
-
-```sh
-# tools/palettes/<id>.json is the whole recipe:
-# {"schema_version": 1, "from": "daylight", "id": "dusk", "name": "Dusk Shift",
-#  "stale_modulate": "8f96b8", "task_lights": "strong", "palette": {"ink": "13171f", ...}}
-.venv/bin/python tools/derive_theme.py                       # derive every recipe in tools/palettes/
-.venv/bin/python tools/derive_theme.py --recipe tools/palettes/dusk.json --output /tmp/probe
-```
-
-Every opaque source pixel must be a palette colour; this is checked per pixel, whatever the pack's `filter` says. A
-foreign colour fails with file name and coordinates (`--keep-foreign` turns it into a warning and keeps the pixel).
-`art/dusk` is committed but is a build product: editing it by hand is drift. To change its look, change the recipe; to
-add an image, add it to `art/daylight/`.
+A palette-only theme derived by a recipe is gone with Dusk Shift; `tools/recolour.py` keeps the exact per-pixel
+substitution the pixel people build still uses (an ambiguous palette or an off-palette pixel is refused, by file and
+coordinates).
 
 **High-density packs.** A schema v2 pack (up to 256 px per tile, see [ASSET_SPEC](ASSET_SPEC.md)) builds and loads the
 same way. Textures load exactly as built; `density` only means "texels per unit", and nodes always scale back by
@@ -577,8 +564,8 @@ reorder the atlas.
 **Offline tint.** A disconnected office (or machine's floors) is tinted. A pack may set an optional top-level
 `"stale_modulate": "8f96b8"` (6 lower-case hex digits) in `pack.json` / `manifest.json`; without it the tint is
 `Color(0.65, 0.65, 0.65)`. It is an optional additive key (`schema_version` stays 1), read through `ArtPack.stale_tint`.
-A dark theme should set its own: a 0.65 grey crushes an already dark picture. `art/dusk` uses a bluish, lighter
-`8f96b8`.
+A dark pack should set its own: a 0.65 grey crushes an already dark picture (the retired dusk pack used a bluish,
+lighter `8f96b8`).
 
 **Agent badges.** All 23 canonical agent IDs in herdr's registry are in `data/agent_catalog.json`: `pi`, `claude`,
 `codex`, `gemini`, `cursor`, `devin`, `agy`, `cline`, `omp`, `opencode`, `copilot`, `kimi`, `kiro`, `droid`, `amp`,
@@ -609,9 +596,8 @@ godot --path . scenes/people_showroom.tscn -- --view=options --zoom=2 --capture=
 # 28 real rendered frames, for checking typing, blinking, raised hands and pivots
 godot --path . scenes/preview.tscn -- --record-dir=/absolute/path/frames
 
-# Every asset, props on light and dark backgrounds to check transparent edges (--source takes any theme)
+# Every asset, props on light and dark backgrounds to check transparent edges (--source takes any pack)
 .venv/bin/python tools/contact_sheet.py --output /absolute/path/contact-sheet.png
-.venv/bin/python tools/contact_sheet.py --source art/dusk --output /absolute/path/dusk-sheet.png
 ```
 
 `make capture` shoots the showrooms, the live office against a fake herdr (read-only) at 2× and 4× (4× in a 1920×1280
@@ -716,8 +702,8 @@ a Makefile target where one exists, so `make check` locally runs the same comman
 1. `make lint`: gdlint over `scripts/` and `tools/` (config in `gdlintrc`) and a gdformat check.
 2. `make docs-check`: every backticked repo path and `make` target in README.md, AGENTS.md, docs/MACHINES.md and
    docs/MANUAL.md exists.
-3. `make art`: derive the recipe themes, rebuild every pack under `art/`, and compare `assets/` and the derived
-   `art/dusk/` with the commit (PNGs by pixel, since zlib output differs by platform; other files by byte).
+3. `make art`: rebuild every pack under `art/` and compare `assets/` with the commit (PNGs by pixel, since zlib output
+   differs by platform; other files by byte).
 4. `make test-art`: the three Python contract tests.
 5. Download Godot from the official GitHub release (version and sha512 in the workflow's top-level `env`), cached with
    `actions/cache` and verified against the sha512 even on a cache hit.
@@ -741,11 +727,10 @@ Screenshots are for looking at; there is no golden comparison. CI does not expor
 
 ```text
 art/daylight/            hand-edited source pack: PNGs, pack.json, table/ (long-table family), fonts/
-art/dusk/                derived theme (from art/daylight + tools/palettes/dusk.json); build product, never hand-edited
 art/pixel_people/        people.json, the pixel people contract (canvas, pivot, facings, layers, tracks,
                          key colours, slots, looks), optional hand-drawn strips and skins/<facing>/
 art/agent_badges/        agent logo sources and ATTRIBUTIONS.md
-assets/<id>/             runtime packs built from art/ (daylight, dusk); never edited here
+assets/<id>/             runtime packs built from art/ (daylight); never edited here
 assets/pixel_people/     people_manifest.json and one packed sheet per facing
 assets/agent_badges/     the 23 agent logos (Avatar Studio only) and ATTRIBUTIONS.md
 data/agent_catalog.json  herdr agent IDs, display names, badge sources, each provider's default clothes
@@ -773,7 +758,6 @@ scripts/art/             typed art pack models; the only readers of manifest JSO
 scripts/people/          PixelPerson prefab script
 tools/                   builders, contract tests, fake herdr / fake ssh, test suites (test_*.gd), capture and perf
 tools/fixtures/          snapshots, monitor screen dumps, herdr_methods.json
-tools/palettes/          one recipe per derived theme
 docs/                    this manual, WRITE_BOUNDARY, VISUAL_LANGUAGE, WORLD_MODEL, ASSET_SPEC, ARTIST_BRIEF,
                          MACHINES, preview.png and showroom.png (README screenshots), templates/ (generated guide canvases)
 Makefile                 every command; `make` lists them

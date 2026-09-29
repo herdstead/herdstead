@@ -12,7 +12,7 @@ canvases (and the pivots, and the 8px guide grid) to the size actually painted
 at a schema-2 density. Labels keep quoting the real canvas.
 
     python tools/artist_templates.py --source art/daylight --output docs/templates --density 2
-    python tools/artist_templates.py --source art/dusk --output /tmp/dusk --scale 6 --blank
+    python tools/artist_templates.py --source art/daylight --output /tmp/templates --scale 6 --blank
     python tools/artist_templates.py --source art/daylight --output /tmp/x4 --density 4 --scale 1
 """
 import argparse

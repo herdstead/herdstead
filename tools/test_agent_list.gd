@@ -8,7 +8,7 @@ const WORKTREES := "res://tools/fixtures/snapshot_worktrees.json"
 const LOCAL := HerdrFleet.LOCAL
 
 var art: ArtPack
-var dusk: ArtPack
+var second: ArtPack
 var pen: OfficeDraw
 var hud: OfficeHud
 ## What the HUD said, in order: ["pick", key] and ["open", key].
@@ -38,7 +38,7 @@ func _run() -> void:
 	root.gui_embed_subwindows = true
 	root.size = Vector2i(800, 480)
 	art = ArtPack.from_manifest("res://assets/daylight/manifest.json")
-	dusk = ArtPack.from_manifest("res://assets/dusk/manifest.json")
+	second = ArtPack.from_manifest(_second_pack_at(_work_dir().path_join("list-pack-second")))
 	pen = OfficeDraw.new(art)
 	await run_cases()
 
@@ -272,7 +272,7 @@ func test_rows_are_kept_and_updated_in_place() -> void:
 	_eq(hud.agent_list.row_for(_local("api:p1")).get_instance_id(), id, "which reuses the pane's row")
 	_check(hud.agent_list.group_for(AgentListModel.FLAT_WORKING) == null, "and drops the flat headers")
 	var daylight_texture := row.icon_badge().texture
-	hud.dress(dusk, OfficeDraw.new(dusk).font)
+	hud.dress(second, OfficeDraw.new(second).font)
 	await _frames(1)
 	_eq(hud.agent_list.row_for(_local("api:p1")).get_instance_id(), id, "a theme switch rebuilds no row")
 	_check(row.icon_badge().texture != daylight_texture, "it re-dresses the badge")
@@ -1043,10 +1043,10 @@ func test_long_labels_and_a_theme_switch_keep_rows_inside_the_list() -> void:
 	_check(window.encloses(hud.agent_list.get_global_rect()), "the list fits the small window")
 	var filter: LineEdit = hud.agent_list.get_node("%Filter")
 	_check(hud.agent_list.get_global_rect().encloses(filter.get_global_rect()), "the filter box stays inside it")
-	hud.dress(dusk, pen.font)
+	hud.dress(second, pen.font)
 	await process_frame
 	_eq(hud.agent_list.row_for(_local("web:p1")), row, "a theme switch reuses rows")
-	_eq(hud.agent_list.art, dusk, "the list's frame takes the new pack")
+	_eq(hud.agent_list.art, second, "the list's frame takes the new pack")
 
 
 ## Only the rows inside the scroll box draw their badge: the renderer culls a

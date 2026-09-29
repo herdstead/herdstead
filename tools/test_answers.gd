@@ -784,6 +784,10 @@ func test_the_reply_box_keeps_tab_and_escape_leaves_it() -> void:
 ## answers; out of answer mode and the box, the card takes none of those keys.
 func test_the_reply_box_and_the_office_keep_their_keys() -> void:
 	var office := await _idle_bee()
+	# The office ships one pack; T cycles packs when it has more than one.
+	office.themes = PackedStringArray(
+		[office.manifest_path, _second_pack_at(_work_dir().path_join("answers-pack-second"))]
+	)
 	var card := _card(office)
 	var pack := office.manifest_path
 	var picked := office.picked_key

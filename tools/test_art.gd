@@ -11,7 +11,6 @@ extends "res://tools/test_base.gd"
 ## failure, 2 on a harness error.
 
 const MANIFEST := "res://assets/daylight/manifest.json"
-const DUSK_MANIFEST := "res://assets/dusk/manifest.json"
 
 ## Where fixture packs are written; --work, from tools/run_tests.sh.
 var work_dir := ""
@@ -43,7 +42,7 @@ func _marker() -> String:
 func test_bundled_typography_keeps_latin_and_cjk_readable() -> void:
 	var text_server := TextServerManager.get_primary_interface()
 	var weight := text_server.name_to_tag("wght")
-	for path: String in [MANIFEST, DUSK_MANIFEST]:
+	for path: String in [MANIFEST]:
 		var pack := ArtPack.from_manifest(path)
 		var drawing := OfficeDraw.new(pack)
 		var text := drawing.font as FontVariation
@@ -68,7 +67,7 @@ func test_bundled_typography_keeps_latin_and_cjk_readable() -> void:
 ## on CI it grew the agent card's twelve preview rows out of the staff panel.
 ## A fallback may draw its glyphs, never make a Latin row taller.
 func test_a_fallback_never_makes_a_row_taller() -> void:
-	for path: String in [MANIFEST, DUSK_MANIFEST]:
+	for path: String in [MANIFEST]:
 		var pack := ArtPack.from_manifest(path)
 		var text := OfficeDraw.new(pack).font
 		var theme := HudTheme.build(pack, text)
@@ -313,9 +312,12 @@ func test_art_pack_optional_keys_default_as_documented() -> void:
 	var plain := ArtPack.from_manifest(_mutated_pack("plain", func(m: Dictionary) -> void: m.erase("stale_modulate")))
 	_eq(plain.stale_tint, ArtPack.STALE_DEFAULT, "a pack that names no stale tint gets the built-in dim")
 	_eq(plain.task_lights, ArtPack.TASK_LIGHTS_SOFT, "and daylight-strength desk lamps")
-	var dusk := ArtPack.from_manifest(DUSK_MANIFEST)
-	_eq(dusk.stale_tint, Color("#8f96b8"), "dusk names its own stale tint")
-	_eq(dusk.task_lights, ArtPack.TASK_LIGHTS_STRONG, "and is the lamp-lit studio")
+	var lamp_lit_keys := func(m: Dictionary) -> void:
+		m.stale_modulate = "8f96b8"
+		m.task_lights = "strong"
+	var lamp_lit := ArtPack.from_manifest(_mutated_pack("lamp-lit", lamp_lit_keys))
+	_eq(lamp_lit.stale_tint, Color("#8f96b8"), "a pack may name its own stale tint")
+	_eq(lamp_lit.task_lights, ArtPack.TASK_LIGHTS_STRONG, "and strong desk lamps")
 	# `filter` is optional in the schema and always written by the builder; a
 	# hand-written manifest gets the rule every other family follows. The
 	# shipped pack names nearest, so the dense pack that names nothing comes
@@ -644,7 +646,7 @@ func test_imports_follow_their_family() -> void:
 			)
 		)
 	_check(counted[false] > 0 and counted[true] > 0, "both rules are exercised: %s" % counted)
-	for family: String in [MANIFEST, DUSK_MANIFEST, PixelPeople.MANIFEST]:
+	for family: String in [MANIFEST, PixelPeople.MANIFEST]:
 		_eq(
 			ArtFamily.read_filter(ArtFamily.read_json(family)),
 			CanvasItem.TEXTURE_FILTER_NEAREST,

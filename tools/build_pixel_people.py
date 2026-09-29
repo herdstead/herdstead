@@ -20,7 +20,7 @@ Sources are drawn in *key colours*: a three-tone ramp per role (skin, top,
 legs, hair, hat) and a few fixed colours (ink, eyes, shoes, paper, cup, lens)
 that pass through unchanged. The build recolours every source into one strip
 per swatch of its layer's colour slot, by exact colour substitution with the
-ambiguity and unmapped-colour checks of ``tools/derive_theme.py``
+ambiguity and unmapped-colour checks of ``tools/recolour.py``
 (``remap_table`` and ``repaint``, imported, not copied):
 
 * ``<facing>/legs.png``, ``top.png``, ``body.png`` -> ``legs_<swatch>``, ``top_<swatch>``, ``body_<skin>``
@@ -64,7 +64,7 @@ from pathlib import Path
 from PIL import Image
 
 from build_assets import prune_unreferenced, report_pruned, save_if_pixels_moved
-from derive_theme import remap_table, repaint
+from recolour import remap_table, repaint
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -350,11 +350,11 @@ def source_palette(spec: dict) -> dict[str, str]:
 
 
 def table(palette: dict[str, str], overrides: dict[str, str]) -> dict:
-    """derive_theme's remap table: old RGB -> new RGB, refusing an ambiguous palette."""
+    """recolour's remap table: old RGB -> new RGB, refusing an ambiguous palette."""
     try:
         return remap_table(palette, overrides)
     except SystemExit as error:
-        raise PeopleError(str(error.code).removeprefix("derive_theme: ")) from error
+        raise PeopleError(str(error.code).removeprefix("recolour: ")) from error
 
 
 def shape_slot(spec: dict, layer: str) -> str | None:

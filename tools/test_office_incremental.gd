@@ -497,6 +497,8 @@ func test_picking_follows_the_window_scale() -> void:
 ## All of it through real input events, as the window delivers them.
 func test_office_actions_answer_their_keys() -> void:
 	var office := await _live_office()
+	# The office ships one pack; T cycles packs when it has more than one.
+	office.themes = PackedStringArray([office.manifest_path, _second_pack()])
 	# An [input] section of our own does not take the engine's built-ins away,
 	# and arrow-key panning is still Input.get_vector() over them.
 	for action: StringName in [&"ui_left", &"ui_right", &"ui_up", &"ui_down"]:
@@ -1013,9 +1015,9 @@ func test_structural_changes_reconcile() -> void:
 	office.fleet._sync_sites()
 	_check(office.world.get_instance_id() == world_id, "back to Local alone preserves the world")
 	world_id = office.world.get_instance_id()
-	office.switch_theme(MANIFESTS[1])
+	office.switch_theme(_second_pack())
 	_check(office.world.get_instance_id() != world_id, "a theme switch rebuilds")
-	_eq(office.art.id, &"dusk", "in the new pack")
+	_eq(office.art.id, SECOND_PACK, "in the new pack")
 	# Hit boxes still land on the desk they draw after in-place updates.
 	_feed(office, _with(renamed, "api:p4", {"agent_status": "done"}))
 	var target := HerdrFleet.pane_key(LOCAL, "api:p4")
@@ -1111,7 +1113,7 @@ func test_rapid_floor_calls_each_switch_and_the_world_stays_clickable() -> void:
 	_eq(office.world.get_instance_id(), world_id, "a snapshot updates the floor in place")
 	_eq(_badge(_station(office, desk)).state, &"working", "with its live data")
 	office.test_screen = Vector2(640, 320)
-	office.switch_theme(MANIFESTS[1])
+	office.switch_theme(_second_pack())
 	_eq(office.hud.floors.row_for(row.key), row, "theme and resize keep the floor buttons")
 	_check(not row.disabled, "still enabled")
 	_done(office)
@@ -1436,7 +1438,7 @@ func test_zoom_change_keeps_the_world() -> void:
 	await _frames(2)
 	_eq(office.world.get_instance_id(), world_id, "still the same world a frame later")
 	_eq(_desk_ids(office, ""), desks, "and still every desk")
-	office.switch_theme(MANIFESTS[1])
+	office.switch_theme(_second_pack())
 	_check(office.world.get_instance_id() != world_id, "a theme switch still rebuilds: its textures are new ones")
 	_done(office)
 
@@ -1496,7 +1498,7 @@ func test_theme_switch_keeps_the_hud() -> void:
 	var before := _screen_of(hud).theme
 	var panel: Texture2D = office.art.sprite_texture(office.art.panel())
 	# The remembered theme decides what the office starts on; switch to the other.
-	var other: String = MANIFESTS[1] if office.manifest_path == MANIFESTS[0] else MANIFESTS[0]
+	var other: String = _second_pack() if office.manifest_path == MANIFESTS[0] else MANIFESTS[0]
 	office.switch_theme(other)
 	await _frames(2)
 	var after := _screen_of(hud).theme
@@ -1675,7 +1677,7 @@ func test_standing_furniture_blocks_nothing() -> void:
 ## too (only a table, a worker and an overlay group their own drawing); and
 ## the only z_index anywhere in the world is OVERLAY_Z.
 func test_world_rules() -> void:
-	for manifest: String in MANIFESTS:
+	for manifest: String in [MANIFESTS[0], _second_pack()]:
 		# A done worker's paper and a blocked worker's bubble, on both sides, so the
 		# rules hold for them too.
 		var office := await _live_office(
@@ -1756,7 +1758,7 @@ func test_world_rules() -> void:
 ## worker sits between their chair and the table's near edge, a near worker
 ## between that edge and their chair. Seats come from the table.
 func test_sorting_by_position() -> void:
-	for manifest: String in MANIFESTS:
+	for manifest: String in [MANIFESTS[0], _second_pack()]:
 		var office := await _live_office(_with(fixture, "api:p3", {"agent": "pi"}))
 		office.switch_theme(manifest)
 		var seen := {}

@@ -113,7 +113,7 @@ it must be one flat colour), `selection` 128×128.)
 ### Palette keys you cannot darken freely
 
 These keys serve both as large surfaces and as text or icon colours, and the program cannot
-separate the two. Take care in a dark theme (Dusk Shift was tuned this way):
+separate the two. Take care in a dark theme (the retired Dusk Shift was tuned this way):
 
 | Key | Used for | Constraint |
 |---|---|---|
@@ -209,7 +209,7 @@ python3 -m venv .venv
 make import
 make check-packs
 
-# 6) See it for real; in the window press T to cycle through all themes, - / = to change the zoom
+# 6) See it for real; in the window press T to cycle through the themes, - / = to change the zoom
 godot --path . -- --pack=res://assets/<id>/manifest.json --read-only
 godot --path . scenes/preview.tscn -- --pack=res://assets/<id>/manifest.json
 godot --path . scenes/preview.tscn -- --pack=res://assets/<id>/manifest.json --offline
@@ -219,20 +219,8 @@ The last command's `--offline` is there to check your `stale_modulate`: the disc
 still show readable text and badges. `--read-only` on the office keeps it from ever writing to a
 herdr session running on your machine.
 
-**Recolouring without reshaping** needs no painting, and no copy of the source images: write a
-recipe, and the theme is a build product.
-
-```sh
-# tools/palettes/<id>.json is the whole recipe for this theme:
-# {"schema_version": 1, "from": "daylight", "id": "<id>", "name": "<display name>",
-#  "stale_modulate": "8f96b8", "task_lights": "strong", "palette": {"ink": "13171f", ...}}
-.venv/bin/python tools/derive_theme.py --recipe tools/palettes/<id>.json
-```
-
-`make art` derives every recipe under `tools/palettes/` and compares the result with the committed
-version. So **never hand-edit a derived `art/<id>/`**: change its recipe to change its look, and add
-images only to the source pack. Any colour in a source image that is not in the source pack's
-palette makes this tool fail with the file name and coordinates.
+**Recolouring without reshaping** by a recipe (the retired Dusk Shift) is no longer supported: a new
+theme is its own pack, copied from `art/daylight` and repainted.
 
 ---
 
@@ -324,12 +312,6 @@ Sizes may be mixed: a 32 px, a 64 px and a 128 px image are all accepted in the 
 The other rules of §2 (no holes in floors, pivot inside the canvas, semantic IDs, ...) apply in both
 modes, checked at the size you actually painted.
 
-**Note**: theme derivation looks at the pixels, not at the pack's `filter`. The shipped `daylight`
-declares `nearest`, so the build already checks its colours pixel by pixel, and `art/dusk` is derived
-from those palette pixels. A `linear` pack whose pixels all stay on the palette can be derived just
-the same. If a source pack ever switches to painted art off the palette, `tools/derive_theme.py`
-fails with the file name and coordinates: the intended loud failure, meaning that theme must now be
-painted on its own.
 
 ### Guide sheets at any density
 

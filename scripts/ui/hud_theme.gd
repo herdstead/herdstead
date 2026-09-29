@@ -49,7 +49,7 @@ const LABEL_HEADINGS: Dictionary[StringName, StringName] = {
 	&"ListChevron": ArtContract.SLATE,
 	&"ListChevronCurrent": ArtContract.PAPER,
 	# The top bar's counters: INK rather than SLATE for the small titles, which
-	# SLATE on CREAM leaves at 2.8:1 in dusk (measured); PAPER on a pressed one.
+	# SLATE on CREAM leaves at 2.8:1 in the retired dusk pack (measured); PAPER on a pressed one.
 	&"CounterTitle": ArtContract.INK,
 	&"CounterTitlePaper": ArtContract.PAPER,
 	&"CounterValue": ArtContract.INK,
@@ -192,7 +192,7 @@ static func _strategic(theme: Theme, art: ArtPack, heading: Font) -> void:
 
 ## The OVERVIEW (scenes/ui/overview*.tscn): rows that light up under the
 ## pointer like the agent list's (CREAM, not CREAM_SHADOW, which is dark in
-## dusk), the selected row in ink, an offline row muted; column heads on a
+## the retired dusk pack), the selected row in ink, an offline row muted; column heads on a
 ## cream band with an ink rule under it; and the `Timeline` type every
 ## timeline, the axis and the legend draw with: one palette colour per state,
 ## the hatch where nobody watched, the axis and now rule in ink, and the two
@@ -225,7 +225,7 @@ static func _overview(theme: Theme, art: ArtPack) -> void:
 		"OverviewRow": ArtContract.INK,
 		"OverviewRowCurrent": ArtContract.PAPER,
 		"OverviewRowDim": ArtContract.MUTED,
-		# INK, not SLATE: SLATE on CREAM is 2.8:1 in dusk (the counters' titles, measured).
+		# INK, not SLATE: SLATE on CREAM is 2.8:1 in the retired dusk pack (the counters' titles, measured).
 		"OverviewHead": ArtContract.INK,
 	}
 	for name: String in tones:
@@ -250,8 +250,8 @@ static func _overview(theme: Theme, art: ArtPack) -> void:
 		&"working": ArtContract.WORKING,
 		&"idle": ArtContract.WOOD_SHADOW,
 		&"unknown": ArtContract.MUTED,
-		# CREAM under SLATE lines: CREAM_SHADOW is near INK in dusk, where the
-		# SLATE hatch on it all but vanished (1.7:1, seen in the dusk capture).
+		# CREAM under SLATE lines: CREAM_SHADOW was near INK in the retired dusk pack, where the
+		# SLATE hatch on it all but vanished (1.7:1, seen in its capture).
 		&"unobserved_fill": ArtContract.CREAM,
 		&"unobserved_line": ArtContract.SLATE,
 		&"axis": ArtContract.INK,
@@ -441,8 +441,8 @@ static func _answer(theme: Theme, art: ArtPack) -> void:
 		key.content_margin_top = 0
 		key.content_margin_bottom = 0
 		theme.set_stylebox(state, "CardKey", key)
-		# The heading chip looks like a key: CREAM_SHADOW is dark in dusk, and INK
-		# on it could not be read (seen in the dusk capture).
+		# The heading chip looks like a key: CREAM_SHADOW was dark in the retired dusk pack, and INK
+		# on it could not be read (seen in its capture).
 		theme.set_stylebox(state, "CardHint", key)
 	for name: String in ["CardKey", "CardHint"]:
 		theme.set_color("font_color", name, art.color(ArtContract.INK))
@@ -692,8 +692,8 @@ static func _agent_list(theme: Theme, art: ArtPack) -> void:
 	theme.set_type_variation("ListRowCurrent", "Button")
 	theme.set_type_variation("ListGroup", "Button")
 	theme.set_type_variation("ListMore", "Button")
-	# CREAM, not CREAM_SHADOW: the shadow is dark in dusk, and the rows' dark
-	# text on it could not be read (seen in the dusk capture).
+	# CREAM, not CREAM_SHADOW: the shadow was dark in the retired dusk pack, and the rows' dark
+	# text on it could not be read (seen in its capture).
 	for state: String in BUTTON_STATES:
 		var hover := state == "hover" or state == "pressed"
 		var lit: StyleBox = _flat(art.color(ArtContract.CREAM)) if hover else StyleBoxEmpty.new()

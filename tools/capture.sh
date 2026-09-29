@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# PNGs of what the project looks like right now: the showroom in both packs,
+# PNGs of what the project looks like right now: the showroom,
 # the pixel people showroom at 2x and 4x, the live office against a fake herdr
 # at zoom 2 and zoom 4 (and with the drawer open, `--drawer=open`, every run
-# starting with it closed), the agent list in its flat and tree views in both packs
+# starting with it closed), the agent list in its flat and tree views
 # at 2x, 4x and the 480x320 minimum, and with three machines (one of them
 # dropped, one with worktree mezzanines), the NEWS strip and the drawer's
 # EVENTS page after a run of state changes (`--drawer=events`, office-events-*
@@ -17,16 +17,16 @@
 # offered and open on a blocked agent, 12 of 31 rows
 # clipped, not sent, unknown result, a refused line; START AGENT on a shell and
 # NEW PANE BESIDE on an agent; Close armed on a working agent and a branch typed
-# for a worktree) in both packs at 2x and 4x
+# for a worktree) at 2x and 4x
 # and at the 480x320 minimum; and the left column's FLOORS minimap with the signposts on the
 # worktrees fixture (mezzanines shown), beside a machine that drops mid-run and
-# one that never answers, in both packs at 2x, 4x and the minimum; and the
-# OVERVIEW (`--overview=open`): the showroom's two-hour mock in both packs, and
+# one that never answers, at 2x, 4x and the minimum; and the
+# OVERVIEW (`--overview=open`): the showroom's two-hour mock, and
 # the live office's while a run of state changes lands, at 2x, 4x and the minimum.
-# The lens held (`--lens=held`, office-lens-*: 2x, 4x, the minimum and dusk) and the
+# The lens held (`--lens=held`, office-lens-*: 2x, 4x and the minimum) and the
 # hover mark on a desk and on another floor's FLOORS row (`--point=`, office-point-*).
 # The strategic view (`--strategic=open`, office-strategic-*): the 80-pane stress
-# floor at 2x, 4x, the minimum and dusk, and the lens's stage at 2x.
+# floor at 2x, 4x and the minimum, and the lens's stage at 2x.
 #
 # Zoom is even only (OfficeScene.content_scale_for): the default 1920x960
 # window holds 2x and nothing more, so every 4x picture runs in a 1920x1280
@@ -257,7 +257,7 @@ godot_attempt() {
 }
 
 mkdir -p "$OUT"
-SHOTS="preview-daylight.png preview-dusk.png office-zoom2.png office-zoom4.png office-drawer-open-zoom2.png"
+SHOTS="preview-daylight.png office-zoom2.png office-zoom4.png office-drawer-open-zoom2.png"
 # NEWS and the drawer's EVENTS page after a run of status changes, 2x and the 480x320 minimum.
 SHOTS="$SHOTS office-events-zoom2.png office-events-min.png"
 # An agent starting in the shell api:p3: walking in from the door under the hourglass, 2x, 4x and the minimum.
@@ -273,14 +273,14 @@ for scale in zoom2 zoom4 min; do
 	done
 done
 # The agent list: flat (raised with --attention) and tree, per pack and scale.
-LIST_TAGS="daylight-zoom2 daylight-zoom4 dusk-zoom2 dusk-zoom4 daylight-min dusk-min"
+LIST_TAGS="daylight-zoom2 daylight-zoom4 daylight-min"
 for tag in $LIST_TAGS; do
 	SHOTS="$SHOTS list-flat-$tag.png list-tree-$tag.png"
 done
 SHOTS="$SHOTS list-machines-flat-zoom2.png list-machines-tree-zoom2.png list-machines-tree-zoom4.png"
 SHOTS="$SHOTS card-working-zoom2.png card-working-zoom4.png card-blocked-zoom2.png card-blocked-zoom4.png"
 # Answer mode and the START AGENT block: every state of tools/capture_card.gd, per pack and scale.
-CARD_TAGS="daylight-zoom2 daylight-zoom4 dusk-zoom2 dusk-zoom4 daylight-min dusk-min"
+CARD_TAGS="daylight-zoom2 daylight-zoom4 daylight-min"
 for tag in $CARD_TAGS; do
 	for state in picked offered answer rows not-sent unknown line-refused start start-confirm start-no-prompt new close-confirm worktree; do
 		SHOTS="$SHOTS card-$state-$tag.png"
@@ -295,7 +295,7 @@ for tag in $CARD_TAGS; do
 done
 # The minimap on the mezzanine 1A, and on 1F with the signpost down to 1A:
 # per pack, 2x, 4x and the 480x320 minimum.
-for pack in daylight dusk; do
+for pack in daylight; do
 	for scale in zoom2 zoom4 min; do
 		SHOTS="$SHOTS floors-$pack-$scale.png floors-signposts-$pack-$scale.png"
 	done
@@ -304,20 +304,20 @@ done
 # removed first and a missing one fails the run.
 SHOTS="$SHOTS people-zoom2.png people-zoom4.png"
 # The OVERVIEW: the showroom's mock log per pack, the live office per scale.
-SHOTS="$SHOTS preview-overview-daylight.png preview-overview-dusk.png"
+SHOTS="$SHOTS preview-overview-daylight.png"
 SHOTS="$SHOTS office-overview-zoom2.png office-overview-zoom4.png office-overview-min.png"
 # The lens held (`--lens=held`) over a stage with blocked and done since
 # before the office watched, working, idle in the pantry and a shell: 2x, 4x, the
-# minimum and dusk; and the hover mark (`--point=`) on a desk and on another
+# minimum; and the hover mark (`--point=`) on a desk and on another
 # floor's FLOORS row, 2x.
-SHOTS="$SHOTS office-lens-zoom2.png office-lens-zoom4.png office-lens-min.png office-lens-dusk-zoom2.png"
+SHOTS="$SHOTS office-lens-zoom2.png office-lens-zoom4.png office-lens-min.png"
 SHOTS="$SHOTS office-point-zoom2.png office-point-floor-zoom2.png"
 # The strategic view (`--strategic=open`) on the 80-pane stress floor at 2x,
-# 4x, the minimum and dusk, and on the lens's stage (a `+` wait, idle, done, a shell).
+# 4x and the minimum, and on the lens's stage (a `+` wait, idle, done, a shell).
 SHOTS="$SHOTS office-strategic-zoom2.png office-strategic-zoom4.png office-strategic-min.png"
-SHOTS="$SHOTS office-strategic-dusk-zoom2.png office-strategic-floors-zoom2.png"
+SHOTS="$SHOTS office-strategic-floors-zoom2.png"
 if [ "$CAPTURE_SET" = ci ]; then
-	SHOTS="preview-daylight.png preview-dusk.png people-zoom2.png people-zoom4.png office-zoom2.png office-zoom4.png"
+	SHOTS="preview-daylight.png people-zoom2.png people-zoom4.png office-zoom2.png office-zoom4.png"
 fi
 for shot in $SHOTS; do
 	rm -f "$OUT/$shot"
@@ -341,11 +341,9 @@ finish() {
 
 echo "== showroom"
 godot_run --path "$ROOT" scenes/preview.tscn -- --capture="$OUT/preview-daylight.png"
-godot_run --path "$ROOT" scenes/preview.tscn -- \
-	--pack=res://assets/dusk/manifest.json --capture="$OUT/preview-dusk.png"
 # The overview over the showroom, fed a two-hour mock state log (preview.gd).
 if [ "$CAPTURE_SET" = all ]; then
-	for pack in daylight dusk; do
+	for pack in daylight; do
 		godot_run --path "$ROOT" scenes/preview.tscn -- --pack=res://assets/$pack/manifest.json \
 			--overview=open --capture="$OUT/preview-overview-$pack.png"
 	done
@@ -662,8 +660,7 @@ for scale in zoom2 zoom4 min; do
 	EVENTS_PID=""
 done
 # The strategic view over the same stress floor: every one of the 80 squares.
-for view in "zoom2 2 daylight" "zoom4 4 daylight --resolution 1920x1280" "min 2 daylight --resolution 960x640" \
-	"dusk-zoom2 2 dusk"; do
+for view in "zoom2 2 daylight" "zoom4 4 daylight --resolution 1920x1280" "min 2 daylight --resolution 960x640"; do
 	read -r shot zoom pack window <<<"$view"
 	# shellcheck disable=SC2086
 	godot_run --path "$ROOT" $window -- --socket="$WORK/stress.sock" --read-only \
@@ -682,7 +679,7 @@ echo "== the agent list, flat and tree, against the same fake herdr"
 # 1920x1280 window. The staff panel along the bottom is its one line at every
 # size. The flat shots hold the keyboard (--attention), the tree shots not;
 # every list shot opens the drawer, which every run starts closed.
-for pack in daylight dusk; do
+for pack in daylight; do
 	for scale in zoom2 zoom4 min; do
 		zoom="${scale#zoom}"
 		window="$(window_for "$zoom")"
@@ -790,7 +787,7 @@ echo "== the agent card's answer mode, by real input, against the same fake herd
 # tools/capture_card.gd resets the fake to the floors fixture, opens exactly
 # the methods the card needs, and stages each state the way the tests do. The
 # minimum is a 960x640 window at 2x: the 480x320 screen the HUD must fit.
-for pack in daylight dusk; do
+for pack in daylight; do
 	for zoom in 2 4; do
 		# shellcheck disable=SC2046
 		godot_run --path "$ROOT" $(window_for "$zoom") --script tools/capture_card.gd -- --wait=30 \
@@ -806,7 +803,7 @@ echo "== the terminal monitor, by real input, against the same fake herdr"
 # tools/capture_monitor.gd resets the fake to the floors fixture with one pane
 # at 120x40, opens the monitor from the card, and shows the recorded dumps; its
 # only writes are to the fake. The same scales as the card.
-for pack in daylight dusk; do
+for pack in daylight; do
 	for zoom in 2 4; do
 		# shellcheck disable=SC2046
 		godot_run --path "$ROOT" $(window_for "$zoom") --script tools/capture_monitor.gd -- --wait=40 \
@@ -857,7 +854,7 @@ floors() {
 	wait "$DROPPER"
 	DROPPER=""
 }
-for pack in daylight dusk; do
+for pack in daylight; do
 	for view in "floors 2" "floors-signposts 1"; do
 		read -r shot floor <<<"$view"
 		floors "$shot" "$floor" "$pack" zoom2
@@ -908,8 +905,7 @@ conn.makefile().readline()
 conn.close()
 PY
 }
-for view in "zoom2 2 daylight" "zoom4 4 daylight --resolution 1920x1280" "min 2 daylight --resolution 960x640" \
-	"dusk-zoom2 2 dusk"; do
+for view in "zoom2 2 daylight" "zoom4 4 daylight --resolution 1920x1280" "min 2 daylight --resolution 960x640"; do
 	read -r shot zoom pack window <<<"$view"
 	# shellcheck disable=SC2086
 	CAPTURE_PREPARE=stage_lens godot_run --path "$ROOT" $window -- --socket="$WORK/herdr.sock" --read-only \

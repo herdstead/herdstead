@@ -1,7 +1,7 @@
 """Validate and copy the shared-table source art without repainting it.
 
-Normal builds only read art/<theme>/table and write assets/<theme>/table.
-daylight is editable; derive_theme.py recolours it into dusk using its recipe.
+Normal builds only read art/<theme>/table and write assets/<theme>/table
+(one theme today, daylight; night is a light over it, not a second pack).
 The module geometry is in density-1 units; the PNGs hold DENSITY texture pixels
 per unit, sampled nearest, so every canvas is its size in units times DENSITY.
 
@@ -47,7 +47,7 @@ from build_assets import copy_if_changed, prune_unreferenced, report_pruned, req
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKS = (ROOT / "art/daylight", ROOT / "art/dusk")
+PACKS = (ROOT / "art/daylight",)
 DENSITY = 2
 
 MODULES: dict[str, tuple[int, int]] = {
@@ -97,7 +97,7 @@ def pixel_map(target: Image.Image, rows: tuple[str, ...], legend: dict[str, str]
     """Paint rows of legend letters onto `target` from `at`; a '.' leaves the pixel as it is.
 
     Every letter names a palette key through `legend`, so a drawing can only
-    ever hold the pack's own colours and dusk stays an exact substitution.
+    ever hold the pack's own colours.
     """
     left, top = at
     width = len(rows[0])

@@ -163,8 +163,8 @@ herdr machine list ─ Roster ┘        │      commands: CommandContext in, C
 |---|---|
 | A semantic ID, palette key or state newly used by a scene / the HUD | `scripts/art/art_contract.gd` (`make check-packs` checks every pack against it); if the pack does not have it yet, add it to `art/daylight/pack.json`, then `make art` |
 | A field added to / changed in the manifest | `ArtPack.from_manifest()` (the only place that reads the JSON) and its typed field, `tools/build_assets.py`, `docs/ASSET_SPEC.md` |
-| Any source image or `pack.json` under `art/daylight/` | `make art`, and commit the products in `art/dusk/` and `assets/` with it (CI rebuilds and compares) |
-| A theme's colours | its recipe `tools/palettes/<id>.json`, then `make art`. **`art/dusk/` is derived and never edited by hand; new images go only into `art/daylight/`** |
+| Any source image or `pack.json` under `art/daylight/` | `make art`, and commit the products in `assets/` with it (CI rebuilds and compares) |
+| A theme's colours | its `pack.json` `palette` under `art/<id>/`, then `make art`. **New images go only into `art/daylight/`**; `assets/` is a build product |
 | The set of semantic IDs (one more prop / tile / icon) | only `art/daylight/pack.json`: Python has no second list. Add it to `art_contract.gd` only when a scene really draws it |
 | A new or renamed `.gd` / `.tscn` | commit its `.uid` with it; the directory list in the [manual](docs/MANUAL.md) |
 | A new PNG | commit its `.import` with it. `mipmaps/generate` goes by asset family (`docs/ASSET_SPEC.md`, "Import policy by asset family"): the nearest families (theme packs, their long tables and the pixel people, all density 2; the minimum zoom is 2, so they are never minified) keep the project default `false`; the only family still minified is the agent logos, which write `true` explicitly in their `.import`. `tools/test_art.gd` checks every PNG under `res://assets` by family |

@@ -10,10 +10,9 @@ from pathlib import Path
 from PIL import Image
 
 from build_table_assets import CURSOR_AT, DENSITY, FURNITURE, MODULES, ROOT, build_pack, generate_templates
-from derive_theme import derive, read_recipe, remap_table, repaint
 
 
-THEMES = ("daylight", "dusk")
+THEMES = ("daylight",)
 
 
 class SharedTableBuildTests(unittest.TestCase):
@@ -108,50 +107,6 @@ class SharedTableBuildTests(unittest.TestCase):
         self.assertEqual(self.tree_state(self.output), first)
         self.assertEqual(self.tree_state(self.source), before)
 
-    def test_recipe_derives_edited_table_pixels_before_runtime_copy(self):
-        path = self.source / "table/surface_mid_a.png"
-        # Palette colours come from the recipe, not repaint() under test.
-        day = json.loads((self.source / "pack.json").read_text())["palette"]
-        recipe = read_recipe(ROOT / "tools/palettes/dusk.json")
-        with Image.open(path) as original:
-            edited = original.copy()
-        point = (9 * DENSITY, 41 * DENSITY)
-        edited.putpixel(point, tuple(bytes.fromhex(day["ink"])) + (255,))
-        edited.save(path)
-        before = self.tree_state(self.source)
-        derived = self.root / "dusk"
-        derive(self.source, derived, recipe)
-        build_pack(derived, self.output)
-        with Image.open(derived / "table/surface_mid_a.png") as night:
-            self.assertEqual(night.getpixel(point), tuple(bytes.fromhex(recipe.palette["ink"])) + (255,))
-            self.assertEqual(night.getchannel("A").tobytes(), edited.getchannel("A").tobytes())
-        self.assertEqual((self.output / "table/surface_mid_a.png").read_bytes(),
-                         (derived / "table/surface_mid_a.png").read_bytes())
-        self.assertEqual(self.tree_state(self.source), before)
-        first = self.tree_state(derived / "table")
-        derive(self.source, derived, recipe)
-        self.assertEqual(self.tree_state(derived / "table"), first)
-
-    def test_recipe_rejects_bad_table_inputs_without_touching_source_or_output(self):
-        path = self.source / "table/shell_front.png"
-        recipe = read_recipe(ROOT / "tools/palettes/dusk.json")
-        with Image.open(path) as original:
-            edited = original.copy()
-        edited.putpixel((20, 27), (1, 2, 3, 255))
-        edited.save(path)
-        self.output.mkdir()
-        (self.output / "keep.png").write_bytes(b"prior derived art")
-        for invalid in ("foreign", "missing"):
-            with self.subTest(invalid=invalid):
-                if invalid == "missing":
-                    path.unlink()
-                before_source = self.tree_state(self.source)
-                before_output = self.tree_state(self.output)
-                with self.assertRaisesRegex(SystemExit, "table/shell_front.png"):
-                    derive(self.source, self.output, recipe)
-                self.assertEqual(self.tree_state(self.source), before_source)
-                self.assertEqual(self.tree_state(self.output), before_output)
-
     def test_build_rejects_overlapping_source_and_output(self):
         before = self.tree_state(self.source)
         for output in (self.source, self.source / "nested", self.root):
@@ -237,8 +192,6 @@ class SharedTableAssetTests(unittest.TestCase):
                         image.close()
 
     def test_wood_edges_match_in_colour_not_only_alpha(self):
-        day = json.loads((ROOT / "art/daylight/pack.json").read_text())["palette"]
-        dusk = json.loads((ROOT / "art/dusk/pack.json").read_text())["palette"]
         for prefix, mids in (("surface", ("mid_a", "mid_b")), ("apron", ("mid",))):
             for theme in THEMES:
                 root = ROOT / "art" / theme / "table"
@@ -258,20 +211,10 @@ class SharedTableAssetTests(unittest.TestCase):
                             for offset in range(2, 3 * DENSITY + 1):
                                 self.assertEqual(edge, a.crop((a.width - offset, 0, a.width - offset + 1, a.height)).tobytes())
                                 self.assertEqual(edge, b.crop((offset - 1, 0, offset, b.height)).tobytes())
-            for suffix in ("left", *mids, "right"):
-                name = f"{prefix}_{suffix}.png"
-                with Image.open(ROOT / "art/daylight/table" / name) as source, \
-                        Image.open(ROOT / "art/dusk/table" / name) as night:
-                    expected, foreign = repaint(source, remap_table(day, dusk), name, False)
-                    self.assertFalse(foreign)
-                    self.assertEqual(expected.tobytes(), night.convert("RGBA").tobytes(), "wood geometry is theme-invariant")
 
-    def test_low_chairs_have_open_frames_and_theme_invariant_geometry(self):
-        day = json.loads((ROOT / "art/daylight/pack.json").read_text())["palette"]
-        dusk = json.loads((ROOT / "art/dusk/pack.json").read_text())["palette"]
+    def test_chairs_are_a_persons_scale_with_a_column_under_the_seat(self):
         for view in ("front", "back"):
-            with Image.open(ROOT / f"art/daylight/table/chair_{view}.png") as daylight, \
-                    Image.open(ROOT / f"art/dusk/table/chair_{view}.png") as night:
+            with Image.open(ROOT / f"art/daylight/table/chair_{view}.png") as daylight:
                 alpha = daylight.getchannel("A")
                 bounds = alpha.getbbox()
                 # Every probe is a unit of the 32x48 canvas, times DENSITY.
@@ -286,13 +229,8 @@ class SharedTableAssetTests(unittest.TestCase):
                 self.assertEqual((alpha.getpixel((12 * d, 39 * d)), alpha.getpixel((16 * d, 39 * d)), alpha.getpixel((20 * d, 39 * d))),
                                  (0, 255, 0), "a gas-lift column, not a box, between the seat and the base")
                 self.assertEqual(set(alpha.getdata()), {0, 255}, "chair has a translucent background")
-                expected, foreign = repaint(daylight, remap_table(day, dusk), view, False)
-                self.assertFalse(foreign)
-                self.assertEqual(expected.tobytes(), night.convert("RGBA").tobytes(), "dusk must be a palette-only derivation")
 
     def test_laptops_are_low_centered_and_shell_marks_do_not_change_the_silhouette(self):
-        day = json.loads((ROOT / "art/daylight/pack.json").read_text())["palette"]
-        dusk = json.loads((ROOT / "art/dusk/pack.json").read_text())["palette"]
         for view in ("rear", "front"):
             for theme in THEMES:
                 with Image.open(ROOT / f"art/{theme}/table/monitor_{view}.png") as normal, \
@@ -307,7 +245,7 @@ class SharedTableAssetTests(unittest.TestCase):
                     self.assertEqual(alpha.tobytes(), shell.getchannel("A").tobytes(), "shell is a marking, not a new shape")
                     self.assertEqual(set(alpha.getdata()), {0, 255}, "no translucent canvas or halo")
                     self.assertNotEqual(normal.tobytes(), shell.tobytes(), "shell prompt is actually painted")
-                    palette = day if theme == "daylight" else dusk
+                    palette = json.loads((ROOT / "art" / theme / "pack.json").read_text())["palette"]
                     mark = tuple(bytes.fromhex(palette["ink" if view == "rear" else "paper"])) + (255,)
                     cursor = CURSOR_AT[view]
                     self.assertEqual(shell.getpixel(cursor), mark, "shell cursor contrasts with silver lid or dark screen")
@@ -330,16 +268,8 @@ class SharedTableAssetTests(unittest.TestCase):
                         self.assertEqual((at(28, 56), at(35, 56)), (silver, silver),
                                          "and no wider than its six texels")
                         self.assertNotEqual(at(32, 52), silver, "keyboard is distinct from the palmrest")
-            for prefix in ("monitor", "shell"):
-                with Image.open(ROOT / f"art/daylight/table/{prefix}_{view}.png") as source, \
-                        Image.open(ROOT / f"art/dusk/table/{prefix}_{view}.png") as night:
-                    expected, foreign = repaint(source, remap_table(day, dusk), view, False)
-                    self.assertFalse(foreign)
-                    self.assertEqual(expected.tobytes(), night.convert("RGBA").tobytes(), "dusk only changes palette")
 
-    def test_tapered_legs_keep_floor_contact_and_theme_geometry(self):
-        day = json.loads((ROOT / "art/daylight/pack.json").read_text())["palette"]
-        dusk = json.loads((ROOT / "art/dusk/pack.json").read_text())["palette"]
+    def test_tapered_legs_keep_floor_contact(self):
         for theme in THEMES:
             with Image.open(ROOT / f"art/{theme}/table/leg.png") as leg:
                 alpha = leg.getchannel("A")
@@ -354,12 +284,6 @@ class SharedTableAssetTests(unittest.TestCase):
                 self.assertLess(glide[2] - glide[0], shoulder[2] - shoulder[0], "no broad pedestal beneath the shaft")
                 for y in range(39 * d):
                     self.assertIsNotNone(alpha.crop((0, y, alpha.width, y + 1)).getbbox(), "joint and glide stay attached")
-        for name in ("leg", "bracket"):
-            with Image.open(ROOT / f"art/daylight/table/{name}.png") as source, \
-                    Image.open(ROOT / f"art/dusk/table/{name}.png") as night:
-                expected, foreign = repaint(source, remap_table(day, dusk), name, False)
-                self.assertFalse(foreign)
-                self.assertEqual(expected.tobytes(), night.convert("RGBA").tobytes(), "supports share geometry across themes")
 
     def test_builder_reproduces_runtime_modules(self):
         for theme in THEMES:

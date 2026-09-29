@@ -1,9 +1,7 @@
 """Fail if a generated tree differs from the committed one.
 
-`assets/` is generated from `art/`, and the derived themes under `art/` are
-generated in turn from their recipe and the pack they come from, so both are
-checked the same way and both are committed products: a hand edit inside one is
-drift, not work.
+`assets/` is generated from `art/` and is a committed product: a hand edit
+inside it is drift, not work.
 
 PNGs are compared by decoded RGBA pixels, not bytes: the atlas is re-encoded by
 Pillow, and zlib builds differ across platforms while the pixels stay identical.

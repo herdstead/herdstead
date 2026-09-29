@@ -575,7 +575,7 @@ func test_a_cold_pass_places_the_pantry_and_the_seated() -> void:
 		_eq(_station(office, _pane("api:p2")).rest, OfficeRests.Rest.PANTRY, when + ": p2 in the pantry")
 	check.call("first drawn")
 	_eq(_shown_papers(office), [_pane("api:p4")], "first drawn: p4's paper")
-	office.switch_theme(MANIFESTS[1])
+	office.switch_theme(_second_pack())
 	check.call("another theme")
 	_eq(_shown_papers(office), [_pane("api:p4")], "another theme: p4's paper")
 	_set_online(office, false)

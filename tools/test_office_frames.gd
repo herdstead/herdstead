@@ -275,7 +275,7 @@ func test_the_same_plan_hangs_the_same_frames_whatever_herdr_says() -> void:
 			pane.agent_name = "agent-%d" % index
 			pane.provider = "claude"
 			index += 1
-	var dusk := OfficeDraw.new(ArtPack.from_manifest("res://assets/dusk/manifest.json"))
+	var second_pen := OfficeDraw.new(ArtPack.from_manifest(_second_pack()))
 	var hung := 0
 	for width: int in [20, 32, 60]:
 		var plan := _planned(quiet, width)
@@ -285,7 +285,7 @@ func test_the_same_plan_hangs_the_same_frames_whatever_herdr_says() -> void:
 		var frames := OfficeShell.frames(plan, pen)
 		hung += frames.size()
 		_eq(OfficeShell.frames(plan, pen), frames, "%d cells: asked again, the same pictures" % width)
-		_eq(OfficeShell.frames(plan, dusk), frames, "%d cells: in the dusk pack too" % width)
+		_eq(OfficeShell.frames(plan, second_pen), frames, "%d cells: in another pack too" % width)
 		_eq(OfficeShell.frames(other, pen), frames, "%d cells: herdr's states and focus move none" % width)
 	_check(hung > 0, "the floors hang pictures: %d" % hung)
 

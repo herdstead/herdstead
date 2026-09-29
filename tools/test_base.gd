@@ -20,6 +20,9 @@ extends SceneTree
 ## the error itself (see ScriptErrorLog). tools/run_tests.sh still fails the
 ## whole run on any `SCRIPT ERROR` in the log, inside a case or not.
 
+## The id of the second pack the pack-switching cases switch to.
+const SECOND_PACK := &"second"
+
 var failures: Array = []
 ## The case running now; every failure is reported under it.
 var current := ""
@@ -231,3 +234,83 @@ func _drop(data: Dictionary, path: Array) -> void:
 	for step: String in path.slice(0, path.size() - 1):
 		holder = _dict(holder, step)
 	holder.erase(path[path.size() - 1])
+
+
+## A copy of the pack `source` names, in `root_dir`, at `density` pixels per unit
+## and sampled the way `filter` names, with `changes` laid over its manifest's
+## top-level keys (a "palette" change is merged key by key). Returns the copy's
+## manifest path; a copy already there is reused. The fixtures that stand in for
+## a second pack (the office ships one; night is a light over it) are built here.
+func _copied_pack(
+	source: String, root_dir: String, density: int, filter := "nearest", changes: Dictionary = {}
+) -> String:
+	var manifest_path := root_dir.path_join("manifest.json")
+	if FileAccess.file_exists(manifest_path):
+		return manifest_path
+	var base: String = source.get_base_dir()
+	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(source))
+	var images: Array = [data.atlas]
+	for category: String in ["props", "ui"]:
+		for id: String in data[category]:
+			images.append(data[category][id].path)
+	var source_density := int(_number(data, "density", 1))
+	for path: String in images:
+		# get_image() can be the texture's own image: resize a copy.
+		var image: Image = (load(base.path_join(path)) as Texture2D).get_image().duplicate()
+		var target_size := Vector2i(
+			image.get_width() / source_density * density, image.get_height() / source_density * density
+		)
+		image.resize(target_size.x, target_size.y, Image.INTERPOLATE_NEAREST)
+		DirAccess.make_dir_recursive_absolute(root_dir.path_join(path).get_base_dir())
+		image.save_png(root_dir.path_join(path))
+	# The shared table is a companion manifest at its own density: copy it as is.
+	var table_target := root_dir.path_join("table")
+	DirAccess.make_dir_recursive_absolute(table_target)
+	var table_data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(base.path_join("table/manifest.json")))
+	for id: String in table_data.modules:
+		var module_path: String = table_data.modules[id].path
+		(load(base.path_join("table").path_join(module_path)) as Texture2D).get_image().save_png(
+			table_target.path_join(module_path)
+		)
+	var table_file := FileAccess.open(table_target.path_join("manifest.json"), FileAccess.WRITE)
+	table_file.store_string(JSON.stringify(table_data))
+	table_file.close()
+	var font_path := str(_dict(data, "font").get("path", ""))
+	DirAccess.make_dir_recursive_absolute(root_dir.path_join(font_path).get_base_dir())
+	var font := FileAccess.open(root_dir.path_join(font_path), FileAccess.WRITE)
+	font.store_buffer(FileAccess.get_file_as_bytes(base.path_join(font_path)))
+	font.close()
+	data.schema_version = 2
+	data.density = density
+	data.filter = filter
+	for key: String in changes:
+		if key == "palette":
+			var palette := _dict(data, "palette")
+			palette.merge(_dict(changes, "palette"), true)
+		else:
+			data[key] = changes[key]
+	var file := FileAccess.open(manifest_path, FileAccess.WRITE)
+	file.store_string(JSON.stringify(data))
+	file.close()
+	return manifest_path
+
+
+## That second pack, built in `root_dir`: the shipped one under its own id and
+## name, its task light and ink other colours, so a switch shows. The office ships one
+## pack (night is a light over it); switching packs is still code it runs.
+func _second_pack_at(root_dir: String) -> String:
+	return _copied_pack(
+		"res://assets/daylight/manifest.json",
+		root_dir,
+		2,
+		"nearest",
+		{"id": str(SECOND_PACK), "name": "Second Pack", "palette": {"task_light": "7fb4ff", "ink": "1d2a44"}}
+	)
+
+
+## The suite's work directory, from run_tests.sh's `--work=`; "" without one.
+func _work_dir() -> String:
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--work="):
+			return argument.trim_prefix("--work=")
+	return ""

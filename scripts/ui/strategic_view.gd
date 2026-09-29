@@ -11,7 +11,7 @@ extends HdPanel
 ## over the hidden world and under the OVERVIEW, the bubble tooltip and the
 ## monitor: FLOORS, the drawer, the staff panel and NEWS stay usable beside it.
 ## On the pack's panel, like the OVERVIEW, so its ink reads in every pack (the
-## bare backdrop is near ink in dusk). A view mode, not a layer: while it is
+## bare backdrop was near ink in the retired dusk pack). A view mode, not a layer: while it is
 ## open the world's nameplates, badges and bubbles are hidden with the world,
 ## so every field is still drawn once. It draws a StrategicModel and nothing
 ## else; every node is the scene's and is kept.

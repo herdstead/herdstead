@@ -1438,7 +1438,7 @@ func test_office_two_machines() -> void:
 	# Theme switch rebuilds the floor; resize retains its layout. Neither restarts a client.
 	var clients := _clients(office)
 	var picked: String = office.picked_key
-	var other: String = MANIFESTS[1] if office.manifest_path == MANIFESTS[0] else MANIFESTS[0]
+	var other: String = _second_pack() if office.manifest_path == MANIFESTS[0] else MANIFESTS[0]
 	var old_world: Node2D = office.world
 	var old_rows: Array = office.hud.floors.row_keys()
 	office.switch_theme(other)

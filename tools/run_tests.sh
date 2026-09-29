@@ -347,7 +347,7 @@ run_scene_suite test_office_layout "OFFICE LAYOUT TESTS" "$MIN_CASES_OFFICE_LAYO
 # The entry band's fixtures and who rests where: pure, no office.
 run_scene_suite test_office_service "OFFICE SERVICE TESTS" "$MIN_CASES_OFFICE_SERVICE"
 run_scene_suite test_office_navigator "OFFICE NAVIGATOR TESTS" "$MIN_CASES_OFFICE_NAVIGATOR"
-run_scene_suite test_office_geometry "OFFICE GEOMETRY TESTS" "$MIN_CASES_OFFICE_GEOMETRY"
+run_scene_suite test_office_geometry "OFFICE GEOMETRY TESTS" "$MIN_CASES_OFFICE_GEOMETRY" -- --work="$WORK"
 # The framed pictures on the row walls: pure placement, the shell that draws
 # it, and the live office's frames through status, focus, selection and a drop.
 run_scene_suite test_office_frames "OFFICE FRAMES TESTS" "$MIN_CASES_OFFICE_FRAMES" -- --read-only \
@@ -370,7 +370,7 @@ run_scene_suite test_floors "FLOORS TESTS" "$MIN_CASES_FLOORS" -- --read-only \
 	--socket="$WORK/floors-nowhere.sock" --work="$WORK"
 
 run_scene_suite test_attention_store "ATTENTION STORE TESTS" "$MIN_CASES_ATTENTION_STORE"
-run_scene_suite test_agent_list "AGENT LIST TESTS" "$MIN_CASES_AGENT_LIST"
+run_scene_suite test_agent_list "AGENT LIST TESTS" "$MIN_CASES_AGENT_LIST" -- --work="$WORK"
 run_scene_suite test_attention_integration "ATTENTION INTEGRATION TESTS" "$MIN_CASES_ATTENTION_INTEGRATION" -- \
 	--read-only --socket="$WORK/attention-nowhere.sock" --work="$WORK"
 

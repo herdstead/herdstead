@@ -10,8 +10,8 @@ them the scenes draw with is scripts/art/art_contract.gd's half, held by
 Runs against any compliant pack source, not just Daylight:
 
     python tools/test_assets.py -v                        # art/daylight
-    python tools/test_assets.py --source art/dusk -v
-    HERDSTEAD_PACK_SOURCE=art/dusk python tools/test_assets.py -v
+    python tools/test_assets.py --source /path/to/pack -v
+    HERDSTEAD_PACK_SOURCE=/path/to/pack python tools/test_assets.py -v
 """
 import contextlib
 import copy
@@ -32,7 +32,7 @@ import check_build_clean
 import draw_pixel_sources
 from build_assets import ROOT, build, contract_size, packs, people_animations, save_if_pixels_moved, validate
 from build_table_assets import build_pack as build_table
-from derive_theme import Recipe, derive, read_recipe, recipes
+from recolour import remap_table, repaint
 from upscale_pack import upgrade
 from wall_templates import generate as wall_templates, wall_image
 
@@ -675,84 +675,25 @@ class DensityContractTests(unittest.TestCase):
 
     ## --- the other tools ------------------------------------------------------
 
-    def recipe(self, source_pack: dict, **changes) -> Recipe:
-        """A one-colour recipe against the pack under test, written to a file and read back."""
-        data = {"schema_version": 1, "from": "daylight", "id": "probe", "name": "Probe",
-                "palette": {next(iter(source_pack["palette"])): "123456"}}
-        data.update(changes)
-        path = self.root / f"recipe-{len(list(self.root.glob('recipe-*.json')))}.json"
-        path.write_text(json.dumps(data))
-        return read_recipe(path)
-
-    def test_derive_theme_reads_the_whole_recipe_and_checks_it(self):
-        source_pack = self.read_pack(SOURCE)
-        strict = self.upgraded(2, "strict", filter_name="nearest")
-        derived_source = self.root / "derived"
-        derived = self.quiet(derive, strict, derived_source,
-                             self.recipe(source_pack, task_lights="strong", stale_modulate="8f96b8"))
-        self.assertEqual((derived["schema_version"], derived["density"], derived["filter"]), (2, 2, "nearest"))
-        # id, name and the optional keys are the derived pack's own, from the
-        # recipe; nothing is passed on a command line any more.
-        self.assertEqual((derived["id"], derived["name"]), ("probe", "Probe"))
-        self.assertEqual((derived["task_lights"], derived["stale_modulate"]), ("strong", "8f96b8"))
-        output = self.root / "derived-out"
-        manifest = self.quiet(build, derived_source, output)
-        self.assertEqual((manifest["density"], manifest["filter"]), (2, "nearest"))
-        self.assert_built_at(derived_source, output, 2)
-
-    def test_derive_theme_refuses_a_recipe_that_is_not_one(self):
-        source_pack = self.read_pack(SOURCE)
-        for changes, message in (
-            ({"schema_version": 2}, "unsupported recipe schema_version"),
-            ({"id": ""}, 'needs a non-empty "id"'),
-            ({"from": "../elsewhere"}, "names a directory under art/"),
-            ({"palette": {}}, 'needs a non-empty "palette"'),
-            ({"palette": {"ink": "#123456"}}, "must be six lowercase hex digits"),
-            ({"task_lights": "bright"}, '"task_lights" must be'),
-        ):
-            with self.subTest(changes=changes), self.assertRaisesRegex(SystemExit, message):
-                self.recipe(source_pack, **changes)
-        # A key the source pack has no colour for is caught when it is applied.
-        bogus = self.recipe(source_pack, palette={"chartreuse": "123456"})
-        with self.assertRaisesRegex(SystemExit, "no colour for: chartreuse"):
-            self.quiet(derive, SOURCE, self.root / "no", bogus)
-
-    def test_every_recipe_covers_every_palette_key(self):
-        # derive_theme refuses a key the source has no colour for, but not one
-        # the recipe leaves out: that key would keep the source's colour in the
-        # derived theme without a word. So a new palette key lands with its
-        # value in every recipe, in the same commit.
-        found = recipes()
-        self.assertTrue(found, "no recipe under tools/palettes")
-        for path in found:
-            recipe = read_recipe(path)
-            source = json.loads((ROOT / "art" / recipe.source_name / "pack.json").read_text())["palette"]
-            with self.subTest(recipe=path.name):
-                self.assertEqual(sorted(set(source) - set(recipe.palette)), [],
-                                 f"{path.name} gives no colour for these art/{recipe.source_name} keys")
-                self.assertEqual(sorted(set(recipe.palette) - set(source)), [],
-                                 f"{path.name} colours keys art/{recipe.source_name} does not have")
-
-    def test_derive_theme_judges_a_pack_by_its_pixels_not_by_its_filter(self):
-        # The build never holds a `linear` pack to the palette, but one painted
-        # in palette colours is still derivable. A `linear` pack derives fine...
-        source_pack = self.read_pack(SOURCE)
-        painted = self.upgraded(2, "painted")
-        self.assertEqual(self.read_pack(painted).get("filter", "linear"), "linear")
-        self.quiet(derive, painted, self.root / "from-linear", self.recipe(source_pack))
-        # ... and one off-palette pixel stops it, by file and by coordinate, with
-        # the reason the failure is loud rather than a silent fallback.
-        path = painted / source_pack["ui"]["panel"]["path"]
-        with Image.open(path) as opened:
-            image = opened.convert("RGBA")
-        image.putpixel((3, 5), (1, 2, 3, 255))
-        image.save(path)
+    def test_recolour_refuses_an_ambiguous_palette_and_names_an_off_palette_pixel(self):
+        # What is left of the retired theme derivation, used by the pixel
+        # people build: a palette whose colours repeat cannot be remapped, and
+        # an off-palette pixel is named by file and coordinate, never guessed.
+        with self.assertRaisesRegex(SystemExit, "ambiguous: a and b are both #123456"):
+            remap_table({"a": "123456", "b": "123456"}, {})
+        table = remap_table({"a": "123456", "b": "654321"}, {"a": "abcdef"})
+        image = Image.new("RGBA", (4, 4), (0x12, 0x34, 0x56, 255))
+        image.putpixel((0, 0), (0, 0, 0, 0))
+        painted, foreign = repaint(image, table, "probe.png", False)
+        self.assertEqual(painted.getpixel((1, 1)), (0xab, 0xcd, 0xef, 255))
+        self.assertEqual(painted.getpixel((0, 0)), (0, 0, 0, 0), "transparency carries no colour")
+        self.assertEqual(foreign, set())
+        image.putpixel((3, 2), (1, 2, 3, 255))
         with self.assertRaises(SystemExit) as caught:
-            self.quiet(derive, painted, self.root / "no", self.recipe(source_pack))
-        self.assertIn("ui/panel.png holds colours outside the source palette: #010203 at (3, 5)", str(caught.exception))
-        self.assertIn("needs its own method", str(caught.exception))
-        # --keep-foreign still lets an artist look at the result.
-        self.quiet(derive, painted, self.root / "forced", self.recipe(source_pack), True)
+            repaint(image, table, "probe.png", False)
+        self.assertIn("probe.png holds colours outside the source palette: #010203 at (3, 2)", str(caught.exception))
+        _, kept = repaint(image, table, "probe.png", True)
+        self.assertEqual(kept, {(1, 2, 3)})
 
     def test_a_generated_png_is_only_rewritten_when_its_pixels_move(self):
         # Every builder writes through this, so a rerun of `make art` puts no

@@ -5,7 +5,7 @@ so the same semantic IDs can be drawn at up to 256 px per tile. Both share the s
 that meets the contract is never resampled. Sizes written "per 32 px tile" are density-1 values; v2 multiplies
 them by the density.
 
-The shipped packs, `daylight` and `dusk`, are **schema 2 / density 2 / nearest**: 1 world unit = 2 texture
+The shipped pack, `daylight`, is **schema 2 / density 2 / nearest**: 1 world unit = 2 texture
 pixels, with layout still in 32-unit tiles. Their long tables (`<pack>/table/`) and the pixel people are density
 2, nearest too. Display scales are even only (2×–8×), so every texel lands on whole screen pixels. A source not
 yet repainted at 2x is a 1x source the build fills in with NEAREST 2×2 blocks.
@@ -165,11 +165,8 @@ atlas is `atlas_size × d` with `32·d` cells. From schema 2 on, `manifest.json`
 Per-pixel checks multiply by each image's own `k`, not the pack's `d`, so a half-repainted pack is checked at the
 size each image is actually painted.
 
-`tools/derive_theme.py` **judges pixels, not the `filter` flag**: every opaque source pixel must be exactly one
-of the source palette's colours. `daylight` declares `nearest`, so the build already holds it to the palette; a
-`linear` pack still derives while its pixels stay on the palette. Off-palette pixels fail with file name and
-coordinates. That loud failure is intended: dusk would then need its own sources or runtime recolouring. Do
-not relax the rule.
+`daylight` declares `nearest`, so the build holds every source pixel to its palette. (A second pack derived from it
+by recolouring, Dusk Shift, was retired on 2026-09-29: night is to be a light over the one pack.)
 
 ## Tiles (29)
 
@@ -212,7 +209,7 @@ Each structural cell belongs to one module: a corner or T joint replaces the sid
 pair, with no side wall drawn underneath. An inner cross wall is T-left, center…, End-right; the right main aisle
 has no cross wall. Walls stay on Ground, cut open at the front; walkable space is validated by the FloorPlan,
 never inferred from transparent pixels. The build checks port pixels and coverage; still look at seams, corners,
-T joints and free ends in daylight and dusk at 2× and 4×.
+T joints and free ends at 2× and 4×.
 
 ## Open floor and long tables
 
@@ -240,14 +237,11 @@ top-left. The family is **density 2**, sampled NEAREST; canvases, rows, columns 
   from the front) mostly hides behind its seated worker, and the near one (`chair_back`, from behind) reaches the
   worker's shoulder blades, so the head, neck and shoulders show over it. Both are painted (GPT Image 2.5,
   pixelized), with a one-texel `deep` outline.
-- Daylight and dusk share the geometry and differ only in palette.
 
-### Table sources, derivation and templates
+### Table sources and templates
 
 - **`art/daylight/table/` is the source**: 18 PNGs and `manifest.json`. The build only reads it: no repainting,
   no saving back, no deleting unlisted drafts.
-- **`art/dusk/table/` is derived** by `derive_theme.py` from the dusk recipe, keeping alpha, canvases and
-  geometry. A non-palette pixel fails with file and coordinates.
 - **`assets/<id>/table/` is the runtime copy**: `build_table_assets.py` validates the whole set, then copies PNGs
   and manifest byte for byte. It refuses missing, broken, non-RGBA or fully transparent images, sizes other than
   contract × `DENSITY`, and a mismatched manifest; a failed validation writes nothing. It prunes only stale
@@ -265,7 +259,7 @@ top-left. The family is **density 2**, sampled NEAREST; canvases, rows, columns 
 The table contract is fixed (schema 2, density 2, `filter: nearest`, 18 modules, one set of size / pivot / views /
 assembly) and `manifest.json` must match the builder's; the build never repairs it. Changing table geometry
 means updating the contract and the world model together; changing pixels needs no code or manifest change. `make
-art` derives dusk, copies both themes' tables, then compares against the committed products.
+art` copies the table, then compares against the committed products.
 
 The table sorts as one piece by its near edge. Each pane is an `OfficeStation` (chair, occupant, badge, click
 area, incremental-update boundary). Near and far panes in the same layout x column face each other; a pane with
@@ -407,24 +401,20 @@ positions, pauses motion, dims the picture and says STALE; idle never stands in 
 0. **Add a prop / tile / UI icon** (no Python change):
    1. Put the PNG in `art/daylight/<props|tiles|ui>/` at contract size × the pack's density.
    2. Add an entry to the category in `art/daylight/pack.json`: `path`, plus `size` / `pivot` (`cell` for a tile).
-   3. `make art`: derives dusk, rebuilds every pack, compares the committed products.
+   3. `make art`: rebuilds every pack, compares the committed products.
    4. **Only when a scene draws it**, add a constant to `scripts/art/art_contract.gd` and its `*_ids()`; until
       then `make check-packs` lists it under `PACK_UNUSED` ("in the pack, drawn by nobody").
 
-   Never put images in `art/dusk/`: it is derived (step 2).
 1. **Change one image**: replace the same-named PNG in `art/daylight/` (or `art/daylight/table/`), keeping canvas,
-   pivot, transparency and palette, then `make art`. Never edit `art/dusk/table/`. The table builder alone only
-   validates and copies one theme; it neither derives dusk nor redraws a missing source. `make test-art` checks
+   pivot, transparency and palette, then `make art`. The table builder alone only validates and copies one
+   theme; it never redraws a missing source. `make test-art` checks
    canvases (contract × density), source / runtime byte equality, surface / divider seams, and that sources are
    kept and rebuilds are identical.
 2. **Reskin a pack**: copy `art/daylight/`, keep semantic IDs and geometry, change palette and PNGs, build with
-   `--source` / `--output`. For colours only, write a **recipe** `tools/palettes/<id>.json` and `make art`
-   derives `art/<id>/`. A recipe is a JSON object: `schema_version`, `from` (the source pack's directory under
-   `art/`), `id`, `name`, `palette`, and optionally `stale_modulate` and `task_lights`. A derived pack **is a
-   build product, like `assets/`**: `make art` compares it to the committed copy, and hand edits are drift.
-   Built into `assets/<id>/`, a pack is discovered at startup: choose it with `--pack`, with `manifest_path` on
-   the root node, or cycle with `T` (stored in `user://herdstead.cfg`; precedence `--pack=` > saved > scene
-   default). `art/dusk` ("Dusk Shift") is the sample second theme; its recipe is `tools/palettes/dusk.json`.
+   `--source` / `--output`. Built into `assets/<id>/`, a pack is discovered at startup: choose it with
+   `--pack`, with `manifest_path` on the root node, or, with more than one, cycle with `T` (stored in
+   `user://herdstead.cfg`; precedence `--pack=` > saved > scene default). A recolour-only pack derived by a
+   recipe (the retired Dusk Shift) is no longer supported.
 3. **Raise the density** (to schema v2), one image at a time:
 
    ```sh
@@ -450,8 +440,8 @@ positions, pauses motion, dims the picture and says STALE; idle never stands in 
    herdr is disconnected; default `Color(0.65, 0.65, 0.65)`. Additive to schema v1, no version bump; read through
    `ArtPack.stale_tint`. A dark theme should set it, or 0.65 grey crushes the picture.
 8. **Optional task-light strength**: top-level `"task_lights": "soft" | "strong"` sets how strongly the table's
-   task-light wedges and chair contact shadows draw; default `"soft"`, and `art/dusk` uses `"strong"`. Additive
-   to schema v1; a derived pack's value is in its recipe; read through `ArtPack.task_lights`.
+   task-light wedges and chair contact shadows draw; default `"soft"`. Additive to schema v1; read through
+   `ArtPack.task_lights`.
    `scripts/world/table.gd` looks only at this key, **never at the pack's name**.
 9. **Scene dependency list**: the palette keys, props, UI, tiles, states and animations scenes use, plus the table
    modules and the pixel people (every semantic animation has a track in both poses, seated tracks draw the
@@ -504,7 +494,7 @@ draw the back). The product manifest is not named `manifest.json`, so it is neve
 | `variation` | slots that vary per pane and their pools (repeats weight); now skin, hair style, hair colour, glasses (about 1 pane in 6) |
 
 Key and fixed colours are all distinct, since recolouring is a table lookup; the builder checks for ambiguity with
-`derive_theme.remap_table()`.
+`recolour.remap_table()` (`tools/recolour.py`).
 
 | Motion | Facings | Frames | Use |
 |---|---|---|---|
@@ -640,7 +630,7 @@ per-facing index sheets keeps one draw call per person.
   −38 and 9 wide (units from the pivot, ink included; the bent arm −36..−35 and 12); the bent arm is never higher
   than the straight one (`RaisedHandTests`, both built at the shipped density and ring, wearing the shipped skins;
   each has pinned density-1 hashes). "3×3 hand, 1 thumb" are cells: a density-2 cell is 2×2 texels.
-- Recolouring is an exact per-pixel substitution (`derive_theme.repaint()`); each product strip maps only its own
+- Recolouring is an exact per-pixel substitution (`recolour.repaint()`); each product strip maps only its own
   layer's role, and any other key colour is an error.
 - The brim is measured in units: hair above the hat's lowest **unit** row must be under the hat (at density 2,
   above the first row of the unit holding the hat's lowest texel).
@@ -803,8 +793,8 @@ rule the builder checks). The output directory must be empty; painted work is ne
   (`.claude/skills/painter`, GPT Image 2.5 Sunburst): `pixelize.py` fixes canvas, pivot, palette and outline, and
   `tilefix.py` pins the connecting pixels (wood floor outer band, wall boundary rows and ports, tileable edges, the
   nine-patch middle, the table's outer columns) back onto the contract. `done_stack`, `plant_b` and `wall_frame`
-  were painted new and committed exactly as `pixelize.py` wrote them (`--check` clean, no hand edits); dusk
-  derives them by recipe. Requests and candidates are not kept in the repository.
+  were painted new and committed exactly as `pixelize.py` wrote them (`--check` clean, no hand edits). Requests and
+  candidates are not kept in the repository.
 - The white model and first versions of tiles and icons come from this project's drawing scripts; every source PNG
   is directly editable. No third-party game sprites were extracted.
 - Code and art are MIT licensed (`LICENSE`); Nunito Sans and Tiny5 are under the SIL OFL 1.1, and their licence

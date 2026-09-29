@@ -329,7 +329,7 @@ func test_a_new_theme_or_floor_walks_nobody() -> void:
 	_feed(office, _without(_with(fixture, "api:p1", {"agent_status": "idle"}), "api:p2"))
 	_check(_walkers(office).size() == 2 and _ghosts(office).size() == 1, "one worker goes to the pantry, one leaves")
 	_step(office, 1.0 / FPS, 5)
-	office.switch_theme(MANIFESTS[1])
+	office.switch_theme(_second_pack())
 	_eq([_ids(_walkers(office)), _ids(_ghosts(office))], [[], []], "a new theme walks nobody")
 	var body := _station(office, _pane("api:p1")).actor()
 	var resting := _station(office, _pane("api:p1"))
@@ -905,7 +905,7 @@ func test_a_seeded_lifecycle_keeps_every_invariant() -> void:
 				if not frozen:
 					_eq(_ids(_walkers(office)), [], when + ": a reconnect places everybody")
 			elif roll < 0.16:
-				var theme: String = MANIFESTS[rng.randi() % 2]
+				var theme: String = [MANIFESTS[0], _second_pack()][rng.randi() % 2]
 				office.switch_theme(theme)
 				_eq(_ids(_walkers(office)), [], when + ": a new theme places everybody")
 			else:

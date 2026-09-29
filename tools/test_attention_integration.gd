@@ -116,6 +116,8 @@ func test_list_arrows_move_the_cursor_not_the_camera() -> void:
 
 func test_office_keys_still_work_while_the_list_has_the_keyboard() -> void:
 	var office := await _listed_office()
+	# The office ships one pack; T cycles packs when it has more than one.
+	office.themes = PackedStringArray([office.manifest_path, _second_pack()])
 	await _key_cycle(KEY_A)
 	var list := office.hud.agent_list
 	var selected := office.picked_key

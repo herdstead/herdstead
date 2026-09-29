@@ -213,10 +213,10 @@ func test_lamps_follow_focus_and_redraw_only_what_moved() -> void:
 
 ## A table set up again for another pack draws every lamp it keeps anew, at
 ## the level it had: a lamp's colour is the pack's, so the guard that skips a
-## lamp already at its level must not skip these (dusk burns them harder).
+## lamp already at its level must not skip these.
 func test_a_table_set_up_for_another_pack_redraws_its_lamps() -> void:
 	var day := ArtPack.from_manifest(MANIFESTS[0])
-	var dusk := ArtPack.from_manifest(MANIFESTS[1])
+	var other := ArtPack.from_manifest(_second_pack())
 	var world := Node2D.new()
 	var ground := Node2D.new()
 	var sorted := Node2D.new()
@@ -230,9 +230,9 @@ func test_a_table_set_up_for_another_pack_redraws_its_lamps() -> void:
 	table.light(0, "far", OfficeTable.Lamp.FOCUS)
 	_eq(table.lamps_drawn, drawn, "a lamp already at its level is not drawn again")
 	var day_focus := table.lamp_color(OfficeTable.Lamp.FOCUS)
-	_check(table.setup(dusk, 160, [48.0, 112.0]), "set up for dusk")
-	_check(table.lamp_color(OfficeTable.Lamp.FOCUS) != day_focus, "dusk's focus lamp is another colour")
-	_eq(table.task_light(0, "far").color, table.lamp_color(OfficeTable.Lamp.FOCUS), "the focus lamp in dusk's colour")
+	_check(table.setup(other, 160, [48.0, 112.0]), "set up for the other pack")
+	_check(table.lamp_color(OfficeTable.Lamp.FOCUS) != day_focus, "its focus lamp is another colour")
+	_eq(table.task_light(0, "far").color, table.lamp_color(OfficeTable.Lamp.FOCUS), "the focus lamp in its colour")
 	_eq(table.task_light(1, "near").color, table.lamp_color(OfficeTable.Lamp.DIM), "the dim one too")
 	_check(table.task_light(0, "far").visible and not table.task_light(0, "near").visible, "on and off as before")
 	world.free()

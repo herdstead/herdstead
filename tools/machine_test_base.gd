@@ -6,7 +6,7 @@ extends "res://tools/test_base.gd"
 ## it holds no cases of its own.
 
 const FIXTURES := "res://tools/fixtures/"
-const MANIFESTS := ["res://assets/daylight/manifest.json", "res://assets/dusk/manifest.json"]
+const MANIFESTS := ["res://assets/daylight/manifest.json"]
 ## The live office with a viewport size this suite decides; see the file.
 const OfficeDouble := preload("res://tools/office_double.gd")
 ## Real seconds any single wait may take before the check fails.
@@ -670,3 +670,8 @@ func _loop_clean_text(value: Variant) -> String:
 		if not control and not bidi:
 			kept += text[index]
 	return kept.strip_edges()
+
+
+## The second pack the pack-switching cases switch to (test_base.gd).
+func _second_pack() -> String:
+	return _second_pack_at(args.work.path_join("machines-pack-second"))

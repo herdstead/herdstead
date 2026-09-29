@@ -17,12 +17,8 @@ RUNS ?= 3
 # The one test entry point, for `test` and for `check`.
 RUN_TESTS = GODOT=$(GODOT) PYTHON=$(PYTHON) bash tools/run_tests.sh
 
-# Every runtime art pack, by the directory it lives in: daylight dusk …
+# Every runtime art pack, by the directory it lives in (today only daylight).
 PACKS := $(notdir $(patsubst %/manifest.json,%,$(wildcard assets/*/manifest.json)))
-# The editable packs that are themselves generated: one recipe under
-# tools/palettes/ derives art/<its name>. They are committed products, so `make
-# art` holds them to the commit exactly as it holds assets/.
-DERIVED := $(patsubst tools/palettes/%.json,art/%,$(wildcard tools/palettes/*.json))
 
 .DEFAULT_GOAL := help
 .PHONY: help setup import imported run people people-templates people-skins wall-templates table-templates pixel-sources test test-art check check-scripts check-packs smoke docs-check lint fmt art capture walk-strips perf pack export clean
@@ -89,12 +85,11 @@ lint:  ## gdlint (config in gdlintrc) and a gdformat check over scripts/ and too
 fmt:  ## Format scripts/ and tools/ the way `make lint` expects
 	$(GDFORMAT) --line-length=120 scripts tools
 
-art:  ## Derive the recipe-built packs, rebuild assets/ from art/, and prove both match the commit
-	$(PYTHON) tools/derive_theme.py
+art:  ## Rebuild assets/ from art/ and prove it matches the commit
 	$(PYTHON) tools/build_assets.py
 	$(PYTHON) tools/build_table_assets.py
 	$(PYTHON) tools/build_pixel_people.py
-	$(PYTHON) tools/check_build_clean.py assets $(DERIVED)
+	$(PYTHON) tools/check_build_clean.py assets
 
 people:  ## Open the pixel people showroom: every agent, or every frame of one look (see scripts/people_showroom.gd for flags)
 	$(GODOT) --path . scenes/people_showroom.tscn
