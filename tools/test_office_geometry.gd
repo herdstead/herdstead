@@ -793,7 +793,7 @@ func test_the_bubble_clears_every_click_target_and_its_neighbours() -> void:
 
 
 ## A done seat's paper sits right of its laptop: over the laptop's right edge
-## by at most three columns of pixels, clear of the worker (x±10 around the
+## by at most three columns of pixels (today it clears it), clear of the worker (x±10 around the
 ## seat) and of whatever the next column's decoration slot may hold, on either
 ## side, every column.
 func test_the_paper_stack_sits_beside_the_laptop_and_off_the_neighbours() -> void:

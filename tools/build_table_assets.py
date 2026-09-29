@@ -25,14 +25,15 @@ numbers are world units; a probe in the PNG is the unit times DENSITY):
 - apron_* 32x3 and divider_* 32x24: fully opaque.
 - leg 20x40: last opaque row 38, so the foot stands on y 37 below its mount at
   y -2; every row is attached; ankle and glide are narrower than the shoulder.
-- chair_front / chair_back 32x48: nothing above row 16, feet on row 45 over the
-  pivot [16, 46], a backrest over (16, 22), an open gap in columns 14..17 in
-  some row 26..29, a seat over (16, 31), and the two views differ.
-- monitor_* / shell_* 32x32: columns 2..29 (centred on x 16), feet on row 29
-  over the pivot [16, 30]; the rear starts at row 18 or lower, the front at row
-  12 or lower. A shell view is its normal view plus a `$_` mark with the same
-  silhouette: ink on the rear lid, paper on the front screen, its cursor at
-  (19, 25) on the rear and (19, 21) on the front.
+- chair_front / chair_back 32x48: nothing above row 22 (at most 24 units
+  tall), centred on x 16 and at most 18 wide, feet on row 45 over the pivot
+  [16, 46], a backrest over (16, 26), a seat over (16, 35), a gas-lift column
+  at row 39 (opaque at x 16, clear at x 12 and 20), and the two views differ.
+- monitor_* / shell_* 32x32, drawn texel by texel: at most 14 wide (columns
+  9..22, centred on x 16), feet on row 29 over the pivot [16, 30]; the rear
+  starts at row 22 or lower, the front at row 19 or lower. A shell view is its
+  normal view plus a `$_` mark with the same silhouette: ink on the rear lid,
+  paper on the front screen, its cursor at CURSOR_AT (texels).
 """
 from __future__ import annotations
 
@@ -234,8 +235,10 @@ def bracket(palette: dict[str, str]) -> Image.Image:
     return pixel_map(image(MODULES["bracket"]), BRACKET, {"K": "deep", "d": "wood_dark", "s": "wood_shadow"}, palette)
 
 
-## One office chair, 22 wide (columns 5..26), feet on row 45, an open frame
-## between backrest and seat. The two views differ in more than colour: a far
+## The first office chair, kept as an authoring template only: the shipped
+## chairs are painted, 17 wide over rows 24..45 (the docstring holds their
+## contract). One office chair, 22 wide (columns 5..26), feet on row 45, an
+## open frame between backrest and seat. The two views differ in more than colour: a far
 ## chair (front view) sits four units behind its worker, so its backrest rises
 ## over the seated head (rows 16..27) and reads as a chair, not as two blobs
 ## beside the face; a near chair (back view) sits in front of its worker, so
@@ -317,94 +320,108 @@ def chair(palette: dict[str, str], view: str) -> Image.Image:
     return result
 
 
-## A silver laptop, 28 wide (columns 2..29). From behind: the lid with its dark
-## mark and the hinge (rows 18..29). From the front: the screen over the
-## keyboard deck and its centred trackpad (rows 12..29).
+## A silver laptop, 14 units wide (columns 9..22), drawn texel by texel at the
+## family's density: at 14 units a unit-thick outline would leave no room
+## inside, so its outline is one texel, like the chairs and the people. From
+## behind: the lid with its dark mark over the hinge and the base (texel rows
+## 44..59, units 22..29). From the front: the screen over the keyboard deck and
+## its centred trackpad (texel rows 38..59, units 19..29). Top-left texel of
+## each map, on the 64x64 canvas:
+LAPTOP_AT = {"rear": (18, 44), "front": (18, 38)}
 LAPTOP_REAR = (
     ".KKKKKKKKKKKKKKKKKKKKKKKKKK.",
     "KYYYYYYYYYYYYYYYYYYYYYYYYYYK",
     "KMMMMMMMMMMMMMMMMMMMMMMMMMJK",
-    "KMMMMMMMMMMMMMIMMMMMMMMMMMJK",
+    "KMMMMMMMMMMMMMMMMMMMMMMMMMJK",
+    "KMMMMMMMMMMMMMMMMMMMMMMMMMJK",
     "KMMMMMMMMMMMMIIMMMMMMMMMMMJK",
     "KMMMMMMMMMMMMIIMMMMMMMMMMMJK",
+    "KMMMMMMMMMMMMMMMMMMMMMMMMMJK",
     "KMMMMMMMMMMMMMMMMMMMMMMMMMJK",
     "KMMMMMMMMMMMMMMMMMMMMMMMMMJK",
     "KJJJJJJJJJJJJJJJJJJJJJJJJJJK",
     "KKKKKKKKKKKKKKKKKKKKKKKKKKKK",
     "KSMMMMMMMMMMMMMMMMMMMMMMMMSK",
+    "KSMMMMMMMMMMMMMMMMMMMMMMMMSK",
+    "KSSSSSSSSSSSSSSSSSSSSSSSSSSK",
     ".KKKKKKKKKKKKKKKKKKKKKKKKKK.",
 )
 LAPTOP_FRONT = (
     ".KKKKKKKKKKKKKKKKKKKKKKKKKK.",
     "KJJJJJJJJJJJJJJJJJJJJJJJJJJK",
-    "KJDDDDDDDDDDDDDDDDDDDDDDDDSK",
-    "KJDDDDDDDDDDDDDDDDDDDDDDDDSK",
-    "KJDDDDDDDDDDDDDDDDDDDDDDDDSK",
-    "KJDDDDDDDDDDDDDDDDDDDDDDDDSK",
-    "KJDDDDDDDDDDDDDDDDDDDDDDDDSK",
-    "KJDDDDDDDDDDDDDDDDDDDDDDDDSK",
-    "KJDDDDDDDDDDDDDDDDDDDDDDDDSK",
-    "KJDDDDDDDDDDDDDDDDDDDDDDDDSK",
+    *(("KJDDDDDDDDDDDDDDDDDDDDDDDDSK",) * 9),
     "KSSSSSSSSSSSSSSSSSSSSSSSSSSK",
     "KKKKKKKKKKKKKKKKKKKKKKKKKKKK",
     "KMSSSSSSSSSSSSSSSSSSSSSSSSMK",
-    "KMSDSDSDSDSDSDSDSDSDSDSDSSMK",
+    "KMS" + "DS" * 11 + "SMK",
     "KMSSSSSSSSSSSSSSSSSSSSSSSSMK",
-    "KMMMMMMMMMMMJJJJMMMMMMMMMMMK",
-    "KMMMMMMMMMMMJJJJMMMMMMMMMMMK",
+    "KMSS" + "DS" * 11 + "MK",
+    "KMSSSSSSSSSSSSSSSSSSSSSSSSMK",
+    "KMMMMMMMMMMJJJJJJMMMMMMMMMMK",
+    "KMMMMMMMMMMJJJJJJMMMMMMMMMMK",
+    "KMMMMMMMMMMMMMMMMMMMMMMMMMMK",
     ".KKKKKKKKKKKKKKKKKKKKKKKKKK.",
 )
 LAPTOP_LEGEND = {
     "K": "deep", "D": "deep", "S": "slate", "M": "muted", "J": "jacket_light",
     "Y": "sky_light", "I": "ink",
 }
-## An agent's screen shows two lines of output; a shell's shows its prompt.
-SCREEN_LINES = ((8, 16, 12, "sky_dark"), (8, 18, 8, "slate"))
-## Deliberately $_, not the >_ speech badge used by working agents.
+## An agent's screen shows two lines of output, a shell's its prompt (texels:
+## x, y, width, key).
+SCREEN_LINES = ((21, 42, 12, "sky_dark"), (21, 44, 8, "slate"))
+## The rear lid's mark (texels: x, y, width, height), silver on a shell's lid.
+LID_MARK = (31, 49, 2, 2)
+## Deliberately $_, not the >_ speech badge used by working agents: a texel
+## glyph, its top-left texel and the cursor after it, per view. The rear's is
+## centred on the lid, the front's starts at the screen's left like a prompt.
 PROMPT = ("..#..", ".####", "#.#..", ".###.", "..#.#", "####.", "..#..")
+PROMPT_AT = {"rear": (27, 46), "front": (21, 41)}
+## The cursor's first texel; tools/test_table_assets.py probes it.
+CURSOR_AT = {"rear": (33, 52), "front": (27, 47)}
+CURSOR_WIDTH = 4
 
 
 def laptop(palette: dict[str, str], rear: bool) -> Image.Image:
-    """The laptop at a seat, seen from behind (far seats) or from the front (near seats)."""
-    result = image(FURNITURE["monitor_rear"])
-    if rear:
-        pixel_map(result, LAPTOP_REAR, LAPTOP_LEGEND, palette, (2, 18))
-    else:
-        pixel_map(result, LAPTOP_FRONT, LAPTOP_LEGEND, palette, (2, 12))
-        for x, y, width, key in SCREEN_LINES:
-            rect(result, (x, y, width, 1), rgba(palette, key))
+    """The laptop at a seat, seen from behind (far seats) or from the front
+    (near seats), already at the family's density (generate_templates does
+    not blow it up)."""
+    view = "rear" if rear else "front"
+    width, height = FURNITURE[f"monitor_{view}"]
+    result = Image.new("RGBA", (width * DENSITY, height * DENSITY), (0, 0, 0, 0))
+    pixel_map(result, LAPTOP_REAR if rear else LAPTOP_FRONT, LAPTOP_LEGEND, palette, LAPTOP_AT[view])
+    if not rear:
+        for x, y, line, key in SCREEN_LINES:
+            rect(result, (x, y, line, 1), rgba(palette, key))
     return result
 
 
 def shell_mark(monitor: Image.Image, view: str, palette: dict[str, str], density: int = DENSITY) -> Image.Image:
     """A shell's laptop: a copy of `monitor` (the `rear` or `front` view, at
-    `density` pixels a unit) with the `$_` prompt in place of what an agent's
+    the family's density) with the `$_` prompt in place of what an agent's
     laptop shows, the silhouette untouched.
 
     The rear loses the maker's mark on its lid to silver and takes the prompt
     in ink; the front loses its two lines of output to the dark screen and
-    takes the prompt in paper. Unit coordinates, each one a density x density block.
+    takes the prompt in paper. Texel coordinates: the laptop is drawn texel by
+    texel, so its marks are too.
     """
     require(view in ("rear", "front"), f"shell_mark: no {view!r} view")
+    require(density == DENSITY, f"shell_mark: the laptop is drawn at density {DENSITY}, not {density}")
     expected = tuple(value * density for value in FURNITURE[f"monitor_{view}"])
     require(monitor.size == expected, f"shell_mark: the {view} monitor is {monitor.size}, not {expected}")
     result = monitor.copy()
-
-    def block(x: int, y: int, width: int, height: int, key: str) -> None:
-        rect(result, (x * density, y * density, width * density, height * density), rgba(palette, key))
-
     if view == "rear":
-        block(15, 21, 2, 3, "muted")
+        rect(result, LID_MARK, rgba(palette, "muted"))
     else:
-        for x, y, width, _ in SCREEN_LINES:
-            block(x, y, width, 1, "deep")
-    mark = "ink" if view == "rear" else "paper"
-    top = 19 if view == "rear" else 15
+        for x, y, line, _ in SCREEN_LINES:
+            rect(result, (x, y, line, 1), rgba(palette, "deep"))
+    mark = rgba(palette, "ink" if view == "rear" else "paper")
+    left, top = PROMPT_AT[view]
     for y, row in enumerate(PROMPT):
         for x, pixel in enumerate(row):
             if pixel == "#":
-                block(10 + x, top + y, 1, 1, mark)
-    block(18, top + 6, 4, 1, mark)
+                result.putpixel((left + x, top + y), mark)
+    rect(result, (*CURSOR_AT[view], CURSOR_WIDTH, 1), mark)
     return result
 
 
@@ -434,12 +451,13 @@ def generate_templates(source: Path, output: Path) -> None:
         "bracket": bracket(palette),
         "chair_front": chair(palette, "front"),
         "chair_back": chair(palette, "back"),
-        "monitor_rear": laptop(palette, True),
-        "monitor_front": laptop(palette, False),
     }
-    # Drawn in units, written at the family's density; the shells are marked
-    # on the written monitors, the way a repainted monitor gets its shell.
+    # Drawn in units, written at the family's density; the laptop is drawn at
+    # that density already. The shells are marked on the written monitors, the
+    # way a repainted monitor gets its shell.
     sprites = {name: upscale(sprite, DENSITY) for name, sprite in makers.items()}
+    sprites["monitor_rear"] = laptop(palette, True)
+    sprites["monitor_front"] = laptop(palette, False)
     for view in ("rear", "front"):
         sprites[f"shell_{view}"] = shell_mark(sprites[f"monitor_{view}"], view, palette, DENSITY)
     manifest = table_manifest(pack)

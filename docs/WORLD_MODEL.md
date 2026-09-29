@@ -101,7 +101,7 @@ table's origin at the left end of its near edge:
 | `render_rect` | `(-8, -150, width + 16, 222)`: selection frame plus people, plates and badges; bottom edge **72** |
 | `reserved_rect` | `(-32, -192, width + 64, 288)`: adds the side passages and drawing clearance for standing and approach points; bottom edge 96 |
 | Seats | far `(x, -68)`, near `(x, 22)` |
-| Laptops | same x as the seat, no side offset; far foot `(x, -72)` (8 inside the far edge), near `(x, -10)` (2 before the near working edge). Rear view 12 units tall, front view with keyboard 18. A shell's empty chair gets the same laptop as an agent |
+| Laptops | same x as the seat, no side offset; far foot `(x, -72)` (8 inside the far edge), near `(x, -10)` (2 before the near working edge). 14 units wide; rear view 8 units tall, front view with keyboard 11. A shell's empty chair gets the same laptop as an agent |
 | Near edge and supports | The working surface ends at `NEAR_SURFACE_EDGE = -8`; a 3-unit lip meets the apron at `APRON_DROP = -5`, `APRON_HEIGHT = 3`, 6 thick in all. `LEG_DROP = -2`, the 39-unit visible leg still lands at y = 37; `BRACKET_DROP = -11`. Lamp light stops at the working surface, never past the edge |
 | Divider | top `DIVIDER_TOP = 28` below the far edge, `DIVIDER_HEIGHT = 24` |
 | Chair | `CHAIR_OFFSET` far −4 (sorts just behind the worker), near 6 (just in front) |
@@ -410,10 +410,11 @@ kept is the plan and the view, not the people's nodes or animation clocks across
   nodes. Measured over every frame: seated, the head reaches y = −31 above the feet (a blocked worker's raised hand
   −36); standing, the head spans −37..−25; every figure is x −8..8 (16 wide, ±12 with a raised hand). A hood is
   headwear that hides the hair layer while worn.
-- `chair_front` / `chair_back` are built from one front/back source image: a low-lumbar office chair with an open
-  back and casters. `CHAIR_OFFSET.near = 6` only keeps the front/back order; there is no large offset to dodge the
-  person. Chairs belong to the table family and are density 2 like the floor (the source is a density-1 drawing
-  scaled ×2 nearest); geometry is in units and does not change with density.
+- `chair_front` / `chair_back` are one office chair from the front and from behind: armrests, a gas-lift column
+  and casters, 17 wide over rows 24–45, at a person's scale (the far one mostly hides behind its seated worker).
+  `CHAIR_OFFSET.near = 6` only keeps the front/back order; there is no large offset to dodge the person. Chairs
+  belong to the table family and are density 2 like the floor (painted at 2x); geometry is in units and does not
+  change with density.
 - The preview keeps a capped bystander in a terra top in front of the API table as a regression check.
 
 Pose and chair-back changes happen only in the art; the depth and foot-point rules do not change.
@@ -441,7 +442,7 @@ Besides the client / machine / incremental-update tests, `tools/run_tests.sh` ch
   units above the head (or raised hand); the selection frame encloses the whole person. The blocked bubble covers
   neither the person (raised hand included) nor the plate text; on tables 160 to 416 wide, the bubbles on both sides
   of every column intersect no seat click area and no other bubble. The paper stack is right of the laptop, overlapping
-  it by at most 3 pixel columns, clear of the person (x ± 10) and the next column's decor slot, with its opaque pixels
+  it by at most 3 pixel columns (the 14-wide laptop leaves a gap), clear of the person (x ± 10) and the next column's decor slot, with its opaque pixels
   on the decor's two working planes.
 - A standing person walking into a table is stopped by its footprint collider; a seated person's feet collider is
   off.

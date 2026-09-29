@@ -68,7 +68,7 @@ const LAMP_ALPHA: Array[float] = [0.0, 0.10, 0.22, 0.52]
 const LAMP_STRONG := 1.4
 ## A station's chair relative to its seat: the far chair (front view) sorts
 ## just behind its worker, the near chair (back view) in front. The painted
-## lumbar chair is under 25 units tall; a small offset leaves the upper back clear.
+## office chair is 22 units tall; a small offset leaves the upper back clear.
 const CHAIR_OFFSET := {"far": -4, "near": 6}
 ## The selection frame encloses the whole workstation island (both rows of
 ## workers with their plates and badges), so it never crosses a seated worker.
@@ -86,9 +86,9 @@ const DECOR_FAR := -55
 const DECOR_NEAR := -9
 ## A done seat's stack of paper (ArtContract.PROP_DONE_STACK) stands this far
 ## right of the seat column, on the same working plane as the decorations
-## (DECOR_FAR or DECOR_NEAR). Measured: the laptop is opaque over x-14..x+13
-## and the stack, 16 wide, over x+11..x+26, so it overlaps the laptop's right
-## edge by 3 columns and stays clear of the worker (x±10) and of the next
+## (DECOR_FAR or DECOR_NEAR). Measured: the laptop is opaque over x-7..x+6
+## and the stack, 16 wide, over x+11..x+26, so it stands a little right of the
+## laptop, clear of the worker (x±10 with room to spare) and of the next
 ## column's decoration, whose leftmost opaque pixel is at x+27. The left of the
 ## laptop is the decoration slot, which never changes with state.
 const PAPERS_ASIDE := 19
@@ -503,7 +503,7 @@ func _sync_shadows() -> void:
 		var points := PackedVector2Array()
 		for step in 16:
 			var angle := TAU * step / 16.0
-			points.append(center + Vector2(cos(angle) * 19.0, sin(angle) * 4.0))
+			points.append(center + Vector2(cos(angle) * 12.0, sin(angle) * 3.0))
 		shadow.polygon = points
 		shadow.color = color
 

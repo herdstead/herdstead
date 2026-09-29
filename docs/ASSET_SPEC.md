@@ -235,8 +235,11 @@ top-left. The family is **density 2**, sampled NEAREST; canvases, rows, columns 
 - Legs are solid wood narrowing twice, a dark mount above and a small glide below. `leg` is 20×40 with its last
   opaque row at 38, hung at y −2, so the foot stands on y 37; `bracket` is 12×10 at y −11.
 - Chairs are charcoal (`jacket` ramp, `ink` shadow, `deep` outline), not teal, so teal clothes against a chair
-  back never merge. The far chair (`chair_front`) has its back from row 16, above the seated head; the near chair
-  (`chair_back`) from row 21, below it, so the whole head shows. Both share seat, gap and base.
+  back never merge. Both are the same office chair at a person's scale, 17 wide over rows 24–45 (22 units, about
+  60% of a standing person), with armrests, a gas-lift column and a five-star base: the far one (`chair_front`,
+  from the front) mostly hides behind its seated worker, and the near one (`chair_back`, from behind) reaches the
+  worker's shoulder blades, so the head, neck and shoulders show over it. Both are painted (GPT Image 2.5,
+  pixelized), with a one-texel `deep` outline.
 - Daylight and dusk share the geometry and differ only in palette.
 
 ### Table sources, derivation and templates
@@ -252,10 +255,10 @@ top-left. The family is **density 2**, sampled NEAREST; canvases, rows, columns 
 - **Procedural drawing is authoring only**: `make table-templates` (and `make pixel-sources`, with the desk
   library) exports into the empty directory `OUT` names; `make art` never runs it. To redo geometry, change the
   drawing functions, export, review and copy chosen files into `art/daylight/table/`. Drawings are made in units
-  on a 1x canvas and scaled by `DENSITY` with NEAREST as written. `shell_*` is derived from the written
-  `monitor_*` by `shell_mark()` (covers the lid mark on the rear, clears two output rows on the front, then draws
-  `$_` with its cursor at unit (19, 25) / (19, 21)); derive it again after repainting a monitor, because the
-  probe points are contract. The pixel contract of every image (transparent surface rows, the leg's last row,
+  on a 1x canvas and scaled by `DENSITY` with NEAREST as written, except the laptop, which `laptop()` draws texel
+  by texel at `DENSITY`. `shell_*` is derived from the written `monitor_*` by `shell_mark()` (covers the lid mark
+  on the rear, clears two output rows on the front, then draws a texel `$_` with its cursor at `CURSOR_AT`);
+  derive it again after redrawing a monitor, because the probe points are contract. The pixel contract of every image (transparent surface rows, the leg's last row,
   chair and laptop probe points) is in the docstring of `tools/build_table_assets.py`, and
   `tools/test_table_assets.py` checks each item.
 
@@ -273,9 +276,10 @@ darkens the floor. Full depth, collision and geometry rules: [the world model](W
 
 **The laptop** is `furniture.monitor` in the table family: a 32×32-unit canvas, pivot `[16,30]`. Views
 `rear_shell / front_privacy` map to `monitor_rear / monitor_front`; `shell_rear / shell_front` add a static `$_`
-mark on the same silhouette. All four are 28 units wide (columns 2–29), centred on x 16; the rear is 12 tall, the
-front with keyboard 18. Silver lid with a small dark mark and lit top edge, hinge line, dark screen with two
-output lines, keyboard and centred trackpad, in `muted / jacket_light / sky_light`; no stand, no runtime shrinking.
+mark on the same silhouette. All four are 14 units wide (columns 9–22), narrower than the seated worker's
+shoulders, centred on x 16; the rear is 8 tall, the front with keyboard 11, drawn texel by texel with a one-texel
+`deep` outline. Silver lid with a small dark mark and lit top edge, hinge line, dark screen with two output lines,
+keyboard and centred trackpad, in `muted / jacket_light / sky_light`; no stand, no runtime shrinking.
 The far mark is a dark `$_` on the lid, the near one a light `$_` on the screen. `TablePack.from_manifest()` /
 `TableFurniture.views` parse the views with no extra schema field. The shell mark binds only to "no provider and
 not launching", never to state, focus or connection; `ArtContract` and the asset tests check all four views.

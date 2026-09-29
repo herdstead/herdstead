@@ -256,7 +256,7 @@ When a floor disappears the view falls back at once to one that exists. The `doo
 
 A herdr pane is a terminal; the office draws a laptop. A monitor offset sideways to clear faces read as belonging to the next seat, so the laptop
 shares the column centre with person and chair and sits at its own table edge. It is shaped after a silver MacBook (thin lid, narrow hinge,
-keyboard and trackpad); the far back is 12 units high, the near front 18, low enough to leave face and shoulders visible without touching the Y-sort.
+keyboard and trackpad); 14 units wide, the far back 8 units high and the near front 11, small enough to leave the far worker's face, shoulders and arms visible without touching the Y-sort.
 
 Seats come in three kinds: **empty** (a chair), **SHELL** (an empty chair + a `$_` laptop), **agent** (a person + an ordinary laptop). Launch pending is
 never drawn as a shell, even before there is a provider. The `$_` is a static mark on the screen (near) or lid (far): no `>_` bubble, no blinking, no

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from build_table_assets import DENSITY, FURNITURE, MODULES, ROOT, build_pack, generate_templates
+from build_table_assets import CURSOR_AT, DENSITY, FURNITURE, MODULES, ROOT, build_pack, generate_templates
 from derive_theme import derive, read_recipe, remap_table, repaint
 
 
@@ -38,7 +38,7 @@ class SharedTableBuildTests(unittest.TestCase):
         # points are units of the 32-unit canvases, times DENSITY: the wood
         # under the divider, the chair's seat, the laptop's palmrest.
         ink = tuple(bytes.fromhex(json.loads((self.source / "pack.json").read_text())["palette"]["ink"])) + (255,)
-        for name, (x, y) in (("surface_mid_a", (9, 41)), ("chair_front", (13, 31)), ("shell_front", (20, 27))):
+        for name, (x, y) in (("surface_mid_a", (9, 41)), ("chair_front", (13, 35)), ("shell_front", (11, 28))):
             point = (x * DENSITY, y * DENSITY)
             path = self.source / "table" / f"{name}.png"
             with Image.open(path) as original:
@@ -277,11 +277,14 @@ class SharedTableAssetTests(unittest.TestCase):
                 # Every probe is a unit of the 32x48 canvas, times DENSITY.
                 d = DENSITY
                 self.assertEqual(daylight.size, (32 * d, 48 * d), "DENSITY texture pixels per unit")
-                self.assertGreaterEqual(bounds[1], 16 * d, "backrest exceeds 30 units above the feet")
+                self.assertGreaterEqual(bounds[1], 22 * d, "the chair is at most 24 units tall")
                 self.assertEqual(bounds[3], 46 * d, "chair feet left the common pivot")
-                self.assertEqual(alpha.getpixel((16 * d, 22 * d)), 255, "missing lumbar cushion")
-                self.assertTrue(any(alpha.crop((14 * d, y, 18 * d, y + 1)).getbbox() is None for y in range(26 * d, 30 * d)), "no open gap between lumbar cushion and seat")
-                self.assertEqual(alpha.getpixel((16 * d, 31 * d)), 255, "missing seat")
+                self.assertEqual(bounds[0] + bounds[2], 32 * d, "the chair centres on x=16")
+                self.assertLessEqual(bounds[2] - bounds[0], 18 * d, "no wider than a seated worker and a unit a side")
+                self.assertEqual(alpha.getpixel((16 * d, 26 * d)), 255, "missing backrest")
+                self.assertEqual(alpha.getpixel((16 * d, 35 * d)), 255, "missing seat")
+                self.assertEqual((alpha.getpixel((12 * d, 39 * d)), alpha.getpixel((16 * d, 39 * d)), alpha.getpixel((20 * d, 39 * d))),
+                                 (0, 255, 0), "a gas-lift column, not a box, between the seat and the base")
                 self.assertEqual(set(alpha.getdata()), {0, 255}, "chair has a translucent background")
                 expected, foreign = repaint(daylight, remap_table(day, dusk), view, False)
                 self.assertFalse(foreign)
@@ -297,36 +300,36 @@ class SharedTableAssetTests(unittest.TestCase):
                     alpha = normal.getchannel("A")
                     left, top, right, bottom = alpha.getbbox()
                     self.assertEqual(left + right, 32 * DENSITY, "silhouette must center on x=16")
-                    self.assertGreaterEqual(top, (18 if view == "rear" else 12) * DENSITY,
+                    self.assertGreaterEqual(top, (22 if view == "rear" else 19) * DENSITY,
                                             "rear lid must stay below the face when placed at the sitter's edge")
+                    self.assertLessEqual(right - left, 14 * DENSITY, "narrower than the seated worker's shoulders")
                     self.assertEqual(bottom, 30 * DENSITY, "deck must reach the common foot pivot")
                     self.assertEqual(alpha.tobytes(), shell.getchannel("A").tobytes(), "shell is a marking, not a new shape")
                     self.assertEqual(set(alpha.getdata()), {0, 255}, "no translucent canvas or halo")
                     self.assertNotEqual(normal.tobytes(), shell.tobytes(), "shell prompt is actually painted")
                     palette = day if theme == "daylight" else dusk
                     mark = tuple(bytes.fromhex(palette["ink" if view == "rear" else "paper"])) + (255,)
-                    cursor = (19 * DENSITY, (25 if view == "rear" else 21) * DENSITY)
+                    cursor = CURSOR_AT[view]
                     self.assertEqual(shell.getpixel(cursor), mark, "shell cursor contrasts with silver lid or dark screen")
                     self.assertNotEqual(normal.getpixel(cursor), mark, "agent laptop has no shell cursor")
                     silver = tuple(bytes.fromhex(palette["muted"])) + (255,)
-                    # Unit probes, times DENSITY. At 32x32 units the trackpad is
-                    # a flat 4x2 pad, too small for a silver-inside-an-outline
-                    # drawing, so it is told from the silver palmrest by colour
-                    # and centred by its two ends.
+                    # Texel probes: the laptop is drawn texel by texel. The
+                    # trackpad is a flat 6x2-texel pad, told from the silver
+                    # palmrest by colour and centred by its two ends.
                     def at(x, y):
-                        return normal.getpixel((x * DENSITY, y * DENSITY))
+                        return normal.getpixel((x, y))
                     if view == "rear":
-                        self.assertEqual(at(8, 20), silver, "lid is aluminum, not a dark monitor bezel")
-                        self.assertEqual(at(16, 22), mark, "lid carries a dark centered logo")
+                        self.assertEqual(at(24, 48), silver, "lid is aluminum, not a dark monitor bezel")
+                        self.assertEqual(at(32, 50), mark, "lid carries a dark centered logo")
                     else:
-                        pad = at(16, 28)
-                        self.assertEqual(at(8, 28), silver, "the palmrest is silver")
+                        pad = at(32, 56)
+                        self.assertEqual(at(22, 56), silver, "the palmrest is silver")
                         self.assertNotEqual(pad, silver, "the trackpad is distinct from the palmrest")
-                        self.assertEqual((at(14, 28), at(17, 28)), (pad, pad),
+                        self.assertEqual((at(29, 56), at(34, 56)), (pad, pad),
                                          "trackpad is centered below the keyboard")
-                        self.assertEqual((at(13, 28), at(18, 28)), (silver, silver),
-                                         "and no wider than its four units")
-                        self.assertNotEqual(at(16, 25), silver, "keyboard is distinct from the palmrest")
+                        self.assertEqual((at(28, 56), at(35, 56)), (silver, silver),
+                                         "and no wider than its six texels")
+                        self.assertNotEqual(at(32, 52), silver, "keyboard is distinct from the palmrest")
             for prefix in ("monitor", "shell"):
                 with Image.open(ROOT / f"art/daylight/table/{prefix}_{view}.png") as source, \
                         Image.open(ROOT / f"art/dusk/table/{prefix}_{view}.png") as night:
