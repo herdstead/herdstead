@@ -487,6 +487,48 @@ func test_a_floor_planned_with_the_drawer_closed_keeps_its_plan_when_it_opens() 
 	_done(office)
 
 
+## On a screen tall enough the compact panel is a card at the bottom-left and
+## NEXT stands at the right end; the office shows between them but takes no
+## click and no wheel there (the user's choice: a dead gap). A real click on a
+## desk seen through the gap picks nothing; a wheel notch there pans nothing.
+func test_the_gap_between_the_card_and_next_takes_no_click() -> void:
+	var office := await _live_office()
+	await _frames(4)
+	var hud := office.hud
+	_check(hud.inspector.card(), "800x480 is tall enough for the card")
+	var gap: Control = hud.inspector.get_node("%CardGap")
+	_check(gap.is_visible_in_tree(), "the gap stands between the card and NEXT")
+	var hole := gap.get_global_rect()
+	var seen: OfficeStation = null
+	var at := Vector2.ZERO
+	for down: float in [0.0, 48.0, 96.0, 144.0, 192.0]:
+		office.camera.pan = Vector2(0.0, down)
+		await _frames(2)
+		for station in _seats(office):
+			var point := station.target_rect().get_center() - office.camera.position
+			if hole.has_point(point) and station.pane_key != office.picked_key:
+				seen = station
+				at = point
+				break
+		if seen != null:
+			break
+	_check(seen != null, "a desk shows through the gap")
+	if seen == null:
+		_done(office)
+		return
+	var before := office.picked_key
+	await _click(at)
+	await _frames(2)
+	_eq(office.picked_key, before, "a click on it through the gap picks nothing")
+	_check(not office.camera.dragging, "the office never saw the press")
+	var pan := office.camera.pan
+	root.push_input(_mouse_button(at, MOUSE_BUTTON_WHEEL_DOWN, true), true)
+	root.push_input(_mouse_button(at, MOUSE_BUTTON_WHEEL_DOWN, false), true)
+	await _frames(2)
+	_eq(office.camera.pan, pan, "and a wheel there pans nothing")
+	_done(office)
+
+
 func _shadow_holder(office: OfficeScene, table: OfficeTable) -> Node2D:
 	var matches: Array[Node2D] = []
 	for node in office.world.find_children("SeatContacts", "Node2D", true, false):

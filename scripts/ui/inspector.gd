@@ -199,6 +199,9 @@ const FROM_THE_BLOCK: Array[CommandContext.Kind] = [
 @export var details_beside_launch_from := 0.0
 ## The card's width in card mode (set_card()); the scene sets it.
 @export var card_width := 0.0
+## NEXT's height in card mode, where it is a pill on one line standing in the
+## middle of the slot; elsewhere it fills its column. The scene sets it.
+@export var next_pill_height := 0.0
 
 ## Null until the office connects one; the card then reads and writes through it.
 var _fleet: HerdrFleet
@@ -572,6 +575,9 @@ func _show_stack() -> void:
 	frame.custom_minimum_size.x = card_width if carded else 0.0
 	var gap: Control = %CardGap
 	gap.visible = carded
+	var next_button: Control = %NextButton
+	next_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER if carded else Control.SIZE_EXPAND_FILL
+	next_button.custom_minimum_size.y = next_pill_height if carded else 0.0
 	empty.visible = _pane == null
 	no_pane.visible = not _compact
 	next.vertical = not _compact

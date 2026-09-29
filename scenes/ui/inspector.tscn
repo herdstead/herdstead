@@ -11,6 +11,7 @@ theme_type_variation = &"HdPanel"
 script = ExtResource("1")
 details_beside_launch_from = 640.0
 card_width = 256.0
+next_pill_height = 40.0
 
 [node name="Frame" type="MarginContainer" parent="."]
 layout_mode = 2
@@ -849,6 +850,7 @@ custom_minimum_size = Vector2(128, 0)
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 0
+alignment = 1
 
 [node name="NextButton" type="Button" parent="Frame/Row/NextSlot"]
 unique_name_in_owner = true
