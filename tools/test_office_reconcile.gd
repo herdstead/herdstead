@@ -449,28 +449,33 @@ func test_a_floor_planned_with_the_drawer_closed_keeps_its_plan_when_it_opens() 
 	await _click_desk(office, HerdrFleet.pane_key(LOCAL, "api:p1"))
 	await _frames(2)
 	_eq(office.picked_key, HerdrFleet.pane_key(LOCAL, "api:p1"), "api:p1 picked")
-	office.camera.pan = Vector2.ZERO
 	(list.get_node("%Scroll") as ScrollContainer).scroll_vertical = 0
-	await _frames(2)
 	var drawer := hud.placed(hud.right_column)
 	var box := (list.get_node("%Scroll") as Control).get_global_rect()
 	var under: OfficeStation = null
 	var row_key := ""
 	var at := Vector2.ZERO
-	for station in _seats(office):
-		var point := station.target_rect().get_center() - office.camera.position
-		if station.pane_key == office.picked_key or not drawer.has_point(point):
-			continue
-		var over := ""
-		for key: String in list.shown_keys():
-			var line := list.row_for(key)
-			if line != null and box.has_point(point) and line.get_global_rect().has_point(point):
-				over = key
-		if over != station.pane_key:
-			under = station
-			row_key = over
-			at = point
+	# At the floor's left edge, panned down as far as it takes for a desk to
+	# stand under the drawer (the card leaves the drawer short of the lowest ones).
+	for down: float in [0.0, 48.0, 96.0, 144.0]:
+		if under != null:
 			break
+		office.camera.pan = Vector2(0.0, down)
+		await _frames(2)
+		for station in _seats(office):
+			var point := station.target_rect().get_center() - office.camera.position
+			if station.pane_key == office.picked_key or not drawer.has_point(point):
+				continue
+			var over := ""
+			for key: String in list.shown_keys():
+				var line := list.row_for(key)
+				if line != null and box.has_point(point) and line.get_global_rect().has_point(point):
+					over = key
+			if over != station.pane_key:
+				under = station
+				row_key = over
+				at = point
+				break
 	_check(under != null, "a desk really is under the open drawer")
 	if under != null:
 		var before := office.picked_key

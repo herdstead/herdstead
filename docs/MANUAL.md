@@ -234,15 +234,17 @@ A new session invalidates the old wait clock.
 The bottom of the screen is the staff panel, which hosts the agent card. The card and HUD are in English; a sentence that
 does not fit is in the tooltip.
 
-**One line by default, at every size**: who · state · where, how long it has waited, `‹ ›`, `Monitor ⤢`, `Open ⏎`, NEXT.
-Below 640 units of screen width these read `⤢`, `⏎`, and NEXT shows only provider and space. The one-line panel has no
-portrait and reads no preview: to see a working agent's terminal, expand it.
+**Compact by default, at every size.** On a screen at least 400 units tall it is a card at the bottom-left: portrait,
+name, the state in a pill of its colour, where, and `‹ ›`, `Monitor ⤢`, `Open ⏎` under them, with NEXT (▶) at the right
+end; the office shows between them but takes no click there. Below 400 units it is one line: who · state · where, how long
+it has waited, `‹ ›`, `Monitor ⤢`, `Open ⏎`, NEXT. Below 640 units of screen width these read `⤢`, `⏎`, and NEXT shows only
+provider and space. Compact, the panel reads no preview: to see a working agent's terminal, expand it.
 
 - `Enter`, `Open ⏎` or answer mode expand it to full height: portrait, state, wait, location (a shell shows `SHELL` /
   `no agent` instead of portrait and state), a live 12-row monospace preview of the terminal (herdr's `detection` when
   blocked, the tail of `recent_unwrapped` otherwise), details, actions and NEXT. Full height below 640 units gives NEXT's
   room to the preview.
-- `Esc` (outside answer mode) or `▾ Esc` in the actions column collapse it to one line; selecting another pane collapses
+- `Esc` (outside answer mode) or `▾ Esc` in the actions column collapse it again; selecting another pane collapses
   it too. When answer mode ends by itself after a key is sent, the panel stays open so the result stays visible.
 - `‹ ›` step through NEXT's queue: select only, never expand or answer.
 

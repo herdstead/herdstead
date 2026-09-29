@@ -1817,21 +1817,22 @@ func test_hud_free_area() -> void:
 	var hud := await _hud(Vector2(800, 480))
 	_eq(
 		hud.world_rect(),
-		Rect2(96, 48, 660, 360),
-		"right of the FLOORS rail, left of the drawer's tab, below the bar, above the staff panel's line"
+		Rect2(96, 48, 660, 308),
+		"right of the FLOORS rail, left of the drawer's tab, below the bar, above the staff panel's card"
 	)
 	_eq(hud.placed(hud.bar), Rect2(0, 0, 800, 32), "the bar spans the top")
-	_eq(hud.placed(hud.floors), Rect2(16, 40, 72, 368), "the minimap is a 72-wide rail, 16 in from the left")
+	_eq(hud.placed(hud.floors), Rect2(16, 40, 72, 316), "the minimap is a 72-wide rail, 16 in from the left")
 	_eq(
 		hud.placed(hud.right_column),
-		Rect2(764, 40, 20, 368),
+		Rect2(764, 40, 20, 316),
 		"the right column (the agent list's drawer) starts closed to its 20-wide tab, 16 in from the right"
 	)
-	_eq(hud.placed(hud.staff), Rect2(16, 424, 768, 28), "the staff panel's line spans the bottom, 16 in")
+	# 480 high is tall enough for the compact panel's card (staff_tall_from): 80 high.
+	_eq(hud.placed(hud.staff), Rect2(16, 372, 768, 80), "the staff panel's card slot spans the bottom, 16 in")
 	_eq(hud.placed(hud.news), Rect2(16, 456, 768, 20), "the NEWS strip under it, along the bottom")
 	hud.fit(Vector2(1600, 960))
 	_eq(hud.placed(hud.floors).size.x, 120.0, "from 1280 wide the minimap names its floors")
-	_eq(hud.world_rect(), Rect2(144, 48, 1412, 840), "a bigger window is more office, not a bigger HUD")
+	_eq(hud.world_rect(), Rect2(144, 48, 1412, 788), "a bigger window is more office, not a bigger HUD")
 	await _frames(2)
 	var lines: Control = hud.bar.get_node("%Lines")
 	var at := lines.get_global_rect()

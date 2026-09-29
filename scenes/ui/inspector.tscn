@@ -1,14 +1,16 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/inspector.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/status_badge.gd" id="2_badge"]
 [ext_resource type="Script" path="res://scripts/ui/launch_block.gd" id="3_launch"]
 [ext_resource type="Script" path="res://scripts/ui/card_details.gd" id="4_details"]
+[ext_resource type="Script" path="res://scripts/ui/hd_panel.gd" id="5_panel"]
 
 [node name="Inspector" type="PanelContainer"]
 theme_type_variation = &"HdPanel"
 script = ExtResource("1")
 details_beside_launch_from = 640.0
+card_width = 256.0
 
 [node name="Frame" type="MarginContainer" parent="."]
 layout_mode = 2
@@ -23,14 +25,22 @@ layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 6
 
-[node name="Stack" type="Control" parent="Frame/Row"]
+[node name="CardFrame" type="PanelContainer" parent="Frame/Row"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_type_variation = &"HdPanelBare"
+script = ExtResource("5_panel")
+
+[node name="Stack" type="Control" parent="Frame/Row/CardFrame"]
 unique_name_in_owner = true
 clip_contents = true
 layout_mode = 2
 mouse_filter = 2
 size_flags_horizontal = 3
 
-[node name="Detail" type="BoxContainer" parent="Frame/Row/Stack"]
+[node name="Detail" type="BoxContainer" parent="Frame/Row/CardFrame/Stack"]
 unique_name_in_owner = true
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -40,13 +50,14 @@ grow_vertical = 2
 theme_override_constants/separation = 6
 script = ExtResource("4_details")
 
-[node name="Left" type="VBoxContainer" parent="Frame/Row/Stack/Detail"]
+[node name="Left" type="VBoxContainer" parent="Frame/Row/CardFrame/Stack/Detail"]
+unique_name_in_owner = true
 custom_minimum_size = Vector2(120, 0)
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 0
 
-[node name="Title" type="Label" parent="Frame/Row/Stack/Detail/Left"]
+[node name="Title" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Left"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 12)
 layout_mode = 2
@@ -55,35 +66,35 @@ text = "AGENT"
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="Header" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Left"]
+[node name="Header" type="HBoxContainer" parent="Frame/Row/CardFrame/Stack/Detail/Left"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 3
 
-[node name="PortraitArea" type="Control" parent="Frame/Row/Stack/Detail/Left/Header"]
+[node name="PortraitArea" type="Control" parent="Frame/Row/CardFrame/Stack/Detail/Left/Header"]
 unique_name_in_owner = true
 clip_contents = true
 custom_minimum_size = Vector2(26, 48)
 layout_mode = 2
 mouse_filter = 2
 
-[node name="PortraitHolder" type="Node2D" parent="Frame/Row/Stack/Detail/Left/Header/PortraitArea"]
+[node name="PortraitHolder" type="Node2D" parent="Frame/Row/CardFrame/Stack/Detail/Left/Header/PortraitArea"]
 unique_name_in_owner = true
 position = Vector2(13, 47)
 
-[node name="Who" type="VBoxContainer" parent="Frame/Row/Stack/Detail/Left/Header"]
+[node name="Who" type="VBoxContainer" parent="Frame/Row/CardFrame/Stack/Detail/Left/Header"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 theme_override_constants/separation = 0
 
-[node name="NameRow" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Left/Header/Who"]
+[node name="NameRow" type="HBoxContainer" parent="Frame/Row/CardFrame/Stack/Detail/Left/Header/Who"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 4
 
-[node name="Provider" type="Label" parent="Frame/Row/Stack/Detail/Left/Header/Who/NameRow"]
+[node name="Provider" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Left/Header/Who/NameRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -92,35 +103,35 @@ theme_type_variation = &"Heading16"
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="BadgeSlot" type="Control" parent="Frame/Row/Stack/Detail/Left/Header/Who/NameRow"]
+[node name="BadgeSlot" type="Control" parent="Frame/Row/CardFrame/Stack/Detail/Left/Header/Who/NameRow"]
 custom_minimum_size = Vector2(16, 20)
 layout_mode = 2
 mouse_filter = 2
 
-[node name="Badge" type="Sprite2D" parent="Frame/Row/Stack/Detail/Left/Header/Who/NameRow/BadgeSlot"]
+[node name="Badge" type="Sprite2D" parent="Frame/Row/CardFrame/Stack/Detail/Left/Header/Who/NameRow/BadgeSlot"]
 unique_name_in_owner = true
 position = Vector2(8, 19)
 script = ExtResource("2_badge")
 
-[node name="CaptionRow" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Left/Header/Who"]
+[node name="CaptionRow" type="HBoxContainer" parent="Frame/Row/CardFrame/Stack/Detail/Left/Header/Who"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 4
 
-[node name="CaptionPill" type="PanelContainer" parent="Frame/Row/Stack/Detail/Left/Header/Who/CaptionRow"]
+[node name="CaptionPill" type="PanelContainer" parent="Frame/Row/CardFrame/Stack/Detail/Left/Header/Who/CaptionRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 4
 mouse_filter = 2
 theme_type_variation = &"StatePillQuiet"
 
-[node name="Caption" type="Label" parent="Frame/Row/Stack/Detail/Left/Header/Who/CaptionRow/CaptionPill"]
+[node name="Caption" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Left/Header/Who/CaptionRow/CaptionPill"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 1
 theme_type_variation = &"LabelPaper"
 
-[node name="Duration" type="Label" parent="Frame/Row/Stack/Detail/Left/Header/Who/CaptionRow"]
+[node name="Duration" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Left/Header/Who/CaptionRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -129,12 +140,12 @@ theme_type_variation = &"LabelWoodShadow"
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="Place" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Left/Header/Who"]
+[node name="Place" type="HBoxContainer" parent="Frame/Row/CardFrame/Stack/Detail/Left/Header/Who"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 4
 
-[node name="Seat" type="Label" parent="Frame/Row/Stack/Detail/Left/Header/Who/Place"]
+[node name="Seat" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Left/Header/Who/Place"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -142,7 +153,7 @@ mouse_filter = 1
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="Machine" type="Label" parent="Frame/Row/Stack/Detail/Left/Header/Who/Place"]
+[node name="Machine" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Left/Header/Who/Place"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -152,7 +163,7 @@ theme_type_variation = &"LabelWoodDark"
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="Footnote" type="Label" parent="Frame/Row/Stack/Detail/Left"]
+[node name="Footnote" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Left"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -161,7 +172,7 @@ theme_type_variation = &"LabelSlate"
 autowrap_mode = 3
 max_lines_visible = 2
 
-[node name="Middle" type="BoxContainer" parent="Frame/Row/Stack/Detail"]
+[node name="Middle" type="BoxContainer" parent="Frame/Row/CardFrame/Stack/Detail"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -169,13 +180,13 @@ size_flags_vertical = 3
 mouse_filter = 2
 theme_override_constants/separation = 6
 
-[node name="PreviewColumn" type="VBoxContainer" parent="Frame/Row/Stack/Detail/Middle"]
+[node name="PreviewColumn" type="VBoxContainer" parent="Frame/Row/CardFrame/Stack/Detail/Middle"]
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 theme_override_constants/separation = 0
 
-[node name="PreviewCaption" type="Label" parent="Frame/Row/Stack/Detail/Middle/PreviewColumn"]
+[node name="PreviewCaption" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Middle/PreviewColumn"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 1
@@ -183,12 +194,12 @@ theme_type_variation = &"LabelSlate"
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="PreviewScreen" type="PanelContainer" parent="Frame/Row/Stack/Detail/Middle/PreviewColumn"]
+[node name="PreviewScreen" type="PanelContainer" parent="Frame/Row/CardFrame/Stack/Detail/Middle/PreviewColumn"]
 layout_mode = 2
 mouse_filter = 2
 theme_type_variation = &"PreviewScreen"
 
-[node name="Preview" type="Label" parent="Frame/Row/Stack/Detail/Middle/PreviewColumn/PreviewScreen"]
+[node name="Preview" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Middle/PreviewColumn/PreviewScreen"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
@@ -208,26 +219,26 @@ text = "
 "
 clip_text = true
 
-[node name="Answer" type="VBoxContainer" parent="Frame/Row/Stack/Detail/Middle"]
+[node name="Answer" type="VBoxContainer" parent="Frame/Row/CardFrame/Stack/Detail/Middle"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 1
 
-[node name="Keys" type="HFlowContainer" parent="Frame/Row/Stack/Detail/Middle/Answer"]
+[node name="Keys" type="HFlowContainer" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/h_separation = 1
 theme_override_constants/v_separation = 1
 
-[node name="Digits" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys"]
+[node name="Digits" type="HBoxContainer" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 1
 
-[node name="Key1" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
+[node name="Key1" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -235,7 +246,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "1"
 
-[node name="Key2" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
+[node name="Key2" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -243,7 +254,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "2"
 
-[node name="Key3" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
+[node name="Key3" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -251,7 +262,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "3"
 
-[node name="Key4" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
+[node name="Key4" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -259,7 +270,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "4"
 
-[node name="Key5" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
+[node name="Key5" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -267,7 +278,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "5"
 
-[node name="Key6" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
+[node name="Key6" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -275,7 +286,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "6"
 
-[node name="Key7" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
+[node name="Key7" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -283,7 +294,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "7"
 
-[node name="Key8" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
+[node name="Key8" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -291,7 +302,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "8"
 
-[node name="Key9" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
+[node name="Key9" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -299,12 +310,12 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "9"
 
-[node name="Choices" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys"]
+[node name="Choices" type="HBoxContainer" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 1
 
-[node name="KeyY" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Choices"]
+[node name="KeyY" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys/Choices"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -312,7 +323,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "y"
 
-[node name="KeyN" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Choices"]
+[node name="KeyN" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys/Choices"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -320,7 +331,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "n"
 
-[node name="KeyEnter" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Choices"]
+[node name="KeyEnter" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys/Choices"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -328,13 +339,13 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "⏎"
 
-[node name="Apart" type="Control" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Choices"]
+[node name="Apart" type="Control" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys/Choices"]
 custom_minimum_size = Vector2(6, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="SendEsc" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Choices"]
+[node name="SendEsc" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys/Choices"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -342,12 +353,12 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "Send Esc"
 
-[node name="Reply" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Middle/Answer"]
+[node name="Reply" type="HBoxContainer" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 2
 
-[node name="ReplyBox" type="LineEdit" parent="Frame/Row/Stack/Detail/Middle/Answer/Reply"]
+[node name="ReplyBox" type="LineEdit" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Reply"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -365,7 +376,7 @@ emoji_menu_enabled = false
 middle_mouse_paste_enabled = false
 caret_blink = true
 
-[node name="SendLine" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Reply"]
+[node name="SendLine" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Reply"]
 unique_name_in_owner = true
 layout_mode = 2
 tooltip_text = "Send one line of text to this terminal, then Enter"
@@ -374,7 +385,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "Send line"
 
-[node name="BestEffort" type="Label" parent="Frame/Row/Stack/Detail/Middle/Answer"]
+[node name="BestEffort" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer"]
 unique_name_in_owner = true
 layout_mode = 2
 tooltip_text = "Before it sends, the card reads this terminal again and sends only if it still reads exactly as the preview you pressed on. That narrows the time in which the screen can change under you; it does not close it: between that re-read and the keys arriving, the question can still change to another one that ends the same way. herdr has no \"send only if the screen still reads so\"."
@@ -384,7 +395,7 @@ text = "Checks the screen first; it can still change"
 autowrap_mode = 3
 max_lines_visible = 2
 
-[node name="Launch" type="VBoxContainer" parent="Frame/Row/Stack/Detail/Middle"]
+[node name="Launch" type="VBoxContainer" parent="Frame/Row/CardFrame/Stack/Detail/Middle"]
 unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(108, 0)
@@ -393,7 +404,7 @@ mouse_filter = 2
 theme_override_constants/separation = 0
 script = ExtResource("3_launch")
 
-[node name="LaunchTitle" type="Label" parent="Frame/Row/Stack/Detail/Middle/Launch"]
+[node name="LaunchTitle" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 1
@@ -403,14 +414,14 @@ autowrap_mode = 3
 text_overrun_behavior = 3
 max_lines_visible = 2
 
-[node name="LaunchKinds" type="HFlowContainer" parent="Frame/Row/Stack/Detail/Middle/Launch"]
+[node name="LaunchKinds" type="HFlowContainer" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/h_separation = 1
 theme_override_constants/v_separation = 1
 
-[node name="Kind0" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchKinds"]
+[node name="Kind0" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch/LaunchKinds"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -418,7 +429,7 @@ focus_mode = 0
 theme_type_variation = &"CardKey"
 disabled = true
 
-[node name="Kind1" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchKinds"]
+[node name="Kind1" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch/LaunchKinds"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -426,7 +437,7 @@ focus_mode = 0
 theme_type_variation = &"CardKey"
 disabled = true
 
-[node name="Kind2" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchKinds"]
+[node name="Kind2" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch/LaunchKinds"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -434,7 +445,7 @@ focus_mode = 0
 theme_type_variation = &"CardKey"
 disabled = true
 
-[node name="Kind3" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchKinds"]
+[node name="Kind3" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch/LaunchKinds"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -442,7 +453,7 @@ focus_mode = 0
 theme_type_variation = &"CardKey"
 disabled = true
 
-[node name="Kind4" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchKinds"]
+[node name="Kind4" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch/LaunchKinds"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -450,7 +461,7 @@ focus_mode = 0
 theme_type_variation = &"CardKey"
 disabled = true
 
-[node name="Kind5" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchKinds"]
+[node name="Kind5" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch/LaunchKinds"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -458,7 +469,7 @@ focus_mode = 0
 theme_type_variation = &"CardKey"
 disabled = true
 
-[node name="Kind6" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchKinds"]
+[node name="Kind6" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch/LaunchKinds"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -466,7 +477,7 @@ focus_mode = 0
 theme_type_variation = &"CardKey"
 disabled = true
 
-[node name="Kind7" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchKinds"]
+[node name="Kind7" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch/LaunchKinds"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -474,7 +485,7 @@ focus_mode = 0
 theme_type_variation = &"CardKey"
 disabled = true
 
-[node name="SplitButton" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch"]
+[node name="SplitButton" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -483,7 +494,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "New pane →"
 
-[node name="LaunchNote" type="Label" parent="Frame/Row/Stack/Detail/Middle/Launch"]
+[node name="LaunchNote" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 1
@@ -492,21 +503,21 @@ text = "Types the kind + Enter in this terminal"
 autowrap_mode = 3
 max_lines_visible = 2
 
-[node name="LaunchScreen" type="PanelContainer" parent="Frame/Row/Stack/Detail/Middle/Launch"]
+[node name="LaunchScreen" type="PanelContainer" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 mouse_filter = 2
 theme_type_variation = &"PreviewScreen"
 
-[node name="LaunchLine" type="Label" parent="Frame/Row/Stack/Detail/Middle/Launch/LaunchScreen"]
+[node name="LaunchLine" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch/LaunchScreen"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 1
 theme_type_variation = &"PreviewText"
 clip_text = true
 
-[node name="ManageRow" type="HFlowContainer" parent="Frame/Row/Stack/Detail/Middle/Launch"]
+[node name="ManageRow" type="HFlowContainer" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -514,7 +525,7 @@ mouse_filter = 2
 theme_override_constants/h_separation = 1
 theme_override_constants/v_separation = 1
 
-[node name="CloseButton" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/ManageRow"]
+[node name="CloseButton" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch/ManageRow"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -522,7 +533,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "Close pane"
 
-[node name="SpaceButton" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/ManageRow"]
+[node name="SpaceButton" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch/ManageRow"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -530,14 +541,14 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "New space"
 
-[node name="WorktreeRow" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Middle/Launch"]
+[node name="WorktreeRow" type="HBoxContainer" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 1
 
-[node name="BranchBox" type="LineEdit" parent="Frame/Row/Stack/Detail/Middle/Launch/WorktreeRow"]
+[node name="BranchBox" type="LineEdit" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch/WorktreeRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(36, 0)
 layout_mode = 2
@@ -557,7 +568,7 @@ emoji_menu_enabled = false
 middle_mouse_paste_enabled = false
 caret_blink = true
 
-[node name="WorktreeButton" type="Button" parent="Frame/Row/Stack/Detail/Middle/Launch/WorktreeRow"]
+[node name="WorktreeButton" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch/WorktreeRow"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -565,7 +576,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "New worktree"
 
-[node name="ManageNote" type="Label" parent="Frame/Row/Stack/Detail/Middle/Launch"]
+[node name="ManageNote" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Launch"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -574,14 +585,14 @@ theme_type_variation = &"CardNote"
 text_overrun_behavior = 3
 max_lines_visible = 1
 
-[node name="More" type="Control" parent="Frame/Row/Stack/Detail"]
+[node name="More" type="Control" parent="Frame/Row/CardFrame/Stack/Detail"]
 unique_name_in_owner = true
 clip_contents = true
 layout_mode = 2
 mouse_filter = 2
 custom_minimum_size = Vector2(88, 0)
 
-[node name="MoreList" type="VBoxContainer" parent="Frame/Row/Stack/Detail/More"]
+[node name="MoreList" type="VBoxContainer" parent="Frame/Row/CardFrame/Stack/Detail/More"]
 unique_name_in_owner = true
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -589,7 +600,7 @@ grow_horizontal = 1
 mouse_filter = 2
 theme_override_constants/separation = 0
 
-[node name="PaneHeading" type="Label" parent="Frame/Row/Stack/Detail/More/MoreList"]
+[node name="PaneHeading" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/More/MoreList"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 12)
 layout_mode = 2
@@ -598,7 +609,7 @@ text = "PANE"
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="PaneId" type="Label" parent="Frame/Row/Stack/Detail/More/MoreList"]
+[node name="PaneId" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/More/MoreList"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 1
@@ -606,7 +617,7 @@ theme_type_variation = &"LabelSlate"
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="PaneLabel" type="Label" parent="Frame/Row/Stack/Detail/More/MoreList"]
+[node name="PaneLabel" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/More/MoreList"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -615,7 +626,7 @@ theme_type_variation = &"LabelWoodDark"
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="Cwd" type="Label" parent="Frame/Row/Stack/Detail/More/MoreList"]
+[node name="Cwd" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/More/MoreList"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 1
@@ -623,16 +634,7 @@ theme_type_variation = &"LabelSlate"
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="ForegroundCwd" type="Label" parent="Frame/Row/Stack/Detail/More/MoreList"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-mouse_filter = 1
-theme_type_variation = &"LabelSlate"
-clip_text = true
-text_overrun_behavior = 3
-
-[node name="Session" type="Label" parent="Frame/Row/Stack/Detail/More/MoreList"]
+[node name="ForegroundCwd" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/More/MoreList"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -641,14 +643,23 @@ theme_type_variation = &"LabelSlate"
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="TitleHolder" type="Control" parent="Frame/Row/Stack/Detail/More/MoreList"]
+[node name="Session" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/More/MoreList"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+mouse_filter = 1
+theme_type_variation = &"LabelSlate"
+clip_text = true
+text_overrun_behavior = 3
+
+[node name="TitleHolder" type="Control" parent="Frame/Row/CardFrame/Stack/Detail/More/MoreList"]
 unique_name_in_owner = true
 clip_contents = true
 layout_mode = 2
 size_flags_vertical = 3
 mouse_filter = 2
 
-[node name="TerminalTitle" type="Label" parent="Frame/Row/Stack/Detail/More/MoreList/TitleHolder"]
+[node name="TerminalTitle" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/More/MoreList/TitleHolder"]
 unique_name_in_owner = true
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -660,7 +671,7 @@ autowrap_trim_flags = 3
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="Actions" type="BoxContainer" parent="Frame/Row/Stack/Detail"]
+[node name="Actions" type="BoxContainer" parent="Frame/Row/CardFrame/Stack/Detail"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(96, 0)
 layout_mode = 2
@@ -668,13 +679,13 @@ vertical = true
 mouse_filter = 2
 theme_override_constants/separation = 2
 
-[node name="TopRow" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Actions"]
+[node name="TopRow" type="HBoxContainer" parent="Frame/Row/CardFrame/Stack/Detail/Actions"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 4
 
-[node name="MonitorButton" type="Button" parent="Frame/Row/Stack/Detail/Actions/TopRow"]
+[node name="MonitorButton" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Actions/TopRow"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -683,7 +694,7 @@ focus_mode = 0
 theme_type_variation = &"CardHint"
 text = "Monitor ⤢"
 
-[node name="FoldButton" type="Button" parent="Frame/Row/Stack/Detail/Actions/TopRow"]
+[node name="FoldButton" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Actions/TopRow"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -693,7 +704,7 @@ focus_mode = 0
 theme_type_variation = &"CardHint"
 text = "▾ Esc"
 
-[node name="AnswerButton" type="Button" parent="Frame/Row/Stack/Detail/Actions"]
+[node name="AnswerButton" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Actions"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
@@ -702,12 +713,12 @@ focus_mode = 0
 theme_type_variation = &"CardHint"
 text = "Answer ⏎"
 
-[node name="ActionGap" type="Control" parent="Frame/Row/Stack/Detail/Actions"]
+[node name="ActionGap" type="Control" parent="Frame/Row/CardFrame/Stack/Detail/Actions"]
 custom_minimum_size = Vector2(0, 2)
 layout_mode = 2
 mouse_filter = 2
 
-[node name="FocusButton" type="Button" parent="Frame/Row/Stack/Detail/Actions"]
+[node name="FocusButton" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Actions"]
 unique_name_in_owner = true
 layout_mode = 2
 tooltip_text = "Switches the shared view of herdr to this pane: every terminal attached to it follows.
@@ -717,7 +728,7 @@ theme_type_variation = &"CardAction"
 disabled = true
 text = "Switch herdr here"
 
-[node name="FocusNote" type="Label" parent="Frame/Row/Stack/Detail/Actions"]
+[node name="FocusNote" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Actions"]
 unique_name_in_owner = true
 layout_mode = 2
 tooltip_text = "herdr's focus is shared, and it marks the whole tab seen: switching here clears UNREAD for every pane on this table."
@@ -725,7 +736,7 @@ mouse_filter = 1
 theme_type_variation = &"LabelSlate"
 text = "Clears table's UNREAD"
 
-[node name="Outcome" type="Label" parent="Frame/Row/Stack/Detail/Actions"]
+[node name="Outcome" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Actions"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -735,7 +746,7 @@ autowrap_mode = 3
 text_overrun_behavior = 3
 max_lines_visible = 2
 
-[node name="CompactRow" type="HBoxContainer" parent="Frame/Row/Stack"]
+[node name="CompactRow" type="HBoxContainer" parent="Frame/Row/CardFrame/Stack"]
 unique_name_in_owner = true
 visible = false
 anchor_right = 1.0
@@ -745,7 +756,7 @@ grow_vertical = 2
 mouse_filter = 2
 theme_override_constants/separation = 6
 
-[node name="CompactLine" type="Label" parent="Frame/Row/Stack/CompactRow"]
+[node name="CompactLine" type="Label" parent="Frame/Row/CardFrame/Stack/CompactRow"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
@@ -753,7 +764,7 @@ mouse_filter = 1
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="CompactWait" type="Label" parent="Frame/Row/Stack/CompactRow"]
+[node name="CompactWait" type="Label" parent="Frame/Row/CardFrame/Stack/CompactRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(36, 0)
 layout_mode = 2
@@ -761,46 +772,46 @@ mouse_filter = 2
 theme_type_variation = &"LabelWoodShadow"
 clip_text = true
 
-[node name="StepBack" type="Button" parent="Frame/Row/Stack/CompactRow"]
+[node name="StepBack" type="Button" parent="Frame/Row/CardFrame/Stack/CompactRow"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_vertical = 4
+size_flags_vertical = 8
 tooltip_text = "The one before in NEXT's queue: picks them and shows their desk. It opens nothing and answers nothing."
 focus_mode = 0
 theme_type_variation = &"CardHint"
 disabled = true
 text = "‹"
 
-[node name="StepOn" type="Button" parent="Frame/Row/Stack/CompactRow"]
+[node name="StepOn" type="Button" parent="Frame/Row/CardFrame/Stack/CompactRow"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_vertical = 4
+size_flags_vertical = 8
 tooltip_text = "The one after in NEXT's queue: picks them and shows their desk. It opens nothing and answers nothing."
 focus_mode = 0
 theme_type_variation = &"CardHint"
 disabled = true
 text = "›"
 
-[node name="CompactMonitor" type="Button" parent="Frame/Row/Stack/CompactRow"]
+[node name="CompactMonitor" type="Button" parent="Frame/Row/CardFrame/Stack/CompactRow"]
 unique_name_in_owner = true
 visible = false
 layout_mode = 2
-size_flags_vertical = 4
+size_flags_vertical = 8
 tooltip_text = "M: open this pane's terminal in the monitor: its live screen, and every key you press goes to it (Ctrl+] closes)."
 focus_mode = 0
 theme_type_variation = &"CardHint"
 text = "Monitor ⤢"
 
-[node name="CompactOpen" type="Button" parent="Frame/Row/Stack/CompactRow"]
+[node name="CompactOpen" type="Button" parent="Frame/Row/CardFrame/Stack/CompactRow"]
 unique_name_in_owner = true
 layout_mode = 2
-size_flags_vertical = 4
+size_flags_vertical = 8
 tooltip_text = "Enter: open the panel: the terminal's preview, the switch and the pane's details. It only opens; nothing is sent."
 focus_mode = 0
 theme_type_variation = &"CardHint"
 text = "Open ⏎"
 
-[node name="Empty" type="VBoxContainer" parent="Frame/Row/Stack"]
+[node name="Empty" type="VBoxContainer" parent="Frame/Row/CardFrame/Stack"]
 unique_name_in_owner = true
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -809,7 +820,7 @@ mouse_filter = 2
 theme_override_constants/separation = 0
 grow_vertical = 2
 
-[node name="NoPane" type="Label" parent="Frame/Row/Stack/Empty"]
+[node name="NoPane" type="Label" parent="Frame/Row/CardFrame/Stack/Empty"]
 custom_minimum_size = Vector2(0, 26)
 layout_mode = 2
 mouse_filter = 2
@@ -817,13 +828,20 @@ theme_type_variation = &"Heading16Slate"
 text = "NO PANE"
 unique_name_in_owner = true
 
-[node name="Message" type="Label" parent="Frame/Row/Stack/Empty"]
+[node name="Message" type="Label" parent="Frame/Row/CardFrame/Stack/Empty"]
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
 mouse_filter = 2
 theme_type_variation = &"LabelSlate"
 autowrap_mode = 3
+
+[node name="CardGap" type="Control" parent="Frame/Row"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
 
 [node name="NextSlot" type="VBoxContainer" parent="Frame/Row"]
 unique_name_in_owner = true

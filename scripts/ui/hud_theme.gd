@@ -518,6 +518,8 @@ static func _panel(theme: Theme, art: ArtPack) -> void:
 	empty.content_margin_right = spec.patch_right
 	empty.content_margin_bottom = spec.patch_bottom
 	theme.set_stylebox("panel", "HdPanel", empty)
+	theme.set_type_variation("HdPanelBare", "PanelContainer")
+	theme.set_stylebox("panel", "HdPanelBare", StyleBoxEmpty.new())
 
 
 ## The minimap's rows. Godot's default Button draws grey chrome and a focus

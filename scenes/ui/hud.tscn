@@ -21,6 +21,7 @@ drawer_open_left = -160.0
 drawer_closed_left = -36.0
 staff_full_top = -144.0
 staff_compact_top = -44.0
+staff_card_top = -96.0
 staff_inset = 16.0
 staff_modal_width = 640.0
 staff_modal_height = 272.0

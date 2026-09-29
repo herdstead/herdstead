@@ -812,7 +812,11 @@ func test_a_pick_does_not_carry_over_to_a_reused_pane_id() -> void:
 	_ctl("control-b", "emit", {"fixture_event": "pane_updated"})
 	await _until(func() -> bool: return office.navigator.active_key == key, "a new terminal takes the id and is shown")
 	await _frames(2)
-	_check(button.visible and button.disabled, "the switch is off for a terminal nobody picked")
+	# The panel folded with the pane it was opened for; open it again, as a
+	# viewer would, so the click below lands on the switch itself.
+	await _open_panel(office)
+	await _frames(2)
+	_check(button.is_visible_in_tree() and button.disabled, "the switch is off for a terminal nobody picked")
 	_eq(card.outcome_text(), "New terminal: pick again", "and the card says why")
 	await _click_control(button)
 	await _frames(4)

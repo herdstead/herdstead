@@ -92,6 +92,9 @@ enum DrawerTab { AGENTS, EVENTS }
 ## screen's bottom (see _fit_staff()). Set in the scene.
 @export var staff_full_top := 0.0
 @export var staff_compact_top := 0.0
+## Its top edge on a screen at least `staff_tall_from` high, where the compact
+## panel is a card (OfficePaneInspector.set_card()). Set in the scene.
+@export var staff_card_top := 0.0
 ## The staff panel's inset from the screen's sides along the bottom, and its
 ## widest and tallest in answer mode, where it stands in the middle under the
 ## bar, at least `staff_modal_gap` clear of the bar and of the screen's bottom
@@ -771,6 +774,9 @@ func _label_tab() -> void:
 func _fit_staff() -> bool:
 	var answering := inspector.answering()
 	var full := answering or _expanded
+	# A tall enough screen shows the compact panel as a card.
+	var card := not full and _screen.y >= staff_tall_from
+	inspector.set_card(card)
 	var width := _screen.x - 2.0 * staff_inset
 	if answering:
 		width = minf(width, staff_modal_width)
@@ -784,7 +790,7 @@ func _fit_staff() -> bool:
 	if news.visible:
 		floor_y = news_top - news_gap
 	var lift := floor_y + world_gap.y
-	var top := (staff_full_top if full else staff_compact_top) + lift
+	var top := (staff_full_top if full else staff_card_top if card else staff_compact_top) + lift
 	var before := Vector2(_staff_top(), _slot_bottom if _floating else staff.offset_bottom)
 	var dim: Control = %ModalDim
 	dim.visible = answering

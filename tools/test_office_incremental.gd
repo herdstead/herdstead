@@ -1179,7 +1179,7 @@ func test_a_room_change_moves_the_world_at_once() -> void:
 	var office := await _live_office()
 	office.test_screen = Vector2(800, 480)
 	office.refresh()
-	_eq(office.camera.free_rect().size, Vector2(660, 360), "the room with the drawer closed to its tab")
+	_eq(office.camera.free_rect().size, Vector2(660, 308), "the room with the drawer closed to its tab, above the card")
 	office.hud.open_drawer()
 	await _frames(1)
 	_eq(office.camera.free_rect(), office.hud.world_rect(), "the camera's room is the HUD's new one")

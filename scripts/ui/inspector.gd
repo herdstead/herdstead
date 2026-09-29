@@ -197,6 +197,8 @@ const FROM_THE_BLOCK: Array[CommandContext.Kind] = [
 ## At a card narrower than this, the START AGENT block takes the PANE
 ## details' place; at this width or more both show (the scene sets it).
 @export var details_beside_launch_from := 0.0
+## The card's width in card mode (set_card()); the scene sets it.
+@export var card_width := 0.0
 
 ## Null until the office connects one; the card then reads and writes through it.
 var _fleet: HerdrFleet
@@ -267,6 +269,8 @@ var _outcome_identity := ""
 var _compact := false
 ## The screen is wide enough for the line's long words (set_wide()).
 var _wide := true
+## The HUD shows the compact panel as a card (set_card()).
+var _card := false
 ## Whom NEXT names (show_next()); null for nobody.
 var _next: NextModel
 ## NEXT's own tooltip as the scene says it; the compact line adds whom it names.
@@ -332,11 +336,16 @@ func _ready() -> void:
 	_show_preview_text("")
 	_show_action()
 	show_next(null)
+	# The card's own frame shows only in card mode (set_card()).
+	var frame: HdPanel = %CardFrame
+	frame.set_framed(false)
 
 
 ## Take the pack: the badge art, the portrait and this panel's own frame.
 func dress(pack: ArtPack) -> void:
 	super(pack)
+	var frame: HdPanel = %CardFrame
+	frame.dress(pack)
 	# A pack swap is a new people family and animation library, so the portrait
 	# is dressed again.
 	_details().forget_look()
@@ -408,6 +417,24 @@ func set_compact(on: bool) -> void:
 	_actions.clear()
 	_show_stack()
 	_word_next()
+
+
+## On a screen tall enough (OfficeHud._fit_staff()), the compact panel is a
+## card at the bottom-left, draft C's: the portrait, the name, the state pill
+## and the seat over the line's buttons (`‹ ›`, Monitor, Open), in a frame of
+## its own (%CardFrame), with NEXT at the panel's right end and the office
+## showing between them. The panel's own frame is not drawn then. It is still
+## the compact panel: it reads nothing (compact()), and the same nodes show.
+func set_card(on: bool) -> void:
+	if on == _card:
+		return
+	_card = on
+	_show_stack()
+
+
+## Whether the compact panel is a card (set_card()).
+func card() -> bool:
+	return _card
 
 
 ## Whether the panel shows its compact line (set_compact()).
@@ -522,8 +549,29 @@ func _show_stack() -> void:
 	var wait: Control = %NextWait
 	var next: BoxContainer = %NextText
 	var next_line: Label = %NextLine
-	detail.visible = _pane != null and not _compact
+	# Card mode: the header (from %Detail) over the line's buttons (from
+	# %CompactRow), which sit on its foot; the line's words and the rest of
+	# the details stay hidden. The boxes only change what shows.
+	var carded := _compact and _card
+	detail.visible = _pane != null and (not _compact or carded)
 	line.visible = _pane != null and _compact
+	for part: Control in [%Middle, %Actions]:
+		part.visible = not carded
+	# The header alone in the card takes the card's whole width.
+	var left: Control = %Left
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL if carded else Control.SIZE_FILL
+	var title: Control = %Title
+	title.visible = not carded and not _answering
+	_show_more()
+	for words: Control in [%CompactLine, %CompactWait]:
+		words.visible = not carded
+	set_framed(not carded)
+	var frame: HdPanel = %CardFrame
+	frame.set_framed(carded)
+	frame.size_flags_horizontal = Control.SIZE_FILL if carded else Control.SIZE_EXPAND_FILL
+	frame.custom_minimum_size.x = card_width if carded else 0.0
+	var gap: Control = %CardGap
+	gap.visible = carded
 	empty.visible = _pane == null
 	no_pane.visible = not _compact
 	next.vertical = not _compact
@@ -1312,8 +1360,8 @@ func _show_answer() -> void:
 	detail.vertical = _answering
 	middle.vertical = _answering
 	actions.vertical = not _answering
-	# The header under it already says who and in what state.
-	title.visible = not _answering
+	# The header under it already says who and in what state; so does a card's.
+	title.visible = not _answering and not (_compact and _card)
 	title.text = HEADING
 	title.tooltip_text = ""
 	if _answering and _pane != null:
@@ -1672,7 +1720,9 @@ func _launch_speaks_for(ticket: CommandTicket) -> bool:
 func _show_more() -> void:
 	var more: Control = %More
 	var launch: Control = %Launch
-	more.visible = not _answering and not (launch.visible and size.x < details_beside_launch_from)
+	more.visible = (
+		not _answering and not (_compact and _card) and not (launch.visible and size.x < details_beside_launch_from)
+	)
 
 
 # --- the reply box --------------------------------------------------------------

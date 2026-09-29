@@ -674,8 +674,9 @@ func test_arrows_and_wheel_never_pan_the_hidden_world() -> void:
 ## The fit, pure (StrategicLayout.fit()): the largest cell of the scene's
 ## ladder at which the plan's rows fit the room, and at that cell the fewest
 ## newspaper columns; eight and a scroll when nothing fits. Pinned for the
-## stress floors (80 and 400 panes) in the room the view has at 2x (1920x960)
-## and at 4x / the minimum (480x320 logical either way).
+## stress floors (80 and 400 panes) in the room the view has at 2x (1920x960,
+## where the compact panel is an 80-high card) and at 4x / the minimum
+## (480x320 logical either way, its one line).
 func test_the_stress_fit_at_2x_4x_and_min() -> void:
 	var art := ArtPack.from_manifest(MANIFESTS[0])
 	var hud: OfficeHud = OfficeScene.HUD_SCENE.instantiate()
@@ -689,14 +690,14 @@ func test_the_stress_fit_at_2x_4x_and_min() -> void:
 	for screen: Vector2 in [WIDE, SMALL]:
 		hud.fit(screen)
 		rooms[screen] = hud.strategic.room_for(hud.world_rect().size)
-	_eq(rooms[WIDE], Vector2(804, 323), "the room at 2x")
+	_eq(rooms[WIDE], Vector2(804, 271), "the room at 2x, above the card")
 	_eq(rooms[SMALL], Vector2(324, 163), "the room at 4x and the minimum")
 	var eighty := _rows_of(10)
 	var four_hundred := _rows_of(50)
 	var cases := [
-		[eighty, WIDE, 32, 4, false],
+		[eighty, WIDE, 32, 5, false],
 		[eighty, SMALL, 12, 4, false],
-		[four_hundred, WIDE, 16, 10, false],
+		[four_hundred, WIDE, 12, 10, false],
 		[four_hundred, SMALL, 8, 6, true],
 	]
 	for each: Array in cases:

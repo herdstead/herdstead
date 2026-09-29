@@ -56,6 +56,14 @@ func _init() -> void:
 	resized.connect(_frame.queue_redraw)
 
 
+## Whether the frame is drawn, and the content kept inside it (`HdPanel`), or
+## neither (`HdPanelBare`: no frame, no margins). The staff panel's card mode
+## draws the card's frame round the card alone (OfficePaneInspector.set_card()).
+func set_framed(on: bool) -> void:
+	_frame.visible = on
+	theme_type_variation = &"HdPanel" if on else &"HdPanelBare"
+
+
 ## Take the pack's panel texture, its nine-patch margins and its sampling.
 ## Called again on a theme switch; nothing in the tree is rebuilt for it.
 func dress(pack: ArtPack) -> void:

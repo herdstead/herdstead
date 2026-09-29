@@ -53,7 +53,7 @@ herdr machine list ─ Roster ┘        │      commands: CommandContext in, C
         OfficeFloorView + floor sign (scenes/world):   OfficeHud (scenes/ui):
         Ground + Sorted (y-sort), table / station / person   top bar counters (OfficeTotals) / left FLOORS minimap (a narrow rail under 1280) + signpost at the world's right edge /
                                                              right drawer (closed at start): the AGENTS tab's agent list (AgentListModel; its History group comes from StateLog via AgentHistory) and the EVENTS tab /
-                                                             bottom staff panel (agent card, `inspector`; one row by default) + NEXT (NextModel's verbs) / bottom row NEWS (NewsItem) /
+                                                             bottom staff panel (agent card, `inspector`; compact by default: a card on tall screens, one row below) + NEXT (NextModel's verbs) / bottom row NEWS (NewsItem) /
                                                              OVERVIEW, opened by PANES or O (OverviewModel; the timeline is a Control drawn in _draw())
         OfficeLens: the lens while L is held (one duration row per station, carpet tint, furniture dimmed); OfficePointer: a dashed frame off the station while a HUD row is hovered
         OfficeStrategic: the strategic view on `S` (a schematic of this floor over the world area; StrategicModel in, StrategicLayout lays out, %Plan's _draw() draws)
