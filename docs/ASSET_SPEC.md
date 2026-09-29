@@ -1,4 +1,4 @@
-# Daylight Studio — asset spec (schema v1 / v2)
+# Studio (`daylight`) — asset spec (schema v1 / v2)
 
 Two pack formats: **schema v1** is density 1; **schema v2** adds a per-pack pixel density and sampling filter,
 so the same semantic IDs can be drawn at up to 256 px per tile. Both share the structural checks, and a v1 image
@@ -288,6 +288,7 @@ margins are part of the spec. Values are units (as in `pack.json`); a density-2 
 |---|---:|---:|
 | `cabinet` | 48×64 | 24,60 |
 | `window` | 64×48 | 32,44 |
+| `window_night` | 64×48 | 32,44 |
 | `door` | 48×80 | 24,76 |
 | `plant`, `plant_b` | 32×48 | 16,46 |
 | `sign` | 64×24 | 32,22 |
@@ -412,8 +413,8 @@ positions, pauses motion, dims the picture and says STALE; idle never stands in 
    kept and rebuilds are identical.
 2. **Reskin a pack**: copy `art/daylight/`, keep semantic IDs and geometry, change palette and PNGs, build with
    `--source` / `--output`. Built into `assets/<id>/`, a pack is discovered at startup: choose it with
-   `--pack`, with `manifest_path` on the root node, or, with more than one, cycle with `T` (stored in
-   `user://herdstead.cfg`; precedence `--pack=` > saved > scene default). A recolour-only pack derived by a
+   `--pack` or `manifest_path` on the root node (stored in `user://herdstead.cfg`; precedence `--pack=` > saved >
+   scene default). A recolour-only pack derived by a
    recipe (the retired Dusk Shift) is no longer supported.
 3. **Raise the density** (to schema v2), one image at a time:
 

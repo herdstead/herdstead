@@ -102,6 +102,9 @@ var geometry: DeskMeasure
 ## How many times a lamp was drawn (_apply_light()): a diagnostic, never a
 ## decision, so a test can prove a quiet refresh redraws no lamp.
 var lamps_drawn := 0
+## How far into night the office is (DayLight.night_at()): the lamps and the
+## contact shadows draw harder as it rises; set_night() changes it.
+var night := 0.0
 var _lamp_levels: Dictionary[String, Lamp] = {}
 var _shell_seats: Dictionary[String, bool] = {}
 var _shadow_holder: Node2D
@@ -436,11 +439,26 @@ func _apply_light(column: int, side: String, level: Lamp) -> void:
 
 
 ## The colour a task lamp is drawn in at `level`: the pack's own task-light
-## colour, at this level's alpha, harder on a lamp-lit pack than a daylight one.
+## colour, at this level's alpha, harder on a lamp-lit pack and at night.
 func lamp_color(level: Lamp) -> Color:
 	var color := art.color(ArtContract.TASK_LIGHT)
-	color.a = LAMP_ALPHA[level] * (LAMP_STRONG if _strong_lights() else 1.0)
+	color.a = minf(1.0, LAMP_ALPHA[level] * _lamp_strength())
 	return color
+
+
+## Night falls or lifts by `amount` (DayLight.night_at()): every lamp that is
+## drawn is drawn again at its level, harder or softer, and so are the contact
+## shadows. The same night is a no-op: every light change asks this of every table.
+func set_night(amount: float) -> void:
+	if is_equal_approx(amount, night):
+		return
+	night = amount
+	for column in columns.size():
+		for side: String in SIDES:
+			var id := _seat_name(column, side)
+			if _lamp_levels.has(id):
+				_apply_light(column, side, _lamp_levels[id])
+	_sync_shadows()
 
 
 ## Show or hide the four-bar selection frame around the table.
@@ -486,7 +504,7 @@ func _sync_shadows() -> void:
 	else:
 		_shadow_holder.position = position - ground.position
 	var color := art.color(ArtContract.CONTACT_SHADOW)
-	color.a = 0.26 if _strong_lights() else 0.12
+	color.a = lerpf(0.12, 0.26, clampf((_lamp_strength() - 1.0) / (LAMP_STRONG - 1.0), 0.0, 1.0))
 	while _shadow_holder.get_child_count() > columns.size():
 		var surplus := _shadow_holder.get_child(_shadow_holder.get_child_count() - 1)
 		_shadow_holder.remove_child(surplus)
@@ -556,3 +574,10 @@ func _seat_name(column: int, side: String) -> String:
 ## a daylight one. The pack says which it is; nothing here knows a theme's name.
 func _strong_lights() -> bool:
 	return art.task_lights == ArtPack.TASK_LIGHTS_STRONG
+
+
+## How much harder than LAMP_ALPHA the lamps draw: 1 by day, LAMP_STRONG on a
+## lamp-lit pack, DayLight.NIGHT_LAMPS at full night, whichever is more.
+func _lamp_strength() -> float:
+	var pack := LAMP_STRONG if _strong_lights() else 1.0
+	return maxf(pack, lerpf(1.0, DayLight.NIGHT_LAMPS, night))

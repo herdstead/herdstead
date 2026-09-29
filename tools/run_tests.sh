@@ -49,6 +49,7 @@ MIN_CASES_OFFICE_SERVICE=14
 MIN_CASES_OFFICE_GEOMETRY=22
 MIN_CASES_OFFICE_FRAMES=5
 MIN_CASES_OFFICE_QUIET=7
+MIN_CASES_DAY_LIGHT=8
 MIN_CASES_OFFICE_RECONCILE=16
 MIN_CASES_OFFICE_WALKING=31
 MIN_CASES_OFFICE_RESTS=27
@@ -356,6 +357,9 @@ run_scene_suite test_office_frames "OFFICE FRAMES TESTS" "$MIN_CASES_OFFICE_FRAM
 # quiet refresh on a kept plan (no placement signature, no structural pass, no lamp).
 run_scene_suite test_office_quiet "QUIET REFRESH TESTS" "$MIN_CASES_OFFICE_QUIET" -- --read-only \
 	--socket="$WORK/quiet-nowhere.sock" --work="$WORK"
+# Day and night (DayLight) over the one pack: the curve, the clock, T, the bar.
+run_scene_suite test_day_light "DAY LIGHT TESTS" "$MIN_CASES_DAY_LIGHT" -- --read-only \
+	--socket="$WORK/day-light-nowhere.sock" --work="$WORK"
 run_scene_suite test_office_reconcile "RECONCILE TESTS" "$MIN_CASES_OFFICE_RECONCILE" -- --read-only \
 	--socket="$WORK/reconcile-nowhere.sock" --work="$WORK"
 # People walking on the shown floor: arrivals, departures, to the pantry and back, cold

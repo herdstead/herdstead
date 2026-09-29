@@ -88,9 +88,10 @@ case "$CAPTURE_MARGIN" in
 		exit 2
 		;;
 esac
-# Which pictures: `all` (the default), or `ci`: both showrooms, the pixel
+# Which pictures: `all` (the default), or `ci`: the showroom, the pixel
 # people and the live office at 2x and 4x, what a change looks like within
-# CI's time (about half a minute there; the whole set takes over ten).
+# CI's time (about half a minute there; the whole set takes over ten), and the
+# office at night at 2x.
 CAPTURE_SET="${CAPTURE_SET:-all}"
 case "$CAPTURE_SET" in
 	all | ci) ;;
@@ -258,6 +259,8 @@ godot_attempt() {
 
 mkdir -p "$OUT"
 SHOTS="preview-daylight.png office-zoom2.png office-zoom4.png office-drawer-open-zoom2.png"
+# The same office at night (`--light=night`, DayLight), 2x, 4x and the 480x320 minimum.
+SHOTS="$SHOTS office-night-zoom2.png office-night-zoom4.png office-night-min.png"
 # NEWS and the drawer's EVENTS page after a run of status changes, 2x and the 480x320 minimum.
 SHOTS="$SHOTS office-events-zoom2.png office-events-min.png"
 # An agent starting in the shell api:p3: walking in from the door under the hourglass, 2x, 4x and the minimum.
@@ -317,7 +320,7 @@ SHOTS="$SHOTS office-point-zoom2.png office-point-floor-zoom2.png"
 SHOTS="$SHOTS office-strategic-zoom2.png office-strategic-zoom4.png office-strategic-min.png"
 SHOTS="$SHOTS office-strategic-floors-zoom2.png"
 if [ "$CAPTURE_SET" = ci ]; then
-	SHOTS="preview-daylight.png people-zoom2.png people-zoom4.png office-zoom2.png office-zoom4.png"
+	SHOTS="preview-daylight.png people-zoom2.png people-zoom4.png office-zoom2.png office-zoom4.png office-night-zoom2.png"
 fi
 for shot in $SHOTS; do
 	rm -f "$OUT/$shot"
@@ -400,6 +403,17 @@ for zoom in 2 4; do
 	godot_run --path "$ROOT" $(window_for "$zoom") -- --socket="$WORK/herdr.sock" --read-only \
 		--pack=res://assets/daylight/manifest.json --zoom="$zoom" \
 		--wait="$DWELL" --capture="$OUT/office-zoom$zoom.png"
+done
+# At night: the world darker and cooler, the lamps harder, the night window.
+for view in "zoom2 2" "zoom4 4 --resolution 1920x1280" "min 2 --resolution 960x640"; do
+	read -r shot zoom window <<<"$view"
+	if [ "$CAPTURE_SET" = ci ] && [ "$shot" != zoom2 ]; then
+		continue
+	fi
+	# shellcheck disable=SC2086
+	godot_run --path "$ROOT" $window -- --socket="$WORK/herdr.sock" --read-only \
+		--pack=res://assets/daylight/manifest.json --zoom="$zoom" --light=night \
+		--wait="$DWELL" --capture="$OUT/office-night-$shot.png"
 done
 [ "$CAPTURE_SET" = ci ] && finish
 # The agent list's drawer open (every run starts with it closed to its tab):

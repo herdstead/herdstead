@@ -160,7 +160,7 @@ Six counters in herdr's words, counting online machines only: `MACHINES 1/2`, `B
 - **CHIME OFF / CHIME ON** at the right end of the counters switches alert tones (see [Alerts](#alerts-when-the-window-is-in-the-background)).
 
 When the window is narrow the bar drops titles first, then icons; numbers always stay. The top-right corner shows the
-theme name, with a `[T]` hint when there is more than one theme.
+pack's name and the light: `STUDIO · DAY  [T]` or `STUDIO · NIGHT  [T]` (see [Day and night](#themes-and-art)).
 
 ## FLOORS and signposts
 
@@ -422,7 +422,7 @@ nothing while the monitor or OVERVIEW is open or a text box has the keyboard.
 | `O` | OVERVIEW |
 | `L` (hold) | Lens |
 | `S` | Strategic view |
-| `T` | Next theme |
+| `T` | Day or night: turn the light over until the clock's own day or night turns |
 | `-` / `=` | Pixel scale down / up |
 | `Ctrl+]` | Close the terminal monitor |
 
@@ -477,7 +477,7 @@ socket as a machine. Forwarding, cleanup, target validation, the debug hook and 
 
 ## Themes and art
 
-**Packs.** One theme ships: Daylight Studio (`daylight`). Dusk Shift, a palette derived from it by a recipe, was
+**Packs.** One theme ships: Studio (`daylight`). Dusk Shift, a palette derived from it by a recipe, was
 retired on 2026-09-29: night is to be a light over the one pack, not a second pack. Each runtime pack has 29 logical 32×32 tiles (wood floor, open corridor, nine-slice rug, walls,
 thresholds) at density 2 (64×64 texels per tile, nearest-neighbour; the build doubles 1× sources into 2×2 blocks),
 5 standalone props (code cabinet, window, door, plant, blank sign), a desk-item library of 5 everyday objects and 3 white
@@ -486,8 +486,8 @@ and connected), a native TileSet, four single-image SpriteFrames (for export onl
 The full spec is [ASSET_SPEC](ASSET_SPEC.md), the painter's brief is [ARTIST_BRIEF](ARTIST_BRIEF.md), and depth and
 collision rules are in [WORLD_MODEL](WORLD_MODEL.md).
 
-**Switching at run time.** The office scans `res://assets/*/manifest.json` at start, sorted by pack id; with more than
-one, `T` cycles through them. Switching rebuilds the backdrop and floor; the HUD re-dresses in place (a new Theme, new textures, no node
+**Choosing a pack.** The office scans `res://assets/*/manifest.json` at start, sorted by pack id; `--pack=` or the saved
+choice picks one. Switching rebuilds the backdrop and floor; the HUD re-dresses in place (a new Theme, new textures, no node
 rebuilt). The herdr connection is untouched: camera, selection, pixel scale and online state stay. The choice is saved in
 `user://herdstead.cfg` and restored; precedence is `--pack=` > saved > the scene default (daylight). A saved path that no
 longer exists falls back to the default with a warning. Capture runs do not write the file. An exported build only sees
@@ -560,6 +560,14 @@ needs `mipmaps/generate=true` in each PNG's `.import`; `tools/test_art.gd` check
 `manifest_path` can also be set on the Office or Preview root node in the Inspector. Hand-painted TileMaps store atlas
 coordinates, so a same-spec reskin should keep atlas slots; procedural scenes look tiles up by semantic ID and can
 reorder the atlas.
+
+**Day and night.** The one pack is lit by the local clock (`DayLight`, `scripts/world/day_light.gd`): day from 07:00 to
+18:00, night otherwise, fading over half an hour round each. At night the world (not the HUD, which is its own canvas
+layer) is darker and cooler through a `CanvasModulate`, the desk lamps and chair shadows draw harder, and the windows show
+the night view (`window_night`, a texture swap). `T` turns the light over: following the clock, the other one holds until
+the clock's own day or night turns. `--light=day|night` holds it (and T then swaps it); a capture holds the day unless it
+asks, so screenshots never depend on the time they are taken. The time of day binds no herdr field: it is lighting, not a
+signal, and a lost connection is still its own grey tint, with everyone frozen, on top of it.
 
 **Offline tint.** A disconnected office (or machine's floors) is tinted. A pack may set an optional top-level
 `"stale_modulate": "8f96b8"` (6 lower-case hex digits) in `pack.json` / `manifest.json`; without it the tint is

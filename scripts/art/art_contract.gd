@@ -95,6 +95,8 @@ const WALL_SIDE_RIGHT := &"wall.side_right"
 ## rather than from these.
 const PROP_SIGN := &"sign"
 const PROP_WINDOW := &"window"
+## The same window at night (DayLight): its frame pixel for pixel, the view dark.
+const PROP_WINDOW_NIGHT := &"window_night"
 const PROP_DOOR := &"door"
 const PROP_PLANT := &"plant"
 ## The second plant: the same piece in another pot, alternating with
@@ -116,6 +118,7 @@ const PROP_DONE_STACK := &"done_stack"
 const PROP_IDS: Array[StringName] = [
 	PROP_SIGN,
 	PROP_WINDOW,
+	PROP_WINDOW_NIGHT,
 	PROP_DOOR,
 	PROP_PLANT,
 	PROP_PLANT_B,

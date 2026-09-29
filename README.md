@@ -51,7 +51,7 @@ connects to herdr.
 - **OVERVIEW** (`O`): one row per pane with timelines. **Lens** (hold `L`): how long everyone has been in their state.
   **Strategic view** (`S`): a diagram of the whole floor.
 - **Background alerts**: `(N)` in the window title, a Dock bounce, and an optional chime.
-- **Themes**: Daylight Studio; a new pack is a copy of `art/daylight` repainted, discovered at start and switched live with `T`.
+- **Day and night**: one pack, Studio, lit by the local clock: by night the office is darker and cooler, the desk lamps burn harder and the windows show the city at night; `T` turns the light over for a while.
 - **Several machines**: every SSH machine herdr has saved becomes its own building, reached over `ssh -L`.
 
 ![The showroom: every agent state on two mock floors](docs/showroom.png)

@@ -116,8 +116,6 @@ func test_list_arrows_move_the_cursor_not_the_camera() -> void:
 
 func test_office_keys_still_work_while_the_list_has_the_keyboard() -> void:
 	var office := await _listed_office()
-	# The office ships one pack; T cycles packs when it has more than one.
-	office.themes = PackedStringArray([office.manifest_path, _second_pack()])
 	await _key_cycle(KEY_A)
 	var list := office.hud.agent_list
 	var selected := office.picked_key
@@ -125,9 +123,9 @@ func test_office_keys_still_work_while_the_list_has_the_keyboard() -> void:
 	_check(office.picked_key != selected and not office.picked_key.is_empty(), "N still walks the queue")
 	_check(list.has_keyboard(), "and the list keeps the keyboard")
 	_eq(list.cursor(), office.picked_key, "its cursor follows N's pick")
-	var theme := office.art.id
+	var night := office.night
 	await _key_cycle(KEY_T)
-	_check(office.art.id != theme, "T still switches the theme")
+	_check(office.night != night, "T still turns the light over")
 	var shown := office.navigator.shown_key
 	await _key_cycle(KEY_PAGEDOWN)
 	_check(office.navigator.shown_key != shown, "PageDown still changes floor")

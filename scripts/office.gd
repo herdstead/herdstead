@@ -23,7 +23,10 @@ extends Node2D
 ## synchronous refresh that took them in first. tools/perf_probe.gd times it.
 signal data_refreshed
 
-## Runtime packs live at res://assets/<id>/manifest.json; `T` cycles through them.
+## Where the world's light comes from: the local clock, or held at day or night.
+enum LightMode { CLOCK, DAY, NIGHT }
+
+## Runtime packs live at res://assets/<id>/manifest.json; `--pack=` picks one.
 const PACK_ROOT := "res://assets"
 ## The pack this build ships, and the one the office falls back to when the
 ## chosen theme cannot be drawn.
@@ -87,6 +90,14 @@ var questions: OfficeQuestionReader
 var themes := PackedStringArray()
 ## True while no machine at all is live; the shown floor also dims on its own.
 var stale := true
+## Where the light comes from: CLOCK follows the local time (DayLight), DAY and
+## NIGHT hold it (`--light=day|night`; a capture holds the day unless it asks,
+## and a test office starts at DAY).
+var light_mode := LightMode.CLOCK
+## Local minutes after midnight; a test hands in its own.
+var clock: Callable = _local_minutes
+## How far into night the world is drawn now: 0 by day, 1 by night (DayLight).
+var night := 0.0
 ## Wanted screen pixels per world unit, always even; `-` and `=` step it by 2.
 var zoom := 2
 ## Whether a theme switch (and the list's view, and the chime switch) is
@@ -121,6 +132,18 @@ var picked_key: String:
 		navigator.pick_desk(value, "" if pane == null else pane.identity_key())
 
 var _paper: ColorRect
+## The world's night tint (DayLight): a CanvasModulate on the world's canvas, so
+## the HUD's own layer keeps its colours; the paper backdrop is tinted apart.
+var _night_light: CanvasModulate
+## T turned the light over while it follows the clock; it holds until the
+## clock's own day or night turns (_flipped_at_night is which one it turned from).
+var _light_flipped := false
+var _flipped_at_night := false
+## Until the clock is read again.
+var _light_left := 0.0
+## The last live-machine count the bar was written with, to write it again
+## when only the light changed.
+var _bar_live := 0
 ## The machine of the floor the world was built for.
 var _world_machine := ""
 ## The shown floor's drawing and its plate band, which the pan is clamped to.
@@ -224,6 +247,11 @@ func _ready() -> void:
 	# The paper starts where the bar ends; the bar's own height is the scene's.
 	_paper.offset_top = hud.placed(hud.bar).size.y
 	backdrop.add_child(_paper)
+	light_mode = _chosen_light(args)
+	_night_light = CanvasModulate.new()
+	_night_light.name = "NightLight"
+	add_child(_night_light)
+	_update_light(true)
 	camera = OfficeCamera.new(hud, _screen)
 	world = Node2D.new()
 	world.position = camera.free_rect().position
@@ -427,7 +455,7 @@ func switch_theme(path: String) -> void:
 	art = chosen
 	pen = OfficeDraw.new(art)
 	hud.dress(art, pen.font)
-	_paper.color = art.color(ArtContract.CREAM_SHADOW)
+	_update_light(true)
 	_redraw()
 	_remember_theme(path)
 
@@ -439,11 +467,75 @@ func _redraw() -> void:
 	_refresh()
 
 
-func _cycle_theme() -> void:
-	if themes.size() < 2:
+## `T`: turn the light over. Following the clock, the other of day and night
+## holds until the clock's own turns; held (`--light=`), it swaps. Never a
+## write, never a state: the time of day binds no herdr field.
+func toggle_light() -> void:
+	if light_mode == LightMode.CLOCK:
+		_light_flipped = not _light_flipped
+		_flipped_at_night = DayLight.is_night(DayLight.night_at(_now_minutes()))
+	else:
+		light_mode = LightMode.NIGHT if light_mode == LightMode.DAY else LightMode.DAY
+	_update_light(true)
+
+
+## Read the clock and light the world for it: the world's tint, the paper
+## backdrop, every lamp and window of the shown floor, and the bar's DAY /
+## NIGHT. Nothing is redrawn while the light stays as it was, unless `force`.
+func _update_light(force := false) -> void:
+	var natural := DayLight.night_at(_now_minutes())
+	if _light_flipped and DayLight.is_night(natural) != _flipped_at_night:
+		# The clock's own day or night turned: follow it again.
+		_light_flipped = false
+	var amount := natural
+	if light_mode == LightMode.DAY:
+		amount = 0.0
+	elif light_mode == LightMode.NIGHT:
+		amount = 1.0
+	if _light_flipped:
+		amount = 1.0 - amount
+	if not force and is_equal_approx(amount, night):
 		return
-	# A `--pack=` from outside res://assets is not in the list; start from the top.
-	switch_theme(themes[(themes.find(manifest_path) + 1) % themes.size()])
+	var was_night := DayLight.is_night(night)
+	night = amount
+	var tint := DayLight.tint(night)
+	if _night_light != null:
+		_night_light.color = tint
+	if _paper != null and art != null:
+		_paper.color = art.color(ArtContract.CREAM_SHADOW) * tint
+	if floor_view != null:
+		floor_view.set_night(night)
+	if (force or was_night != DayLight.is_night(night)) and fleet != null and art != null:
+		_show_bar(_bar_live)
+
+
+## `--light=day|night|clock`; a capture holds the day unless it asks.
+func _chosen_light(args: AppArgs) -> LightMode:
+	match args.text("light", "day" if args.has("capture") else ""):
+		"day":
+			return LightMode.DAY
+		"night":
+			return LightMode.NIGHT
+		"clock", "":
+			return light_mode
+		var other:
+			push_warning("--light takes day, night or clock, not %s; following the clock" % other)
+			return LightMode.CLOCK
+
+
+## The clock's minutes after midnight.
+func _now_minutes() -> float:
+	var minutes: float = clock.call()
+	return minutes
+
+
+## Local minutes after midnight, from the system clock.
+static func _local_minutes() -> float:
+	var now := Time.get_time_dict_from_system()
+	var hour: int = now.get("hour", 0)
+	var minute: int = now.get("minute", 0)
+	var second: int = now.get("second", 0)
+	return hour * 60.0 + minute + second / 60.0
 
 
 func _remember_theme(path: String) -> void:
@@ -462,6 +554,10 @@ func _remember_theme(path: String) -> void:
 func _process(delta: float) -> void:
 	if floor_view != null:
 		floor_view.walk(delta)
+	_light_left -= delta
+	if _light_left <= 0.0:
+		_light_left = 1.0
+		_update_light()
 	_inbox_left -= delta
 	if _inbox_left <= 0.0:
 		_inbox_left = 1.0
@@ -509,8 +605,8 @@ func _act_on(event: InputEvent) -> bool:
 	if zoom_in or event.is_action_pressed(&"office_zoom_out"):
 		zoom = clampi(zoom + (ZOOM_STEP if zoom_in else -ZOOM_STEP), ZOOM_MIN, ZOOM_MAX)
 		fit_window()
-	elif event.is_action_pressed(&"office_next_theme"):
-		_cycle_theme()
+	elif event.is_action_pressed(&"office_toggle_light"):
+		toggle_light()
 	elif floor_up or event.is_action_pressed(&"office_floor_down"):
 		_step_floor(1 if floor_up else -1)
 	elif event.is_action_pressed(&"office_next_attention"):
@@ -549,7 +645,7 @@ func _overview_key(event: InputEvent) -> bool:
 		hud.overview.scroll_rows(-1 if event.is_action(&"ui_up") else 1)
 	else:
 		var zoom_key := event.is_action_pressed(&"office_zoom_in") or event.is_action_pressed(&"office_zoom_out")
-		return not (zoom_key or event.is_action_pressed(&"office_next_theme"))
+		return not (zoom_key or event.is_action_pressed(&"office_toggle_light"))
 	return true
 
 
@@ -988,6 +1084,7 @@ func _build(found: FloorRef, planned: FloorPlan, problems: PackedStringArray) ->
 	world.add_child(rooms)
 	floor_view = OfficeFloorView.new()
 	floor_view.setup(pen, rooms, _on_desk_picked, _on_bubble_picked, _on_bubble_hovered)
+	floor_view.set_night(night)
 	# A floor whose current input cannot be planned keeps drawing the model its
 	# last valid plan was made for.
 	var drawn := found.floor_model if problems.is_empty() else plans.planned_model(found.floor_model.key)
@@ -1263,10 +1360,9 @@ func _signposts() -> Array[SignpostModel]:
 ## The right-hand lines: the pack, and how the office runs. The bar's labels
 ## are permanent: this writes text into them, it never rebuilds them.
 func _show_bar(live: int) -> void:
+	_bar_live = live
 	var status := bar_status(fleet.read_only(), live, fleet.size())
-	var theme := art.display_name.to_upper()
-	if themes.size() > 1:
-		theme += "  [T]"
+	var theme := "%s · %s  [T]" % [art.display_name.to_upper(), "NIGHT" if DayLight.is_night(night) else "DAY"]
 	hud.fit(_screen())
 	hud.show_bar(theme, status, live < fleet.size())
 

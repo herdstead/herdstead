@@ -29,6 +29,13 @@ var refresh_depth := 0
 var deepest_refresh := 0
 
 
+func _init() -> void:
+	super()
+	# A test office is lit by day, whatever the clock says; a case about the
+	# light sets light_mode, or the clock, itself.
+	light_mode = LightMode.DAY
+
+
 func _screen() -> Vector2:
 	return test_screen
 

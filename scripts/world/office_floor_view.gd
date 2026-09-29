@@ -57,6 +57,11 @@ var pointer: OfficePointer
 var _pen: OfficeDraw
 ## The lens is held: furnishing made while it is starts dimmed too.
 var _lens := false
+## How far into night the floor is drawn (set_night()); tables and windows made
+## later start at it.
+var _night := 0.0
+## The outer wall's windows, for set_night()'s day / night view.
+var _windows: Array[Sprite2D] = []
 var _shell: Node2D
 var _decor: Dictionary[String, OfficeDecor] = {}
 ## The entry band's counters, by fixture key.
@@ -325,6 +330,7 @@ func _index(model: FloorModel) -> void:
 		if view == null:
 			continue
 		tables.append(view.table)
+		view.table.set_night(_night)
 		for key in view.pane_stations:
 			var station := view.pane_stations[key]
 			var retained: Seat = seats.get(key)
@@ -434,8 +440,30 @@ func _draw_walls(next: FloorPlan) -> void:
 
 func _outer_wall(next: FloorPlan) -> void:
 	_pen.prop(_shell, ArtContract.PROP_DOOR, OfficeShell.door(next))
+	_windows.clear()
 	for at in OfficeShell.window_xs(next, _pen):
-		_pen.prop(_shell, ArtContract.PROP_WINDOW, Vector2(at, OfficeShell.WINDOW_FOOT))
+		_windows.append(_pen.prop(_shell, _window_id(), Vector2(at, OfficeShell.WINDOW_FOOT)))
+
+
+## Night falls or lifts on this floor by `amount` (DayLight.night_at()): the
+## lamps and contact shadows of every table, and the windows' view, which turns
+## to the night one past the middle of a fade (a texture swap, no node rebuilt).
+func set_night(amount: float) -> void:
+	_night = amount
+	for table in tables:
+		table.set_night(amount)
+	var texture := _pen.art.sprite_texture(_pen.art.prop_sprite(_window_id()))
+	for window in _windows:
+		window.texture = texture
+
+
+## The outer wall's windows as drawn now, for a test of the night view.
+func windows() -> Array[Sprite2D]:
+	return _windows.duplicate()
+
+
+func _window_id() -> StringName:
+	return ArtContract.PROP_WINDOW_NIGHT if DayLight.is_night(_night) else ArtContract.PROP_WINDOW
 
 
 ## The framed pictures on the row walls (OfficeShell.frames()), in the shell:

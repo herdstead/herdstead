@@ -497,8 +497,6 @@ func test_picking_follows_the_window_scale() -> void:
 ## All of it through real input events, as the window delivers them.
 func test_office_actions_answer_their_keys() -> void:
 	var office := await _live_office()
-	# The office ships one pack; T cycles packs when it has more than one.
-	office.themes = PackedStringArray([office.manifest_path, _second_pack()])
 	# An [input] section of our own does not take the engine's built-ins away,
 	# and arrow-key panning is still Input.get_vector() over them.
 	for action: StringName in [&"ui_left", &"ui_right", &"ui_up", &"ui_down"]:
@@ -516,9 +514,9 @@ func test_office_actions_answer_their_keys() -> void:
 	held.pressed = false
 	held.echo = false
 	await _parsed(held)
-	var pack: String = office.manifest_path
+	var night := office.night
 	await _office_key(office, KEY_T)
-	_check(office.manifest_path != pack, "`T` switches the theme")
+	_check(office.night != night, "`T` turns the light over")
 	var shown := office.layout_plan().floor_key
 	await _office_key(office, KEY_PAGEUP)
 	_check(office.layout_plan().floor_key != shown, "PageUp shows another floor")

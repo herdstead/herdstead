@@ -245,10 +245,14 @@ When a floor disappears the view falls back at once to one that exists. The `doo
 - The lamp was already there (one `Polygon2D` per column and side in `OfficeTable`); four intensity steps carry focus.
 - Focus has three levels (workspace → tab → pane) and light has strengths; the selection marks are binary and already carry `picked_key`.
 - It needs no new art. The steps are table geometry, constants only in `scripts/world/table.gd` (invariant 5), scaled by the pack's
-  `task_lights: soft / strong`.
+  `task_lights: soft / strong` and, at night, up to `DayLight.NIGHT_LAMPS` (×1.8), so the four steps stay apart under the night tint.
 - Measured (`OfficeTable.LAMP_ALPHA = [0, 0.10, 0.22, 0.52]`, ×1.4 in a strong pack, against unlit desk wood): daylight DIM +5 / ON +11 /
   FOCUS +25 levels, the retired dusk pack +13 / +28 / +66. A single +3 step is invisible in a full capture.
 - **DIM cannot be read as disconnected**: disconnection makes the desk 68–69 levels **darker** (`stale_tint`); DIM is a few levels **brighter**.
+- **Night is lighting, not a signal.** The time of day (`DayLight`, the local clock, `T` to turn it over) binds no herdr field, so rule 1
+  does not apply to it and nothing reads it as a state. It darkens and cools the whole world alike (`DayLight.NIGHT_TINT`, a
+  `CanvasModulate`; the HUD is its own layer), which keeps every channel's contrast in order; a lost connection is still its own grey
+  `stale_tint` on top, with everyone frozen (invariant 4), and `tools/test_day_light.gd` holds the two apart.
 - When `active_tab_id` is missing, every tab of that workspace is unknown (`RoomModel.Active.UNKNOWN`) and drawn ON, not DIM: not said is not no.
 - Floor-level focus is not drawn: only one floor is drawn at a time, and the minimap's current-row highlight already means "the floor I am looking at".
 

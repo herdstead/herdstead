@@ -209,7 +209,7 @@ python3 -m venv .venv
 make import
 make check-packs
 
-# 6) See it for real; in the window press T to cycle through the themes, - / = to change the zoom
+# 6) See it for real; in the window press T to see it by night, - / = to change the zoom
 godot --path . -- --pack=res://assets/<id>/manifest.json --read-only
 godot --path . scenes/preview.tscn -- --pack=res://assets/<id>/manifest.json
 godot --path . scenes/preview.tscn -- --pack=res://assets/<id>/manifest.json --offline
