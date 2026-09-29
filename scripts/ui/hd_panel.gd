@@ -62,7 +62,7 @@ func dress(pack: ArtPack) -> void:
 	art = pack
 	_frame.texture_filter = pack.filter
 	_frame.density = pack.density
-	var spec := pack.panel()
+	var spec := pack.hud_panel()
 	var box := StyleBoxTexture.new()
 	box.texture = pack.sprite_texture(spec)
 	# Texture margins are texture pixels; the manifest names them in units.

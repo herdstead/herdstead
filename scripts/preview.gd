@@ -100,7 +100,7 @@ func _ready() -> void:
 	sorted.name = "Sorted"
 	sorted.y_sort_enabled = true
 	world.add_child(sorted)
-	pen.box(self, Rect2(0, 32, 800, 448), ArtContract.CREAM_SHADOW)
+	pen.box(self, Rect2(0, 32, 800, 448), ArtContract.DEEP)
 	# Keep the office layer over the background, below the screen-space UI.
 	move_child(world, get_child_count() - 1)
 	var hud := _hud()

@@ -1,7 +1,7 @@
 # Artist brief: Herdstead theme packs
 
 For a pixel artist who does not write code. The job is **a whole new theme**: the same 76 PNGs
-(29 tiles, 18 props, 11 UI images, 18 long-table pieces) in a new style. When you are done, run
+(29 tiles, 18 props, 12 UI images, 18 long-table pieces) in a new style. When you are done, run
 the self-check commands and hand in one folder. The program loads your pack without a single code change.
 
 Sizes, sources and the reasons behind them are in [ASSET_SPEC.md](ASSET_SPEC.md); this brief covers
@@ -79,11 +79,12 @@ The first versions of the desk items and the long table were drawn by a program
 (`art/pixel_people/`); you deliver no character images. You only name which animation each state
 uses in `pack.json`'s `states` (§4).
 
-**11 UI images**: 9 icons of 16×16 (`working`, `blocked`, `unread`, `idle`, `unknown`, `offline`,
-`starting`, `branch`, `connected`), pivot 8,16, except `connected` at 8,8; `panel` 32×32, pivot 0,0,
-nine-patch margins `[4,4,4,4]`; `selection` 64×64, pivot 32,60.
-(All in units; 2x PNG: icons 32×32, `panel` 64×64 (margins of 8 texels; the middle is stretched, so
-it must be one flat colour), `selection` 128×128.)
+**12 UI images**: 9 icons of 16×16 (`working`, `blocked`, `unread`, `idle`, `unknown`, `offline`,
+`starting`, `branch`, `connected`), pivot 8,16, except `connected` at 8,8; `panel` and `hud_panel`
+32×32, pivot 0,0, nine-patch margins `[4,4,4,4]` (`panel` light, for the world's bubble and the tools;
+`hud_panel` dark, for every HUD panel); `selection` 64×64, pivot 32,60.
+(All in units; 2x PNG: icons 32×32, `panel` and `hud_panel` 64×64 (margins of 8 texels; the middle is
+stretched, so it must be one flat colour), `selection` 128×128.)
 
 ---
 

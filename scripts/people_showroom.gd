@@ -45,8 +45,8 @@ const CAPTION_GAP := 2
 ## Palette key per panel variation: the page behind everything, and the stage
 ## the people stand on.
 const PANELS: Dictionary[StringName, StringName] = {
-	&"ShowroomBackdrop": ArtContract.CREAM,
-	&"ShowroomStage": ArtContract.CREAM_SHADOW,
+	&"ShowroomBackdrop": ArtContract.DEEP,
+	&"ShowroomStage": ArtContract.INK,
 }
 
 ## The command line (see the header). A test may set it before the showroom
@@ -368,7 +368,7 @@ static func _theme(pack: ArtPack) -> Theme:
 		result.set_constant("separation", variation, gaps[variation])
 	# The HUD's LabelSlate is sized for a 2-3x office; notes here are read at 1x.
 	result.set_type_variation(&"ShowroomNote", "Label")
-	result.set_color("font_color", &"ShowroomNote", pack.color(ArtContract.SLATE))
+	result.set_color("font_color", &"ShowroomNote", pack.color(ArtContract.MUTED))
 	result.set_type_variation(&"ShowroomGrid", "GridContainer")
 	result.set_type_variation(&"ShowroomFlow", "HFlowContainer")
 	for variation: StringName in [&"ShowroomGrid", &"ShowroomFlow"]:

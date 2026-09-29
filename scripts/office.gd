@@ -241,12 +241,13 @@ func _ready() -> void:
 		set_process_unhandled_input(false)
 		return
 	pen = OfficeDraw.new(art)
-	# The paper backdrop stays put while the office scrolls under the camera.
+	# The backdrop stays put while the office scrolls under the camera: the
+	# dark HUD's `deep`, so the world reads as lit inside a dark frame.
 	var backdrop := CanvasLayer.new()
 	backdrop.layer = -1
 	add_child(backdrop)
 	_paper = ColorRect.new()
-	_paper.color = art.color(ArtContract.CREAM_SHADOW)
+	_paper.color = art.color(ArtContract.DEEP)
 	_paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_paper.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	# The paper starts where the bar ends; the bar's own height is the scene's.
@@ -510,7 +511,7 @@ func _update_light(force := false) -> void:
 	if _night_light != null:
 		_night_light.color = tint
 	if _paper != null and art != null:
-		_paper.color = art.color(ArtContract.CREAM_SHADOW) * tint
+		_paper.color = art.color(ArtContract.DEEP) * tint
 	if floor_view != null:
 		floor_view.set_night(night)
 	if (force or was_night != DayLight.is_night(night)) and fleet != null and art != null:

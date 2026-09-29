@@ -1501,7 +1501,11 @@ func test_theme_switch_keeps_the_hud() -> void:
 	await _frames(2)
 	var after := _screen_of(hud).theme
 	_check(after != before, "a theme switch builds a new Theme")
-	_check(after.get_color("font_color", "Label") != before.get_color("font_color", "Label"), "with the new pack's ink")
+	# The dark HUD's text is paper; ink is still the loud counter's words.
+	_check(
+		after.get_color("font_color", "CounterTitle") != before.get_color("font_color", "CounterTitle"),
+		"with the new pack's ink"
+	)
 	_eq(_hud_nodes(office), nodes, "and keeps every HUD node")
 	_check(office.art.sprite_texture(office.art.panel()) != panel, "the panels are dressed from the new pack")
 	_eq(hud.floors.art, office.art, "and so is the minimap")

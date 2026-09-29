@@ -164,9 +164,16 @@ static func pick(items: Array[ArtSprite], rng: RandomNumberGenerator) -> ArtSpri
 	return null
 
 
-## The nine-patch every HUD panel is drawn from. Never null in a valid pack.
+## The light nine-patch the world's and the tools' panels are drawn from (the
+## blocked bubble, the Avatar Studio). Never null in a valid pack.
 func panel() -> ArtSprite:
 	return ui_sprite(ArtContract.UI_PANEL)
+
+
+## The dark nine-patch every HUD panel is drawn from (HdPanel). Never null in a
+## valid pack.
+func hud_panel() -> ArtSprite:
+	return ui_sprite(ArtContract.UI_HUD_PANEL)
 
 
 ## The frame drawn around the selected seat. Never null in a valid pack.

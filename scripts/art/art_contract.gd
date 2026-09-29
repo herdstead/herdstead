@@ -24,6 +24,11 @@ const WOOD_DARK := &"wood_dark"
 const WOOD_SHADOW := &"wood_shadow"
 const WORKING := &"working"
 const BLOCKED := &"blocked"
+## The dark HUD's ground and its quieter text (HudTheme): `deep` under the bar,
+## NEWS and screens, `jacket_light` for faint words, `wood_light` for warm ones.
+const DEEP := &"deep"
+const JACKET_LIGHT := &"jacket_light"
+const WOOD_LIGHT := &"wood_light"
 const TASK_LIGHT := &"task_light"
 const CONTACT_SHADOW := &"contact_shadow"
 ## The done state's own colour (its badge is `unread`): an UNREAD window in the
@@ -52,6 +57,9 @@ const PALETTE_KEYS: Array[StringName] = [
 	WOOD_SHADOW,
 	WORKING,
 	BLOCKED,
+	DEEP,
+	JACKET_LIGHT,
+	WOOD_LIGHT,
 	TASK_LIGHT,
 	CONTACT_SHADOW,
 	UNREAD,
@@ -136,6 +144,9 @@ const ITEM_GROUPS: Dictionary[StringName, StringName] = {
 	&"plant": ItemSpec.PLACE_FLOOR,
 }
 const UI_PANEL := &"panel"
+## The dark HUD's panels (HdPanel); `panel` stays the world's and the tools'
+## light one (the blocked bubble, the Avatar Studio, the showroom's notes).
+const UI_HUD_PANEL := &"hud_panel"
 const UI_SELECTION := &"selection"
 const UI_BRANCH := &"branch"
 ## Three display overlays, not herdr states: a pane whose agent is still
@@ -231,9 +242,9 @@ static func problems(pack: ArtPack) -> PackedStringArray:
 	for image in ui_ids():
 		if pack.ui_sprite(image) == null:
 			found.append("ui: no image named " + image)
-	var panel := pack.panel()
-	if panel != null and not panel.nine_patched():
-		found.append("ui: the panel carries no nine_patch margins")
+	for framed: ArtSprite in [pack.panel(), pack.hud_panel()]:
+		if framed != null and not framed.nine_patched():
+			found.append("ui: %s carries no nine_patch margins" % framed.id)
 	for name in STATES:
 		var drawn := pack.state(name)
 		if drawn == null:
@@ -284,6 +295,7 @@ static func rug_cell(row: StringName, column: StringName) -> StringName:
 static func ui_ids() -> Array[StringName]:
 	return [
 		UI_PANEL,
+		UI_HUD_PANEL,
 		UI_SELECTION,
 		UI_BRANCH,
 		UI_STARTING,

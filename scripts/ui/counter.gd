@@ -229,7 +229,8 @@ static func _durations(tracks: Array[StateLog.Track], now_msec: int) -> PackedSt
 	return words
 
 
-## Pressed (a filter) wins over loud; the labels on the dark pressed look turn paper.
+## Pressed (a filter) wins over loud. On the dark chip the title is muted
+## under a paper number; pressed, both are paper; on the loud blocked chip, ink.
 func _restyle() -> void:
 	var look := &"Counter"
 	if _active:
@@ -240,6 +241,9 @@ func _restyle() -> void:
 	var label: Label = %Title
 	var value: Label = %Value
 	var more: Label = %Extra
-	label.theme_type_variation = &"CounterTitlePaper" if _active else &"CounterTitle"
+	var loud := look == &"CounterHot"
+	label.theme_type_variation = (
+		&"CounterTitle" if loud else &"CounterTitlePaper" if _active else &"CounterTitleMuted"
+	)
 	more.theme_type_variation = label.theme_type_variation
-	value.theme_type_variation = &"CounterValuePaper" if _active else &"CounterValue"
+	value.theme_type_variation = &"CounterValue" if loud else &"CounterValuePaper"

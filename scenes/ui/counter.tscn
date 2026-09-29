@@ -41,12 +41,6 @@ size_flags_vertical = 4
 mouse_filter = 2
 theme_override_constants/separation = 1
 
-[node name="Title" type="Label" parent="Line/Text"]
-unique_name_in_owner = true
-layout_mode = 2
-mouse_filter = 2
-theme_type_variation = &"CounterTitle"
-
 [node name="Figures" type="HBoxContainer" parent="Line/Text"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -57,7 +51,7 @@ theme_override_constants/separation = 3
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
-theme_type_variation = &"CounterValue"
+theme_type_variation = &"CounterValuePaper"
 text = "0"
 
 [node name="Extra" type="Label" parent="Line/Text/Figures"]
@@ -66,4 +60,10 @@ visible = false
 layout_mode = 2
 size_flags_vertical = 8
 mouse_filter = 2
-theme_type_variation = &"CounterTitle"
+theme_type_variation = &"CounterTitleMuted"
+
+[node name="Title" type="Label" parent="Line/Text"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_filter = 2
+theme_type_variation = &"CounterTitleMuted"
