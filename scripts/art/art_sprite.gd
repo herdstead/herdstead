@@ -17,6 +17,9 @@ var patch_left := 0
 var patch_top := 0
 var patch_right := 0
 var patch_bottom := 0
+## The item's own facts (ItemSpec), for a prop whose entry has an `item`
+## block; null for one placed by code by its id.
+var item: ItemSpec
 
 
 ## Whether this image is stretched as a nine-patch rather than drawn whole.

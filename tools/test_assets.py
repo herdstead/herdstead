@@ -664,6 +664,45 @@ class DensityContractTests(unittest.TestCase):
             validate(source, strict)
         validate(source, relaxed)  # ... and its off-palette shading
 
+    def test_an_item_block_is_held_to_its_rules(self):
+        # docs/ITEMS.md: the block's own keys and values, the same rules
+        # ArtPack._read_item() holds at run time, each refused by name.
+        source = self.base_source
+        broken = {
+            "has keys it does not know": lambda item: item.update(colour="red"),
+            "place is 'roof'": lambda item: item.update(place="roof"),
+            "a desk item needs a footprint": lambda item: item.pop("footprint"),
+            "is empty or wider than its": lambda item: item.update(footprint=[30, 3]),
+            "blocks is only true, on a floor item": lambda item: item.update(blocks=True),
+            "is not \\[a-z0-9_\\]\\+": lambda item: item.update(group="Desk!"),
+            "weight is a whole number": lambda item: item.update(weight=-1),
+        }
+        for message, change in broken.items():
+            with self.subTest(message=message):
+                pack = self.read_pack(source)
+                change(pack["props"]["desk_mug"]["item"])
+                with self.assertRaisesRegex(ValueError, "props/desk_mug item.*" + message):
+                    validate(source, pack)
+
+    def test_a_desk_item_keeps_to_the_desk_plane(self):
+        # Measured on the pixels: a desk item is opaque only in unit rows 3..21
+        # of its canvas, or the build refuses it.
+        source = self.base_source
+        pack = self.read_pack(source)
+        path = source / pack["props"]["desk_mug"]["path"]
+        with Image.open(path) as opened:
+            image = opened.convert("RGBA")
+        ink = tuple(bytes.fromhex(pack["palette"]["ink"])) + (255,)
+        # The pixels of one unit, whatever density this source is painted at.
+        unit = image.height // pack["props"]["desk_mug"]["size"][1]
+        tall = image.copy()
+        tall.putpixel((image.width // 2, 2 * unit), ink)
+        tall.save(path)
+        with self.assertRaisesRegex(ValueError, "props/desk_mug item: a desk item is opaque only in rows 3..21"):
+            validate(source, pack)
+        image.save(path)
+        validate(source, pack)
+
     def test_relaxed_filter_still_checks_the_geometry_it_is_given(self):
         # A painted pack buys freedom in its pixels, not in its manifest: the
         # canvas and the anchor are still held to what pack.json declares.

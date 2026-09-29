@@ -84,6 +84,10 @@ const SIDES := ["far", "near"]
 const DECOR_OFFSET := -28
 const DECOR_FAR := -55
 const DECOR_NEAR := -9
+## The pools a table draws its trinkets from (ItemSpec.group in the pack): one
+## per column from DESK_GROUP, and now and then a cat from CAT_GROUP.
+const DESK_GROUP := &"desk"
+const CAT_GROUP := &"cat"
 ## A done seat's stack of paper (ArtContract.PROP_DONE_STACK) stands this far
 ## right of the seat column, on the same working plane as the decorations
 ## (DECOR_FAR or DECOR_NEAR). Measured: the laptop is opaque over x-7..x+6
@@ -220,20 +224,24 @@ func _sync_decorations() -> void:
 	var retained: Array[StringName] = []
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _decoration_identity.hash()
+	var cats := art.items_in(CAT_GROUP)
+	var items := art.items_in(DESK_GROUP)
 	var has_cat := not columns.is_empty() and rng.randf() < 0.28
-	if has_cat:
-		var cat := ArtContract.DESK_CATS[rng.randi_range(0, ArtContract.DESK_CATS.size() - 1)]
-		_decoration(&"Cat", cat, Vector2(columns[0] + DECOR_OFFSET, DECOR_NEAR))
+	var cat := ArtPack.pick(cats, rng) if has_cat else null
+	if cat != null:
+		_decoration(&"Cat", cat.id, Vector2(columns[0] + DECOR_OFFSET, DECOR_NEAR))
 		retained.append(&"Cat")
 	for index in columns.size():
 		# A separate stream per column keeps all old choices when a desk grows.
 		rng.seed = ("%s:%d" % [_decoration_identity, index]).hash()
 		if rng.randf() >= 0.75:
 			continue
-		var item := ArtContract.DESK_ITEMS[rng.randi_range(0, ArtContract.DESK_ITEMS.size() - 1)]
-		var far := rng.randi_range(0, 1) == 0 or (has_cat and index == 0)
+		var item := ArtPack.pick(items, rng)
+		if item == null:
+			continue
+		var far := rng.randi_range(0, 1) == 0 or (cat != null and index == 0)
 		var id := StringName("Item%d" % index)
-		_decoration(id, item, Vector2(columns[index] + DECOR_OFFSET, DECOR_FAR if far else DECOR_NEAR))
+		_decoration(id, item.id, Vector2(columns[index] + DECOR_OFFSET, DECOR_FAR if far else DECOR_NEAR))
 		retained.append(id)
 	for child in holder.get_children():
 		if child.name not in retained:

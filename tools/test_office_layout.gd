@@ -1128,10 +1128,10 @@ func test_the_wall_run_keeps_its_place_when_a_table_grows() -> void:
 func test_the_wall_run_alternates_two_plants_by_place() -> void:
 	var plant := &"plant"
 	var plant_b := &"plant_b"
-	_eq(OfficeDecorPlanner.plant_at(0), plant, "place 0 is the first plant")
-	_eq(OfficeDecorPlanner.plant_at(1), plant_b, "place 1 is the other")
-	_eq(OfficeDecorPlanner.plant_at(2), plant, "and they take turns")
-	_eq(OfficeDecorPlanner.plant_at(7), plant_b, "by the place's parity")
+	_eq(OfficeDecorPlanner.plant_at(pen.art, 0), plant, "place 0 is the first plant")
+	_eq(OfficeDecorPlanner.plant_at(pen.art, 1), plant_b, "place 1 is the other")
+	_eq(OfficeDecorPlanner.plant_at(pen.art, 2), plant, "and they take turns")
+	_eq(OfficeDecorPlanner.plant_at(pen.art, 7), plant_b, "by the place's parity")
 	var both_kinds := 0
 	for width in FURNISHED_WIDTHS:
 		var plan := _furnished(_floor([_room("a", 2), _room("b", 2, 1)]), width)
@@ -1153,7 +1153,11 @@ func test_the_wall_run_alternates_two_plants_by_place() -> void:
 					step = placed.key.get_slice("/", 2).to_int()
 				if step < 0:
 					continue
-				_eq(placed.piece, OfficeDecorPlanner.plant_at(step), "%s stands the plant of its place" % placed.key)
+				_eq(
+					placed.piece,
+					OfficeDecorPlanner.plant_at(pen.art, step),
+					"%s stands the plant of its place" % placed.key
+				)
 				run += 1
 				kinds[placed.piece] = true
 				parities[step % 2] = true

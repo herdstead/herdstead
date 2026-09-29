@@ -51,7 +51,7 @@ func furnish(next: FloorPlan) -> void:
 	var lane_y := band_top + OfficeShell.WALKING_LANE
 	var foot_y := band_top + OfficeShell.COUNTER_FOOT
 	var pitch := OfficeShell.SPOT_PITCH
-	var counter_width: float = OfficeDecor.FOOTPRINT[ArtContract.PROP_RECEPTION].x
+	var counter_width := OfficeDecor.footprint_of(_pen.art, ArtContract.PROP_RECEPTION).x
 	var counter_right := next.main_corridor_cells.position.x * grid - OfficeShell.DOOR_CLEARANCE
 	var counter_left := counter_right - counter_width
 	var length := counter_left - inner_left
@@ -60,7 +60,7 @@ func furnish(next: FloorPlan) -> void:
 	var queue := mini(OfficeShell.MAX_QUEUE, floori(length / pitch))
 	var spots := 0
 	var shared := floori((length - OfficeShell.FIXTURE_GAP) / pitch)
-	var pantry_width: float = OfficeDecor.FOOTPRINT[ArtContract.PROP_PANTRY].x
+	var pantry_width := OfficeDecor.footprint_of(_pen.art, ArtContract.PROP_PANTRY).x
 	if shared >= OfficeShell.MIN_QUEUE + 1:
 		var halved := clampi(ceili(shared / 2.0), OfficeShell.MIN_QUEUE, OfficeShell.MAX_QUEUE)
 		# The pantry's counter stays clear of where the queue's tail stands.
@@ -93,7 +93,7 @@ func _fixture(kind: FixturePlacement.Kind, piece: StringName, at: Vector2) -> Fi
 	result.key = "reception" if kind == FixturePlacement.Kind.RECEPTION else "pantry"
 	result.piece = piece
 	result.position = at
-	var footprint: Vector2 = OfficeDecor.FOOTPRINT[piece]
+	var footprint := OfficeDecor.footprint_of(_pen.art, piece)
 	result.footprint = Rect2(at - Vector2(footprint.x / 2.0, footprint.y), footprint)
 	var sprite := _pen.art.prop_sprite(piece)
 	result.draw_rect = Rect2(at - sprite.pivot, Vector2(sprite.size))

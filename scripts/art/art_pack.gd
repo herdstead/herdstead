@@ -134,6 +134,36 @@ func prop_sprite(sprite_id: StringName) -> ArtSprite:
 	return props[sprite_id] if props.has(sprite_id) else null
 
 
+## Every prop drawn from `group` (ItemSpec.group), by id: the pools the table
+## and the floor planners draw from by weight. By id, never by where a manifest
+## happens to list them: a tool that writes JSON with its keys sorted must not
+## change what a table draws.
+func items_in(group: StringName) -> Array[ArtSprite]:
+	var found: Array[ArtSprite] = []
+	for sprite_id in props:
+		var member := props[sprite_id]
+		if member.item != null and member.item.group == group:
+			found.append(member)
+	found.sort_custom(func(a: ArtSprite, b: ArtSprite) -> bool: return str(a.id) < str(b.id))
+	return found
+
+
+## One of `items` by their weights, from `rng`: with equal weights this is one
+## randi_range() over them, so a table's picture keeps its old choices.
+static func pick(items: Array[ArtSprite], rng: RandomNumberGenerator) -> ArtSprite:
+	var total := 0
+	for member in items:
+		total += member.item.weight
+	if total <= 0:
+		return null
+	var roll := rng.randi_range(0, total - 1)
+	for member in items:
+		roll -= member.item.weight
+		if roll < 0:
+			return member
+	return null
+
+
 ## The nine-patch every HUD panel is drawn from. Never null in a valid pack.
 func panel() -> ArtSprite:
 	return ui_sprite(ArtContract.UI_PANEL)
@@ -327,6 +357,12 @@ func _read_images(manifest: Dictionary) -> String:
 			var problem := _image_error(read.path, read.size)
 			if not problem.is_empty():
 				return "%s/%s: %s" % [category, sprite_id, problem]
+			if spec.has("item"):
+				if category != "props":
+					return "%s/%s: only a prop has an item block" % [category, sprite_id]
+				read.item = _read_item(spec["item"], read.size)
+				if read.item == null:
+					return "props/%s: its item block is not one (docs/ITEMS.md)" % sprite_id
 			target[read.id] = read
 	return ""
 
@@ -430,6 +466,57 @@ static func _read_sprite(sprite_id: StringName, spec: Dictionary) -> ArtSprite:
 
 ## Validate JSON numbers before Vector2 (float32) rounding or Vector2i wrapping.
 ## The typed geometry uses signed 32-bit coordinates; -1 is the invalid marker.
+## An `item` block (ItemSpec), or null when it is not one: an unknown key, a
+## place that is none of the three, a desk or floor item without a footprint or
+## one wider than its canvas, `blocks` off the floor, a group that is not an id,
+## a weight without a group or not a whole number.
+static func _read_item(value: Variant, size: Vector2i) -> ItemSpec:
+	if not value is Dictionary:
+		return null
+	var data: Dictionary = value
+	for key: Variant in data:
+		if not key is String or not ItemSpec.KEYS.has(key):
+			return null
+	var item := ItemSpec.new()
+	item.place = read_name(data.get("place"))
+	if not ItemSpec.PLACES.has(item.place):
+		return null
+	if data.has("footprint"):
+		var pair := _whole_pair(data["footprint"])
+		if pair.x < 1 or pair.y < 1 or pair.x > size.x:
+			return null
+		item.footprint = Vector2(pair)
+	elif item.place != ItemSpec.PLACE_WALL:
+		return null
+	item.blocks = item.place == ItemSpec.PLACE_FLOOR
+	if data.has("blocks"):
+		# Only true for now: nothing a person walks over stands on a floor yet,
+		# and the walk graph takes every floor item's footprint as an obstacle.
+		if not data["blocks"] is bool or item.place != ItemSpec.PLACE_FLOOR or not data["blocks"]:
+			return null
+		item.blocks = true
+	if data.has("group"):
+		item.group = read_name(data["group"])
+		if not _is_group(item.group):
+			return null
+	if data.has("weight"):
+		item.weight = _whole_unit(data["weight"])
+		if item.weight < 0 or item.group.is_empty():
+			return null
+	return item
+
+
+## `[a-z0-9_]+`: a pool's name.
+static func _is_group(group: StringName) -> bool:
+	var text := str(group)
+	if text.is_empty():
+		return false
+	for character in text:
+		if not (character == "_" or (character >= "a" and character <= "z") or (character >= "0" and character <= "9")):
+			return false
+	return true
+
+
 static func _whole_unit(value: Variant) -> int:
 	if not (value is int or value is float):
 		return -1

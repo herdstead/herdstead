@@ -169,6 +169,104 @@ func test_art_pack_refuses_a_manifest_it_cannot_draw() -> void:
 	_check(ArtPack.from_manifest("res://assets/no-such-pack/manifest.json") == null, "nor does a manifest that is gone")
 
 
+## An `item` block (docs/ITEMS.md) reads into ItemSpec: what the item stands
+## on, its footprint, whether it blocks, its pool and weight; a prop without
+## one (the door) has none. A pool is its members by id, whatever order a file lists them in.
+func test_an_item_block_reads_into_typed_fields() -> void:
+	var art := ArtPack.from_manifest(MANIFEST)
+	var mug := art.prop_sprite(&"desk_mug").item
+	_check(mug != null, "the mug has an item block")
+	_eq(
+		[mug.place, mug.footprint, mug.blocks, mug.group, mug.weight],
+		[&"desk", Vector2(7, 3), false, &"desk", 1],
+		"a desk item"
+	)
+	var plant := art.prop_sprite(&"plant").item
+	_eq(
+		[plant.place, plant.footprint, plant.blocks, plant.group],
+		[&"floor", Vector2(20, 10), true, &"plant"],
+		"a floor item blocks"
+	)
+	_eq(art.prop_sprite(&"wall_frame").item.place, &"wall", "a wall item needs no footprint")
+	_eq(art.prop_sprite(&"done_stack").item.group, &"", "a signal is in no pool")
+	_check(art.prop_sprite(&"door").item == null, "the door is placed by code, by its id")
+	var desk: Array[StringName] = []
+	for member in art.items_in(&"desk"):
+		desk.append(member.id)
+	_eq(desk, [&"desk_headphones", &"desk_mug", &"desk_notebook", &"desk_papers", &"desk_plant"], "by id")
+	_check(art.items_in(&"nothing").is_empty(), "a pool nobody is in is empty")
+
+
+## Equal weights draw as one randi_range() over the pool; a weight of 0 is never
+## drawn; an empty pool, nothing.
+func test_a_pool_draws_by_weight_and_equal_weights_keep_old_choices() -> void:
+	var cats := ArtPack.from_manifest(MANIFEST).items_in(&"cat")
+	for seed_value in 200:
+		var drawn := RandomNumberGenerator.new()
+		drawn.seed = seed_value
+		var old := RandomNumberGenerator.new()
+		old.seed = seed_value
+		_eq(ArtPack.pick(cats, drawn).id, cats[old.randi_range(0, cats.size() - 1)].id, "seed %d" % seed_value)
+	var never := func(m: Dictionary) -> void:
+		m.props.cat_loaf.item.weight = 0
+		m.props.cat_sit.item.weight = 3
+	var weighted := ArtPack.from_manifest(_mutated_pack("weighted-cats", never)).items_in(&"cat")
+	var seen: Dictionary[StringName, int] = {}
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	for draw in 400:
+		var id := ArtPack.pick(weighted, rng).id
+		seen[id] = seen.get(id, 0) + 1
+	_check(not seen.has(&"cat_loaf"), "a weight of 0 is never drawn: %s" % seen)
+	var sit: int = seen.get(&"cat_sit", 0)
+	var sleep: int = seen.get(&"cat_sleep", 0)
+	_check(sit > sleep * 2, "three times the weight, about three times the draws: %s" % seen)
+	var none: Array[ArtSprite] = []
+	_check(ArtPack.pick(none, rng) == null, "an empty pool draws nothing")
+
+
+## A broken item block refuses the whole pack, like any other contract error:
+## a misspelt key must not read as an absent one.
+func test_a_broken_item_block_refuses_the_pack() -> void:
+	var broken := {
+		"an unknown key": func(m: Dictionary) -> void: m.props.desk_mug.item.colour = "red",
+		"a place that is none": func(m: Dictionary) -> void: m.props.desk_mug.item.place = "roof",
+		"a desk item with no footprint":
+		func(m: Dictionary) -> void: _drop(m, ["props", "desk_mug", "item", "footprint"]),
+		"a footprint wider than the canvas": func(m: Dictionary) -> void: m.props.desk_mug.item.footprint = [30, 3],
+		"an empty footprint": func(m: Dictionary) -> void: m.props.desk_mug.item.footprint = [0, 3],
+		"blocks on a desk item": func(m: Dictionary) -> void: m.props.desk_mug.item.blocks = true,
+		"a floor item that does not block": func(m: Dictionary) -> void: m.props.plant.item.blocks = false,
+		"a group that is not an id": func(m: Dictionary) -> void: m.props.desk_mug.item.group = "Desk!",
+		"a weight with no group": func(m: Dictionary) -> void: m.props.done_stack.item.weight = 2,
+		"a negative weight": func(m: Dictionary) -> void: m.props.desk_mug.item.weight = -1,
+		"an item on a UI image": func(m: Dictionary) -> void: m.ui.panel.item = {"place": "wall"},
+	}
+	for what: String in broken:
+		var change: Callable = broken[what]
+		var path := _mutated_pack("item-" + what, change)
+		_check(ArtPack.from_manifest(path) == null, "a pack with " + what + " does not load")
+
+
+## Every pool a scene draws from has members, and each stands where its pool
+## is drawn; the done paper stack, a signal, is never in one.
+func test_the_contract_names_an_empty_or_misplaced_pool() -> void:
+	var catless := func(m: Dictionary) -> void:
+		for cat: String in ["cat_loaf", "cat_sleep", "cat_sit"]:
+			_drop(m, ["props", cat, "item", "group"])
+	var problems := ArtContract.problems(ArtPack.from_manifest(_mutated_pack("pool-catless", catless)))
+	_check(problems.has("props: nothing in the cat pool"), "an empty pool: %s" % problems)
+	var misplaced := func(m: Dictionary) -> void:
+		m.props.plant_b.item = {"place": "desk", "footprint": [20, 10], "group": "plant"}
+	problems = ArtContract.problems(ArtPack.from_manifest(_mutated_pack("pool-misplaced", misplaced)))
+	_check(
+		problems.has("props: plant_b is in the plant pool but stands on the desk"), "a misplaced member: %s" % problems
+	)
+	var pooled := func(m: Dictionary) -> void: m.props.done_stack.item.group = "desk"
+	problems = ArtContract.problems(ArtPack.from_manifest(_mutated_pack("pool-signal", pooled)))
+	_check(problems.has("props: done_stack is a signal, never in a pool"), "a signal in a pool: %s" % problems)
+
+
 func test_art_pack_rejects_wrong_json_containers() -> void:
 	for field: String in ["palette", "tiles", "props", "ui", "states", "font"]:
 		var absent := func(m: Dictionary) -> void: m.erase(field)

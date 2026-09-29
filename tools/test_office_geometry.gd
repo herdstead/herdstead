@@ -154,7 +154,7 @@ func test_desktop_decor_survives_growth_state_updates_and_theme_rebuilds() -> vo
 			var reference := copy_holder.get_node(NodePath(image.name)) as Sprite2D
 			_eq(image.position, reference.position, "theme, state and focus never shift decor")
 			var matched := false
-			for id in ArtContract.DESK_ITEMS + ArtContract.DESK_CATS:
+			for id in _trinkets(art):
 				if reference.texture == art.sprite_texture(art.prop_sprite(id)):
 					matched = true
 					_eq(
@@ -210,10 +210,10 @@ func test_desktop_library_varies_without_covering_equipment_or_leaving_the_top()
 							not (laptop.transform * laptop.get_rect()).intersects(bounds),
 							"even vacant laptops stay clear"
 						)
-				for id in ArtContract.DESK_ITEMS + ArtContract.DESK_CATS:
+				for id in _trinkets(pack):
 					if image.texture == pack.sprite_texture(pack.prop_sprite(id)):
 						seen[id] = true
-		for id in ArtContract.DESK_ITEMS + ArtContract.DESK_CATS:
+		for id in _trinkets(pack):
 			_check(seen.has(id), "varied identities exercise library variant " + id)
 		# A done seat's paper stands on the same working planes, by the same rule.
 		for column in table.columns.size():
@@ -822,7 +822,8 @@ func test_the_paper_stack_sits_beside_the_laptop_and_off_the_neighbours() -> voi
 			if column + 1 < table.columns.size():
 				var y := OfficeTable.DECOR_FAR if side == "far" else OfficeTable.DECOR_NEAR
 				var slot := Vector2(table.columns[column + 1] + OfficeTable.DECOR_OFFSET, y)
-				for id in ArtContract.DESK_ITEMS:
+				for sprite in art.items_in(OfficeTable.DESK_GROUP):
+					var id := sprite.id
 					var spec := art.prop_sprite(id)
 					var used := Rect2(art.sprite_texture(spec).get_image().get_used_rect())
 					var drawn := Rect2(slot + used.position - spec.pivot, used.size)
@@ -939,3 +940,12 @@ func _plate_text(station: OfficeStation) -> Rect2:
 ## `bounds`, given in `node`'s own coordinates, in the station's.
 func _in_station(station: OfficeStation, node: CanvasItem, bounds: Rect2) -> Rect2:
 	return station.get_global_transform().affine_inverse() * node.get_global_transform() * bounds
+
+
+## The ids a table draws its trinkets from in `pack`: its desk pool, then its cats.
+func _trinkets(pack: ArtPack) -> Array[StringName]:
+	var ids: Array[StringName] = []
+	for group: StringName in [OfficeTable.DESK_GROUP, OfficeTable.CAT_GROUP]:
+		for sprite in pack.items_in(group):
+			ids.append(sprite.id)
+	return ids

@@ -249,6 +249,46 @@ def check_sprite_geometry(category: str, name: str, info: dict, size: tuple[int,
                 f"{category}/{name} nine_patch margins {margins} leave no stretchable middle in {width}x{height}")
 
 
+ITEM_KEYS = {"place", "footprint", "blocks", "group", "weight"}
+ITEM_PLACES = ("desk", "floor", "wall")
+GROUP_NAME = re.compile(r"[a-z0-9_]+")
+## A desk item stands on a table's working plane (docs/ITEMS.md): its opaque
+## pixels only in unit rows DESK_ROWS of its canvas (under the divider, above
+## the lip, two rows under the foot). Its width needs no rule: its 24-unit
+## canvas, 28 left of its column, already clears the laptop and the paper stack.
+DESK_ROWS = (3, 21)
+
+
+def check_item(name: str, item, size: tuple[int, int], image: Image.Image, factor: int) -> None:
+    """A prop's `item` block (docs/ITEMS.md), the rules ArtPack._read_item() holds
+    at run time, and a desk item's measured pixels against the desk plane."""
+    where = f"props/{name} item"
+    require(isinstance(item, dict), f"{where} is not a JSON object")
+    unknown = sorted(set(item) - ITEM_KEYS)
+    require(not unknown, f"{where} has keys it does not know: {unknown}")
+    place = item.get("place")
+    require(place in ITEM_PLACES, f"{where} place is {place!r}, not one of {list(ITEM_PLACES)}")
+    if "footprint" in item:
+        w, d = whole_pair(item["footprint"], f"{where} footprint")
+        require(1 <= w <= size[0] and d >= 1, f"{where} footprint {[w, d]} is empty or wider than its {size[0]}-unit canvas")
+    else:
+        require(place == "wall", f"{where}: a {place} item needs a footprint [w, d]")
+    if "blocks" in item:
+        # Only true for now: the walk graph takes every floor footprint as an obstacle.
+        require(item["blocks"] is True and place == "floor", f"{where} blocks is only true, on a floor item, for now")
+    if "group" in item:
+        require(isinstance(item["group"], str) and GROUP_NAME.fullmatch(item["group"]) is not None,
+                f"{where} group {item['group']!r} is not [a-z0-9_]+")
+    if "weight" in item:
+        require(type(item["weight"]) is int and item["weight"] >= 0 and "group" in item,
+                f"{where} weight is a whole number >= 0 for an item in a group")
+    if place == "desk":
+        _left, top, _right, bottom = image.getchannel("A").getbbox()
+        rows = (top // factor, (bottom - 1) // factor)
+        require(DESK_ROWS[0] <= rows[0] and rows[1] <= DESK_ROWS[1],
+                f"{where}: a desk item is opaque only in rows {DESK_ROWS[0]}..{DESK_ROWS[1]}; this one spans {rows[0]}..{rows[1]}")
+
+
 def validate(source: Path, pack: dict) -> Compiled:
     density, filter_name = resolve_density_filter(pack)
     ## `nearest` is the v1 pixel discipline; `linear` relaxes only the rules a
@@ -312,6 +352,9 @@ def validate(source: Path, pack: dict) -> Compiled:
                     require(image.getchannel("A").getextrema() == (255, 255), f"Unexpected floor/wall hole: {name}")
             else:
                 check_sprite_geometry(category, name, info, expected)
+                if "item" in info:
+                    require(category == "props", f"{category}/{name}: only a prop has an item block")
+                    check_item(name, info["item"], expected, image, k)
             images[(category, name)] = upscale(image, density // k)
             factors[(category, name)] = k
     check_tile_connections(images, density)

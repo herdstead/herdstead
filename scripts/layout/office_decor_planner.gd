@@ -16,6 +16,9 @@ extends RefCounted
 ## furnished floor would close a path to any seat. Drawing it is
 ## OfficeFloorView's business.
 
+## The pool the wall-foot and spare-bay pots are drawn from (ItemSpec.group).
+const PLANT_GROUP := &"plant"
+
 var _pen: OfficeDraw
 
 
@@ -26,10 +29,14 @@ func _init(pen: OfficeDraw) -> void:
 
 ## Which plant stands at place `index` of a run (the row's first plant is place
 ## 0, the wall-foot run's pieces their grid step, the spare bay's plant its cell
-## column): the two plants take turns by the place's parity, so a run reads as
-## two kinds, not a stamp. Only the place: never a state, a tab or the time.
-static func plant_at(index: int) -> StringName:
-	return ArtContract.PROP_PLANT if posmod(index, 2) == 0 else ArtContract.PROP_PLANT_B
+## column): the pack's plants (PLANT_GROUP, in the order it lists them) take
+## turns by the place, so a run reads as kinds, not a stamp. Only the place:
+## never a state, a tab or the time. Empty when the pack has no plant.
+static func plant_at(art: ArtPack, index: int) -> StringName:
+	var plants := art.items_in(PLANT_GROUP)
+	if plants.is_empty():
+		return &""
+	return plants[posmod(index, plants.size())].id
 
 
 ## Add every candidate that fits `next`, row by row. A new candidate plan can be
@@ -46,7 +53,7 @@ func furnish(next: FloorPlan) -> void:
 			_candidate(
 				"%06d/cabinet" % row.index, ArtContract.PROP_CABINET, Vector2(cabinet_x, top + OfficeShell.CABINET_FOOT)
 			),
-			_candidate("%06d/plant" % row.index, plant_at(0), Vector2(plant_x, top + OfficeShell.PLANT_FOOT))
+			_candidate("%06d/plant" % row.index, plant_at(_pen.art, 0), Vector2(plant_x, top + OfficeShell.PLANT_FOOT))
 		]
 		for candidate in candidates:
 			if _fits(next, row, placed, candidate, 0.0):
@@ -54,14 +61,16 @@ func furnish(next: FloorPlan) -> void:
 		var step := 1
 		while plant_x + step * OfficeShell.WALL_RUN_PITCH < cabinet_x:
 			var at := Vector2(plant_x + step * OfficeShell.WALL_RUN_PITCH, top + OfficeShell.PLANT_FOOT)
-			var candidate := _candidate("%06d/wall/%03d" % [row.index, step], plant_at(step), at)
+			var candidate := _candidate("%06d/wall/%03d" % [row.index, step], plant_at(_pen.art, step), at)
 			if _fits(next, row, placed, candidate, OfficeShell.WALL_RUN_GAP):
 				placed.append(candidate)
 			step += 1
 		var bay := _spare_bay(next, row)
 		if bay >= 0:
 			var candidate := _candidate(
-				"%06d/bay" % row.index, plant_at(bay), Vector2((bay + 0.5) * grid, top + OfficeShell.BAY_PLANT_FOOT)
+				"%06d/bay" % row.index,
+				plant_at(_pen.art, bay),
+				Vector2((bay + 0.5) * grid, top + OfficeShell.BAY_PLANT_FOOT)
 			)
 			if _fits(next, row, placed, candidate, 0.0):
 				placed.append(candidate)
@@ -93,7 +102,7 @@ func _candidate(key: String, piece: StringName, at: Vector2) -> DecorPlacement:
 	result.key = key
 	result.piece = piece
 	result.position = at
-	var footprint: Vector2 = OfficeDecor.FOOTPRINT[piece]
+	var footprint := OfficeDecor.footprint_of(_pen.art, piece)
 	result.footprint = Rect2(at - Vector2(footprint.x / 2.0, footprint.y), footprint)
 	var sprite := _pen.art.prop_sprite(piece)
 	result.draw_rect = Rect2(at - sprite.pivot, Vector2(sprite.size))

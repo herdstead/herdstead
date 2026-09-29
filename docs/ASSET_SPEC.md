@@ -304,8 +304,8 @@ code change outside it (step 0 of "Replace and iterate protocol"). Scenes use th
 on the outer wall, the standing plants and cabinet, and desk items and white cats picked by a random choice fixed
 per table group (see [the visual language](VISUAL_LANGUAGE.md)).
 
-- `plant` and `plant_b` are two pots of one fixture: same canvas, pivot and footprint (`OfficeDecor.FOOTPRINT`
-  20×10). `OfficeDecorPlanner.plant_at()` alternates them by position parity (a row's first pot is cell 0, a
+- `plant` and `plant_b` are two pots of one fixture: same canvas, pivot and footprint (their `item` block, 20×10,
+  [ITEMS](ITEMS.md)). `OfficeDecorPlanner.plant_at()` takes the `plant` pool's members in turn by position (a row's first pot is cell 0, a
   wall-foot row uses its grid step, an empty bay's pot its grid column), never by state, tab or time.
 - `wall_frame` hangs on a row's back wall: no footprint, drawn in the shell, foot at row top + 48
   (`OfficeShell.FRAME_FOOT`), the sign's band; its position depends only on the wall grid and the sign's bounds
@@ -321,13 +321,14 @@ versions (`make pixel-sources OUT=<empty dir>`, never run by `make art`). The ta
 work surface (`OfficeTable.DECOR_*`), so opaque pixels may only fall in rows 3–21 (units; 6–43 in the 48×48 PNG):
 they fit the near surface, clear the divider and lip, and leave two rows under the foot point. The generator
 checks this, and `tools/test_office_geometry.gd` checks it on a real table. They are static, never posed by herdr
-state; a new variant is declared as a prop, then picked through the desk library in `ArtContract`.
+state; a new variant is declared as a prop with an `item` block in the `desk` (or `cat`) pool ([ITEMS](ITEMS.md)):
+`make art` checks the rows rule on its pixels, and the table draws it by weight.
 
 **Entry-band fixtures**: `reception` (wooden top, brass bell on the right, a paper name strip on a teal front,
 dark skirting) and `pantry` (two cups, a coffee machine on the right, two cabinet doors). `draw_pixel_sources.py`
 draws first drafts; the committed pair is 2x AI-painter art, and the tests check the footprint contract on the
 committed files at their own density. A counter's opaque width is its whole canvas, which is its footprint width
-(`OfficeDecor.FOOTPRINT`: 48 and 64); its bottom outline sits one row above the foot point, and the foot point and
+(its `item` footprint: 48 and 64); its bottom outline sits one row above the foot point, and the foot point and
 below are transparent. The planner lays out queue and pantry spots by that width.
 
 A station is not one composite image: chair and worker sort by their own foot points, the laptop belongs to the
@@ -404,7 +405,9 @@ positions, pauses motion, dims the picture and says STALE; idle never stands in 
    2. Add an entry to the category in `art/daylight/pack.json`: `path`, plus `size` / `pivot` (`cell` for a tile).
    3. `make art`: rebuilds every pack, compares the committed products.
    4. **Only when a scene draws it**, add a constant to `scripts/art/art_contract.gd` and its `*_ids()`; until
-      then `make check-packs` lists it under `PACK_UNUSED` ("in the pack, drawn by nobody").
+      then `make check-packs` lists it under `PACK_UNUSED` ("in the pack, drawn by nobody"). An item a pool draws
+      (a desk trinket, a cat, a pot) needs no constant: give it an `item` block with its `group`
+      ([ITEMS](ITEMS.md)) and the scene that draws that pool finds it.
 
 1. **Change one image**: replace the same-named PNG in `art/daylight/` (or `art/daylight/table/`), keeping canvas,
    pivot, transparency and palette, then `make art`. The table builder alone only validates and copies one

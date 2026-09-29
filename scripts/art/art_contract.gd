@@ -113,7 +113,7 @@ const PROP_RECEPTION := &"reception"
 const PROP_PANTRY := &"pantry"
 ## A signal, not furniture: the stack of paper the table puts beside the laptop
 ## of a seat whose agent is done and not yet looked at (OfficeTable.show_papers()).
-## Never one of DESK_ITEMS, which are static and chosen by the table's identity.
+## Never in a pool (ITEM_GROUPS): it is placed by code, by state.
 const PROP_DONE_STACK := &"done_stack"
 const PROP_IDS: Array[StringName] = [
 	PROP_SIGN,
@@ -127,10 +127,14 @@ const PROP_IDS: Array[StringName] = [
 	PROP_RECEPTION,
 	PROP_PANTRY,
 ]
-## Static desktop libraries, never agent states. All variants are used by the
-## table's deterministic decoration sampler and must exist in every theme.
-const DESK_ITEMS: Array[StringName] = [&"desk_mug", &"desk_notebook", &"desk_papers", &"desk_plant", &"desk_headphones"]
-const DESK_CATS: Array[StringName] = [&"cat_loaf", &"cat_sleep", &"cat_sit"]
+## The pools scenes draw furniture from by weight (ItemSpec.group in the pack,
+## docs/ITEMS.md), and what their members must stand on: never agent states.
+## Every pack has at least one of each.
+const ITEM_GROUPS: Dictionary[StringName, StringName] = {
+	&"desk": ItemSpec.PLACE_DESK,
+	&"cat": ItemSpec.PLACE_DESK,
+	&"plant": ItemSpec.PLACE_FLOOR,
+}
 const UI_PANEL := &"panel"
 const UI_SELECTION := &"selection"
 const UI_BRANCH := &"branch"
@@ -214,6 +218,16 @@ static func problems(pack: ArtPack) -> PackedStringArray:
 	for piece in prop_ids():
 		if pack.prop_sprite(piece) == null:
 			found.append("props: no " + piece)
+	for group in ITEM_GROUPS:
+		var members := pack.items_in(group)
+		if members.is_empty():
+			found.append("props: nothing in the %s pool" % group)
+		for member in members:
+			if member.item.place != ITEM_GROUPS[group]:
+				found.append("props: %s is in the %s pool but stands on the %s" % [member.id, group, member.item.place])
+	var stack := pack.prop_sprite(PROP_DONE_STACK)
+	if stack != null and stack.item != null and not stack.item.group.is_empty():
+		found.append("props: %s is a signal, never in a pool" % PROP_DONE_STACK)
 	for image in ui_ids():
 		if pack.ui_sprite(image) == null:
 			found.append("ui: no image named " + image)
@@ -372,9 +386,9 @@ static func _file_problems(pack: ArtPack) -> PackedStringArray:
 # --- what a pack carries that nothing above asks for ----------------------------
 
 
-## Every prop a scene places, including the desktop decoration libraries.
+## Every prop a scene places by its id; the pools' members are drawn by group.
 static func prop_ids() -> Array[StringName]:
-	var ids: Array[StringName] = PROP_IDS + DESK_ITEMS + DESK_CATS
+	var ids: Array[StringName] = PROP_IDS.duplicate()
 	ids.append(PROP_DONE_STACK)
 	return ids
 
@@ -417,7 +431,11 @@ static func unused(pack: ArtPack) -> Dictionary[StringName, PackedStringArray]:
 	if pack == null:
 		return found
 	found[&"tiles"] = _unasked(pack.tiles.keys(), tile_ids())
-	found[&"props"] = _unasked(pack.props.keys(), prop_ids())
+	var placed := prop_ids()
+	for group in ITEM_GROUPS:
+		for member in pack.items_in(group):
+			placed.append(member.id)
+	found[&"props"] = _unasked(pack.props.keys(), placed)
 	found[&"ui"] = _unasked(pack.ui.keys(), ui_ids())
 	var modules: Array[StringName] = [] if pack.table == null else pack.table.modules.keys()
 	found[&"table"] = _unasked(modules, table_module_ids(pack.table))
