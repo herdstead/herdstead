@@ -55,6 +55,12 @@ var presentation := OfficePresentation.new()
 ## The hover mark (OfficePointer), the floor root's last child; point() moves it.
 var pointer: OfficePointer
 var _pen: OfficeDraw
+## The ground the shell carries past the floor's side walls, in cells to the
+## left (x) and to the right (y) (set_apron()): the floor seen under the HUD's
+## side panels, which float over it. Drawn only: the plan, the walk graph, the
+## seats' clicks and the camera's reach never see it.
+var _apron := Vector2i.ZERO
+var _apron_layer: TileMapLayer
 ## The lens is held: furnishing made while it is starts dimmed too.
 var _lens := false
 ## How far into night the floor is drawn (set_night()); tables and windows made
@@ -394,6 +400,9 @@ func _draw_shell(next: FloorPlan, frames: Array[Vector2]) -> void:
 	ground.add_child(_shell)
 	ground.move_child(_shell, 0)
 	var art := _pen.art
+	_apron_layer = _pen.layer(_shell, Vector2.ZERO)
+	_apron_layer.name = "Apron"
+	_fill_apron(next)
 	var floor_layer := _pen.layer(_shell, Vector2.ZERO)
 	floor_layer.name = "Floor"
 	for y in next.floor_cells.size.y:
@@ -409,6 +418,46 @@ func _draw_shell(next: FloorPlan, frames: Array[Vector2]) -> void:
 	_outer_wall(next)
 	_hang_frames(frames)
 	_furnish(next)
+
+
+## How far the shell's apron reaches past the floor's side walls, in cells:
+## on the left to the screen's edge from the world's room (`room`, where the
+## floor starts at no pan), on the right to the screen's edge from the room's
+## end or from a floor narrower than the room, whichever is further.
+## `floor_width` is the floor's, in units.
+static func apron_cells(room: Rect2, screen: Vector2, floor_width: float) -> Vector2i:
+	var grid := float(FloorLayoutPolicy.GRID)
+	var right := maxf(screen.x - room.end.x, screen.x - room.position.x - floor_width)
+	return Vector2i(ceili(maxf(room.position.x, 0.0) / grid), ceili(maxf(right, 0.0) / grid))
+
+
+## Carry the shell's ground `cells` past the floor's side walls (apron_cells()).
+## Only the apron's tiles change; nothing is rebuilt.
+func set_apron(cells: Vector2i) -> void:
+	if cells == _apron:
+		return
+	_apron = cells
+	if plan != null:
+		_fill_apron(plan)
+
+
+## The apron beside `next`: wood floor, as deep as the floor. No wall,
+## walkway or furniture: past the walls nothing is the office's, and every
+## wall tile stays the floor's own (the Walls layer, inside its cells).
+func _fill_apron(next: FloorPlan) -> void:
+	if _apron_layer == null:
+		return
+	_apron_layer.clear()
+	var art := _pen.art
+	var size := next.floor_cells.size
+	var columns: Array[int] = []
+	for x in range(-_apron.x, 0):
+		columns.append(x)
+	for x in range(size.x, size.x + _apron.y):
+		columns.append(x)
+	for y in size.y:
+		for x in columns:
+			_apron_layer.set_cell(Vector2i(x, y), 0, art.cell(ArtContract.FLOOR_WOOD[posmod(x + 2 * y, 3)]))
 
 
 func _draw_walls(next: FloorPlan) -> void:

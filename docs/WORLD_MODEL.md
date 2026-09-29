@@ -139,6 +139,12 @@ side walls run from top to bottom. Where a row back wall meets the left outer wa
 A joint replaces the straight or side wall in the same cell; two sets of end pieces are never stacked. Only this
 rectangular shell with parallel row back walls is supported; it is not a general wall-network generator.
 
+**The apron.** Past its side walls the shell carries plain wood floor (`Ground/Shell/Apron`, a `TileMapLayer` under the
+floor's own), from the screen's left edge to its right one and as deep as the floor, so the HUD's side panels float
+over floor rather than over the backdrop (`OfficeFloorView.apron_cells()` from the camera's room and the screen;
+`set_apron()` only refills its cells). It is drawn only: no wall, walkway or furniture, never in the plan's cells, the
+walk graph, a seat's click or the camera's reach. Below and beyond the floor's depth the backdrop stays.
+
 Cap plus face make a 64-unit drawing band, the same band the people's clearance check uses. Bricks are placed with
 `set_cell()` by semantic ID; no Terrain autotiling, and no `TileMapPattern` deciding where walls and openings go.
 

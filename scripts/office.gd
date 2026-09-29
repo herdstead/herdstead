@@ -1112,6 +1112,10 @@ func _show_plate(found: FloorRef, problems: PackedStringArray) -> void:
 	plate.show_floor(found.building, found.floor_model, frame.several_machines(), problems)
 	_show_plate_state()
 	camera.world_size = Vector2(maxf(_content_size.x, plate.size.x), _content_size.y)
+	var floor_width := (
+		float(floor_view.plan.floor_cells.size.x * FloorLayoutPolicy.GRID) if floor_view.plan != null else 0.0
+	)
+	floor_view.set_apron(OfficeFloorView.apron_cells(camera.free_rect(), _screen(), floor_width))
 
 
 ## The plate's state line, and a lobby's note, from the shown machine's

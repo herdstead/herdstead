@@ -529,6 +529,36 @@ func test_the_gap_between_the_card_and_next_takes_no_click() -> void:
 	_done(office)
 
 
+## The floor's ground runs on past its side walls, under the HUD's side
+## panels, which float over it (the shell's apron): from the screen's left
+## edge to its right one, as deep as the floor, and nowhere on the floor
+## itself. Only drawn: the plan's cells, and so the walk graph, stay the
+## floor's, and the camera's reach does not grow with it.
+func test_the_floor_runs_on_under_the_side_panels() -> void:
+	var office := await _live_office()
+	await _frames(4)
+	var apron: TileMapLayer = office.floor_view.ground.find_child("Apron", true, false)
+	_check(apron != null, "the shell has an apron")
+	if apron == null:
+		_done(office)
+		return
+	var plan := office.floor_view.plan
+	var cells := plan.floor_cells
+	var used := apron.get_used_rect()
+	var room := office.camera.free_rect()
+	var grid := float(FloorLayoutPolicy.GRID)
+	var screen := Vector2(office.test_screen)
+	_check(used.position.x * grid <= -room.position.x, "from the screen's left edge: %s" % used)
+	_check(used.end.x * grid >= screen.x - room.position.x, "to its right edge: %s" % used)
+	_eq([used.position.y, used.size.y], [0, cells.size.y], "as deep as the floor")
+	for x in cells.size.x:
+		_eq(apron.get_cell_source_id(Vector2i(x, cells.size.y - 1)), -1, "none on the floor's own column %d" % x)
+	_eq(cells.position, Vector2i.ZERO, "the plan's floor still starts at its own origin")
+	var reach := Vector2(maxf(plan.render_bounds.end.x, room.size.x), office.camera.world_size.y)
+	_eq(office.camera.world_size, reach, "and the camera reaches no further than the floor and its plate")
+	_done(office)
+
+
 func _shadow_holder(office: OfficeScene, table: OfficeTable) -> Node2D:
 	var matches: Array[Node2D] = []
 	for node in office.world.find_children("SeatContacts", "Node2D", true, false):
