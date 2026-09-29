@@ -174,7 +174,8 @@ measure() {
 		# Read-only, like every baseline before the write boundary: the agent
 		# card's terminal preview would add reads the older runs never made.
 		# No Dock bounce: a measuring run sits in the background while the fake flips states.
-		args+=(--socket="$WORK/herdr.sock" --pack=res://assets/daylight/manifest.json --read-only --no-bounce)
+		# A plain window: a measurement is taken in the window it asked for, never a maximized one.
+		args+=(--socket="$WORK/herdr.sock" --pack=res://assets/daylight/manifest.json --read-only --no-bounce --window=plain)
 	else
 		args+=(--count=80)
 	fi

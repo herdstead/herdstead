@@ -34,6 +34,8 @@ func _init() -> void:
 	# A test office is lit by day, whatever the clock says; a case about the
 	# light sets light_mode, or the clock, itself.
 	light_mode = LightMode.DAY
+	# Its window is the suite's or the capture's, never maximized.
+	may_fill_screen = false
 
 
 func _screen() -> Vector2:

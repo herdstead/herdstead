@@ -836,6 +836,58 @@ func test_the_chime_switch_fits_and_steps_aside_on_a_narrow_bar() -> void:
 	_done(office)
 
 
+## In a window that fills the screen the window's own buttons (macOS: the
+## traffic lights) stand over the bar's left end: the wordmark and the
+## counters start after the gap and still fit at every width, and go back when
+## it closes.
+func test_a_title_gap_moves_the_wordmark_and_counters_after_it() -> void:
+	var hud := await _bare_hud(Vector2(1920, 480))
+	var bar := hud.bar
+	var wordmark: Control = bar.get_node("%Wordmark")
+	var home := wordmark.get_global_rect().position.x
+	for width: float in [480.0, 960.0, 1920.0]:
+		var screen := Vector2(width, 480.0 if width > 480.0 else 320.0)
+		hud.fit(screen)
+		bar.set_title_gap(67.0)
+		await _frames(2)
+		var where := "at %s" % screen
+		_eq(bar.title_gap(), 67.0, "the gap is kept " + where)
+		_eq(wordmark.get_global_rect().position.x, home + 67.0, "the wordmark starts after it " + where)
+		_fits(bar, "after the gap " + where)
+	hud.fit(Vector2(1920, 480))
+	bar.set_title_gap(0.0)
+	await _frames(2)
+	_eq(wordmark.get_global_rect().position.x, home, "a closed gap puts the wordmark back")
+	_check(bar.counters().all(_titled), "and the titles come back at 1920")
+	_fits(bar, "with no gap at 1920")
+	hud.free()
+
+
+## Only a normal run fills the screen. A capture and a headless run keep the
+## window they asked for, `--window=plain` keeps the plain one, an
+## always-on-top corner view never covers the screen, and a test office never
+## fills whatever its arguments say.
+func test_only_a_normal_run_fills_the_screen() -> void:
+	var cases: Dictionary[String, bool] = {
+		"": true,
+		"--window=fill": true,
+		"--window=plain": false,
+		"--capture=/tmp/shot.png": false,
+		"--window=fill --capture=/tmp/shot.png": false,
+		"--always-on-top": false,
+	}
+	for line in cases:
+		var given := AppArgs.parse(line.split(" ", false))
+		_eq(OfficeWindow.fills_screen(given, false), cases[line], "windowed with `%s`" % line)
+		_eq(OfficeWindow.fills_screen(given, true), false, "headless with `%s`" % line)
+	var office := await _live_office()
+	_eq(office.filled, false, "a test office never fills the screen")
+	_eq(office.get_window().extend_to_title, false, "nor draws under the title bar")
+	_eq(office.hud.bar.moves_window, false, "so its bar drags nothing")
+	_eq(office.hud.bar.title_gap(), 0.0, "and leaves no gap")
+	_done(office)
+
+
 # --- helpers ------------------------------------------------------------------
 
 

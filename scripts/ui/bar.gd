@@ -13,6 +13,11 @@ extends Control
 ## Its nodes are permanent. Setting a Label's text to what it already holds is a
 ## no-op in Godot, so the office may call show_bar() and show_totals() on every
 ## refresh. A counter pressed is the office's to act on (counter_pressed).
+##
+## In a window that fills the screen the bar is also its title bar: the window's
+## own buttons (the macOS traffic lights) stand over its left end, so the
+## wordmark and counters start after them (set_title_gap()), and a press on the
+## bar's bare ground drags the window, a double click zooms it (moves_window).
 
 ## A counter was pressed; `id` is what it counts (OfficeCounter.id).
 signal counter_pressed(id: StringName)
@@ -29,6 +34,10 @@ const STRATEGIC_LINE := "STRATEGIC · S"
 ## What the chime switch says, on and off (show_chime()).
 const CHIME_ON := "CHIME ON"
 const CHIME_OFF := "CHIME OFF"
+
+## The bar stands in for the window's title bar: its bare ground drags the
+## window and a double click zooms it. The office sets it; off in a plain window.
+var moves_window := false
 
 ## The screen is wide enough for titles (OfficeHud.fit()); they still go when
 ## the counters would not fit with them.
@@ -56,9 +65,21 @@ func _notification(what: int) -> void:
 
 
 ## The bar takes the mouse like the two panels do; see HdPanel._gui_input.
+## Standing in for the title bar, a left press on its bare ground drags the
+## window and a double click zooms it, as the system's title bar would; a
+## counter or the chime switch takes its own press first.
 func _gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton:
-		accept_event()
+	if not event is InputEventMouseButton:
+		return
+	accept_event()
+	var button := event as InputEventMouseButton
+	if not moves_window or not button.pressed or button.button_index != MOUSE_BUTTON_LEFT:
+		return
+	var window := get_window()
+	if button.double_click:
+		window.mode = Window.MODE_WINDOWED if window.mode == Window.MODE_MAXIMIZED else Window.MODE_MAXIMIZED
+	else:
+		window.start_drag()
 
 
 ## Every counter its icon from `art`: MACHINES the connected mark, a state's
@@ -148,6 +169,21 @@ func set_filter(id: StringName) -> void:
 			each.set_active(each.id == id)
 
 
+## Room, in the bar's own pixels, the window's own buttons take at its left
+## end; the wordmark and the counters start after it. 0 in a plain window.
+func set_title_gap(width: float) -> void:
+	var content: Control = %Content
+	if is_equal_approx(content.offset_left, width):
+		return
+	content.offset_left = width
+	_fit_counters()
+
+
+func title_gap() -> float:
+	var content: Control = %Content
+	return content.offset_left
+
+
 ## PANES reads pressed while the overview is open.
 func set_overview(on: bool) -> void:
 	counter(&"panes").set_active(on)
@@ -190,7 +226,8 @@ func _fit_counters() -> void:
 		return
 	var row: HBoxContainer = %Counters
 	var each := counters()
-	var room := size.x * (row.anchor_right - row.anchor_left) + row.offset_right - row.offset_left
+	var content: Control = %Content
+	var room := content.size.x * (row.anchor_right - row.anchor_left) + row.offset_right - row.offset_left
 	var gaps := row.get_theme_constant("separation") * (each.size() - 1)
 	var switch: Button = %Chime
 	if switch.visible:

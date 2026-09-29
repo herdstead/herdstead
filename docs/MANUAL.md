@@ -28,7 +28,8 @@ Office options go after `--`.
 godot --path .                                           # the live office, default session
 godot --path . -- --socket=/absolute/path/herdr.sock     # another session's socket
 godot --path . -- --read-only                            # watch only (see below)
-godot --path . -- --always-on-top                        # a small window kept in a corner
+godot --path . -- --window=plain                         # a plain 1920×960 window instead of filling the screen
+godot --path . -- --always-on-top                        # a small window kept in a corner (never fills the screen)
 godot --path . -- --chime                                # alert tones on for this run
 godot --path . -- --no-bounce --no-title-count           # no Dock bounce, no (N) in the title
 godot --path . -- --fps=24                               # fixed frame cap; --fps=0 means no cap
@@ -432,7 +433,12 @@ bar, FLOORS, signposts, drawer and staff panel stay fixed on screen; only the wo
 
 ## Window, zoom and frame rate
 
-The default desktop window is 1920×960. The pixel scale is fixed (default 2×); `-` / `=` step through 2×, 4×, 6×, 8×.
+The office fills the screen: its window opens maximized, so the menu bar and the Dock stay. On macOS the title bar
+is see-through and the top bar stands in for it: the window's own buttons sit at its left end, a press on its bare
+ground drags the window and a double click zooms it, as the title bar's would. `--window=plain` opens the plain
+1920×960 window instead; a capture, `make perf`, a headless run and `--always-on-top` always do.
+
+The plain desktop window is 1920×960. The pixel scale is fixed (default 2×); `-` / `=` step through 2×, 4×, 6×, 8×.
 A bigger window shows more floor, never bigger pixels; a window too small for the scale drops to the largest even scale
 that fits. The scale is the whole window's content scale (the HUD scales too), and changing it never re-lays out or
 rebuilds tables or people. Scales are even so that every texel of the density-2 art lands on whole screen pixels. So the
@@ -755,7 +761,7 @@ scripts/herdr_commands.gd  HerdrCommands, the write boundary; not constructed un
 scripts/herdr_fleet.gd   Local + SSH machines; the only thing the office reads data from; feeds the state log
 scripts/machine_link.gd, machine_roster.gd, child_process.gd   ssh -L forwards, herdr machine list, bounded child processes
 scripts/office_projection.gd  pure projection: typed snapshot → OfficeFrame
-scripts/office_*.gd      navigator, camera, lens, alerts, draw helpers
+scripts/office_*.gd      navigator, camera, lens, alerts, draw helpers, window (fill the screen, bar as title bar)
 scripts/model/           typed models: HerdrSnapshot (the only reader of raw snapshots), OfficeFrame, StateLog,
                          command context / ticket / refusal / results, layout plans
 scripts/layout/          floor planning, seat planning, walk graph, validation

@@ -100,6 +100,11 @@ var clock: Callable = _local_minutes
 var night := 0.0
 ## Wanted screen pixels per world unit, always even; `-` and `=` step it by 2.
 var zoom := 2
+## Whether this office may fill the screen at all; a test double, whose window
+## is the suite's or a capture's, turns it off.
+var may_fill_screen := true
+## The window fills the screen with the bar as its title bar (OfficeWindow).
+var filled := false
 ## Whether a theme switch (and the list's view, and the chime switch) is
 ## written to the user's settings. A capture is a screenshot, not a session,
 ## and a test is neither: both turn this off.
@@ -341,6 +346,9 @@ func _ready() -> void:
 	questions.enabled = _question_reads()
 	questions.question_changed.connect(_show_question)
 	add_child(questions)
+	filled = may_fill_screen and OfficeWindow.fills_screen(args, DisplayServer.get_name() == "headless")
+	if filled:
+		OfficeWindow.fill(get_window(), hud.bar)
 	get_window().size_changed.connect(fit_window)
 	get_viewport().size_changed.connect(_refresh)
 	fit_window()
@@ -1278,6 +1286,7 @@ func fit_window() -> void:
 	# letterboxed rectangle after this callback, even when the canvas is correct.
 	window.content_scale_size = Vector2i.ZERO
 	window.content_scale_factor = scale_now
+	hud.bar.set_title_gap(OfficeWindow.title_gap(window, hud.placed(hud.bar).size.y))
 
 
 ## Why a capture would not show what `--zoom` asked for, empty when it does.
