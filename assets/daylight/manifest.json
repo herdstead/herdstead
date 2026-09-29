@@ -246,7 +246,14 @@
       "pivot": [
         24,
         60
-      ]
+      ],
+      "item": {
+        "place": "floor",
+        "footprint": [
+          40,
+          12
+        ]
+      }
     },
     "window": {
       "path": "props/window.png",
@@ -290,7 +297,15 @@
       "pivot": [
         16,
         46
-      ]
+      ],
+      "item": {
+        "place": "floor",
+        "footprint": [
+          20,
+          10
+        ],
+        "group": "plant"
+      }
     },
     "plant_b": {
       "path": "props/plant_b.png",
@@ -301,7 +316,15 @@
       "pivot": [
         16,
         46
-      ]
+      ],
+      "item": {
+        "place": "floor",
+        "footprint": [
+          20,
+          10
+        ],
+        "group": "plant"
+      }
     },
     "wall_frame": {
       "path": "props/wall_frame.png",
@@ -312,7 +335,10 @@
       "pivot": [
         20,
         30
-      ]
+      ],
+      "item": {
+        "place": "wall"
+      }
     },
     "sign": {
       "path": "props/sign.png",
@@ -334,7 +360,15 @@
       "pivot": [
         12,
         22
-      ]
+      ],
+      "item": {
+        "place": "desk",
+        "footprint": [
+          7,
+          3
+        ],
+        "group": "desk"
+      }
     },
     "desk_notebook": {
       "path": "props/desk_notebook.png",
@@ -345,7 +379,15 @@
       "pivot": [
         12,
         22
-      ]
+      ],
+      "item": {
+        "place": "desk",
+        "footprint": [
+          8,
+          3
+        ],
+        "group": "desk"
+      }
     },
     "desk_papers": {
       "path": "props/desk_papers.png",
@@ -356,7 +398,15 @@
       "pivot": [
         12,
         22
-      ]
+      ],
+      "item": {
+        "place": "desk",
+        "footprint": [
+          8,
+          3
+        ],
+        "group": "desk"
+      }
     },
     "desk_plant": {
       "path": "props/desk_plant.png",
@@ -367,7 +417,15 @@
       "pivot": [
         12,
         22
-      ]
+      ],
+      "item": {
+        "place": "desk",
+        "footprint": [
+          9,
+          4
+        ],
+        "group": "desk"
+      }
     },
     "desk_headphones": {
       "path": "props/desk_headphones.png",
@@ -378,7 +436,15 @@
       "pivot": [
         12,
         22
-      ]
+      ],
+      "item": {
+        "place": "desk",
+        "footprint": [
+          11,
+          3
+        ],
+        "group": "desk"
+      }
     },
     "cat_loaf": {
       "path": "props/cat_loaf.png",
@@ -389,7 +455,15 @@
       "pivot": [
         12,
         22
-      ]
+      ],
+      "item": {
+        "place": "desk",
+        "footprint": [
+          15,
+          5
+        ],
+        "group": "cat"
+      }
     },
     "cat_sleep": {
       "path": "props/cat_sleep.png",
@@ -400,7 +474,15 @@
       "pivot": [
         12,
         22
-      ]
+      ],
+      "item": {
+        "place": "desk",
+        "footprint": [
+          18,
+          5
+        ],
+        "group": "cat"
+      }
     },
     "cat_sit": {
       "path": "props/cat_sit.png",
@@ -411,7 +493,15 @@
       "pivot": [
         12,
         22
-      ]
+      ],
+      "item": {
+        "place": "desk",
+        "footprint": [
+          9,
+          4
+        ],
+        "group": "cat"
+      }
     },
     "done_stack": {
       "path": "props/done_stack.png",
@@ -422,7 +512,14 @@
       "pivot": [
         12,
         22
-      ]
+      ],
+      "item": {
+        "place": "desk",
+        "footprint": [
+          11,
+          4
+        ]
+      }
     },
     "reception": {
       "path": "props/reception.png",
@@ -433,7 +530,14 @@
       "pivot": [
         24,
         30
-      ]
+      ],
+      "item": {
+        "place": "floor",
+        "footprint": [
+          48,
+          14
+        ]
+      }
     },
     "pantry": {
       "path": "props/pantry.png",
@@ -444,7 +548,14 @@
       "pivot": [
         32,
         46
-      ]
+      ],
+      "item": {
+        "place": "floor",
+        "footprint": [
+          64,
+          14
+        ]
+      }
     }
   },
   "ui": {
