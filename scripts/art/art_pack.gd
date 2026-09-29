@@ -39,6 +39,10 @@ var font: Font
 var font_path := ""
 ## The font's licence, which ships beside it and may not be dropped.
 var font_license_path := ""
+## The optional pixel face for the HUD's few fixed ASCII headings (the
+## wordmark, FLOORS, NEWS, NEXT); null when the manifest names none. Drawn with
+## no antialiasing, at sizes on its own grid (HudTheme.DISPLAY_SIZES).
+var display_font: Font
 var stale_tint := STALE_DEFAULT
 var task_lights := TASK_LIGHTS_SOFT
 ## The pixel people every theme shares: who sits at a desk, stands in the
@@ -289,7 +293,9 @@ func _read(manifest: Dictionary) -> String:
 	for field: String in ["palette", "tiles", "props", "ui", "states", "font"]:
 		if not manifest.get(field) is Dictionary:
 			return '"%s" is not a JSON object' % field
-	var steps: Array[Callable] = [_read_palette, _read_tiles, _read_images, _read_states, _read_font, _read_options]
+	var steps: Array[Callable] = [
+		_read_palette, _read_tiles, _read_images, _read_states, _read_font, _read_display_font, _read_options
+	]
 	for step in steps:
 		var problem: String = step.call(manifest)
 		if not problem.is_empty():
@@ -405,6 +411,29 @@ func _read_font(manifest: Dictionary) -> String:
 	font = _load_font(base_path.path_join(font_path))
 	if font == null:
 		return "font %s did not load" % font_path
+	return ""
+
+
+## The optional display face, which ships with its licence beside it as the
+## main font does. Absent is legal (display_font stays null); named, it must load.
+func _read_display_font(manifest: Dictionary) -> String:
+	if not manifest.has("display_font"):
+		return ""
+	if not manifest["display_font"] is Dictionary:
+		return '"display_font" is not a JSON object'
+	var spec: Dictionary = manifest["display_font"]
+	var path := str(read_name(spec.get("path")))
+	if path.is_empty() or str(read_name(spec.get("license"))).is_empty():
+		return '"display_font" names no file or no licence'
+	display_font = _load_font(base_path.path_join(path))
+	if display_font == null:
+		return "display font %s did not load" % path
+	if display_font is FontFile:
+		# A pixel face: hard edges, whole pixels, whatever the import said.
+		var face := display_font as FontFile
+		face.antialiasing = TextServer.FONT_ANTIALIASING_NONE
+		face.hinting = TextServer.HINTING_NONE
+		face.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
 	return ""
 
 

@@ -17,7 +17,7 @@ theme_override_constants/separation = 8
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
-theme_type_variation = &"LabelPaper"
+theme_type_variation = &"DisplayHeading"
 text = "NEWS"
 
 [node name="Clip" type="Control" parent="Line"]

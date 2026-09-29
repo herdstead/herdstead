@@ -24,6 +24,7 @@ const LABEL_COLORS: Dictionary[StringName, StringName] = {
 	&"LabelSlate": ArtContract.MUTED,
 	&"LabelMuted": ArtContract.JACKET_LIGHT,
 	&"LabelPaper": ArtContract.PAPER,
+	&"LabelInk": ArtContract.INK,
 	&"LabelWoodDark": ArtContract.WOOD_LIGHT,
 	&"LabelWoodShadow": ArtContract.WOOD_LIGHT,
 	&"LabelBlocked": ArtContract.BLOCKED,
@@ -65,6 +66,21 @@ const LABEL_HEADINGS: Dictionary[StringName, StringName] = {
 	&"CounterValue": ArtContract.INK,
 	&"CounterValuePaper": ArtContract.PAPER,
 }
+## The pack's display face (ArtPack.display_font, a pixel font on an 8-pixel
+## grid) for the fixed ASCII headings: the wordmark, and FLOORS, NEWS and
+## NEXT. Sizes are multiples of 4 units, so every even content scale lands its
+## glyphs on whole screen pixels (at 2x a 4-unit step is 8 pixels). Without a
+## display face these fall back to the main font at the same size.
+const DISPLAY_SIZES: Dictionary[StringName, int] = {
+	&"Wordmark": 16,
+	&"DisplayHeading": 12,
+	&"DisplayHeadingMuted": 12,
+}
+const DISPLAY_COLORS: Dictionary[StringName, StringName] = {
+	&"Wordmark": ArtContract.PAPER,
+	&"DisplayHeading": ArtContract.PAPER,
+	&"DisplayHeadingMuted": ArtContract.MUTED,
+}
 ## Panel variations that are a flat fill of one palette colour: the bar's
 ## ground and the minimap's floor chips. A building's heading wears the pack's
 ## own icon rather than a coloured square, so it needs none of these.
@@ -87,6 +103,15 @@ const SECTION_PANELS: Dictionary[StringName, StringName] = {
 ## How much of the office shows through the dim under the answer-mode panel
 ## (`ModalDim`, `deep` at this opacity): enough to see which desk it is about.
 const MODAL_DIM := 0.55
+## The agent card's state pill (CardDetails.pill_of()): a state's own colour,
+## the quiet one `slate`.
+const STATE_PILLS: Dictionary[StringName, StringName] = {
+	&"StatePillWorking": ArtContract.WORKING,
+	&"StatePillBlocked": ArtContract.BLOCKED,
+	&"StatePillDone": ArtContract.UNREAD,
+	&"StatePillIdle": ArtContract.CREAM,
+	&"StatePillQuiet": ArtContract.SLATE,
+}
 ## Every state a Button stylebox has to cover. A flat button looks the same in
 ## all of them: a press changes the office, not the button. The agent card's
 ## action (CardAction) is the exception, see _card().
@@ -135,9 +160,21 @@ static func build(art: ArtPack, font: Font) -> Theme:
 		if LABEL_SIZES[name] >= 13:
 			theme.set_font("font", name, heading)
 		theme.set_font("font", name, _fit(theme.get_font("font", name), art.font, LABEL_SIZES[name]))
+	for name: StringName in DISPLAY_SIZES:
+		_label(theme, name, DISPLAY_SIZES[name], art.color(DISPLAY_COLORS[name]))
+		if art.display_font != null:
+			theme.set_font("font", name, art.display_font)
 	for name in FLAT_PANELS:
 		theme.set_type_variation(name, "Panel")
 		theme.set_stylebox("panel", name, _flat(art.color(FLAT_PANELS[name])))
+	for name: StringName in STATE_PILLS:
+		theme.set_type_variation(name, "PanelContainer")
+		var pill := _flat(art.color(STATE_PILLS[name]))
+		pill.set_corner_radius_all(2)
+		pill.anti_aliasing = false
+		pill.content_margin_left = 4
+		pill.content_margin_right = 4
+		theme.set_stylebox("panel", name, pill)
 	theme.set_type_variation(&"ModalDim", "Panel")
 	theme.set_stylebox("panel", &"ModalDim", _flat(Color(art.color(ArtContract.DEEP), MODAL_DIM)))
 	_panel(theme, art)
@@ -390,12 +427,24 @@ static func _staff(theme: Theme, art: ArtPack) -> void:
 	theme.set_type_variation("NextAction", "Button")
 	theme.set_type_variation("DrawerTab", "Button")
 	for state: String in BUTTON_STATES:
-		theme.set_stylebox(state, "NextAction", _dark_button(art, state, true))
+		var next := _dark_button(art, state, true)
+		next.set_corner_radius_all(6)
+		next.anti_aliasing = false
+		theme.set_stylebox(state, "NextAction", next)
 		var tab := _dark_button(art, state)
 		tab.border_color = art.color(ArtContract.SLATE)
 		tab.content_margin_top = 4
 		theme.set_stylebox(state, "DrawerTab", tab)
 	_dark_button_text(theme, art, "DrawerTab")
+	# NEXT's play mark: a round `working` button with a `deep` ring, the ink ▶ on it.
+	theme.set_type_variation("NextPlay", "PanelContainer")
+	var play := _flat(art.color(ArtContract.WORKING))
+	play.set_corner_radius_all(10)
+	play.anti_aliasing = false
+	play.set_border_width_all(1)
+	play.border_color = art.color(ArtContract.DEEP)
+	play.content_margin_left = 1
+	theme.set_stylebox("panel", "NextPlay", play)
 	# Nine lines of one letter each stand in a column as short as 120 units.
 	theme.set_constant("line_spacing", "DrawerTab", -3)
 

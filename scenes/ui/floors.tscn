@@ -34,6 +34,7 @@ offset_right = -6.0
 offset_bottom = 17.0
 grow_horizontal = 2
 mouse_filter = 2
+theme_type_variation = &"DisplayHeading"
 text = "FLOORS"
 
 [node name="Scroll" type="ScrollContainer" parent="Body"]

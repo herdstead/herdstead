@@ -225,6 +225,34 @@ func test_a_pool_draws_by_weight_and_equal_weights_keep_old_choices() -> void:
 	_check(ArtPack.pick(none, rng) == null, "an empty pool draws nothing")
 
 
+## The display face is optional: the shipped pack names Tiny5, read as a font
+## drawn hard (no antialiasing, no hinting, whole-pixel positions); a pack that
+## names none loads with none, and HudTheme falls back to the main face; one
+## that names a file it does not ship is refused.
+func test_the_display_font_is_optional_and_drawn_hard() -> void:
+	var shipped := ArtPack.from_manifest(MANIFEST)
+	_check(shipped.display_font is FontFile, "the shipped pack has its display face")
+	var face := shipped.display_font as FontFile
+	if face != null:
+		_eq(face.antialiasing, TextServer.FONT_ANTIALIASING_NONE, "no antialiasing")
+		_eq(face.subpixel_positioning, TextServer.SUBPIXEL_POSITIONING_DISABLED, "whole pixels")
+	var theme := HudTheme.build(shipped, OfficeDraw.new(shipped).font)
+	_eq(theme.get_font("font", "Wordmark"), shipped.display_font, "the wordmark wears it")
+	var without := ArtPack.from_manifest(
+		_mutated_pack("no-display", func(m: Dictionary) -> void: m.erase("display_font"))
+	)
+	_check(without != null and without.display_font == null, "a pack without one loads, with none")
+	if without != null:
+		var plain := HudTheme.build(without, OfficeDraw.new(without).font)
+		_check(plain.get_font("font", "Wordmark") != shipped.display_font, "and the wordmark keeps the main face")
+	var missing := func(m: Dictionary) -> void: m.display_font.path = "fonts/nowhere.ttf"
+	_eq(
+		ArtPack.from_manifest(_mutated_pack("lost-display", missing)),
+		null,
+		"a display face it does not ship is refused"
+	)
+
+
 ## A broken item block refuses the whole pack, like any other contract error:
 ## a misspelt key must not read as an absent one.
 func test_a_broken_item_block_refuses_the_pack() -> void:
@@ -1038,6 +1066,8 @@ func _mutated_pack(name: String, change: Callable, source := MANIFEST) -> String
 	var base := source.get_base_dir()
 	var data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(source))
 	var paths: Array = [data.atlas, data.font.path, data.font.license]
+	if data.has("display_font"):
+		paths.append_array([data.display_font.path, data.display_font.license])
 	for category: String in ["props", "ui"]:
 		for spec: Dictionary in _dict(data, category).values():
 			paths.append(spec.path)
@@ -1072,13 +1102,16 @@ func _dense_pack(density: int, filter := "nearest") -> String:
 		image.resize(target_size.x, target_size.y, Image.INTERPOLATE_NEAREST)
 		DirAccess.make_dir_recursive_absolute(root_dir.path_join(path).get_base_dir())
 		image.save_png(root_dir.path_join(path))
-	var font_path := str(_dict(data, "font").get("path", ""))
-	DirAccess.make_dir_recursive_absolute(root_dir.path_join(font_path).get_base_dir())
-	var font := FileAccess.open(root_dir.path_join(font_path), FileAccess.WRITE)
-	font.store_buffer(FileAccess.get_file_as_bytes(base.path_join(font_path)))
-	font.close()
-	var license_path := str(_dict(data, "font").get("license", ""))
-	DirAccess.copy_absolute(base.path_join(license_path), root_dir.path_join(license_path))
+	for face: String in ["font", "display_font"]:
+		if not data.has(face):
+			continue
+		var font_path := str(_dict(data, face).get("path", ""))
+		DirAccess.make_dir_recursive_absolute(root_dir.path_join(font_path).get_base_dir())
+		var font := FileAccess.open(root_dir.path_join(font_path), FileAccess.WRITE)
+		font.store_buffer(FileAccess.get_file_as_bytes(base.path_join(font_path)))
+		font.close()
+		var license_path := str(_dict(data, face).get("license", ""))
+		DirAccess.copy_absolute(base.path_join(license_path), root_dir.path_join(license_path))
 	data.schema_version = 2
 	data.density = density
 	data.filter = filter

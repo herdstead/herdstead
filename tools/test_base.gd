@@ -275,11 +275,15 @@ func _copied_pack(
 	var table_file := FileAccess.open(table_target.path_join("manifest.json"), FileAccess.WRITE)
 	table_file.store_string(JSON.stringify(table_data))
 	table_file.close()
-	var font_path := str(_dict(data, "font").get("path", ""))
-	DirAccess.make_dir_recursive_absolute(root_dir.path_join(font_path).get_base_dir())
-	var font := FileAccess.open(root_dir.path_join(font_path), FileAccess.WRITE)
-	font.store_buffer(FileAccess.get_file_as_bytes(base.path_join(font_path)))
-	font.close()
+	# The fonts the manifest names: the main one, and the display face when it has one.
+	for face: String in ["font", "display_font"]:
+		if not data.has(face):
+			continue
+		var font_path := str(_dict(data, face).get("path", ""))
+		DirAccess.make_dir_recursive_absolute(root_dir.path_join(font_path).get_base_dir())
+		var font := FileAccess.open(root_dir.path_join(font_path), FileAccess.WRITE)
+		font.store_buffer(FileAccess.get_file_as_bytes(base.path_join(font_path)))
+		font.close()
 	data.schema_version = 2
 	data.density = density
 	data.filter = filter

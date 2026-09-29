@@ -361,6 +361,11 @@ def validate(source: Path, pack: dict) -> Compiled:
     for key in ("path", "license"):
         # The OFL licence ships with the font; dropping it is not an option.
         source_path(source, pack["font"][key])
+    for key in ("path", "license"):
+        if "display_font" in pack:
+            require(isinstance(pack["display_font"], dict) and isinstance(pack["display_font"].get(key), str),
+                    f"display_font needs a {key}")
+            source_path(source, pack["display_font"][key])
     return Compiled(images, factors, density, filter_name)
 
 
@@ -446,8 +451,10 @@ def build(source: Path, output: Path):
                 mirror_png(source_path(source, info["path"]), target)
             else:
                 save_if_pixels_moved(compiled.images[(category, name)], target)
-    for relative in (pack["font"]["path"], pack["font"]["license"]):
-        copy_if_changed(source_path(source, relative), output / relative)
+    fonts = [pack["font"]] + ([pack["display_font"]] if "display_font" in pack else [])
+    for face in fonts:
+        for relative in (face["path"], face["license"]):
+            copy_if_changed(source_path(source, relative), output / relative)
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     # The pack's own tree only; the shared table beside it has its own builder.
     report_pruned(output, prune_unreferenced(output, written))

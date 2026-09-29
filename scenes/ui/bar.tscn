@@ -36,7 +36,7 @@ offset_top = 7.0
 offset_right = 116.0
 offset_bottom = 27.0
 mouse_filter = 2
-theme_type_variation = &"Heading16Paper"
+theme_type_variation = &"Wordmark"
 text = "HERDSTEAD"
 
 [node name="Counters" type="HBoxContainer" parent="Content"]

@@ -457,6 +457,8 @@ func show_next(next: NextModel) -> void:
 	back.disabled = next == null
 	on.disabled = next == null
 	chevron.visible = next != null
+	var play: Control = %PlayMark
+	play.visible = next != null
 	if next == null:
 		set_next_wait("")
 	_word_next()

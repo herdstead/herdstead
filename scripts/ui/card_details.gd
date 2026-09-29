@@ -81,6 +81,9 @@ func show_pane(pane: PaneModel, machine: String, dimmed: bool, art: ArtPack) -> 
 	caption.text = (
 		"STALE / OFFLINE" if dimmed else "STARTING" if starting else "no agent" if shell else caption_of(art, state)
 	)
+	var pill: PanelContainer = %CaptionPill
+	pill.theme_type_variation = pill_of(state, dimmed or starting or shell)
+	caption.theme_type_variation = &"LabelPaper" if pill.theme_type_variation == &"StatePillQuiet" else &"LabelInk"
 	caption.tooltip_text = "herdr reports no agent in this pane: a shell." if shell else ""
 	if not pane.provider.is_empty():
 		caption.tooltip_text = (
@@ -120,6 +123,25 @@ func show_pane(pane: PaneModel, machine: String, dimmed: bool, art: ArtPack) -> 
 	footnote.visible = dimmed or (state == ArtContract.STATE_DONE and not starting)
 	footnote.text = ("Connection lost.\nNot an idle signal." if dimmed else "UNREAD = not yet seen\nNot task success.")
 	_show_portrait(art, pane.provider, &"" if shell else state, starting, dimmed, pane.key)
+
+
+## The pill the state caption stands in (HudTheme's StatePill*): a state's
+## own colour for working, blocked, done (UNREAD) and idle, with ink words;
+## `slate` with paper words for a quiet one (a shell, a start, a dropped
+## machine, a state the office has no colour for).
+static func pill_of(state: StringName, quiet: bool) -> StringName:
+	if quiet:
+		return &"StatePillQuiet"
+	match state:
+		ArtContract.STATE_WORKING:
+			return &"StatePillWorking"
+		ArtContract.STATE_BLOCKED:
+			return &"StatePillBlocked"
+		ArtContract.STATE_DONE:
+			return &"StatePillDone"
+		ArtContract.STATE_IDLE:
+			return &"StatePillIdle"
+	return &"StatePillQuiet"
 
 
 ## What `art` calls this state. A state the pack does not draw has no words

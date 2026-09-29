@@ -75,7 +75,9 @@ def upgrade(source: Path, output: Path, density: int, pack_id: str | None = None
                 fail(f"{category}/{asset} is {image.width}x{image.height}, not an allowed multiple of the {expected_width}x{expected_height} contract")
             upscale(image, density // factor).save(target)
             written += 1
-    for relative in (pack["font"]["path"], pack["font"]["license"]):
+    # The fonts the pack names, each with its licence: the main one and the display face.
+    faces = [pack["font"]] + ([pack["display_font"]] if "display_font" in pack else [])
+    for relative in [path for face in faces for path in (face["path"], face["license"])]:
         target = output / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source / relative, target)

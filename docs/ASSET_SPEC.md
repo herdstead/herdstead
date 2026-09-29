@@ -447,6 +447,10 @@ positions, pauses motion, dims the picture and says STALE; idle never stands in 
    task-light wedges and chair contact shadows draw; default `"soft"`. Additive to schema v1; read through
    `ArtPack.task_lights`.
    `scripts/world/table.gd` looks only at this key, **never at the pack's name**.
+   **Optional display face**: top-level `"display_font": {"path", "license"}`, like `font`, names a pixel face
+   for the HUD's few fixed ASCII headings (the wordmark, FLOORS, NEWS, NEXT). Read through
+   `ArtPack.display_font` with antialiasing, hinting and subpixel positioning off; `HudTheme` draws it only at
+   sizes on its 8-pixel grid (`DISPLAY_SIZES`) and falls back to the main font when a pack names none.
 9. **Scene dependency list**: the palette keys, props, UI, tiles, states and animations scenes use, plus the table
    modules and the pixel people (every semantic animation has a track in both poses, seated tracks draw the
    back), live in `scripts/art/art_contract.gd`, beside the code that uses them; scene code takes IDs only through
@@ -792,7 +796,8 @@ rule the builder checks). The output directory must be empty; painted work is ne
   `NunitoSans-OFL.txt`, which must be distributed with it. `OfficeDraw` uses the pack's font as its base, with CJK
   and missing glyphs falling back to the platform CJK font; `HudTheme` overrides only the weight of large titles.
 - Tiny5 from [Google Fonts](https://github.com/google/fonts/tree/main/ofl/tiny5) is kept with its `OFL.txt`; it is
-  not in the UI font chain.
+  the pack's `display_font`, for the HUD's fixed ASCII headings only (not in the fallback chain: workspace and agent
+  names can be CJK, and Tiny5 has no CJK).
 - The environment's density-2 art (furniture, desk library, UI, walls, tiles, long table) is drawn by the AI painter
   (`.claude/skills/painter`, GPT Image 2.5 Sunburst): `pixelize.py` fixes canvas, pivot, palette and outline, and
   `tilefix.py` pins the connecting pixels (wood floor outer band, wall boundary rows and ports, tileable edges, the
