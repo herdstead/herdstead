@@ -121,6 +121,7 @@ static func build(art: ArtPack, font: Font) -> Theme:
 		_label(theme, name, LABEL_SIZES[name], art.color(LABEL_HEADINGS[name]))
 		if LABEL_SIZES[name] >= 13:
 			theme.set_font("font", name, heading)
+		theme.set_font("font", name, _fit(theme.get_font("font", name), art.font, LABEL_SIZES[name]))
 	for name in FLAT_PANELS:
 		theme.set_type_variation(name, "Panel")
 		theme.set_stylebox("panel", name, _flat(art.color(FLAT_PANELS[name])))
@@ -348,8 +349,10 @@ static func _card(theme: Theme, art: ArtPack, font: Font) -> void:
 	var mono := SystemFont.new()
 	mono.font_names = PackedStringArray(MONO_FACES)
 	mono.fallbacks = font.fallbacks
+	var bare := SystemFont.new()
+	bare.font_names = PackedStringArray(MONO_FACES)
 	_label(theme, &"PreviewText", PREVIEW_SIZE, art.color(ArtContract.PAPER))
-	theme.set_font("font", "PreviewText", mono)
+	theme.set_font("font", "PreviewText", _fit(mono, bare, PREVIEW_SIZE))
 	# Terminal rows sit edge to edge: twelve of them are a fixed block. A Latin
 	# descender still clears the next row's capitals at this pitch.
 	theme.set_constant("line_spacing", "PreviewText", PREVIEW_LINE_SPACING)
@@ -765,6 +768,19 @@ static func _agent_list(theme: Theme, art: ArtPack) -> void:
 		theme.set_stylebox(state, "DrawerScroll", grabber)
 	theme.set_type_variation("DrawerRowsGap", "MarginContainer")
 	theme.set_constant("margin_right", "DrawerRowsGap", DRAWER_BAR_GAP)
+
+
+## `face` at `pixels`, never taller than `own` (the face without its fallbacks):
+## Godot sizes a row by the tallest font in the chain.
+static func _fit(face: Font, own: Font, pixels: int) -> Font:
+	var extra := face.get_height(pixels) - own.get_height(pixels)
+	if extra <= 0.0:
+		return face
+	var fitted: FontVariation = face.duplicate() if face is FontVariation else FontVariation.new()
+	if face is not FontVariation:
+		fitted.base_font = face
+	fitted.spacing_top -= int(extra)
+	return fitted
 
 
 static func _label(theme: Theme, name: StringName, pixels: int, color: Color) -> void:

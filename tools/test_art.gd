@@ -63,6 +63,30 @@ func test_bundled_typography_keeps_latin_and_cjk_readable() -> void:
 		_check(text.get_string_size("CLAUDE", HORIZONTAL_ALIGNMENT_LEFT, -1, 10).x <= 64.0, "name fits its seat column")
 
 
+## Godot sizes a text row by the tallest font in the fallback chain. Linux's
+## Noto Sans CJK is taller than the pack's face (macOS's Hiragino is not), and
+## on CI it grew the agent card's twelve preview rows out of the staff panel.
+## A fallback may draw its glyphs, never make a Latin row taller.
+func test_a_fallback_never_makes_a_row_taller() -> void:
+	for path: String in [MANIFEST, DUSK_MANIFEST]:
+		var pack := ArtPack.from_manifest(path)
+		var text := OfficeDraw.new(pack).font
+		var theme := HudTheme.build(pack, text)
+		for name: StringName in HudTheme.LABEL_SIZES:
+			var pixels := HudTheme.LABEL_SIZES[name]
+			var height := theme.get_font("font", name).get_height(pixels)
+			_check(
+				height <= pack.font.get_height(pixels), "%s at %d: %s, no taller than its face" % [name, pixels, height]
+			)
+		var mono := SystemFont.new()
+		mono.font_names = PackedStringArray(HudTheme.MONO_FACES)
+		var preview := theme.get_font("font", "PreviewText").get_height(HudTheme.PREVIEW_SIZE)
+		_check(
+			preview <= mono.get_height(HudTheme.PREVIEW_SIZE),
+			"a preview row: %s, no taller than the mono face" % preview
+		)
+
+
 ## The set of semantic IDs the scenes draw with lives in GDScript, next to the
 ## code that draws, and every pack is held to it. A pack that lacks one is
 ## named, not quietly missing a texture at runtime.
