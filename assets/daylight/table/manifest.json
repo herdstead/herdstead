@@ -3,7 +3,7 @@
   "density": 2,
   "filter": "nearest",
   "id": "daylight-shared-table",
-  "name": "Daylight Studio shared table",
+  "name": "Studio shared table",
   "modules": {
     "surface_left": {
       "path": "surface_left.png",

@@ -3,7 +3,7 @@
   "density": 2,
   "filter": "nearest",
   "id": "daylight",
-  "name": "Daylight Studio",
+  "name": "Studio",
   "tile_size": 32,
   "atlas_size": [
     256,
@@ -250,6 +250,17 @@
     },
     "window": {
       "path": "props/window.png",
+      "size": [
+        64,
+        48
+      ],
+      "pivot": [
+        32,
+        44
+      ]
+    },
+    "window_night": {
+      "path": "props/window_night.png",
       "size": [
         64,
         48
