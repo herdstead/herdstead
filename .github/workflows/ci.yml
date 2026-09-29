@@ -27,7 +27,7 @@ defaults:
 jobs:
   check:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -128,7 +128,8 @@ jobs:
       - name: Screenshot the showroom and the live office
         # Capturing needs a viewport, so the software renderer gets a display.
         # A picture of what the PR changed, on every PR. No golden compare yet.
-        run: timeout 300 make capture OUT="$RUNNER_TEMP/captures"
+        # Only the key set (CAPTURE_SET=ci): the whole one takes over ten minutes.
+        run: CAPTURE_SET=ci timeout 300 make capture OUT="$RUNNER_TEMP/captures"
 
       - name: Upload the screenshots
         uses: actions/upload-artifact@v4

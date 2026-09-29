@@ -593,6 +593,7 @@ Screenshots need a display; never add `--headless`.
 ```sh
 make capture                  # the standard set, into build/captures
 make capture OUT=/tmp/shots
+CAPTURE_SET=ci make capture   # only the key set: showrooms, pixel people and office at 2x and 4x
 
 # One native-viewport shot. The live scene waits for the first snapshot; with herdr unreachable it shoots OFFLINE after 8 s.
 godot --path . -- --capture=/absolute/path/office.png
@@ -618,7 +619,9 @@ window) and the 480×320 minimum screen, and every panel and state worth looking
 scrollbars, NEWS and EVENTS, OVERVIEW, lens and pointing, strategic view, FLOORS and signposts with mezzanines and an
 offline machine, the agent card in answer mode, START AGENT, NEW PANE BESIDE, Close and Worktree, and launches in
 progress. A missing image fails the run. Every step has a watchdog: a step that outlives its own `--wait=` plus
-`CAPTURE_MARGIN` seconds (default 60) is killed and the run fails naming that image. `make walk-strips` renders
+`CAPTURE_MARGIN` seconds (default 60) is killed and the run fails naming that image. `CAPTURE_SET=ci` shoots only
+both showrooms, the pixel people and the live office at 2× and 4× (about half a minute on CI; the whole set takes over
+ten). `make walk-strips` renders
 frame-by-frame strips of people walking. On Linux without a desktop, use
 `xvfb-run -a godot ... --display-driver x11 --audio-driver Dummy`; `make capture` wraps itself that way when `DISPLAY` is
 unset and `xvfb` is installed.
@@ -727,8 +730,8 @@ a Makefile target where one exists, so `make check` locally runs the same comman
    every asset).
 10. `make test`: every test in `tools/run_tests.sh`, judged by its exit code. The load and pack checks already ran, so
     this step sets `HERDSTEAD_SKIP_LOAD_CHECKS=1` to skip them (as `make check` does; a plain `make test` runs them).
-11. `make capture` (with `xvfb` and software GL), uploading every screenshot with `actions/upload-artifact`, pass or
-    fail.
+11. `CAPTURE_SET=ci make capture` (with `xvfb` and software GL): the key set only, uploading every screenshot with
+    `actions/upload-artifact`, pass or fail.
 
 Screenshots are for looking at; there is no golden comparison. CI does not export the `.app` or publish releases.
 `tools/probe_herdr.gd` needs a real herdr and `make perf` needs a window and varies by machine, so neither runs in CI or

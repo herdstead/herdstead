@@ -88,6 +88,17 @@ case "$CAPTURE_MARGIN" in
 		exit 2
 		;;
 esac
+# Which pictures: `all` (the default), or `ci`: both showrooms, the pixel
+# people and the live office at 2x and 4x, what a change looks like within
+# CI's time (about half a minute there; the whole set takes over ten).
+CAPTURE_SET="${CAPTURE_SET:-all}"
+case "$CAPTURE_SET" in
+	all | ci) ;;
+	*)
+		echo "CAPTURE: CAPTURE_SET is all or ci, not '$CAPTURE_SET'"
+		exit 2
+		;;
+esac
 
 if [ -x "$ROOT/.venv/bin/python" ]; then
 	DEFAULT_PYTHON="$ROOT/.venv/bin/python"
@@ -305,19 +316,40 @@ SHOTS="$SHOTS office-point-zoom2.png office-point-floor-zoom2.png"
 # 4x, the minimum and dusk, and on the lens's stage (a `+` wait, idle, done, a shell).
 SHOTS="$SHOTS office-strategic-zoom2.png office-strategic-zoom4.png office-strategic-min.png"
 SHOTS="$SHOTS office-strategic-dusk-zoom2.png office-strategic-floors-zoom2.png"
+if [ "$CAPTURE_SET" = ci ]; then
+	SHOTS="preview-daylight.png preview-dusk.png people-zoom2.png people-zoom4.png office-zoom2.png office-zoom4.png"
+fi
 for shot in $SHOTS; do
 	rm -f "$OUT/$shot"
 done
+
+# Godot exits 0 even when it drew nothing, so the pictures are the check: a
+# capture step that quietly produces no PNG is the failure this step exists for.
+finish() {
+	local missing=""
+	for shot in $SHOTS; do
+		[ -s "$OUT/$shot" ] || missing="$missing $shot"
+	done
+	if [ -n "$missing" ]; then
+		echo "CAPTURE_FAILED: no picture for$missing"
+		exit 1
+	fi
+	echo "CAPTURE_OK: $OUT"
+	ls -l "$OUT"
+	exit 0
+}
 
 echo "== showroom"
 godot_run --path "$ROOT" scenes/preview.tscn -- --capture="$OUT/preview-daylight.png"
 godot_run --path "$ROOT" scenes/preview.tscn -- \
 	--pack=res://assets/dusk/manifest.json --capture="$OUT/preview-dusk.png"
 # The overview over the showroom, fed a two-hour mock state log (preview.gd).
-for pack in daylight dusk; do
-	godot_run --path "$ROOT" scenes/preview.tscn -- --pack=res://assets/$pack/manifest.json \
-		--overview=open --capture="$OUT/preview-overview-$pack.png"
-done
+if [ "$CAPTURE_SET" = all ]; then
+	for pack in daylight dusk; do
+		godot_run --path "$ROOT" scenes/preview.tscn -- --pack=res://assets/$pack/manifest.json \
+			--overview=open --capture="$OUT/preview-overview-$pack.png"
+	done
+fi
 
 echo "== pixel people showroom"
 # Every catalog agent in its own look, one screen pixel per pixel times --zoom.
@@ -371,6 +403,7 @@ for zoom in 2 4; do
 		--pack=res://assets/daylight/manifest.json --zoom="$zoom" \
 		--wait="$DWELL" --capture="$OUT/office-zoom$zoom.png"
 done
+[ "$CAPTURE_SET" = ci ] && finish
 # The agent list's drawer open (every run starts with it closed to its tab):
 # the world gives the column its room, the floor keeps the plan it has for the tab.
 godot_run --path "$ROOT" -- --socket="$WORK/herdr.sock" --read-only \
@@ -895,17 +928,4 @@ CAPTURE_PREPARE=stage_lens godot_run --path "$ROOT" -- --socket="$WORK/herdr.soc
 	--pack=res://assets/daylight/manifest.json --zoom=2 --strategic=open \
 	--wait="$DWELL" --capture="$OUT/office-strategic-floors-zoom2.png"
 ctl reset '{"fixture": "snapshot_floors"}'
-
-# Godot exits 0 even when it drew nothing, so the pictures are the check: a
-# capture step that quietly produces no PNG is the failure this step exists for.
-missing=""
-for shot in $SHOTS; do
-	[ -s "$OUT/$shot" ] || missing="$missing $shot"
-done
-if [ -n "$missing" ]; then
-	echo "CAPTURE_FAILED: no picture for$missing"
-	exit 1
-fi
-
-echo "CAPTURE_OK: $OUT"
-ls -l "$OUT"
+finish
