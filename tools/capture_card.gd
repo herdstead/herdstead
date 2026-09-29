@@ -129,6 +129,10 @@ func _capture() -> void:
 		"set_preview",
 		{"pane_id": SHELL, "source": "recent_unwrapped", "text": listing + "~/code/api $ \n"}
 	)
+	# Answer mode's panel stands over the world's middle: Escape leaves it (and
+	# the reply box) before the shell is clicked.
+	await _tap(KEY_ESCAPE)
+	await _until(func() -> bool: return not card.answering(), "answer mode left")
 	await _pick(office, shell)
 	await _open_up(office)
 	var kind: Button = card.get_node("%Kind0")

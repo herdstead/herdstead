@@ -320,6 +320,35 @@ func _pick_local(office: OfficeDouble, pane_id: String, open := true) -> void:
 		await _open_panel(office)
 
 
+## Pick pane `key` with a real click on its row in the agent list, opening the
+## drawer by its tab first; with `open`, then open the staff panel with Enter.
+## The way to another agent while answer mode's panel stands over the world's
+## middle, where a desk under it takes no click; it picks as a desk click does.
+func _pick_in_list(office: OfficeDouble, key: String, open := true) -> void:
+	if not office.hud.drawer_open():
+		var tab: Control = office.hud.get_node("%DrawerTab")
+		await _click_control(tab)
+		await _frames(2)
+	var row := office.hud.agent_list.row_for(key)
+	_check(row != null and row.is_visible_in_tree(), "the agent list shows a row for " + key)
+	if row == null:
+		return
+	# Where the row shows: its middle, or its right end past the panel over it.
+	var rect := row.get_global_rect()
+	var at := rect.get_center()
+	var panel := office.hud.staff.get_global_rect()
+	if panel.has_point(at):
+		at.x = rect.end.x - 4.0
+	_check(not panel.has_point(at), "the row for %s shows beside the panel" % key)
+	for down: bool in [true, false]:
+		_button(at, MOUSE_BUTTON_LEFT, down)
+		await process_frame
+	await _frames(2)
+	_eq(office.hud.inspector.shown_pane_key(), key, "the row picked " + key)
+	if open:
+		await _open_panel(office)
+
+
 ## The staff panel is one line until it is opened: Enter opens it, as a viewer
 ## would (capture_card.gd's _open_up()).
 func _open_panel(office: OfficeDouble) -> void:
@@ -677,7 +706,8 @@ func _godot(engine: PackedStringArray, user: PackedStringArray, output: Array) -
 	return OS.execute(OS.get_executable_path(), arguments, output, true)
 
 
-## Every HUD panel shown stays on screen and off every other one.
+## Every HUD panel shown stays on screen and off every other one; in answer
+## mode the staff panel is a modal over the others, so it only stays on screen.
 func _panels_apart(office: OfficeDouble, what: String) -> void:
 	var hud := office.hud
 	var screen: Control = hud.get_node("Screen")
@@ -698,7 +728,11 @@ func _panels_apart(office: OfficeDouble, what: String) -> void:
 	for i in shown.size():
 		var rect := shown[i].get_global_rect()
 		_check(room.encloses(rect), "%s: %s stays on screen: %s" % [what, shown[i].name, rect])
+		if shown[i] == hud.staff and hud.inspector.answering():
+			continue
 		for j in range(i + 1, shown.size()):
+			if shown[j] == hud.staff and hud.inspector.answering():
+				continue
 			var other := shown[j].get_global_rect()
 			_check(
 				not rect.intersects(other),

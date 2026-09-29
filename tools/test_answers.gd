@@ -693,7 +693,7 @@ func test_an_unknown_answer_is_still_said_when_coming_back() -> void:
 	await _open_answer(office)
 	await _click_control(_key_button(office, "Key1"))
 	await _until(func() -> bool: return _last_write(office) == "SENT", "the key is out")
-	await _pick_bee(office, "alpha:p1")
+	await _pick_in_list(office, HerdrFleet.pane_key(BEE, "alpha:p1"))
 	_check(not card.answering(), "another desk: answer mode is over")
 	var deadline := Time.get_ticks_msec() + int((HerdrCommands.INPUT_TIMEOUT + 3.0) * 1000)
 	while _last_write(office) != "UNKNOWN" and Time.get_ticks_msec() < deadline:
@@ -725,7 +725,7 @@ func test_a_draft_stays_with_its_pane() -> void:
 	await _click_control(box)
 	await _type("hello there")
 	_eq(box.text, "hello there", "typed")
-	await _pick_bee(office, "alpha:p1")
+	await _pick_in_list(office, HerdrFleet.pane_key(BEE, "alpha:p1"))
 	_check(not card.answering() and not box.has_focus(), "another desk: no answer mode, no box focus")
 	_eq(box.text, "", "its box is empty")
 	await _tap(KEY_ENTER)
@@ -909,7 +909,7 @@ func test_a_line_that_went_is_no_draft_on_return() -> void:
 	_ctl("control-b", "next", {"action": "delay", "method": "agent.prompt", "seconds": 1.5})
 	await _click_control(_key_button(office, "SendLine"))
 	await _until(func() -> bool: return _last_write(office) == "SENT", "the line is out")
-	await _pick_bee(office, "alpha:p1")
+	await _pick_in_list(office, HerdrFleet.pane_key(BEE, "alpha:p1"))
 	await _until(func() -> bool: return _last_write(office) == "ACCEPTED", "herdr took it, the card elsewhere")
 	await _pick_bee(office, "alpha:p3")
 	await _frames(3)
@@ -982,7 +982,7 @@ func test_back_before_an_answer_ends_still_hears_how_it_ended() -> void:
 	await _open_answer(office)
 	await _click_control(_key_button(office, "Key1"))
 	await _until(func() -> bool: return _last_write(office) == "SENT", "the key is out")
-	await _pick_bee(office, "alpha:p1")
+	await _pick_in_list(office, HerdrFleet.pane_key(BEE, "alpha:p1"))
 	await _pick_bee(office, "alpha:p3")
 	var deadline := Time.get_ticks_msec() + int((HerdrCommands.INPUT_TIMEOUT + 3.0) * 1000)
 	while _last_write(office) != "UNKNOWN" and Time.get_ticks_msec() < deadline:
@@ -1414,6 +1414,40 @@ func test_answer_mode_writes_nothing_without_a_gesture() -> void:
 	_eq(_all_inputs(), 0, "and wrote nothing")
 	_eq(_writes_seen("control-b"), PackedStringArray(), "not even a re-read for one")
 	_check(card.answering(), "answer mode stayed open")
+
+
+## Answer mode is a modal: the staff panel, at its full height and at most
+## `staff_modal_width` wide, stands in the middle of the screen over the dim,
+## which covers the whole screen, and the world keeps the room the opened panel
+## left it. The dim only darkens: a real click through it on another agent's
+## row in the list picks that agent and so leaves answer mode, sending
+## nothing, and the panel is back along the bottom.
+func test_answer_mode_is_a_modal_over_the_dim() -> void:
+	var office := await _blocked_bee()
+	var card := _card(office)
+	var hud := office.hud
+	var dim: Control = hud.get_node("%ModalDim")
+	_check(not dim.visible, "no dim before answer mode")
+	var room := hud.world_rect()
+	await _open_answer(office)
+	await _frames(3)
+	var screen := Vector2(SCREEN)
+	_check(dim.is_visible_in_tree(), "the dim shows in answer mode")
+	_eq(dim.get_global_rect(), Rect2(Vector2.ZERO, screen), "over the whole screen")
+	_eq(dim.mouse_filter, Control.MOUSE_FILTER_IGNORE, "and lets every click through")
+	var panel := card.get_global_rect()
+	_eq(panel.size, Vector2(minf(screen.x - 2.0 * hud.staff_inset, hud.staff_modal_width), 128), "the panel's size")
+	_check(panel.get_center().distance_to(screen / 2.0) <= 1.0, "in the middle of the screen: %s" % panel)
+	_fits(card, "the modal")
+	_eq(hud.world_rect(), room, "the world keeps the room the opened panel left it")
+	var picked := card.shown_pane_key()
+	await _pick_in_list(office, HerdrFleet.pane_key(BEE, "alpha:p1"), false)
+	await _frames(3)
+	_check(card.shown_pane_key() != picked, "a click through the dim picked another agent")
+	_check(not card.answering(), "which left answer mode")
+	_check(not dim.visible, "and took the dim away")
+	_eq(card.get_global_rect().end.y, screen.y + hud.staff.offset_bottom, "the panel is back along the bottom")
+	_eq(_all_inputs(), 0, "nothing was sent")
 
 
 # --- helpers only these cases use ------------------------------------------------

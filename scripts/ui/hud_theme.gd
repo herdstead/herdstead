@@ -74,6 +74,9 @@ const SECTION_PANELS: Dictionary[StringName, StringName] = {
 	&"WindowUnknown": ArtContract.MUTED,
 	&"WindowDark": ArtContract.SLATE,
 }
+## How much of the office shows through the dim under the answer-mode panel
+## (`ModalDim`, INK at this opacity): enough to see which desk it is about.
+const MODAL_DIM := 0.55
 ## Every state a Button stylebox has to cover. A flat button looks the same in
 ## all of them: a press changes the office, not the button. The agent card's
 ## action (CardAction) is the exception, see _card().
@@ -125,6 +128,8 @@ static func build(art: ArtPack, font: Font) -> Theme:
 	for name in FLAT_PANELS:
 		theme.set_type_variation(name, "Panel")
 		theme.set_stylebox("panel", name, _flat(art.color(FLAT_PANELS[name])))
+	theme.set_type_variation(&"ModalDim", "Panel")
+	theme.set_stylebox("panel", &"ModalDim", _flat(Color(art.color(ArtContract.INK), MODAL_DIM)))
 	_panel(theme, art)
 	_buttons(theme, art)
 	_attention(theme, art)

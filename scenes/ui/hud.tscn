@@ -21,6 +21,8 @@ drawer_open_left = -160.0
 drawer_closed_left = -36.0
 staff_full_top = -144.0
 staff_compact_top = -44.0
+staff_inset = 16.0
+staff_modal_width = 640.0
 staff_tall_from = 400.0
 staff_next_from = 640.0
 next_width = 128.0
@@ -142,18 +144,6 @@ S
 ·
 0"
 
-[node name="Staff" parent="Screen" instance=ExtResource("4")]
-unique_name_in_owner = true
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 16.0
-offset_top = -44.0
-offset_right = -16.0
-offset_bottom = -16.0
-grow_horizontal = 2
-grow_vertical = 0
-
 [node name="News" parent="Screen" instance=ExtResource("10_news")]
 unique_name_in_owner = true
 anchor_top = 1.0
@@ -215,6 +205,29 @@ offset_bottom = -172.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 0
+
+[node name="ModalDim" type="Panel" parent="Screen"]
+unique_name_in_owner = true
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_type_variation = &"ModalDim"
+
+[node name="Staff" parent="Screen" instance=ExtResource("4")]
+unique_name_in_owner = true
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -44.0
+offset_right = -16.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 0
 
 [node name="BubbleTip" type="PanelContainer" parent="Screen"]
 unique_name_in_owner = true

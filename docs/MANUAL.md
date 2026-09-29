@@ -259,6 +259,13 @@ out.
 ## Answer mode
 
 Only for an agent seat you picked yourself. `Enter` or **Answer ⏎** in the card header opens it; opening sends nothing.
+A click on a blocked agent's bubble, NEXT or `N` opens it too, once the question shows; nothing opens it by itself.
+
+Answer mode is a modal: the staff panel, at its full height and at most 640 units wide, stands in the middle of the
+screen over the dimmed office, and the world keeps the room the opened panel left it. The dim only darkens: clicks go
+through it, so another agent's bubble, desk or row picks them (and leaves answer mode) wherever the panel does not cover
+it. A desk under the panel takes no click; leave with `Esc` or move on with `N`. Leaving drops the panel back along
+the bottom.
 
 - A **blocked** agent: click `1`–`9`, `y`, `n`, `⏎` (Enter) or the separate **Send Esc**.
 - An **idle / done** agent: write one line in the reply box and click **Send line**; herdr types it and presses Enter

@@ -506,7 +506,7 @@ func _click_visible_pane(office: OfficeDouble, key: String) -> void:
 			# Under a signpost: bring it down from under them, or left when the
 			# pan cannot go that way any further.
 			wheel = MOUSE_BUTTON_WHEEL_RIGHT if stuck else MOUSE_BUTTON_WHEEL_UP
-		_press(visible.get_center(), wheel)
+		_press(_wheel_point(office, visible), wheel)
 		await process_frame
 		await process_frame
 		var moved := _desk_point(office, key)
@@ -525,16 +525,29 @@ func _click_visible_pane(office: OfficeDouble, key: String) -> void:
 ## under a signpost, which stands over the world's top-right corner and takes
 ## a click there, or under the drawer (open over the desks a plan made for it
 ## closed puts to its right, or its closed tab) or the NEWS strip (counted so
-## one moved over the world cannot swallow a test's click unseen).
+## one moved over the world cannot swallow a test's click unseen), or under
+## the staff panel, which stands over the world's middle in answer mode.
 func _clickable(office: OfficeDouble, visible: Rect2, at: Vector2) -> bool:
 	if not visible.has_point(at):
 		return false
 	var tab: Control = office.hud.get_node("%DrawerTab")
 	var holder: Control = office.hud.get_node("%ListHolder")
-	for cover: Control in [office.hud.signposts, tab, holder, office.hud.news]:
+	for cover: Control in [office.hud.signposts, tab, holder, office.hud.news, office.hud.staff]:
 		if cover.is_visible_in_tree() and cover.get_global_rect().has_point(at):
 			return false
 	return true
+
+
+## Where a wheel notch pans the world: the visible room's middle, or, while
+## something covers that (the staff panel in answer mode), a corner of the room
+## the viewer could still scroll at.
+func _wheel_point(office: OfficeDouble, visible: Rect2) -> Vector2:
+	var inner := visible.grow(-4.0)
+	for at: Vector2 in [visible.get_center(), inner.position, Vector2(inner.position.x, inner.end.y)]:
+		if _clickable(office, visible, at):
+			return at
+	_fail("no room to scroll the world at in %s" % visible)
+	return visible.get_center()
 
 
 ## Read the actual rendered plate, not an internal world rebuild signature.

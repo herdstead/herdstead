@@ -1328,6 +1328,10 @@ func test_a_start_is_refused_when_the_pane_changes_between_click_and_send() -> v
 	await _frames(4)
 	_eq(card.outcome_text(), "Not sent: target changed", "the card says so on the new binding")
 	_eq(_writes_seen("control-a"), PackedStringArray(), "the pick moved: nothing written, not even a re-read")
+	# N opened answer mode on the blocked agent it picked, and its panel stands
+	# over the world's middle: Escape leaves it before the shell is clicked again.
+	if card.answering():
+		await _tap(KEY_ESCAPE)
 	await _pick_local(office, "alpha:p2")
 	var check := {"action": "delay", "method": "pane.read", "id_suffix": HerdrCommands.CHECK_SUFFIX, "seconds": 1.2}
 	_ctl("control-a", "next", check)

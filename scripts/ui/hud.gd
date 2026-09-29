@@ -6,6 +6,8 @@ extends CanvasLayer
 ## (the agent card, `inspector`, with NEXT at its right end) over the NEWS
 ## strip, the strategic view over the world rect and the OVERVIEW over the
 ## world when they are open; laid out by the scene and styled by one Theme.
+## In answer mode the staff panel stands in the middle of the screen over a
+## dimmed office, as a modal (_fit_staff()).
 ##
 ## The office hands it models and asks it back for the room it left over; it
 ## never tells a panel where to stand. Moving a panel in `hud.tscn` moves the
@@ -90,6 +92,11 @@ enum DrawerTab { AGENTS, EVENTS }
 ## screen's bottom (see _fit_staff()). Set in the scene.
 @export var staff_full_top := 0.0
 @export var staff_compact_top := 0.0
+## The staff panel's inset from the screen's sides along the bottom, and its
+## widest in answer mode, where it stands in the middle (see _fit_staff()).
+## Set in the scene.
+@export var staff_inset := 0.0
+@export var staff_modal_width := 0.0
 ## The logical screen height from which the NEWS strip stays under the staff
 ## panel opened to full height; below it, the opened panel takes the strip's
 ## room (see _fit_news()). Set in the scene.
@@ -228,6 +235,12 @@ var _posts: Array[SignpostModel] = []
 ## (the panel was opened for that pane; another one folds it).
 var _was_answering := false
 var _expanded_pane := ""
+## In answer mode the panel floats in the middle of the screen, and its slot
+## along the bottom, which the world keeps clear of, is kept here: its top and
+## bottom edges from the screen's bottom (see _fit_staff()).
+var _floating := false
+var _slot_top := 0.0
+var _slot_bottom := 0.0
 var _monitor: TerminalMonitor
 ## Agents that need a human now (AttentionStore.current()), for whatever shows the number.
 var _attention_count := 0
@@ -663,7 +676,7 @@ func _fit_room() -> void:
 ## Where the side columns (and the overview) stop, from the screen's bottom.
 func _column_bottom() -> float:
 	if staff.visible:
-		return staff.offset_top - world_gap.y
+		return _staff_top() - world_gap.y
 	if news.visible:
 		return news_top - world_gap.y
 	return -world_gap.y
@@ -741,10 +754,22 @@ func _label_tab() -> void:
 ## words, and NEXT there is `next_wide_width` wide. While the NEWS strip shows,
 ## the panel stands `news_gap` above it, lifted whole by as much as the strip
 ## takes. Only which value applies, and `visible`, change here. True when an
-## edge moved.
+## edge of its slot moved.
+##
+## In answer mode the panel, at its full height and at most `staff_modal_width`
+## wide, stands in the middle of the screen over the dim (`%ModalDim`), a
+## modal; its slot along the bottom stays where it was and the world keeps
+## clear of it, so leaving answer mode drops the panel back into it and lays
+## nothing out again. The dim only darkens: a click goes through it, so a click
+## on another desk or bubble picks that pane, which leaves answer mode as it
+## always has (a new binding), and the next agent can be answered from there.
 func _fit_staff() -> bool:
-	var full := inspector.answering() or _expanded
-	var wide := _screen.x >= staff_next_from
+	var answering := inspector.answering()
+	var full := answering or _expanded
+	var width := _screen.x - 2.0 * staff_inset
+	if answering:
+		width = minf(width, staff_modal_width)
+	var wide := width + 2.0 * staff_inset >= staff_next_from
 	_compact = not full
 	inspector.set_compact(_compact)
 	inspector.set_wide(wide)
@@ -755,11 +780,29 @@ func _fit_staff() -> bool:
 		floor_y = news_top - news_gap
 	var lift := floor_y + world_gap.y
 	var top := (staff_full_top if full else staff_compact_top) + lift
-	if staff.offset_top == top and staff.offset_bottom == floor_y:
-		return false
-	staff.offset_top = top
-	staff.offset_bottom = floor_y
-	return true
+	var before := Vector2(_staff_top(), _slot_bottom if _floating else staff.offset_bottom)
+	var dim: Control = %ModalDim
+	dim.visible = answering
+	_floating = answering
+	_slot_top = top
+	_slot_bottom = floor_y
+	var side := (_screen.x - width) / 2.0
+	staff.offset_left = side
+	staff.offset_right = -side
+	if answering:
+		var height := floor_y - top
+		staff.offset_top = -roundf((_screen.y + height) / 2.0)
+		staff.offset_bottom = staff.offset_top + height
+	else:
+		staff.offset_top = top
+		staff.offset_bottom = floor_y
+	return before != Vector2(top, floor_y)
+
+
+## The top of the staff panel's slot along the bottom, from the screen's
+## bottom: where the panel stands, or would stand while it floats.
+func _staff_top() -> float:
+	return _slot_top if _floating else staff.offset_top
 
 
 ## The overview stops where the side columns do, so it covers them and the
@@ -855,7 +898,7 @@ func world_rect() -> Rect2:
 	if right_column.visible:
 		corner.x = right.position.x - world_gap.x
 	if staff.visible:
-		corner.y = placed(staff).position.y - world_gap.y
+		corner.y = _screen.y + _staff_top() - world_gap.y
 	elif news.visible:
 		corner.y = placed(news).position.y - world_gap.y
 	return Rect2(origin, (corner - origin).maxf(0.0))
