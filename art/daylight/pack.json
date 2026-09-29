@@ -601,5 +601,9 @@
   "font": {
     "path": "fonts/NunitoSans.ttf",
     "license": "fonts/NunitoSans-OFL.txt"
+  },
+  "display_font": {
+    "path": "fonts/Tiny5-Regular.ttf",
+    "license": "fonts/OFL.txt"
   }
 }
