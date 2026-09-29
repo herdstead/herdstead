@@ -25,9 +25,12 @@ extends HdPanel
 ##
 ## Answer mode (docs/WRITE_BOUNDARY.md §2). Only for a desk the viewer picked, on an agent.
 ## Enter, or the "Answer" chip, opens it; nothing else does, and the Enter
-## itself sends nothing. It trades the switch and the details list for the
-## answer keys, "Send Esc", the reply box and the best-effort line beside the
-## preview, which keeps its 12 rows; the header stays. Buttons are aimed at their
+## itself sends nothing. The HUD then stands the card in the middle of the
+## screen as a modal (OfficeHud._fit_staff()), and the card turns its boxes to
+## lay itself out top to bottom (_show_answer()): the header, the preview across
+## the whole card (still 12 rows), the answer keys, "Send Esc", the reply box
+## and the best-effort line under it, and Monitor, Close and the outcome along
+## the foot. It trades the switch and the details list for them. Buttons are aimed at their
 ## press and sent at their release, and never take keyboard focus. In answer
 ## mode the keyboard sends only 1–9 and y, by key position: `N` leaves and goes
 ## to the next agent (never sends "n"), Escape only leaves, Enter never sends.
@@ -1098,7 +1101,7 @@ func _show_action() -> void:
 	# it view-only. The same on the one-line row.
 	var monitor: Button = %MonitorButton
 	var line_monitor: Button = %CompactMonitor
-	monitor.visible = _pane != null and _fleet != null and not _answering
+	monitor.visible = _pane != null and _fleet != null
 	line_monitor.visible = monitor.visible
 	# Escape in answer mode only leaves it: `▾ Esc` folds only out of it.
 	var fold: Button = %FoldButton
@@ -1294,10 +1297,21 @@ func _show_answer() -> void:
 		if _answering
 		else "Enter: answer this agent. Opens the answer keys and the reply box; nothing is sent until you press one."
 	)
-	# The staff panel is wide enough for the header beside the answer keys.
 	header.visible = true
 	_show_more()
 	answer.visible = _answering
+	# Answer mode is a modal (OfficeHud._fit_staff()) laid out top to bottom:
+	# who and where, the terminal across the whole panel, the keys and the
+	# reply under it, the actions and what became of the last write along the
+	# foot. The same nodes, only the boxes turn: nothing moves between parents.
+	var detail: BoxContainer = %Detail
+	var middle: BoxContainer = %Middle
+	var actions: BoxContainer = %Actions
+	detail.vertical = _answering
+	middle.vertical = _answering
+	actions.vertical = not _answering
+	# The header under it already says who and in what state.
+	title.visible = not _answering
 	title.text = HEADING
 	title.tooltip_text = ""
 	if _answering and _pane != null:

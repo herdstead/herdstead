@@ -864,16 +864,15 @@ func test_a_title_gap_moves_the_wordmark_and_counters_after_it() -> void:
 
 
 ## Only a normal run fills the screen. A capture and a headless run keep the
-## window they asked for, `--window=plain` keeps the plain one, an
+## window they asked for, `--plain-window` keeps the plain one, an
 ## always-on-top corner view never covers the screen, and a test office never
 ## fills whatever its arguments say.
 func test_only_a_normal_run_fills_the_screen() -> void:
 	var cases: Dictionary[String, bool] = {
 		"": true,
-		"--window=fill": true,
-		"--window=plain": false,
+		"--plain-window": false,
 		"--capture=/tmp/shot.png": false,
-		"--window=fill --capture=/tmp/shot.png": false,
+		"--window=960x640 --capture=/tmp/shot.png": false,
 		"--always-on-top": false,
 	}
 	for line in cases:

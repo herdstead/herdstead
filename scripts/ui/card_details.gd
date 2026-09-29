@@ -1,5 +1,5 @@
 class_name CardDetails
-extends HBoxContainer
+extends BoxContainer
 ## The agent card's header and details (OfficePaneInspector): the portrait and
 ## its badge, provider, status caption, seat, machine and the footnote, and the
 ## PANE list (id, label, directories, session, terminal title). It only writes

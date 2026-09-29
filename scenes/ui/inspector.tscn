@@ -30,7 +30,7 @@ layout_mode = 2
 mouse_filter = 2
 size_flags_horizontal = 3
 
-[node name="Detail" type="HBoxContainer" parent="Frame/Row/Stack"]
+[node name="Detail" type="BoxContainer" parent="Frame/Row/Stack"]
 unique_name_in_owner = true
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -154,9 +154,11 @@ theme_type_variation = &"LabelSlate"
 autowrap_mode = 3
 max_lines_visible = 2
 
-[node name="Middle" type="HBoxContainer" parent="Frame/Row/Stack/Detail"]
+[node name="Middle" type="BoxContainer" parent="Frame/Row/Stack/Detail"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_vertical = 3
 mouse_filter = 2
 theme_override_constants/separation = 6
 
@@ -206,13 +208,19 @@ layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 1
 
-[node name="Digits" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Middle/Answer"]
+[node name="Keys" type="HFlowContainer" parent="Frame/Row/Stack/Detail/Middle/Answer"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/h_separation = 1
+theme_override_constants/v_separation = 1
+
+[node name="Digits" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 1
 
-[node name="Key1" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+[node name="Key1" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -220,7 +228,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "1"
 
-[node name="Key2" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+[node name="Key2" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -228,7 +236,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "2"
 
-[node name="Key3" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+[node name="Key3" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -236,7 +244,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "3"
 
-[node name="Key4" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+[node name="Key4" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -244,7 +252,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "4"
 
-[node name="Key5" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+[node name="Key5" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -252,7 +260,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "5"
 
-[node name="Key6" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+[node name="Key6" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -260,7 +268,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "6"
 
-[node name="Key7" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+[node name="Key7" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -268,7 +276,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "7"
 
-[node name="Key8" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+[node name="Key8" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -276,7 +284,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "8"
 
-[node name="Key9" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Digits"]
+[node name="Key9" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Digits"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -284,12 +292,12 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "9"
 
-[node name="Choices" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Middle/Answer"]
+[node name="Choices" type="HBoxContainer" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_constants/separation = 1
 
-[node name="KeyY" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Choices"]
+[node name="KeyY" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Choices"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -297,7 +305,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "y"
 
-[node name="KeyN" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Choices"]
+[node name="KeyN" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Choices"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -305,7 +313,7 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "n"
 
-[node name="KeyEnter" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Choices"]
+[node name="KeyEnter" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Choices"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -313,12 +321,13 @@ theme_type_variation = &"CardKey"
 disabled = true
 text = "⏎"
 
-[node name="Apart" type="Control" parent="Frame/Row/Stack/Detail/Middle/Answer/Choices"]
+[node name="Apart" type="Control" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Choices"]
+custom_minimum_size = Vector2(6, 0)
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 2
 
-[node name="SendEsc" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Choices"]
+[node name="SendEsc" type="Button" parent="Frame/Row/Stack/Detail/Middle/Answer/Keys/Choices"]
 unique_name_in_owner = true
 layout_mode = 2
 focus_mode = 0
@@ -644,9 +653,11 @@ autowrap_trim_flags = 3
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="Actions" type="VBoxContainer" parent="Frame/Row/Stack/Detail"]
+[node name="Actions" type="BoxContainer" parent="Frame/Row/Stack/Detail"]
+unique_name_in_owner = true
 custom_minimum_size = Vector2(96, 0)
 layout_mode = 2
+vertical = true
 mouse_filter = 2
 theme_override_constants/separation = 2
 
@@ -710,6 +721,7 @@ text = "Clears table's UNREAD"
 [node name="Outcome" type="Label" parent="Frame/Row/Stack/Detail/Actions"]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_horizontal = 3
 mouse_filter = 1
 theme_type_variation = &"CardOutcome"
 autowrap_mode = 3

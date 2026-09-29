@@ -93,10 +93,13 @@ enum DrawerTab { AGENTS, EVENTS }
 @export var staff_full_top := 0.0
 @export var staff_compact_top := 0.0
 ## The staff panel's inset from the screen's sides along the bottom, and its
-## widest in answer mode, where it stands in the middle (see _fit_staff()).
-## Set in the scene.
+## widest and tallest in answer mode, where it stands in the middle under the
+## bar, at least `staff_modal_gap` clear of the bar and of the screen's bottom
+## (see _fit_staff()). Set in the scene.
 @export var staff_inset := 0.0
 @export var staff_modal_width := 0.0
+@export var staff_modal_height := 0.0
+@export var staff_modal_gap := 0.0
 ## The logical screen height from which the NEWS strip stays under the staff
 ## panel opened to full height; below it, the opened panel takes the strip's
 ## room (see _fit_news()). Set in the scene.
@@ -756,9 +759,11 @@ func _label_tab() -> void:
 ## takes. Only which value applies, and `visible`, change here. True when an
 ## edge of its slot moved.
 ##
-## In answer mode the panel, at its full height and at most `staff_modal_width`
-## wide, stands in the middle of the screen over the dim (`%ModalDim`), a
-## modal; its slot along the bottom stays where it was and the world keeps
+## In answer mode the panel, at most `staff_modal_width` wide and
+## `staff_modal_height` tall (less on a screen without the room,
+## `staff_modal_gap` clear of the bar and the bottom), stands in the middle under
+## the bar, over the dim (`%ModalDim`): a modal, laid out top to bottom by the
+## card itself; its slot along the bottom stays where it was and the world keeps
 ## clear of it, so leaving answer mode drops the panel back into it and lays
 ## nothing out again. The dim only darkens: a click goes through it, so a click
 ## on another desk or bubble picks that pane, which leaves answer mode as it
@@ -790,8 +795,10 @@ func _fit_staff() -> bool:
 	staff.offset_left = side
 	staff.offset_right = -side
 	if answering:
-		var height := floor_y - top
-		staff.offset_top = -roundf((_screen.y + height) / 2.0)
+		var below := placed(bar).end.y + staff_modal_gap
+		var room := _screen.y - below - staff_modal_gap
+		var height := minf(staff_modal_height, room)
+		staff.offset_top = below - _screen.y + roundf((room - height) / 2.0)
 		staff.offset_bottom = staff.offset_top + height
 	else:
 		staff.offset_top = top

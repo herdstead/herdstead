@@ -28,7 +28,7 @@ Office options go after `--`.
 godot --path .                                           # the live office, default session
 godot --path . -- --socket=/absolute/path/herdr.sock     # another session's socket
 godot --path . -- --read-only                            # watch only (see below)
-godot --path . -- --window=plain                         # a plain 1920×960 window instead of filling the screen
+godot --path . -- --plain-window                         # a plain 1920×960 window instead of filling the screen
 godot --path . -- --always-on-top                        # a small window kept in a corner (never fills the screen)
 godot --path . -- --chime                                # alert tones on for this run
 godot --path . -- --no-bounce --no-title-count           # no Dock bounce, no (N) in the title
@@ -261,8 +261,10 @@ out.
 Only for an agent seat you picked yourself. `Enter` or **Answer ⏎** in the card header opens it; opening sends nothing.
 A click on a blocked agent's bubble, NEXT or `N` opens it too, once the question shows; nothing opens it by itself.
 
-Answer mode is a modal: the staff panel, at its full height and at most 640 units wide, stands in the middle of the
-screen over the dimmed office, and the world keeps the room the opened panel left it. The dim only darkens: clicks go
+Answer mode is a modal: the staff panel, at most 640×272 units, stands in the middle of the room under the bar over
+the dimmed office, laid out top to bottom: who and where, the terminal across the whole panel, the answer keys in one
+row, the reply box, and along the foot Monitor, Close and what became of the last answer. NEXT stays at its right end on
+a wide enough screen. The world keeps the room the opened panel left it. The dim only darkens: clicks go
 through it, so another agent's bubble, desk or row picks them (and leaves answer mode) wherever the panel does not cover
 it. A desk under the panel takes no click; leave with `Esc` or move on with `N`. Leaving drops the panel back along
 the bottom.
@@ -442,7 +444,7 @@ bar, FLOORS, signposts, drawer and staff panel stay fixed on screen; only the wo
 
 The office fills the screen: its window opens maximized, so the menu bar and the Dock stay. On macOS the title bar
 is see-through and the top bar stands in for it: the window's own buttons sit at its left end, a press on its bare
-ground drags the window and a double click zooms it, as the title bar's would. `--window=plain` opens the plain
+ground drags the window and a double click zooms it, as the title bar's would. `--plain-window` opens the plain
 1920×960 window instead; a capture, `make perf`, a headless run and `--always-on-top` always do.
 
 The plain desktop window is 1920×960. The pixel scale is fixed (default 2×); `-` / `=` step through 2×, 4×, 6×, 8×.

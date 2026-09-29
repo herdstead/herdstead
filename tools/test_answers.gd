@@ -1282,7 +1282,7 @@ func test_same_text_a_to_b_is_sent_and_the_card_says_it_can_change() -> void:
 ## At the smallest screen the HUD fits (480x320) the card is the staff panel's
 ## line along the bottom, and answer mode takes its full height: Enter opens it
 ## up (the question has to be read and shown first), a second Enter opens
-## answer mode, 448x128, with a refusal in two lines, while the drawer's list
+## answer mode, a 448x272 modal with the refusal whole along its foot, while the drawer's list
 ## (opened by a real click on its tab) stays open. No visible control leaves
 ## the panel, nothing overlaps along any row or column, and the preview keeps
 ## its 12 rows. Escape leaves answer mode and leaves the panel open; a second
@@ -1317,7 +1317,7 @@ func test_answer_mode_fits_the_smallest_screen() -> void:
 	_ctl("control-b", "next", stage)
 	await _open_answer(office)
 	await _frames(3)
-	_eq(office.hud.placed(card).size, Vector2(448, 128), "the card at 480x320 in answer mode")
+	_eq(office.hud.placed(card).size, Vector2(448, 272), "the card at 480x320 in answer mode, the modal's whole height")
 	_eq(office.hud.world_rect().size, Vector2(216, 112), "the world above it keeps a desk's room, the drawer open")
 	_fits(card, "answer mode")
 	# The minimap keeps to the room between the bar and the panel, and scrolls.
@@ -1330,7 +1330,7 @@ func test_answer_mode_fits_the_smallest_screen() -> void:
 	await _until(func() -> bool: return card.outcome_text().begins_with("Not sent: the terminal"), "a refusal")
 	await _frames(3)
 	var outcome: Label = card.get_node("%Outcome")
-	_eq(outcome.get_visible_line_count(), 2, "the refusal takes its two lines, whole")
+	_eq(outcome.get_visible_line_count(), outcome.get_line_count(), "the refusal shows whole along the foot")
 	_fits(card, "answer mode, a refusal in two lines")
 	_panels_apart(office, "a refusal")
 	var preview: Label = card.get_node("%Preview")
@@ -1416,8 +1416,9 @@ func test_answer_mode_writes_nothing_without_a_gesture() -> void:
 	_check(card.answering(), "answer mode stayed open")
 
 
-## Answer mode is a modal: the staff panel, at its full height and at most
-## `staff_modal_width` wide, stands in the middle of the screen over the dim,
+## Answer mode is a modal: the staff panel, at most `staff_modal_width` wide
+## and `staff_modal_height` tall, stands in the middle of the room under the
+## bar, laid out top to bottom (who, the terminal, the keys, the foot), over the dim,
 ## which covers the whole screen, and the world keeps the room the opened panel
 ## left it. The dim only darkens: a real click through it on another agent's
 ## row in the list picks that agent and so leaves answer mode, sending
@@ -1436,8 +1437,14 @@ func test_answer_mode_is_a_modal_over_the_dim() -> void:
 	_eq(dim.get_global_rect(), Rect2(Vector2.ZERO, screen), "over the whole screen")
 	_eq(dim.mouse_filter, Control.MOUSE_FILTER_IGNORE, "and lets every click through")
 	var panel := card.get_global_rect()
-	_eq(panel.size, Vector2(minf(screen.x - 2.0 * hud.staff_inset, hud.staff_modal_width), 128), "the panel's size")
-	_check(panel.get_center().distance_to(screen / 2.0) <= 1.0, "in the middle of the screen: %s" % panel)
+	var below := hud.placed(hud.bar).end.y + hud.staff_modal_gap
+	var space := screen.y - below - hud.staff_modal_gap
+	var size := Vector2(
+		minf(screen.x - 2.0 * hud.staff_inset, hud.staff_modal_width), minf(hud.staff_modal_height, space)
+	)
+	_eq(panel.size, size, "the panel's size")
+	var middle := Vector2(screen.x / 2.0, below + space / 2.0)
+	_check(panel.get_center().distance_to(middle) <= 1.0, "in the middle of the room under the bar: %s" % panel)
 	_fits(card, "the modal")
 	_eq(hud.world_rect(), room, "the world keeps the room the opened panel left it")
 	var picked := card.shown_pane_key()

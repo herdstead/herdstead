@@ -175,7 +175,7 @@ measure() {
 		# card's terminal preview would add reads the older runs never made.
 		# No Dock bounce: a measuring run sits in the background while the fake flips states.
 		# A plain window: a measurement is taken in the window it asked for, never a maximized one.
-		args+=(--socket="$WORK/herdr.sock" --pack=res://assets/daylight/manifest.json --read-only --no-bounce --window=plain)
+		args+=(--socket="$WORK/herdr.sock" --pack=res://assets/daylight/manifest.json --read-only --no-bounce --plain-window)
 	else
 		args+=(--count=80)
 	fi

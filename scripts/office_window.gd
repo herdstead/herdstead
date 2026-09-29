@@ -7,21 +7,13 @@ class_name OfficeWindow
 
 ## Whether this run's window fills the screen: maximized, so the menu bar and
 ## the Dock stay, with the top bar standing in for the title bar. A normal run
-## does; `--window=plain` keeps the plain window of `window_width_override`.
-## A capture, a measurement (`--window=plain` in tools/perf.sh) and a headless
+## does; `--plain-window` keeps the plain window of `window_width_override`.
+## A capture, a measurement (`--plain-window` in tools/perf.sh) and a headless
 ## run never do: their windows are the size they asked for. Nor does
 ## `--always-on-top`: a corner view kept over everything must not cover it all.
+## (`--window=WxH` is the capture driver's own, the size a capture asked for.)
 static func fills_screen(args: AppArgs, headless: bool) -> bool:
-	if headless or args.has("capture") or args.flag("always-on-top"):
-		return false
-	match args.text("window", "fill"):
-		"fill":
-			return true
-		"plain":
-			return false
-		var other:
-			push_warning("--window takes fill or plain, not %s; filling the screen" % other)
-			return true
+	return not (headless or args.has("capture") or args.flag("always-on-top") or args.flag("plain-window"))
 
 
 ## Maximize `window` and, where the system can (macOS), draw the office under
