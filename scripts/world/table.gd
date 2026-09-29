@@ -87,11 +87,11 @@ const DECOR_NEAR := -9
 ## A done seat's stack of paper (ArtContract.PROP_DONE_STACK) stands this far
 ## right of the seat column, on the same working plane as the decorations
 ## (DECOR_FAR or DECOR_NEAR). Measured: the laptop is opaque over x-7..x+6
-## and the stack, 16 wide, over x+11..x+26, so it stands a little right of the
-## laptop, clear of the worker (x±10 with room to spare) and of the next
+## and the stack, 11 wide, over x+10.5..x+21.5, so it stands just right of the
+## laptop, clear of the worker (x±10; the figure itself is x±8) and of the next
 ## column's decoration, whose leftmost opaque pixel is at x+27. The left of the
 ## laptop is the decoration slot, which never changes with state.
-const PAPERS_ASIDE := 19
+const PAPERS_ASIDE := 16
 
 var art: ArtPack
 var width := 0.0

@@ -107,7 +107,7 @@ table's origin at the left end of its near edge:
 | Chair | `CHAIR_OFFSET` far −4 (sorts just behind the worker), near 6 (just in front) |
 | Selection frame | `FRAME_ABOVE_FAR = 70`, `FRAME_BELOW_NEAR = 70` |
 | Desk decor | left of each column at `DECOR_OFFSET = -28`; far foot y = `DECOR_FAR = -55`, near y = `DECOR_NEAR = -9`. The white cat uses only the first column's near slot, and moves to the far side if clutter is there |
-| Paper stack | `PAPERS_ASIDE = 19` right of the column, on the decor's working plane |
+| Paper stack | `PAPERS_ASIDE = 16` right of the column, on the decor's working plane |
 | Standing spots | far `(x + 24, -86)`, near `(x + 24, 22)`: the near seat leg's corner; nobody stands there |
 | Approach points | far `(x, -112)`, near `(x, 48)`, both cell centres; read via `approach_position()`. They start the walk-graph legs to seat and standing spot (see "Collision and walking") |
 
