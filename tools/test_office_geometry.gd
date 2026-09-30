@@ -617,7 +617,7 @@ func test_optional_decor_cannot_cover_wall_title_or_sign() -> void:
 		world.add_child(floor_root)
 		var view := OfficeFloorView.new()
 		view.setup(pen, floor_root)
-		view.reconcile(result.plan, model)
+		view.reconcile(result.plan, MapModel.of(model))
 		await process_frame
 		var desk := view.desks[room.key]
 		_eq(desk.title.text, room.label, "the real label contains the long title")
@@ -674,7 +674,7 @@ func test_the_wall_run_leaves_every_drawn_sign_and_title_clear() -> void:
 		world.add_child(floor_root)
 		var view := OfficeFloorView.new()
 		view.setup(pen, floor_root)
-		view.reconcile(result.plan, model)
+		view.reconcile(result.plan, MapModel.of(model))
 		await process_frame
 		var covers: Array[Rect2] = []
 		for tab: String in view.desks:

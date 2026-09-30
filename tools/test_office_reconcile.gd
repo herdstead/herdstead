@@ -885,3 +885,59 @@ func test_a_new_floor_is_validated_once_decor_included() -> void:
 	_check(not office.layout_plan().decorations.is_empty(), "and furnished")
 	_eq(OfficeFloorValidation.validations - before, 1, "one validation covers the plan and its furniture")
 	_done(office)
+
+
+## Two workspaces are two floors, each planned, drawn and panned apart, as
+## before there were maps: A (one tab of 40 panes) plans (47,18); B (2 panes)
+## plans its own (23,18) rather than A's width; back on A, its own plan again,
+## not planned anew. Every PageUp/PageDown between them is cold: a new world,
+## nobody walking. Each floor is back where the viewer dragged it.
+func test_each_workspace_keeps_its_own_plan_world_and_pan() -> void:
+	var snapshot := {
+		"workspaces": [{"workspace_id": "a", "number": 1}, {"workspace_id": "b", "number": 2}],
+		"tabs":
+		[{"workspace_id": "a", "tab_id": "a:t", "number": 1}, {"workspace_id": "b", "tab_id": "b:t", "number": 1}],
+		"panes": [],
+		"layouts": []
+	}
+	var counts: Dictionary[String, int] = {"a": 40, "b": 2}
+	for space: String in counts:
+		for index in counts[space]:
+			var pane := {"pane_id": "%s:p%d" % [space, index], "tab_id": space + ":t", "workspace_id": space}
+			_list(snapshot, "panes").append(pane)
+	# 880 wide lays the world out 740 units wide: a first plan is 23 cells.
+	var office := await _live_office(snapshot, Vector2(880, 480))
+	var a := HerdrFleet.pane_key(LOCAL, "a")
+	var b := HerdrFleet.pane_key(LOCAL, "b")
+	var plan_a := office.layout_plan()
+	_eq([plan_a.floor_key, plan_a.floor_cells.size], [a, Vector2i(47, 18)], "A is planned for its 40 panes")
+	var middle := office.hud.world_rect().get_center()
+	var pan := office.camera.pan
+	await _drag(middle, middle + Vector2(-160, -60))
+	var pan_a := office.camera.pan
+	_check(pan_a != pan, "a real drag pans A: %s" % pan_a)
+	var attempts := office.layout_attempt_count()
+	var world := office.world.get_instance_id()
+	await _tap_key(KEY_PAGEUP)
+	var plan_b := office.layout_plan()
+	_eq([office.navigator.shown_key, plan_b.floor_key], [b, b], "PageUp shows B")
+	_eq(plan_b.floor_cells.size, Vector2i(23, 18), "planned for its own 2 panes, not at A's width")
+	_eq(office.layout_attempt_count(), attempts + 1, "once")
+	_check(office.world.get_instance_id() != world, "a cold switch: the world is built again")
+	_eq(office.floor_view.presentation.walkers(), [], "and nobody walks")
+	await _drag(middle, middle + Vector2(-40, -80))
+	var pan_b := office.camera.pan
+	_check(pan_b != pan_a, "a real drag pans B apart from A: %s" % pan_b)
+	world = office.world.get_instance_id()
+	await _tap_key(KEY_PAGEDOWN)
+	_eq([office.navigator.shown_key, office.layout_plan()], [a, plan_a], "PageDown: A again, on its own plan")
+	_eq(office.layout_plan().floor_cells.size, Vector2i(47, 18), "at its own size")
+	_eq(office.layout_attempt_count(), attempts + 1, "which is not planned again")
+	_check(office.world.get_instance_id() != world, "cold again")
+	_eq(office.floor_view.presentation.walkers(), [], "nobody walks")
+	_eq(office.camera.pan, pan_a, "A is where the viewer dragged it")
+	await _tap_key(KEY_PAGEUP)
+	_eq([office.navigator.shown_key, office.layout_plan()], [b, plan_b], "and B on its own plan")
+	_eq(office.layout_attempt_count(), attempts + 1, "not planned again either")
+	_eq(office.camera.pan, pan_b, "where the viewer dragged it")
+	_done(office)

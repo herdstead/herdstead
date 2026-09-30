@@ -316,7 +316,7 @@ func _view(plan: FloorPlan, model: ZoneModel) -> OfficeFloorView:
 	world.add_child(floor_root)
 	var view := OfficeFloorView.new()
 	view.setup(pen, floor_root)
-	view.reconcile(plan, model)
+	view.reconcile(plan, MapModel.of(model))
 	return view
 
 
@@ -393,7 +393,7 @@ func test_a_moved_sign_moves_the_frames_out_of_its_way() -> void:
 	var view := _view(first, first_model)
 	await process_frame
 	_eq(_hung(view), before, "the first floor draws its pictures")
-	view.reconcile(grown, grown_model)
+	view.reconcile(grown, MapModel.of(grown_model))
 	await process_frame
 	_eq(_hung(view), after, "updated in place, the floor draws the grown plan's pictures")
 	var grid := float(FloorLayoutPolicy.GRID)

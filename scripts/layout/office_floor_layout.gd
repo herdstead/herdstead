@@ -73,6 +73,7 @@ static func plan(
 			return result
 		var placed := DeskPlacement.new()
 		placed.tab_key = room.key
+		placed.zone_key = floor_model.key
 		placed.capacity = seats.capacity
 		placed.seats = seats.seats
 		wanted[room.key] = placed
@@ -348,6 +349,7 @@ static func _finalize(next: FloorPlan, width: int, rules: FloorLayoutPolicy) -> 
 			rules.cross_corridor_cells
 		)
 		next.corridors.append(row.corridor_cells)
+	next.zones = [_zone(next, rules)]
 	next.render_bounds = Rect2(
 		next.floor_cells.position * FloorLayoutPolicy.GRID, next.floor_cells.size * FloorLayoutPolicy.GRID
 	)
@@ -355,3 +357,17 @@ static func _finalize(next: FloorPlan, width: int, rules: FloorLayoutPolicy) -> 
 		var drawing := placed.measure.render_rect
 		drawing.position += placed.origin
 		next.render_bounds = next.render_bounds.merge(drawing)
+
+
+## The plan's one zone: the whole floor below the entry band, over the plan's
+## own rows (see ZonePlacement).
+static func _zone(next: FloorPlan, rules: FloorLayoutPolicy) -> ZonePlacement:
+	var zone := ZonePlacement.new()
+	zone.zone_key = next.floor_key
+	zone.rows = next.rows
+	zone.initial_width_cells = next.initial_width_cells
+	zone.cells = Rect2i(0, rules.wall_cells + rules.entry_cells, next.floor_cells.size.x, 0)
+	for row in next.rows:
+		zone.cells = zone.cells.merge(row.band_cells) if zone.cells.has_area() else row.band_cells
+	zone.sign_at = Vector2(zone.cells.position * FloorLayoutPolicy.GRID)
+	return zone

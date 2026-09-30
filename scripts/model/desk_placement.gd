@@ -6,6 +6,8 @@ extends RefCounted
 static var signatures := 0
 
 var tab_key := ""
+## ZoneModel.key of the zone the desk stands in (FloorPlan.zone()).
+var zone_key := ""
 var row := -1
 var reserved_cells := Rect2i()
 var origin := Vector2.ZERO
@@ -27,4 +29,4 @@ func geometry_signature() -> String:
 	for placed in seats:
 		members.append(placed.geometry_signature())
 	members.sort()
-	return JSON.stringify([tab_key, row, reserved_cells, origin, capacity, members])
+	return JSON.stringify([tab_key, zone_key, row, reserved_cells, origin, capacity, members])

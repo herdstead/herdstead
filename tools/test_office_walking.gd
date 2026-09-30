@@ -531,7 +531,7 @@ func test_no_walk_on_the_stress_floor_needs_a_teleport() -> void:
 	var longest_walk := OfficePresentation.TOP_SPEED * OfficePresentation.LONGEST_WALK
 	for width: int in [20, 32]:
 		var plans := FloorPlanCache.new()
-		var empty := _stress_model(false)
+		var empty := MapModel.of(_stress_model(false))
 		var plan := plans.prepare(empty, pen, width * 32.0)
 		_eq(plan.floor_cells.size.x, width, "the stress floor is %d cells wide" % width)
 		var holder := Node2D.new()
@@ -540,7 +540,7 @@ func test_no_walk_on_the_stress_floor_needs_a_teleport() -> void:
 		view.setup(pen, holder)
 		view.reconcile(plan, empty)
 		view.update_desks(empty, "", false)
-		var full := _stress_model(true)
+		var full := MapModel.of(_stress_model(true))
 		var next := plans.prepare(full, pen, width * 32.0)
 		view.reconcile(next, full)
 		view.update_desks(full, "", false)
@@ -772,14 +772,14 @@ func test_routing_stops_at_its_budget_and_places_the_rest() -> void:
 	var pen := OfficeDraw.new(art)
 	for budget: int in [400, OfficePresentation.ROUTING_BUDGET]:
 		var plans := FloorPlanCache.new()
-		var empty := _stress_model(false)
+		var empty := MapModel.of(_stress_model(false))
 		var holder := Node2D.new()
 		root.add_child(holder)
 		var view := OfficeFloorView.new()
 		view.setup(pen, holder)
 		view.reconcile(plans.prepare(empty, pen, 20 * 32.0), empty)
 		view.update_desks(empty, "", false)
-		var full := _stress_model(true)
+		var full := MapModel.of(_stress_model(true))
 		view.reconcile(plans.prepare(full, pen, 20 * 32.0), full)
 		view.update_desks(full, "", false)
 		for frame in 30:
@@ -787,7 +787,7 @@ func test_routing_stops_at_its_budget_and_places_the_rest() -> void:
 		var walking := view.presentation.walkers().size()
 		_check(walking > 40, "budget %d: %d walk in" % [budget, walking])
 		view.presentation.routing_budget = budget
-		var grown := _stress_model(true, 12)
+		var grown := MapModel.of(_stress_model(true, 12))
 		var next := plans.prepare(grown, pen, 20 * 32.0)
 		_check(next.floor_cells.size.x > 20, "budget %d: tab 0 grew too wide and widened the floor" % budget)
 		var graph := OfficeWalkGraph.of(next, PixelPerson.footprint(), PixelPerson.drawing_rect(art.people))

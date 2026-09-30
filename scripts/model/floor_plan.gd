@@ -7,6 +7,9 @@ var policy_signature := ""
 var initial_width_cells := 0
 var floor_cells := Rect2i()
 var rows: Array[RowPlan] = []
+## The zones laid out on this plan. For now there is exactly one, and its rows
+## are `rows` (see ZonePlacement).
+var zones: Array[ZonePlacement] = []
 var desks: Array[DeskPlacement] = []
 var decorations: Array[DecorPlacement] = []
 var corridors: Array[Rect2i] = []
@@ -23,6 +26,14 @@ var pantry: FixturePlacement
 func desk(tab_key: String) -> DeskPlacement:
 	for placed in desks:
 		if placed.tab_key == tab_key:
+			return placed
+	return null
+
+
+## The zone placed under ZoneModel.key `key`; null for none.
+func zone(key: String) -> ZonePlacement:
+	for placed in zones:
+		if placed.zone_key == key:
 			return placed
 	return null
 
@@ -59,6 +70,9 @@ func geometry_signature() -> String:
 	var service := PackedStringArray()
 	for fixture in fixtures():
 		service.append(fixture.geometry_signature())
+	var areas := PackedStringArray()
+	for placed in zones:
+		areas.append(placed.geometry_signature())
 	return JSON.stringify(
-		[floor_key, policy_signature, initial_width_cells, floor_cells, groups, bands, props, service]
+		[floor_key, policy_signature, initial_width_cells, floor_cells, groups, bands, props, service, areas]
 	)

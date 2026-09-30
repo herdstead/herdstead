@@ -123,7 +123,7 @@ static func lamp_of(pane: PaneModel, room: RoomModel) -> OfficeTable.Lamp:
 ## Same floor, same layout as on screen: redraw just the desks whose worker,
 ## state or selection moved. `active_key` is the selected desk; a worker drawn
 ## while the floor's machine is `frozen` starts frozen, like the rest of it.
-func update_desks(model: ZoneModel, active_key: String, frozen: bool) -> void:
+func update_desks(model: MapModel, active_key: String, frozen: bool) -> void:
 	# Repeated keys are part of the layout model; the rebuild owns those desks.
 	var repeated := model.repeated_keys()
 	for room_index in model.rooms.size():
@@ -274,7 +274,7 @@ func freeze(is_stale: bool, tint: Color) -> void:
 ## is still there. The presentation takes whoever leaves out of their seat
 ## first, and keeps whoever will walk where they stand; `frozen` says the
 ## shown machine is stale, which walks nobody.
-func reconcile(next: FloorPlan, model: ZoneModel, frozen := false) -> void:
+func reconcile(next: FloorPlan, model: MapModel, frozen := false) -> void:
 	presentation.before(self, next, model, frozen)
 	var wanted: Dictionary[String, RoomModel] = {}
 	for room in model.rooms:
@@ -315,7 +315,7 @@ func reconcile(next: FloorPlan, model: ZoneModel, frozen := false) -> void:
 
 ## The rooms in the model's order, each with its panes in order: what _order()
 ## and _index() lay out from, besides the plan.
-static func _rooms_key(model: ZoneModel) -> String:
+static func _rooms_key(model: MapModel) -> String:
 	var parts := PackedStringArray()
 	for room in model.rooms:
 		parts.append(room.key)
@@ -328,7 +328,7 @@ static func _rooms_key(model: ZoneModel) -> String:
 
 ## Seats by pane key and tables by room, after a reconcile: a seat whose station
 ## survived keeps what it shows, so the next update_desks() redraws only change.
-func _index(model: ZoneModel) -> void:
+func _index(model: MapModel) -> void:
 	var indexed: Dictionary[String, Seat] = {}
 	tables.clear()
 	for room in model.rooms:
@@ -352,7 +352,7 @@ func _index(model: ZoneModel) -> void:
 	seats = indexed
 
 
-func _order(model: ZoneModel) -> void:
+func _order(model: MapModel) -> void:
 	var index := 0
 	var ground_index := 1
 	for room in model.rooms:

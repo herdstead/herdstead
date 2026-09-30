@@ -119,11 +119,11 @@ func test_fixtures_stand_where_the_plan_puts_them() -> void:
 ## No fixtures where there are no tables: the lobby and an empty workspace.
 func test_no_fixtures_without_tables() -> void:
 	var cache := FloorPlanCache.new()
-	var lobby := cache.prepare(OfficeProjection.lobby("machine"), _pen(), 640.0)
+	var lobby := cache.prepare(MapModel.of(OfficeProjection.lobby("machine")), _pen(), 640.0)
 	_eq([lobby.reception, lobby.pantry], [null, null], "the lobby has none")
-	var empty := cache.prepare(_floor([]), _pen(), 640.0)
+	var empty := cache.prepare(MapModel.of(_floor([])), _pen(), 640.0)
 	_eq([empty.reception, empty.pantry], [null, null], "nor has an empty workspace")
-	var tables := cache.prepare(_floor([_room("a", 2)]), _pen(), 640.0)
+	var tables := cache.prepare(MapModel.of(_floor([_room("a", 2)])), _pen(), 640.0)
 	_check(tables.reception != null and tables.pantry != null, "a floor with a table has both")
 
 
@@ -323,7 +323,7 @@ func test_every_state_has_its_place() -> void:
 		]
 	)
 	var plan := _serviced(_floor([room]), 20)
-	var service := OfficeRests.assign(plan, _floor([room]))
+	var service := OfficeRests.assign(plan, MapModel.of(_floor([room])))
 	var places := {}
 	for key: String in service.places:
 		places[key] = [service.places[key].rest, service.places[key].index]
@@ -354,30 +354,30 @@ func test_the_pantry_keeps_everyone_on_their_spot() -> void:
 		room.panes.append(_agent("i%d" % index, "idle"))
 	var plan := _serviced(_floor([room]), 32)
 	var spots := plan.pantry.spots.size()
-	var first := OfficeRests.assign(plan, _floor([room]))
+	var first := OfficeRests.assign(plan, MapModel.of(_floor([room])))
 	var taken := {}
 	for index in 3:
 		var place := first.places["i%d" % index]
 		_eq(place.rest, OfficeRests.Rest.PANTRY, "i%d rests in the pantry" % index)
 		_check(not taken.has(place.index), "i%d on a spot of their own" % index)
 		taken[place.index] = true
-	var alone := OfficeRests.assign(plan, _floor([_room_of([room.panes[1]])]))
+	var alone := OfficeRests.assign(plan, MapModel.of(_floor([_room_of([room.panes[1]])])))
 	_eq(alone.places["i1"].index, posmod("i1".hash(), spots), "alone, i1 takes its own spot, its key's hash")
-	var without := OfficeRests.assign(plan, _floor([_room_of([room.panes[1], room.panes[2]])]))
+	var without := OfficeRests.assign(plan, MapModel.of(_floor([_room_of([room.panes[1], room.panes[2]])])))
 	for index: int in [1, 2]:
 		var kept: int = first.places["i%d" % index].index
 		_eq(without.places["i%d" % index].index, kept, "i0 leaves: i%d keeps its spot" % index)
 	room.panes.append(_agent("late", "idle", 999.0))
 	var replanned := _serviced(_floor([room]), 32, plan)
 	_eq(replanned.pantry.geometry_signature(), plan.pantry.geometry_signature(), "the same pantry")
-	var second := OfficeRests.assign(replanned, _floor([room]))
+	var second := OfficeRests.assign(replanned, MapModel.of(_floor([room])))
 	for index in 3:
 		_eq(second.places["i%d" % index].index, first.places["i%d" % index].index, "i%d stays put" % index)
 	for index in spots:
 		room.panes.append(_agent("crowd%d" % index, "idle", 1000.0 + index))
 	var crowded := _serviced(_floor([room]), 32, replanned)
 	_eq(crowded.pantry.geometry_signature(), plan.pantry.geometry_signature(), "still the same pantry")
-	var full := OfficeRests.assign(crowded, _floor([room]))
+	var full := OfficeRests.assign(crowded, MapModel.of(_floor([room])))
 	var resting := 0
 	var seated := 0
 	for key: String in full.places:
@@ -401,7 +401,7 @@ func test_n_follows_the_wait_order() -> void:
 	room.panes.append(_agent("d1", "done"))
 	var floor_model := _floor([room])
 	var plan := _serviced(floor_model, 20)
-	var service := OfficeRests.assign(plan, floor_model)
+	var service := OfficeRests.assign(plan, MapModel.of(floor_model))
 	var building := BuildingModel.new()
 	building.zones.append(floor_model)
 	var buildings: Array[BuildingModel] = [building]
@@ -423,7 +423,7 @@ func test_blocked_and_done_sit_on_a_floor_without_fixtures() -> void:
 	var plan := _serviced(_floor([room]), 20)
 	plan.reception = null
 	plan.pantry = null
-	var service := OfficeRests.assign(plan, _floor([room]))
+	var service := OfficeRests.assign(plan, MapModel.of(_floor([room])))
 	_eq(service.places.size(), 5, "every agent has a place")
 	for key: String in service.places:
 		_eq([service.places[key].rest, service.places[key].index], [OfficeRests.Rest.SEAT, -1], key + ": the seat")
@@ -439,7 +439,7 @@ func test_nobody_rests_at_the_reception() -> void:
 		room.panes.append(_agent("s%d" % index, states[index % 3], 10.0 * index))
 	var plan := _serviced(_floor([room]), 20)
 	_check(plan.reception != null and plan.reception.spots.size() >= OfficeShell.MIN_QUEUE, "the plan keeps the slots")
-	var service := OfficeRests.assign(plan, _floor([room]))
+	var service := OfficeRests.assign(plan, MapModel.of(_floor([room])))
 	var pantry := 0
 	for key: String in service.places:
 		var place := service.places[key]

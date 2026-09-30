@@ -861,16 +861,18 @@ func _refresh() -> void:
 	# refreshes before the camera's next frame), and a floor's first plan fixes
 	# its width for good.
 	var room := camera.free_rect()
-	var planned := plans.prepare(found.zone_model, pen, hud.plan_width())
+	# The shown floor's map: one workspace, under that workspace's key.
+	var map := MapModel.of(found.zone_model)
+	var planned := plans.prepare(map, pen, hud.plan_width())
 	var problems := plans.problems()
-	var model := JSON.stringify([found.zone_model.key, art.id])
+	var model := JSON.stringify([map.key, art.id])
 	if model != world_model:
 		world_model = model
-		_build(found, planned, problems)
+		_build(found, map, planned, problems)
 	elif problems.is_empty():
-		floor_view.reconcile(planned, found.zone_model, _frozen())
+		floor_view.reconcile(planned, map, _frozen())
 	if problems.is_empty():
-		floor_view.update_desks(found.zone_model, navigator.active_key, _frozen())
+		floor_view.update_desks(map, navigator.active_key, _frozen())
 	else:
 		# Nothing on the floor followed this input: the next update that can be
 		# laid out brings all of it at once, with nobody walking.
@@ -1080,7 +1082,7 @@ func _machines() -> Array[MachineView]:
 
 ## Only changing floors or packs replaces the world; everything else goes
 ## through OfficeFloorView, which retains the other desks and their animations.
-func _build(found: ZoneRef, planned: FloorPlan, problems: PackedStringArray) -> void:
+func _build(found: ZoneRef, map: MapModel, planned: FloorPlan, problems: PackedStringArray) -> void:
 	remove_child(world)
 	world.queue_free()
 	world = Node2D.new()
@@ -1096,7 +1098,7 @@ func _build(found: ZoneRef, planned: FloorPlan, problems: PackedStringArray) -> 
 	floor_view.set_night(night)
 	# A floor whose current input cannot be planned keeps drawing the model its
 	# last valid plan was made for.
-	var drawn := found.zone_model if problems.is_empty() else plans.planned_model(found.zone_model.key)
+	var drawn := map if problems.is_empty() else plans.planned_model(map.key)
 	floor_view.reconcile(planned, drawn, _frozen())
 	floor_view.update_desks(drawn, navigator.active_key, _frozen())
 	plate = PLATE_SCENE.instantiate()

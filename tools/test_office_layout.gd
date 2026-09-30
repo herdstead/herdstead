@@ -908,15 +908,15 @@ func _keyed(key: String, rooms: Array[RoomModel]) -> ZoneModel:
 ## not reflow it; new geometry plans again, keeping what still fits.
 func test_the_plan_cache_plans_each_input_once() -> void:
 	var cache := FloorPlanCache.new()
-	var first := cache.prepare(_floor([_room("a", 2), _room("b", 1, 1)]), _pen(), 640.0)
+	var first := cache.prepare(MapModel.of(_floor([_room("a", 2), _room("b", 1, 1)])), _pen(), 640.0)
 	_check(first != null and cache.problems().is_empty(), "a valid floor is planned")
 	_eq(cache.attempt_count(), 1, "once")
-	var again := _floor([_room("a", 2), _room("b", 1, 1)])
+	var again := MapModel.of(_floor([_room("a", 2), _room("b", 1, 1)]))
 	_eq(cache.prepare(again, _pen(), 640.0), first, "the same geometry in a new model reuses the plan")
 	_eq(cache.attempt_count(), 1, "without planning again")
 	_eq(cache.planned_model(again.key), again, "and the floor is drawn from the newer model")
 	_eq(cache.prepare(again, _pen(), 1600.0), first, "a wider window does not reflow the floor")
-	var grown := cache.prepare(_floor([_room("a", 5), _room("b", 1, 1)]), _pen(), 640.0)
+	var grown := cache.prepare(MapModel.of(_floor([_room("a", 5), _room("b", 1, 1)])), _pen(), 640.0)
 	_eq(cache.attempt_count(), 2, "new geometry is planned")
 	_check(grown != first and grown.desk("a").capacity > first.desk("a").capacity, "into a new plan")
 	_eq(grown.desk("b").geometry_signature(), first.desk("b").geometry_signature(), "which keeps what still fits")
@@ -928,9 +928,9 @@ func test_the_plan_cache_plans_each_input_once() -> void:
 ## is not planned again, and a corrected one clears the diagnosis.
 func test_the_plan_cache_keeps_the_last_valid_plan_while_the_input_is_invalid() -> void:
 	var cache := FloorPlanCache.new()
-	var valid := _floor([_room("a", 2)])
+	var valid := MapModel.of(_floor([_room("a", 2)]))
 	var plan := cache.prepare(valid, _pen(), 640.0)
-	var twice := _floor([_room("a", 2)])
+	var twice := MapModel.of(_floor([_room("a", 2)]))
 	twice.rooms[0].panes.append(_pane(twice.rooms[0].panes[0].key))
 	_eq(cache.prepare(twice, _pen(), 640.0), plan, "a repeated pane keeps the last valid plan")
 	_check(not cache.problems().is_empty(), "and says why")
@@ -939,7 +939,7 @@ func test_the_plan_cache_keeps_the_last_valid_plan_while_the_input_is_invalid() 
 	_eq(cache.prepare(twice, _pen(), 640.0), plan, "the same failing input again")
 	_eq(cache.attempt_count(), attempts, "is not planned again")
 	_check(not cache.problems().is_empty(), "and keeps its diagnosis")
-	cache.prepare(_floor([_room("a", 2)]), _pen(), 640.0)
+	cache.prepare(MapModel.of(_floor([_room("a", 2)])), _pen(), 640.0)
 	_check(cache.problems().is_empty(), "a corrected input clears it")
 	_eq(cache.attempt_count(), attempts + 1, "planned once")
 
@@ -948,14 +948,14 @@ func test_the_plan_cache_keeps_the_last_valid_plan_while_the_input_is_invalid() 
 ## and kept; but it lays out nothing herdr sent, so no layout diagnostic reports it.
 func test_the_plan_cache_plans_a_lobby_apart_from_the_layout() -> void:
 	var cache := FloorPlanCache.new()
-	var lobby := OfficeProjection.lobby("machine")
+	var lobby := MapModel.of(OfficeProjection.lobby("machine"))
 	var plan := cache.prepare(lobby, _pen(), 640.0)
 	_check(plan != null and plan.desks.is_empty() and plan.rows.is_empty(), "a lobby is an empty planned floor")
 	_eq(plan.floor_key, lobby.key, "under its own key")
 	_eq(OfficeFloorLayout.validate(plan, FloorLayoutPolicy.new()), PackedStringArray(), "with a walkable entrance")
 	_eq([cache.plan(lobby.key), cache.attempt_count()], [null, 0], "and no layout diagnostic counts it")
 	_eq(cache.problems(), PackedStringArray(), "or finds a problem with it")
-	_eq(cache.prepare(OfficeProjection.lobby("machine"), _pen(), 1600.0), plan, "it is planned once")
+	_eq(cache.prepare(MapModel.of(OfficeProjection.lobby("machine")), _pen(), 1600.0), plan, "it is planned once")
 	cache.prune([])
 	_check(cache.prepare(lobby, _pen(), 640.0) != plan, "a lobby that went away is planned afresh")
 
@@ -964,15 +964,42 @@ func test_the_plan_cache_plans_a_lobby_apart_from_the_layout() -> void:
 ## not shown, keeps both.
 func test_pruning_releases_only_the_floors_that_went_away() -> void:
 	var cache := FloorPlanCache.new()
-	var kept := cache.prepare(_keyed("machine/kept", [_room("a", 2)]), _pen(), 640.0)
-	cache.prepare(_keyed("machine/closed", [_room("b", 2)]), _pen(), 640.0)
+	var kept := cache.prepare(MapModel.of(_keyed("machine/kept", [_room("a", 2)])), _pen(), 640.0)
+	cache.prepare(MapModel.of(_keyed("machine/closed", [_room("b", 2)])), _pen(), 640.0)
 	var kept_keys: Array[String] = ["machine/kept"]
 	cache.prune(kept_keys)
 	_eq(cache.plan("machine/closed"), null, "the closed floor's plan is released")
 	_eq(cache.plan("machine/kept"), kept, "the other floor keeps its plan")
 	var attempts := cache.attempt_count()
-	cache.prepare(_keyed("machine/closed", [_room("b", 2)]), _pen(), 640.0)
+	cache.prepare(MapModel.of(_keyed("machine/closed", [_room("b", 2)])), _pen(), 640.0)
 	_eq(cache.attempt_count(), attempts + 1, "and a floor that comes back is planned afresh")
+
+
+## A map of one workspace plans exactly as that workspace does, under its key,
+## and its plan places that one zone over the plan's own rows: every desk names
+## the zone it stands in, and the zone holds every desk.
+func test_a_one_zone_plan_places_its_zone_over_its_rows() -> void:
+	var floor_model := _keyed("machine/one", [_room("a", 4), _room("b", 2, 1), _room("c", 6, 2)])
+	var map := MapModel.of(floor_model)
+	_eq([map.key, map.zones], [floor_model.key, [floor_model]], "a map wraps one zone under the workspace's key")
+	_eq(map.geometry_signature(), floor_model.geometry_signature(), "and has that zone's geometry signature")
+	_eq([map.rooms, map.pane_count()], [floor_model.rooms, floor_model.pane_count()], "its rooms and panes")
+	floor_model.mezzanine_of = "machine/source"
+	_eq(map.geometry_signature(), floor_model.geometry_signature(), "a mezzanine grouping is not geometry")
+	var plan := FloorPlanCache.new().prepare(map, _pen(), 640.0)
+	_check(plan != null and plan.rows.size() > 1, "a valid plan of several rows")
+	_eq(plan.zones.size(), 1, "places one zone")
+	var zone := plan.zones[0]
+	_eq([zone.zone_key, plan.zone(floor_model.key), plan.zone("machine/other")], [plan.floor_key, zone, null], "by key")
+	_eq(zone.rows, plan.rows, "whose rows are the plan's rows")
+	_eq([zone.first_lane, zone.lanes, zone.initial_width_cells], [0, 1, plan.initial_width_cells], "one lane wide")
+	var desks := 0
+	for row in zone.rows:
+		desks += row.desks.size()
+	_eq(desks, plan.desks.size(), "every desk stands in one of its rows")
+	for placed in plan.desks:
+		_eq(placed.zone_key, floor_model.key, "desk %s names its zone" % placed.tab_key)
+		_check(zone.cells.encloses(placed.reserved_cells), "and stands inside it: %s" % placed.tab_key)
 
 
 ## The decor planner furnishes a candidate before its one validation: the same
@@ -1294,7 +1321,7 @@ func test_no_walk_graph_edge_enters_an_obstacle() -> void:
 func test_the_validator_and_the_walkers_walk_one_graph() -> void:
 	var cache := FloorPlanCache.new()
 	var built := OfficeWalkGraph.builds
-	var plan := cache.prepare(_floor([_room("a", 4), _room("b", 2, 1), _room("c", 6, 2)]), _pen(), 640.0)
+	var plan := cache.prepare(MapModel.of(_floor([_room("a", 4), _room("b", 2, 1), _room("c", 6, 2)])), _pen(), 640.0)
 	_check(plan != null and cache.problems().is_empty(), "a valid floor")
 	_eq(OfficeWalkGraph.builds - built, 1, "planning it builds one walk graph, to validate it")
 	var feet := PixelPerson.footprint()
