@@ -9,9 +9,12 @@ nothing else):
 - the entry band's fixtures: the reception counter and the pantry
   (a kitchenette counter with a coffee machine);
 - the shared table family, through `build_table_assets.py`'s template path
-  (see its docstring for what those drawings keep).
+  (see its docstring for what those drawings keep);
+- two pieces drawn texel by texel at the pack's density 2 instead: the small
+  paper stack `done_stack_small` (a state signal, the done seat's paper on a
+  pod desk) and the seat selection mark `selection_seat` (ui).
 
-It writes a complete tree into an empty directory: `props/` and `table/`, laid
+It writes a complete tree into an empty directory: `props/`, `ui/` and `table/`, laid
 out exactly as `art/daylight/` is. Nothing here ever writes into `art/`, and
 `make art` never runs it (like `make table-templates`): review the output,
 copy what you want into `art/daylight/` and run `make art`. An artist can
@@ -29,6 +32,19 @@ What a desk piece keeps (the table places it with its foot on a working plane,
 see OfficeTable.DECOR_*): everything opaque lies in rows 3..21 and columns
 0..23, so a piece on the near plane stays on the wood, clear of the divider,
 the lip and every laptop, and the two rows under the foot stay clear.
+
+What `done_stack_small` keeps: a 24x24-unit canvas (48x48 texels) on the
+pivot [12, 22], opaque exactly 6 units wide by 9 tall at x -3..3 and y -9..0
+about its pivot (units 9..14 by rows 13..21, inside the desk rows), with hard
+alpha: the painted `done_stack`'s paper-in-a-tray look, smaller, so it fits
+the 6 units between a pod laptop and its column's edge (PAPERS_ASIDE 13).
+
+What `selection_seat` keeps: a 32x48-unit canvas (64x96 texels) on the pivot
+[16, 46], four corner marks in `ui.selection`'s colour (`blocked`) and line
+weight (2 units), reaching the canvas edges, each arm SEAT_ARM units long;
+nothing else is opaque, so the middle (x 2..30, y 2..46) stays clear for the
+seated person it encloses (x -8..12 about the foot with a raised hand, y
+-36..0).
 
 What a fixture keeps (OfficeFixturePlanner stands a counter with its foot on
 the floor under the top wall): each drawing fills its canvas as
@@ -319,6 +335,74 @@ FIXTURE_PIVOTS: dict[str, tuple[int, int]] = {
 }
 
 
+## The pack's density: the pieces below are drawn texel by texel at it.
+DENSE = 2
+## done_stack_small, texel by texel: 12x18 texels (6x9 units), its top-left
+## texel at DENSE_AT on the 48x48 canvas, so the bottom outline sits on the
+## texel row right above the foot (22 units = texel 44). The same letters as the
+## painted done_stack: ink outline, a stack of cream sheets lit from the top
+## left, their paper edges, in a terracotta tray.
+PAPERS_SMALL = (
+    "..IIIIIIII..",
+    ".IPkkkkkkjI.",
+    ".IkLLLLLLjI.",
+    ".IkLLLLLLjI.",
+    ".ILLLLLLLjI.",
+    ".ILLLLLLjjI.",
+    ".IjjjjjjjjI.",
+    ".IPJJJJJJMI.",
+    ".IPPPPPPPPI.",
+    ".IMMMMMMMMI.",
+    "IKMMMMMMMMKI",
+    "IkKPPPPPPKrI",
+    "IrKPPPPPPKrI",
+    "IkrKKKKKKrsI",
+    "IrrrrrrrrrrI",
+    "IssssssssssI",
+    "IKssssssssKI",
+    ".IIIIIIIIII.",
+)
+PAPERS_SMALL_LEGEND = {
+    "I": "ink", "K": "deep", "P": "paper", "k": "skin", "L": "floor_light", "j": "skin_shadow",
+    "J": "jacket_light", "M": "muted", "r": "terra", "s": "wood_shadow",
+}
+DENSE_AT = {"done_stack_small": (18, 26)}
+DENSE_SIZES = {"done_stack_small": (24, 24), "selection_seat": (32, 48)}
+DENSE_PIVOTS = {"done_stack_small": (12, 22), "selection_seat": (16, 46)}
+## selection_seat: each corner's arm length and the line weight, in units.
+SEAT_ARM = 6
+SEAT_LINE = 2
+
+
+def done_stack_small(palette: dict[str, str]) -> Image.Image:
+    """The small paper stack a done seat shows on a pod desk (see the module docstring)."""
+    width, height = DENSE_SIZES["done_stack_small"]
+    result = Image.new("RGBA", (width * DENSE, height * DENSE), (0, 0, 0, 0))
+    pixel_map(result, PAPERS_SMALL, PAPERS_SMALL_LEGEND, palette, DENSE_AT["done_stack_small"])
+    left, top, right, bottom = result.getchannel("A").getbbox()
+    pivot_x, pivot_y = (value * DENSE for value in DENSE_PIVOTS["done_stack_small"])
+    require((left, right) == (pivot_x - 3 * DENSE, pivot_x + 3 * DENSE),
+            f"done_stack_small: opaque columns {left}..{right - 1}, not x -3..3 about the pivot")
+    require((top, bottom) == (pivot_y - 9 * DENSE, pivot_y),
+            f"done_stack_small: opaque rows {top}..{bottom - 1}, not y -9..0 about the pivot")
+    return result
+
+
+def selection_seat(palette: dict[str, str]) -> Image.Image:
+    """Four corner marks round one seated person, in ui.selection's colour and weight."""
+    width, height = (value * DENSE for value in DENSE_SIZES["selection_seat"])
+    result = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    mark = (*bytes.fromhex(palette["blocked"]), 255)
+    arm, line = SEAT_ARM * DENSE, SEAT_LINE * DENSE
+    for x in (0, width - arm):
+        for y in (0, height - line):
+            result.paste(mark, (x, y, x + arm, y + line))
+    for x in (0, width - line):
+        for y in (0, height - arm):
+            result.paste(mark, (x, y, x + line, y + arm))
+    return result
+
+
 class Sketch:
     """A canvas of legend letters, drawn on with rectangles: what a fixture is
     built from before pixel_map() paints it, so it keeps to the same legend."""
@@ -471,12 +555,17 @@ def draw(source: Path, output: Path) -> list[Path]:
     palette = palette_of(source / "pack.json")
     pieces = {name: desk_piece(name, palette) for name in DESK_PIECES}
     pieces.update({name: fixture_piece(name, palette) for name in FIXTURE_SIZES})
+    pieces["done_stack_small"] = done_stack_small(palette)
     written = []
     (output / "props").mkdir(parents=True)
     for name, piece in pieces.items():
         target = output / "props" / f"{name}.png"
         piece.save(target)
         written.append(target)
+    (output / "ui").mkdir()
+    target = output / "ui/selection_seat.png"
+    selection_seat(palette).save(target)
+    written.append(target)
     generate_templates(source, output / "table")
     written.extend(sorted((output / "table").iterdir()))
     return written
@@ -493,7 +582,7 @@ def main() -> None:
     except (ValueError, KeyError, OSError) as error:
         parser.exit(1, f"draw_pixel_sources: {error}\n")
     print(f"PIXEL_SOURCES_OK: {args.output} ({len(written)} files: {len(DESK_PIECES)} desk props, "
-          f"{len(FIXTURE_SIZES)} fixture props, the table family)")
+          f"{len(FIXTURE_SIZES)} fixture props, {len(DENSE_SIZES)} density-{DENSE} pieces, the table family)")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,9 @@
 """Contract and seam checks for the modular shared-table art pack."""
 from __future__ import annotations
 
+import contextlib
+import copy
+import io
 import json
 import shutil
 import tempfile
@@ -9,7 +12,8 @@ from pathlib import Path
 
 from PIL import Image
 
-from build_table_assets import CURSOR_AT, DENSITY, FURNITURE, MODULES, ROOT, build_pack, generate_templates
+from build_table_assets import (CURSOR_AT, DENSITY, FURNITURE, LEGACY, LEGACY_POD, MODULES, POD_MODULES, ROOT,
+                                SOURCE_SETS, build_pack, generate_templates)
 
 
 THEMES = ("daylight",)
@@ -140,14 +144,17 @@ class SharedTableAssetTests(unittest.TestCase):
             manifest = json.loads((source / "manifest.json").read_text())
             self.assertEqual(manifest["density"], DENSITY, theme)
             self.assertEqual((manifest["density"], manifest["filter"]), (2, "nearest"), f"{theme}: the shipped table is 2x, nearest")
-            self.assertEqual(set(manifest["modules"]), set(MODULES) | set(FURNITURE), theme)
+            # Either accepted source set (build_table_assets.SOURCE_SETS), and
+            # every module of the set it declares is checked below.
+            declared = next((sizes for sizes in SOURCE_SETS.values() if set(manifest["modules"]) == set(sizes)), None)
+            self.assertIsNotNone(declared, f"{theme}: modules are neither the legacy set nor legacy+pod")
             self.assertEqual(manifest["assembly"], {
                 "module_width": 32,
                 "surface_depth": 80,
                 "divider_height": 24,
                 "apron_height": 3,
             })
-            for name, logical_size in {**MODULES, **FURNITURE}.items():
+            for name, logical_size in declared.items():
                 info = manifest["modules"][name]
                 self.assertEqual(info["size"], list(logical_size), f"{theme}/{name} manifest size")
                 source_path = source / info["path"]
@@ -294,7 +301,8 @@ class SharedTableAssetTests(unittest.TestCase):
                 copied_output = temporary_root / "assets"
                 shutil.copytree(source, copied_source)
                 build_pack(copied_source, copied_output)
-                for name in {**MODULES, **FURNITURE}:
+                declared = json.loads((source / "table/manifest.json").read_text())["modules"]
+                for name in declared:
                     # Pixels, not bytes: Pillow's zlib output differs across
                     # platforms, so a rebuilt PNG need not match byte for byte.
                     with Image.open(ROOT / "assets" / theme / "table" / f"{name}.png") as expected, \
@@ -305,6 +313,192 @@ class SharedTableAssetTests(unittest.TestCase):
                             expected.convert("RGBA").tobytes(),
                             f"builder drifted: {theme}/{name} pixels",
                         )
+
+
+class PodSourceSetTests(unittest.TestCase):
+    """The builder accepts the LEGACY module set or LEGACY plus POD, told apart
+    by the modules the manifest declares, and requires every image of that set.
+    Built from fresh templates, so the cases hold whichever set art/ ships."""
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.source = self.root / "art"
+        self.source.mkdir()
+        shutil.copyfile(ROOT / "art/daylight/pack.json", self.source / "pack.json")
+        with contextlib.redirect_stdout(io.StringIO()):
+            generate_templates(self.source, self.source / "table")
+        self.manifest = self.source / "table/manifest.json"
+
+    def build(self, name="runtime"):
+        with contextlib.redirect_stdout(io.StringIO()):
+            build_pack(self.source, self.root / name)
+        return self.root / name / "table"
+
+    def as_legacy(self):
+        """Today's shape: the manifest without the pod modules and their images gone."""
+        data = json.loads(self.manifest.read_text())
+        for name in POD_MODULES:
+            del data["modules"][name]
+            (self.source / "table" / f"{name}.png").unlink()
+        self.manifest.write_text(json.dumps(data, indent=2) + "\n")
+
+    def test_the_sets_are_legacy_and_legacy_with_pod(self):
+        self.assertEqual(set(SOURCE_SETS), {"legacy", "legacy+pod"})
+        self.assertEqual(LEGACY, {**MODULES, **FURNITURE})
+        self.assertEqual(LEGACY_POD, {**MODULES, **FURNITURE, **POD_MODULES})
+        self.assertFalse(set(POD_MODULES) & set(LEGACY), "the pod adds modules, it renames none")
+        self.assertEqual(POD_MODULES, {
+            "desk_left": (32, 48), "desk_mid_a": (32, 48), "desk_mid_b": (32, 48), "desk_right": (32, 48),
+            "screen_left": (32, 6), "screen_mid": (32, 6), "screen_right": (32, 6), "leg_short": (6, 22),
+        })
+
+    def test_templates_declare_legacy_with_pod_and_build(self):
+        self.assertEqual(set(json.loads(self.manifest.read_text())["modules"]), set(LEGACY_POD))
+        runtime = self.build()
+        for name in LEGACY_POD:
+            self.assertEqual((runtime / f"{name}.png").read_bytes(), (self.source / "table" / f"{name}.png").read_bytes(), name)
+
+    def test_a_legacy_only_source_is_still_valid_and_builds_only_legacy(self):
+        self.as_legacy()
+        runtime = self.build()
+        self.assertEqual({path.stem for path in runtime.glob("*.png")}, set(LEGACY))
+        self.assertEqual(set(json.loads((runtime / "manifest.json").read_text())["modules"]), set(LEGACY))
+
+    def test_a_pod_set_missing_one_image_is_refused_before_writing(self):
+        for name in POD_MODULES:
+            with self.subTest(name=name):
+                target = self.source / "table" / f"{name}.png"
+                original = target.read_bytes()
+                target.unlink()
+                try:
+                    with self.assertRaisesRegex(ValueError, name):
+                        self.build(f"missing-{name}")
+                    self.assertFalse((self.root / f"missing-{name}").exists(), "nothing written")
+                finally:
+                    target.write_bytes(original)
+
+    def test_a_manifest_that_is_not_its_sets_contract_is_refused(self):
+        original = self.manifest.read_text()
+        cases = {
+            "size": lambda data: data["modules"]["leg_short"].__setitem__("size", [6, 24]),
+            "path": lambda data: data["modules"]["desk_mid_a"].__setitem__("path", "desk_mid_b.png"),
+            "assembly": lambda data: data["assembly"].__setitem__("surface_depth", 48),
+        }
+        for label, mutate in cases.items():
+            with self.subTest(label=label):
+                data = json.loads(original)
+                mutate(data)
+                self.manifest.write_text(json.dumps(data))
+                with self.assertRaisesRegex(ValueError, "native table contract"):
+                    self.build(f"bad-{label}")
+        self.manifest.write_text(original)
+
+    def test_a_part_of_the_pod_set_or_an_unknown_module_is_refused(self):
+        original = json.loads(self.manifest.read_text())
+        partial = copy.deepcopy(original)
+        del partial["modules"]["screen_mid"]
+        unknown = copy.deepcopy(original)
+        unknown["modules"]["desk_corner"] = {"path": "desk_corner.png", "size": [32, 48]}
+        for label, data, reason in (("partial", partial, r"missing \['screen_mid'\]"),
+                                    ("unknown", unknown, r"unknown \['desk_corner'\]")):
+            with self.subTest(label=label):
+                self.manifest.write_text(json.dumps(data))
+                with self.assertRaisesRegex(ValueError, "neither the legacy set nor legacy\\+pod.*" + reason):
+                    self.build(f"bad-{label}")
+
+
+def pod_tables():
+    """Every table tree holding the pod modules: fresh templates, and each shipped
+    theme once it declares them (so the checks follow the art when it lands)."""
+    temporary = tempfile.TemporaryDirectory()
+    root = Path(temporary.name)
+    shutil.copyfile(ROOT / "art/daylight/pack.json", root / "pack.json")
+    with contextlib.redirect_stdout(io.StringIO()):
+        generate_templates(root, root / "table")
+    trees = [("templates", root / "table")]
+    for theme in THEMES:
+        table = ROOT / "art" / theme / "table"
+        if set(POD_MODULES) <= set(json.loads((table / "manifest.json").read_text())["modules"]):
+            trees.append((theme, table))
+    return temporary, trees
+
+
+class PodModuleContractTests(unittest.TestCase):
+    """The POD pixel contract in build_table_assets.py's docstring, rule by rule."""
+
+    def setUp(self):
+        temporary, self.trees = pod_tables()
+        self.addCleanup(temporary.cleanup)
+
+    def test_desks_keep_the_working_top_the_lip_and_a_clear_foot(self):
+        d = DENSITY
+        for label, table in self.trees:
+            for end in ("left", "mid_a", "mid_b", "right"):
+                with self.subTest(tree=label, end=end), Image.open(table / f"desk_{end}.png") as desk:
+                    self.assertEqual(desk.size, (32 * d, 48 * d))
+                    alpha = desk.getchannel("A")
+                    self.assertEqual({value for _, value in alpha.getcolors()}, {0, 255}, "hard alpha")
+                    self.assertEqual(alpha.crop((0, 0, 32 * d, 43 * d)).getextrema(), (255, 255),
+                                     "rows 0..42 (the working top and the lip) are opaque")
+                    self.assertEqual(alpha.crop((0, 43 * d, 32 * d, 48 * d)).getextrema(), (0, 0),
+                                     "rows 43..47 are transparent: the apron continues the lip")
+
+    def test_desk_modules_join_without_a_seam_in_alpha_or_colour(self):
+        d = DENSITY
+        for label, table in self.trees:
+            for left in ("left", "mid_a", "mid_b"):
+                for right in ("mid_a", "mid_b", "right"):
+                    with self.subTest(tree=label, join=f"{left}->{right}"), \
+                            Image.open(table / f"desk_{left}.png") as a, Image.open(table / f"desk_{right}.png") as b:
+                        edge = a.crop((a.width - 1, 0, a.width, a.height)).tobytes()
+                        self.assertEqual(edge, b.crop((0, 0, 1, b.height)).tobytes(), "a colour seam")
+                        # The three outer units on each side are one uniform
+                        # column, like the surface modules'.
+                        for offset in range(2, 3 * d + 1):
+                            self.assertEqual(edge, a.crop((a.width - offset, 0, a.width - offset + 1, a.height)).tobytes())
+                            self.assertEqual(edge, b.crop((offset - 1, 0, offset, b.height)).tobytes())
+
+    def test_screens_are_opaque_and_continue_their_panel_lines(self):
+        d = DENSITY
+        for label, table in self.trees:
+            images = {end: Image.open(table / f"screen_{end}.png") for end in ("left", "mid", "right")}
+            try:
+                for end, screen in images.items():
+                    with self.subTest(tree=label, end=end):
+                        self.assertEqual(screen.size, (32 * d, 6 * d))
+                        self.assertEqual(screen.getchannel("A").getextrema(), (255, 255), "a screen is fully opaque")
+                # The panel repeats every 8 units, so a mid module continues
+                # itself: its columns x and x + 8 units match across the join.
+                mid = images["mid"]
+                for x in range(mid.width - 8 * d, mid.width):
+                    self.assertEqual(mid.crop((x, 0, x + 1, mid.height)).tobytes(),
+                                     mid.crop((x - 8 * d, 0, x - 8 * d + 1, mid.height)).tobytes(), f"{label}: column {x}")
+                for x in range(8 * d):
+                    self.assertEqual(mid.crop((x, 0, x + 1, mid.height)).tobytes(),
+                                     mid.crop((x + 8 * d, 0, x + 8 * d + 1, mid.height)).tobytes(), f"{label}: column {x}")
+            finally:
+                for screen in images.values():
+                    screen.close()
+
+    def test_the_short_leg_ends_on_row_20_attached_and_tapered(self):
+        d = DENSITY
+        for label, table in self.trees:
+            with self.subTest(tree=label), Image.open(table / "leg_short.png") as leg:
+                self.assertEqual(leg.size, (6 * d, 22 * d))
+                alpha = leg.getchannel("A")
+                self.assertEqual({value for _, value in alpha.getcolors()}, {0, 255}, "hard alpha")
+                left, top, right, bottom = alpha.getbbox()
+                self.assertEqual((top, bottom), (0, 21 * d), "hung at LEG_DROP -2, the foot ends at pod y 19")
+                self.assertEqual(left + right, 6 * d, "centred on its canvas")
+                for y in range(21 * d):
+                    self.assertIsNotNone(alpha.crop((0, y, alpha.width, y + 1)).getbbox(), f"row {y} is attached")
+                def span(unit_row):
+                    box = alpha.crop((0, unit_row * d, alpha.width, unit_row * d + 1)).getbbox()
+                    return box[2] - box[0]
+                self.assertLess(span(19), span(4), "the glide is narrower than the shoulder")
+                self.assertLess(span(14), span(4), "the shaft steps in")
 
 
 if __name__ == "__main__":

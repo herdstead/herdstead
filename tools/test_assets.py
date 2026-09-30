@@ -811,8 +811,9 @@ class PixelSourceTests(unittest.TestCase):
         files = sorted(path.relative_to(first) for path in first.rglob("*") if path.is_file())
         self.assertEqual(
             len(files),
-            len(draw_pixel_sources.DESK_PIECES) + len(draw_pixel_sources.FIXTURE_SIZES) + 19,
-            "8 desk props, 2 fixture props, 18 modules, 1 manifest",
+            len(draw_pixel_sources.DESK_PIECES) + len(draw_pixel_sources.FIXTURE_SIZES)
+            + len(draw_pixel_sources.DENSE_SIZES) + 27,
+            "8 desk props, 2 fixture props, 2 density-2 pieces, 26 modules (legacy and pod), 1 manifest",
         )
         self.assertEqual(files, sorted(path.relative_to(second) for path in second.rglob("*") if path.is_file()))
         for relative in files:
@@ -845,6 +846,58 @@ class PixelSourceTests(unittest.TestCase):
                 self.assertIsNotNone(box, f"{name}: shipped empty")
                 self.assertEqual(box[3], declared["pivot"][1] * k, f"{name}: the shipped piece stands on its foot")
                 self.assertEqual((box[0], box[2]), (0, shipped.width), f"{name}: the shipped piece stands on its whole width")
+
+    def test_the_density_two_pieces_keep_their_contract_and_make_art_accepts_them(self):
+        drawn = self.draw("drawn")
+        pack = self.root / "pack"
+        shutil.copytree(ROOT / "art/daylight", pack)
+        shutil.copytree(drawn, pack, dirs_exist_ok=True)
+        manifest = json.loads((pack / "pack.json").read_text())
+        # Declared the way art/daylight/pack.json declares them (or will).
+        manifest["props"]["done_stack_small"] = {
+            "path": "props/done_stack_small.png", "size": [24, 24], "pivot": [12, 22],
+            "item": {"place": "desk", "footprint": [6, 3]},
+        }
+        manifest["ui"]["selection_seat"] = {"path": "ui/selection_seat.png", "size": [32, 48], "pivot": [16, 46]}
+        compiled = validate(pack, manifest)
+        self.assertEqual(compiled.factors[("props", "done_stack_small")], 2, "drawn at the pack's density")
+        self.assertEqual(compiled.factors[("ui", "selection_seat")], 2, "drawn at the pack's density")
+        d = draw_pixel_sources.DENSE
+        with Image.open(drawn / "props/done_stack_small.png") as stack:
+            self.assertEqual(stack.size, (24 * d, 24 * d))
+            alpha = stack.getchannel("A")
+            self.assertEqual({value for _, value in alpha.getcolors()}, {0, 255}, "hard alpha")
+            # 6 wide by 9 tall, x -3..3 and y -9..0 about the pivot [12, 22].
+            self.assertEqual(alpha.getbbox(), (9 * d, 13 * d, 15 * d, 22 * d))
+        with Image.open(ROOT / "art/daylight/props/done_stack.png") as big, \
+                Image.open(drawn / "props/done_stack_small.png") as small:
+            self.assertLessEqual({colour for _, colour in small.getcolors()} - {(0, 0, 0, 0)},
+                                 {colour for _, colour in big.getcolors()},
+                                 "the painted done_stack's colours, nothing new")
+        with Image.open(drawn / "ui/selection_seat.png") as mark, \
+                Image.open(ROOT / "art/daylight/ui/selection.png") as selection:
+            self.assertEqual(mark.size, (32 * d, 48 * d))
+            colours = {colour for _, colour in mark.getcolors()}
+            self.assertEqual(colours - {(0, 0, 0, 0)}, {colour for _, colour in selection.getcolors()} - {(0, 0, 0, 0)},
+                             "ui.selection's one colour")
+            alpha = mark.getchannel("A")
+            line, arm = draw_pixel_sources.SEAT_LINE * d, draw_pixel_sources.SEAT_ARM * d
+            self.assertEqual(alpha.getbbox(), (0, 0, mark.width, mark.height), "the corners reach the canvas edges")
+            self.assertEqual(alpha.crop((line, line, mark.width - line, mark.height - line)).getextrema(), (0, 0),
+                             "the middle stays clear for the seated person")
+            for x0, y0 in ((0, 0), (mark.width - arm, 0), (0, mark.height - line), (mark.width - arm, mark.height - line)):
+                self.assertEqual(alpha.crop((x0, y0, x0 + arm, y0 + line)).getextrema(), (255, 255), "a corner's arm")
+            self.assertEqual(alpha.crop((arm, 0, mark.width - arm, mark.height)).getbbox(), None,
+                             "nothing between the corners along the top and bottom")
+            self.assertEqual(alpha.crop((0, arm, mark.width, mark.height - arm)).getbbox(), None,
+                             "nothing between the corners along the sides")
+            # ui.selection's line weight: the left stroke, a row under the top
+            # stroke, is as wide on both marks.
+            def weight(image):
+                row = image.getchannel("A").crop((0, 3 * d, image.width // 2, 3 * d + 1))
+                return row.getbbox()
+            self.assertEqual(weight(mark), (0, 0, line, 1))
+            self.assertEqual(weight(selection), (0, 0, line, 1), "the same weight as ui.selection")
 
     def test_refuses_an_occupied_output_and_writes_nothing(self):
         occupied = self.root / "occupied"
