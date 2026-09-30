@@ -574,6 +574,101 @@
           14
         ]
       }
+    },
+    "side_table": {
+      "path": "props/side_table.png",
+      "size": [
+        32,
+        32
+      ],
+      "pivot": [
+        16,
+        30
+      ],
+      "item": {
+        "place": "floor",
+        "footprint": [
+          28,
+          10
+        ]
+      }
+    },
+    "partition_h": {
+      "path": "props/partition_h.png",
+      "size": [
+        32,
+        10
+      ],
+      "pivot": [
+        16,
+        10
+      ]
+    },
+    "partition_h_end_l": {
+      "path": "props/partition_h_end_l.png",
+      "size": [
+        32,
+        10
+      ],
+      "pivot": [
+        16,
+        10
+      ]
+    },
+    "partition_h_end_r": {
+      "path": "props/partition_h_end_r.png",
+      "size": [
+        32,
+        10
+      ],
+      "pivot": [
+        16,
+        10
+      ]
+    },
+    "partition_v": {
+      "path": "props/partition_v.png",
+      "size": [
+        6,
+        32
+      ],
+      "pivot": [
+        3,
+        32
+      ]
+    },
+    "partition_corner_bl": {
+      "path": "props/partition_corner_bl.png",
+      "size": [
+        32,
+        32
+      ],
+      "pivot": [
+        16,
+        32
+      ]
+    },
+    "partition_corner_br": {
+      "path": "props/partition_corner_br.png",
+      "size": [
+        32,
+        32
+      ],
+      "pivot": [
+        16,
+        32
+      ]
+    },
+    "partition_post": {
+      "path": "props/partition_post.png",
+      "size": [
+        6,
+        12
+      ],
+      "pivot": [
+        3,
+        12
+      ]
     }
   },
   "ui": {

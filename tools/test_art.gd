@@ -592,9 +592,23 @@ func test_art_contract_names_ids_no_scene_asks_for() -> void:
 		["wall.front_center", "wall.front_left", "wall.front_right", "wall.threshold"],
 		"the front wall nothing lays: it would cover the near seats (docs/WORLD_MODEL.md)"
 	)
-	# The open-plan pod's art lands before the code that draws it (lane B1):
+	# The open-plan art lands before the code that draws it (lanes B1, B2):
 	# exactly these ids are shipped and not drawn yet.
-	_eq(Array(unused[&"props"]), ["done_stack_small"], "every prop but the pod's paper is placed somewhere")
+	_eq(
+		Array(unused[&"props"]),
+		[
+			"done_stack_small",
+			"partition_corner_bl",
+			"partition_corner_br",
+			"partition_h",
+			"partition_h_end_l",
+			"partition_h_end_r",
+			"partition_post",
+			"partition_v",
+			"side_table",
+		],
+		"every prop but the pod's paper, the zone partitions and the side table is placed somewhere"
+	)
 	_eq(Array(unused[&"ui"]), ["selection_seat"], "every UI image but the seat mark is drawn somewhere")
 	_eq(
 		Array(unused[&"table"]),
