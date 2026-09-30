@@ -109,15 +109,26 @@ zone takes more lanes, up to the map's, while it would stand taller than `zone_t
 **Placement is a masonry that only grows, down or right** (`OfficeFloorLayout._place()`), zones taken in (number,
 key) order:
 
+0. the map widens first, once, to the most lanes any zone needs, retained or new (`OfficeFloorLayout.final_lanes()`;
+   lanes are appended on the right; the main corridor and the lift door move right; the pantry stays), so every
+   decision below is taken against the final width (widened zone by zone, a zone judged against the narrower map
+   moved although its own place fit the map a later zone widened);
 1. every retained zone holds its slot;
-2. a retained zone that must grow (taller, or wider by any number of lanes): the map widens first when it needs more
-   lanes than the map has (lanes are appended on the right; the main corridor and the lift door move right; the pantry
-   stays); then it grows in place when the cells it grows over, down and right, aisle row included, are free of every
-   held slot (the ones grown earlier in the pass included); otherwise it alone releases its slot and moves;
+2. a retained zone that must grow (taller, or wider by any number of lanes) grows in place when the cells it grows
+   over, down and right, aisle row included, are free of every held slot (the ones grown earlier in the pass
+   included); otherwise it alone releases its slot and moves;
 3. the zones that move and the new ones, in order, take the **top-most, then left-most** gap their whole slot fits in
    over k adjacent lanes (from row 6); a new mezzanine first tries directly below its source's slot, in the same
    lanes; only on its first placement (grouping is display, never in the geometry signature, so a group forming or
    breaking later moves nothing).
+
+The work is bounded before it is done: an empty workspace (one empty pod row) is charged to `max_tables` like a table;
+a map whose slots cannot fit the dimensional budget even packed lane by lane (as deep as the entry band plus the
+slots' lane rows, k·t for a slot k lanes wide and t rows tall, spread over the final lanes) is refused before any
+placement (`_cannot_fit()`); and a first-fit search, over a per-lane index of the rows the placed slots take (a
+binary search, not a scan of every slot), stops at the first top whose slot would end past `max_height_cells`. A
+refusal names `floor exceeds width, height or cell budget` and keeps the previous map (the plan cache's atomic
+fallback).
 
 Inside a zone the row allocator is today's: next-fit on the zone's first layout, gap reuse afterwards, growth
 left-anchored, a table wider than the zone first was taking a row of its own (and widening the zone by lanes), rows
@@ -252,7 +263,7 @@ zone or state:
 - **lane gaps**: every run of at least `LANE_GAP_MIN_CELLS` (3) free cell rows inside a lane, outside every zone's
   slot and down to the map's bottom (`OfficeDecorPlanner.lane_gaps()`), stands a piece every `LANE_GAP_STEP_CELLS` (2)
   rows from its second row, in the lane's middle column, foot `LANE_GAP_FOOT` (8) above its row's bottom, keyed
-  `%02d/gap/%04d` (lane, row); pieces take turns by their number j along the run: `plant_at(j)` for an even j, a
+  `%02d/gap/%04d` (lane, row); pieces take turns by their number j along the run: `plant_at(j / 2)` for an even j (so its plants take turns too), a
   `side_table` for an odd one. A side table carries one piece (`DecorPlacement.item`) from the `desk` pool or, on
   28% of keys, the `cat` pool, picked by `OfficeDecorPlanner.side_table_item()` from a stream seeded by the placement
   key alone; `OfficeDecor.hold()` stands it in the piece's `%Top` at `OfficeDecor.TOP_Y` (−20), and the candidate's

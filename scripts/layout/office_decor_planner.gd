@@ -11,8 +11,9 @@ extends RefCounted
 ##   cell rows inside a lane, outside every zone's slot and down to the map's
 ##   bottom, a piece every LANE_GAP_STEP_CELLS rows from the run's second row,
 ##   in the lane's middle column, keyed by the lane and the row
-##   ("%02d/gap/%04d"): plants (plant_at() of the piece's number) and side
-##   tables take turns along the run; a side table carries one piece from the
+##   ("%02d/gap/%04d"): plants and side tables take turns along the run
+##   (piece j: a side table when j is odd, else the plant plant_at(j / 2), so
+##   the plants of one run take turns too); a side table carries one piece from the
 ##   `desk` pool or, now and then, the `cat` one (side_table_item(), seeded by
 ##   its key).
 ## A piece is kept only where its drawing stays on the map and, grown by
@@ -135,7 +136,7 @@ func furnish(next: FloorPlan) -> void:
 			var key := "%02d/gap/%04d" % [gap.lane, row]
 			var at := Vector2(middle, (row + 1) * grid - OfficeShell.LANE_GAP_FOOT)
 			var table := index % 2 == 1
-			var piece := ArtContract.PROP_SIDE_TABLE if table else plant_at(_pen.art, index)
+			var piece := ArtContract.PROP_SIDE_TABLE if table else plant_at(_pen.art, index >> 1)
 			var candidate := _candidate(key, piece, at, side_table_item(_pen.art, key) if table else &"")
 			if _fits(next, covers, walkways, placed, candidate):
 				placed.append(candidate)

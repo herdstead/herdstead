@@ -10,16 +10,64 @@ extends RefCounted
 ## than the map has. A zone stands in one or more adjacent lanes under an aisle
 ## row of its own (its slot). The placement is a masonry that only grows, down
 ## or right, and never moves a zone it does not have to:
+## - the map widens first, once, to the most lanes any zone needs (retained
+##   or new), so every decision below is taken against its final width;
 ## - every retained zone first holds its slot;
-## - a retained zone that grows (taller, or wider by any number of lanes:
-##   the map widens first) grows in place while the cells it grows over are
-##   free of every held slot; otherwise it alone moves, and its old slot is a gap;
+## - a retained zone that grows (taller, or wider by any number of lanes)
+##   grows in place while the cells it grows over are free of every held
+##   slot; otherwise it alone moves, and its old slot is a gap;
 ## - then the zones that move and the new ones, in (number, key) order, take
 ##   the top-most, then left-most gap their slot fits in (a new mezzanine first
 ##   tries directly below its source).
 ## The map keeps its largest extents: removing a zone leaves a gap, never a
 ## smaller map. A failure anywhere fails the whole map (the plan cache keeps
 ## the previous one); the zones at fault are named in failing_zones.
+##
+## The work is bounded before it is done: an empty workspace (one empty pod
+## row) is charged to the table budget like a table; a map whose zones' slots
+## cannot fit the dimensional budget even packed edge to edge at the final
+## lane count is refused before any placement (_cannot_fit()); and a first-fit
+## search stops at the first top whose slot would end past max_height_cells.
+
+
+## What the slots placed so far take, lane by lane, for the first-fit search:
+## each lane's taken rows as sorted, disjoint [start, end) spans (slots never
+## overlap, and a slot takes whole lanes), and every row a first fit may start
+## at (the zones' top and every slot's bottom), sorted. A lookup is a binary
+## search, not a scan of every slot: planning many zones stays near n² log n.
+class Taken:
+	var lanes: Array[Lane] = []
+	var tops: Array[int] = []
+
+	class Lane:
+		var starts: Array[int] = []
+		var ends: Array[int] = []
+
+	func _init(count: int, first_top: int) -> void:
+		for lane in count:
+			lanes.append(Lane.new())
+		tops.append(first_top)
+
+	## Take `slot`'s rows in its lanes.
+	func add(slot: Rect2i, rules: FloorLayoutPolicy) -> void:
+		var first := rules.lane_of(slot.position.x)
+		for lane in range(first, first + rules.lanes_for_width(slot.size.x)):
+			var spans := lanes[lane]
+			var at := spans.starts.bsearch(slot.position.y)
+			spans.starts.insert(at, slot.position.y)
+			spans.ends.insert(at, slot.end.y)
+		var top := tops.bsearch(slot.end.y)
+		if top >= tops.size() or tops[top] != slot.end.y:
+			tops.insert(top, slot.end.y)
+
+	## Whether rows [from, to) are open in `count` lanes from `first`.
+	func open(first: int, count: int, from: int, to: int) -> bool:
+		for lane in range(first, first + count):
+			var spans := lanes[lane]
+			var after := spans.starts.bsearch(to)
+			if after > 0 and spans.ends[after - 1] > from:
+				return false
+		return true
 
 
 ## Plan `map`, keeping what `previous` placed where it still fits. With a
@@ -65,7 +113,12 @@ static func plan(
 			return result
 		nodes_left -= layout.nodes
 		layouts.append(layout)
-	var slots := _place(next, zones, layouts, retained, rules)
+	var slots: Dictionary[String, Rect2i] = {}
+	if not _cannot_fit(next.lanes, zones, layouts, retained, rules):
+		slots = _place(next, zones, layouts, retained, rules)
+	if slots.size() != zones.size():
+		result.problems.append("floor exceeds width, height or cell budget")
+		return result
 	var height := maxi(rules.min_height_cells, rules.wall_cells + rules.entry_cells)
 	if retained != null:
 		height = maxi(height, retained.floor_cells.size.y)
@@ -130,7 +183,8 @@ static func _input_problems(map: MapModel, rules: FloorLayoutPolicy, failing: Pa
 			found.append("duplicate or missing zone identity")
 			return found
 		zone_keys[zone.key] = true
-		tables += zone.rooms.size()
+		# An empty workspace still lays out (and places) one empty pod row.
+		tables += maxi(zone.rooms.size(), 0 if zone.lobby else 1)
 		panes_total += zone.pane_count()
 	if tables > rules.max_tables:
 		found.append("input exceeds table budget")
@@ -212,8 +266,39 @@ static func _local_desks(retained: FloorPlan, before: ZonePlacement) -> Dictiona
 	return found
 
 
+## Whether the zones' slots cannot fit the dimensional budget however they are
+## packed, at the final lane count: the map as wide as that, and as deep as its
+## top plus the slots' lane rows (a slot k lanes wide and t rows tall takes k·t
+## of them) spread over every lane, or the deepest slot, or the retained map's
+## depth. A lower bound: a map it passes may still fail after placement; one it
+## fails always would, so no placement is tried.
+static func _cannot_fit(
+	lanes: int,
+	zones: Array[ZoneModel],
+	layouts: Array[OfficeZoneLayout.Result],
+	retained: FloorPlan,
+	rules: FloorLayoutPolicy
+) -> bool:
+	var pod := OfficeZoneLayout.pod_row_cells()
+	var wide := final_lanes(lanes, zones, layouts, retained)
+	var top := rules.zones_top_cells() - rules.zone_aisle_cells
+	var area := 0
+	var deepest := 0
+	for index in zones.size():
+		var before: ZonePlacement = retained.zone(zones[index].key) if retained != null else null
+		var k := maxi(layouts[index].lanes, before.lanes if before != null else 0)
+		var tall := layouts[index].rows.size() * pod + rules.zone_aisle_cells
+		area += k * tall
+		deepest = maxi(deepest, tall)
+	var height := maxi(rules.min_height_cells, top + maxi(deepest, ceili(float(area) / wide)))
+	if retained != null:
+		height = maxi(height, retained.floor_cells.size.y)
+	return not _within_budget(Vector2i(rules.map_width(wide), height), rules)
+
+
 ## Every zone's slot (its aisle row and its rectangle), by zone key, in map
 ## cells; widens `next` (its lanes) where a zone needs more lanes than it has.
+## Fewer slots than zones when a first fit found none within max_height_cells.
 static func _place(
 	next: FloorPlan,
 	zones: Array[ZoneModel],
@@ -223,6 +308,10 @@ static func _place(
 ) -> Dictionary[String, Rect2i]:
 	var pod := OfficeZoneLayout.pod_row_cells()
 	var slots: Dictionary[String, Rect2i] = {}
+	# The map's final width, before anything is held, grown or moved: widened
+	# zone by zone, a zone judged against the narrower map moved although its
+	# own place fits the map a later zone widens (codex's review of ba943f9).
+	next.lanes = final_lanes(next.lanes, zones, layouts, retained)
 	# (a) Every retained zone holds its slot while the others are placed.
 	for zone in zones:
 		var before: ZonePlacement = retained.zone(zone.key) if retained != null else null
@@ -240,7 +329,6 @@ static func _place(
 			continue
 		var lanes := maxi(layouts[index].lanes, before.lanes)
 		var height := layouts[index].rows.size() * pod
-		next.lanes = maxi(next.lanes, lanes)
 		if lanes == before.lanes and height == before.cells.size.y:
 			continue
 		var grown := Rect2i(
@@ -254,10 +342,12 @@ static func _place(
 	# (c) The zones that move and the new ones, in order: a new mezzanine
 	# directly below its source when that is free, else the top-most, then
 	# left-most gap its whole slot fits in.
+	var taken := Taken.new(next.lanes, rules.zones_top_cells() - rules.zone_aisle_cells)
+	for key: String in slots:
+		taken.add(slots[key], rules)
 	for index in moving:
 		var zone := zones[index]
 		var lanes := layouts[index].lanes
-		next.lanes = maxi(next.lanes, lanes)
 		var size := Vector2i(rules.zone_width(lanes), layouts[index].rows.size() * pod + rules.zone_aisle_cells)
 		var is_new := retained == null or retained.zone(zone.key) == null
 		if is_new and not zone.mezzanine_of.is_empty() and slots.has(zone.mezzanine_of):
@@ -265,30 +355,42 @@ static func _place(
 			var below := Rect2i(Vector2i(source.position.x, source.end.y), size)
 			if rules.lane_of(below.position.x) + lanes <= next.lanes and _free(below, slots, zone.key):
 				slots[zone.key] = below
+				taken.add(below, rules)
 				continue
-		slots[zone.key] = _first_fit(size, lanes, next.lanes, slots, rules)
+		var fit := _first_fit(size, lanes, next.lanes, taken, rules)
+		if fit.size == Vector2i.ZERO:
+			return slots
+		slots[zone.key] = fit
+		taken.add(fit, rules)
 	return slots
 
 
+## The lanes the map needs: `lanes` (today's), or more when a zone needs more,
+## retained (at least as many as it had) or new.
+static func final_lanes(
+	lanes: int, zones: Array[ZoneModel], layouts: Array[OfficeZoneLayout.Result], retained: FloorPlan
+) -> int:
+	var wanted := lanes
+	for index in zones.size():
+		var before: ZonePlacement = retained.zone(zones[index].key) if retained != null else null
+		wanted = maxi(wanted, maxi(layouts[index].lanes, before.lanes if before != null else 0))
+	return wanted
+
+
 ## The top-most, then left-most slot of `size` (`lanes` lanes wide) that meets
-## no slot in `slots`. Only the top of the rows and the bottom of a slot can be
-## the top of a first fit, so only those rows are tried.
-static func _first_fit(
-	size: Vector2i, lanes: int, map_lanes: int, slots: Dictionary[String, Rect2i], rules: FloorLayoutPolicy
-) -> Rect2i:
-	var tops: Array[int] = [rules.zones_top_cells() - rules.zone_aisle_cells]
-	for key: String in slots:
-		if not tops.has(slots[key].end.y):
-			tops.append(slots[key].end.y)
-	tops.sort()
-	for top in tops:
+## nothing `taken` holds. Only the top of the rows and the bottom of a slot can
+## be the top of a first fit, so only those rows are tried, and none from the
+## first whose slot would end past max_height_cells: then an empty Rect2i.
+static func _first_fit(size: Vector2i, lanes: int, map_lanes: int, taken: Taken, rules: FloorLayoutPolicy) -> Rect2i:
+	for top in taken.tops:
+		if top + size.y > rules.max_height_cells:
+			return Rect2i()
 		for lane in map_lanes - lanes + 1:
-			var candidate := Rect2i(Vector2i(rules.lane_x(lane), top), size)
-			if _free(candidate, slots, ""):
-				return candidate
+			if taken.open(lane, lanes, top, top + size.y):
+				return Rect2i(Vector2i(rules.lane_x(lane), top), size)
 	# Not reached: `lanes` never exceeds `map_lanes` (the map widens first),
 	# and at the lowest slot's end every lane is free, so the loop returns.
-	return Rect2i(Vector2i(rules.lane_x(0), tops[tops.size() - 1]), size)
+	return Rect2i()
 
 
 static func _free(slot: Rect2i, slots: Dictionary[String, Rect2i], own: String) -> bool:

@@ -1261,8 +1261,10 @@ func test_the_top_run_and_lane_gaps_keep_their_place_when_a_zone_grows() -> void
 	_check(kept == before.size(), "every piece still fits the grown map: %d of %d" % [kept, before.size()])
 
 
-## Plants and side tables take turns along a lane gap by the piece's number
-## (plant_at() of an even number, a side table at an odd one), and the top-wall
+## Plants and side tables take turns along a lane gap by the piece's number j
+## (a side table at an odd one, else plant_at(j / 2): the plants take turns
+## too; test_a_lane_gap_stands_both_plants_between_its_side_tables in the map
+## suite pins a run of five), and the top-wall
 ## run's plants take the plant of their grid step (plant_at()), two kinds by
 ## the place's parity. Never a state, a tab or the time: the planner reads no
 ## herdr, so the place is all there is to go by. Every piece a furnished map
@@ -1298,7 +1300,9 @@ func test_lane_gaps_alternate_plants_and_side_tables_by_place() -> void:
 						float(placed.key.get_slice("/", 2).to_int() - gap.top - 1) / OfficeShell.LANE_GAP_STEP_CELLS
 					)
 					var wanted := (
-						OfficeDecorPlanner.plant_at(pen.art, number) if number % 2 == 0 else ArtContract.PROP_SIDE_TABLE
+						OfficeDecorPlanner.plant_at(pen.art, number >> 1)
+						if number % 2 == 0
+						else ArtContract.PROP_SIDE_TABLE
 					)
 					_eq(placed.piece, wanted, "%d cells: %s stands the piece of its place" % [width, placed.key])
 					kinds[placed.piece] = true
@@ -1310,8 +1314,8 @@ func test_lane_gaps_alternate_plants_and_side_tables_by_place() -> void:
 				)
 				if pieces.size() >= 2:
 					_check(
-						kinds.has(ArtContract.PROP_SIDE_TABLE) and kinds.size() == 2,
-						"a gap of %d reads as two kinds" % pieces.size()
+						kinds.has(ArtContract.PROP_SIDE_TABLE) and kinds.size() >= 2,
+						"a gap of %d reads as a plant and a side table" % pieces.size()
 					)
 					both_kinds += 1
 	_check(both_kinds > 0, "some gap stands both kinds")

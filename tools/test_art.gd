@@ -95,6 +95,9 @@ func test_art_contract_names_every_id_a_pack_lacks() -> void:
 		"a palette colour": func(m: Dictionary) -> void: _drop(m, ["palette", "task_light"]),
 		"a tile": func(m: Dictionary) -> void: _drop(m, ["tiles", "rug.middle_center"]),
 		"a prop": func(m: Dictionary) -> void: _drop(m, ["props", "window"]),
+		# The showroom's row room (scripts/preview.gd) still stands both.
+		"the showroom's sign": func(m: Dictionary) -> void: _drop(m, ["props", "sign"]),
+		"the showroom's cabinet": func(m: Dictionary) -> void: _drop(m, ["props", "cabinet"]),
 		"a UI image": func(m: Dictionary) -> void: _drop(m, ["ui", "branch"]),
 		"a state": func(m: Dictionary) -> void: _drop(m, ["states", "blocked"]),
 	}
@@ -102,6 +105,8 @@ func test_art_contract_names_every_id_a_pack_lacks() -> void:
 		"a palette colour": "task_light",
 		"a tile": "rug.middle_center",
 		"a prop": "window",
+		"the showroom's sign": "sign",
+		"the showroom's cabinet": "cabinet",
 		"a UI image": "branch",
 		"a state": "blocked",
 	}
@@ -607,13 +612,13 @@ func test_art_contract_names_ids_no_scene_asks_for() -> void:
 	# The pods of desks draw the pod's art (lane B1); the long table's big paper
 	# stack is shipped and drawn by nothing now, until lane C prunes it from the
 	# pack; the open run's two ends are drawn by no zone (a zone's bottom run
-	# ends in its corners); the retired reception, row sign and cabinet the live
-	# office no longer places (the showroom's row room still stands the sign and
-	# the cabinet until lane C redoes it). Exactly these ids.
+	# ends in its corners); the retired reception nothing places. The row sign
+	# and the cabinet stay in the contract while the showroom's row room
+	# (scripts/preview.gd) stands them, until lane C redoes it. Exactly these ids.
 	_eq(
 		Array(unused[&"props"]),
-		["cabinet", "done_stack", "partition_h_end_l", "partition_h_end_r", "reception", "sign"],
-		"every prop but the long table's paper, the open run's ends and the retired row pieces is in the contract"
+		["done_stack", "partition_h_end_l", "partition_h_end_r", "reception"],
+		"every prop but the long table's paper, the open run's ends and the retired reception is in the contract"
 	)
 	_eq(Array(unused[&"ui"]), ["selection"], "every UI image but the long table's frame is drawn somewhere")
 	_eq(

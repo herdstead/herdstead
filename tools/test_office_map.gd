@@ -835,3 +835,108 @@ func test_the_zone_sign_is_as_wide_as_what_it_says() -> void:
 	_eq(widths[3], OfficeZoneSign.MAX_WIDTH, "a very long one stops at MAX_WIDTH")
 	_check(widths[1] < 64.0, "API's sign is small: %s" % widths[1])
 	board.free()
+
+
+## The map's final width is settled before any retained zone is held, grown or
+## moved (codex's review of ba943f9, P1): in one refresh the blocker left of A
+## goes, A grows 2 → 20 panes (two lanes) and B under both grows 20 → 48 (three
+## lanes). Widened zone by zone, A was judged against the two-lane map and moved
+## to (1, 6) although its own place fits the three-lane map B brings; widened
+## first, A grows right in place at (11, 6) and B grows in place under it.
+func test_the_map_widens_for_every_zone_before_any_zone_is_moved() -> void:
+	var zones: Array[ZoneModel] = [
+		_zoned("machine/0", 0, [_room("r0", 2)]),
+		_zoned("machine/a", 1, [_room("ra", 2)]),
+		_zoned("machine/b", 2, [_room("rb", 20)]),
+	]
+	var first := _map_plan(zones)
+	if first == null:
+		return
+	_eq(
+		[first.zone("machine/0").cells, first.zone("machine/a").cells, first.zone("machine/b").cells],
+		[Rect2i(1, 6, 9, 6), Rect2i(11, 6, 9, 6), Rect2i(1, 13, 19, 6)],
+		"the blocker and A side by side, B of two lanes under both"
+	)
+	var signature := first.geometry_signature()
+	var after: Array[ZoneModel] = [_zoned("machine/a", 1, [_room("ra", 20)]), _zoned("machine/b", 2, [_room("rb", 48)])]
+	var grown := _map_plan(after, first)
+	if grown == null:
+		return
+	_eq(first.geometry_signature(), signature, "the previous map is unchanged")
+	_eq(grown.lanes, 3, "the map widened to B's three lanes")
+	_eq(grown.zone("machine/a").cells, Rect2i(11, 6, 19, 6), "A grew right in place, from (11, 6), over two lanes")
+	_eq(grown.zone("machine/b").cells, Rect2i(1, 13, 29, 6), "B grew right in place under it, over three")
+
+
+## Empty workspaces are bounded work (codex's review of ba943f9, P2): each is a
+## zone of one empty pod row, so it is charged to the table budget, and a map
+## whose slots cannot fit max_height_cells even packed lane by lane is refused
+## before any placement. Straight from herdr's wire (HerdrSnapshot.from_wire(),
+## OfficeProjection.project()): 100 empty workspaces plan; 290, the most two
+## lanes hold (5 + 145 · 7 = 1020 of 1024 rows), plan too; 291 do not, nor 600
+## (4.4 s before, placing every one first), nor 4096 (HerdrSnapshot's cap, over
+## the table budget), each refused promptly and by name. The bound is generous
+## for CI load: the refusals measure a few to 25 ms here.
+func test_many_empty_workspaces_are_refused_before_they_are_placed() -> void:
+	var cases := [
+		[100, ""],
+		[290, ""],
+		[291, "floor exceeds width, height or cell budget"],
+		[600, "floor exceeds width, height or cell budget"],
+		[HerdrSnapshot.MAX_WORKSPACES, "input exceeds table budget"],
+	]
+	for each: Array in cases:
+		var count: int = each[0]
+		var refusal: String = each[1]
+		var workspaces: Array[Dictionary] = []
+		for index in count:
+			workspaces.append({"workspace_id": "workspace%04d" % index, "number": index})
+		var snapshot := HerdrSnapshot.from_wire({"workspaces": workspaces, "tabs": [], "panes": []})
+		_check(snapshot != null, "%d empty workspaces come off the wire" % count)
+		if snapshot == null:
+			continue
+		var zones := OfficeProjection.project(snapshot, PackedStringArray(), "machine")
+		_eq(zones.size(), count, "%d: one zone each" % count)
+		var start := Time.get_ticks_usec()
+		var result := OfficeFloorLayout.plan(MapModel.of_zones("machine", zones), null, _real_rules(25))
+		var elapsed := (Time.get_ticks_usec() - start) / 1000.0
+		print("EMPTY_WORKSPACES %d: %.1f ms, %s" % [count, elapsed, result.problems])
+		if refusal.is_empty():
+			_eq(result.problems, PackedStringArray(), "%d: a valid map" % count)
+			_check(result.plan != null and result.plan.zones.size() == count, "%d: every zone placed" % count)
+		else:
+			_check(result.plan == null, "%d: refused" % count)
+			_eq(result.problems, PackedStringArray([refusal]), "%d: by name" % count)
+			_check(elapsed < 250.0, "%d: promptly, %.1f ms" % [count, elapsed])
+
+
+## A lane gap's plants take turns as well as its side tables: piece j is a side
+## table when j is odd, else plant_at(j / 2), so a run of five stands a plant, a
+## side table, the other plant, a side table and the first plant again (with
+## plant_at(j) every plant of a run was the first one). Zone 1, three pods deep
+## in lane 0, leaves lane 1 a gap of twelve rows under zone 2.
+func test_a_lane_gap_stands_both_plants_between_its_side_tables() -> void:
+	var zones: Array[ZoneModel] = [
+		_zoned("machine/1", 1, [_room("a", ROW), _room("b", ROW, 1), _room("c", ROW, 2)]),
+		_zoned("machine/2", 2, [_room("d", 2)]),
+	]
+	var plan := _furnished(MapModel.of_zones("machine", zones), 25)
+	if plan == null:
+		return
+	var gaps := OfficeDecorPlanner.lane_gaps(plan, _real_rules(25))
+	_eq(gaps.size(), 1, "one gap")
+	if gaps.is_empty():
+		return
+	var pieces := _gap_pieces(plan, gaps[0])
+	var kinds: Array[StringName] = []
+	for placed in pieces:
+		kinds.append(placed.piece)
+	print("GAP_RUN lane %d rows %d..%d: %s" % [gaps[0].lane, gaps[0].top, gaps[0].end, kinds])
+	var plant := OfficeDecorPlanner.plant_at(_pen().art, 0)
+	var other := OfficeDecorPlanner.plant_at(_pen().art, 1)
+	_check(plant != other, "the pack has two plants: %s, %s" % [plant, other])
+	_eq(
+		kinds,
+		[plant, ArtContract.PROP_SIDE_TABLE, other, ArtContract.PROP_SIDE_TABLE, plant] as Array[StringName],
+		"plant, side table, the other plant, side table, plant"
+	)

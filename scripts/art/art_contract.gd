@@ -96,9 +96,11 @@ const WALL_SIDE_RIGHT := &"wall.side_right"
 ## plants, the pictures, the pantry, the zones' partitions and the side tables
 ## of the lane gaps. All of it is furniture in the strict sense — it carries
 ## no herdr field — and `desk`, `monitor` and `chair` are drawn from the shared
-## table's own art rather than from these. The showroom's row room still
-## stands the retired row-wall sign and cabinet (PROP_SIGN, PROP_CABINET),
-## which the office no longer draws.
+## table's own art rather than from these. The showroom's row room
+## (scripts/preview.gd) still stands the retired row-wall sign and cabinet
+## (PROP_SIGN, PROP_CABINET), which the office no longer draws: they stay
+## required until the showroom stops drawing them (lane C), so a pack without
+## them is refused rather than dressing the showroom with holes.
 const PROP_SIGN := &"sign"
 const PROP_WINDOW := &"window"
 ## The same window at night (DayLight): its frame pixel for pixel, the view dark.
@@ -132,6 +134,7 @@ const PROP_PARTITION_H := &"partition_h"
 ## code, by state.
 const PROP_DONE_STACK_SMALL := &"done_stack_small"
 const PROP_IDS: Array[StringName] = [
+	PROP_SIGN,
 	PROP_WINDOW,
 	PROP_WINDOW_NIGHT,
 	PROP_DOOR,
@@ -145,6 +148,7 @@ const PROP_IDS: Array[StringName] = [
 	PROP_PARTITION_CORNER_BR,
 	PROP_PARTITION_H,
 	PROP_SIDE_TABLE,
+	PROP_CABINET,
 ]
 ## The pools scenes draw furniture from by weight (ItemSpec.group in the pack,
 ## docs/ITEMS.md), and what their members must stand on: never agent states.
