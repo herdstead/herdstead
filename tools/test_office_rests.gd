@@ -12,9 +12,22 @@ extends "res://tools/walking_test_base.gd"
 ## godot --headless --path . --script tools/test_office_rests.gd -- \
 ##     --read-only --socket=<a socket nobody listens on> --work=<short tmp dir>
 
+## The shared fixture with every zone, for the cases that page between zones.
+var whole: Dictionary = {}
+
 
 func _marker() -> String:
 	return "RESTS TESTS"
+
+
+## These cases are about one zone's people: api's, on a map of api alone, as
+## its floor was before one map per machine (the fixture's other zones would
+## put their own idle agents in the one pantry, and their papers on the map).
+## How zones share the pantry is test_the_pantry_is_shared_by_the_zones_in_wait_order.
+func _run() -> void:
+	whole = fixture
+	fixture = _only(fixture, "api")
+	await super()
 
 
 # --- blocked and done at the seat -------------------------------------------------
@@ -345,7 +358,7 @@ func test_the_bubble_wait_is_short_enough_to_read() -> void:
 ## pointer leaving takes it away; a drag over the bubble shows none; switching
 ## floors takes it away.
 func test_hovering_a_bubble_shows_a_tooltip() -> void:
-	var office := await _live_office(_with(fixture, "api:p2", {"agent_status": "blocked"}))
+	var office := await _live_office(_with(whole, "api:p2", {"agent_status": "blocked"}))
 	var key := _pane("api:p2")
 	var station := _station(office, key)
 	office.reveal(key)
@@ -388,10 +401,12 @@ func test_hovering_a_bubble_shows_a_tooltip() -> void:
 	await _parsed(_motion(at + Vector2(0, 70)))
 	await _parsed(_motion(at))
 	_check(office.hud.bubble_tip_shown(), "back on the bubble: the tooltip again")
-	# PageUp, the pointer staying where it is: the floor it pointed at is gone.
+	# PageUp, the pointer staying where it is: the camera pans to web's zone,
+	# and the bubble it pointed at moves away from under it.
 	await _office_key(office, KEY_PAGEUP)
-	_eq(office.navigator.shown_key, HerdrFleet.pane_key(LOCAL, "web"), "PageUp shows web")
-	_check(not office.hud.bubble_tip_shown(), "another floor: no tooltip")
+	await _physics_frames(2)
+	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "web"), "PageUp pans to web")
+	_check(not office.hud.bubble_tip_shown(), "another zone in view: no tooltip")
 	_done(office)
 
 
@@ -601,12 +616,12 @@ func test_a_cold_pass_places_the_pantry_and_the_seated() -> void:
 ## the moment it drops, but the office ranks the frozen floor by the starts it
 ## last saw live, so a refresh never reshuffles who has a spot: a real click,
 ## `N` (which finds a blocked agent on a second, live machine and switches to
-## its floor; the section brings us back, the floor drawn afresh) and a real
+## its map; the section brings us back, the map drawn afresh) and a real
 ## snapshot from that other machine. The first snapshot after the reconnect is
 ## cold and ranks afresh: every start is unknown then, so the projection order
 ## decides.
 func test_a_stale_pantry_is_never_reranked() -> void:
-	var office := await _two_machine_office(_with_residents(fixture))
+	var office := await _two_machine_office(_with_residents(fixture), PLAN_SCREEN)
 	var snapshot := _with_residents(fixture)
 	for pane_id: String in ["api:p4", "api:p2", "api:p1"]:
 		OS.delay_msec(5)
@@ -633,9 +648,9 @@ func test_a_stale_pantry_is_never_reranked() -> void:
 	var api := HerdrFleet.pane_key(LOCAL, "api")
 	await _office_key(office, KEY_N)
 	_eq(office.picked_key, HerdrFleet.pane_key(BEE, "hive:p1"), "N finds the live machine's blocked agent")
-	_check(office.navigator.shown_key != api, "and switches to its floor")
+	_eq(office.navigator.shown_key, BEE, "and switches to its map")
 	await _visit_floor(office, api)
-	_eq(office.navigator.shown_key, api, "the section brings us back")
+	_eq(office.navigator.shown_key, LOCAL, "the section brings us back")
 	_eq(rests.call(), [seat, pantry, pantry], "after N and back: drawn afresh, the same pantry")
 	var seen := office.frame.pane(HerdrFleet.pane_key(BEE, "hive:p1"))
 	_feed_bee(office, _bee_snapshot("working"))
@@ -757,18 +772,21 @@ func test_a_launched_agent_never_takes_a_pantry_spot() -> void:
 	_done(office)
 
 
-## A floor drawn afresh (another floor and back) puts everyone where they rest
-## at once, walking nobody: the idle back in the pantry with a cup, the blocked
-## at the desk with a hand up.
+## A map drawn afresh (another machine's and back) puts everyone where they
+## rest at once, walking nobody: the idle back in the pantry with a cup, the
+## blocked at the desk with a hand up. (Another zone of the same map pans and
+## walks on: WALKING's test_a_pageup_pans_without_rebuilding.)
 func test_a_floor_switch_places_everyone() -> void:
-	var office := await _live_office()
+	var office := await _two_machine_office(fixture, PLAN_SCREEN)
 	var snapshot := _with(fixture, "api:p2", {"agent_status": "idle"})
 	_feed(office, snapshot)
 	snapshot = _with(snapshot, "api:p1", {"agent_status": "blocked"})
 	_feed(office, snapshot)
 	_check(not _walkers(office).is_empty(), "api:p2 is still walking to the pantry when we leave")
-	await _visit_floor(office, HerdrFleet.pane_key(LOCAL, "web"))
+	await _visit_floor(office, HerdrFleet.pane_key(BEE, "hive"))
+	_eq(office.navigator.shown_key, BEE, "bee's map")
 	await _visit_floor(office, HerdrFleet.pane_key(LOCAL, "api"))
+	_eq(office.navigator.shown_key, LOCAL, "and back")
 	_eq([_ids(_walkers(office)), _ids(_ghosts(office))], [[], []], "back: nobody walks")
 	var resting := _station(office, _pane("api:p2"))
 	_eq(_floor_point(office, resting.actor()), resting.position + resting.rest_position(), "p2 on its spot")
@@ -834,66 +852,34 @@ func test_revealing_a_pantry_worker_shows_them() -> void:
 	_done(office)
 
 
-## Local and a second machine, `bee`, on a socket nobody answers: both clients
-## stopped, fed by hand.
-func _two_machine_office(first := fixture) -> OfficeDouble:
-	var office := OfficeDouble.new()
-	_live_offices.append(office)
-	# The suite's floors are planned 488 wide (PLAN_SCREEN, walking_test_base.gd).
-	office.test_screen = PLAN_SCREEN
-	office.test_args = AppArgs.parse(
-		PackedStringArray(
-			[
-				"--read-only",
-				"--socket=" + args.socket,
-				"--machine-socket=bee=" + args.work.path_join("bee-nowhere.sock")
-			]
-		)
+## Every zone of a map shares its one pantry: idle agents of different zones
+## take its spots in the order they went idle (OfficeRests, the `N` key's
+## order), and whoever finds none left sits at their desk.
+func test_the_pantry_is_shared_by_the_zones_in_wait_order() -> void:
+	var working: Dictionary = whole.duplicate(true)
+	for pane: Dictionary in _list(working, "panes"):
+		if pane.get("agent") != null:
+			pane.agent_status = "working"
+	var office := await _live_office(working)
+	var spots := office.layout_plan().pantry.capacity()
+	_eq(spots, 5, "one pantry of five spots for the map's five zones")
+	var order: Array[String] = ["web:p1", "api:p1", "infra:p1", "api:p2", "web:p2", "data:p1"]
+	var snapshot := working
+	for pane_id in order:
+		OS.delay_msec(5)
+		snapshot = _with(snapshot, pane_id, {"agent_status": "idle"})
+		_feed(office, snapshot)
+	office.settle()
+	var rests: Array = []
+	for pane_id in order:
+		rests.append(_station(office, _pane(pane_id)).rest)
+	var pantry := OfficeRests.Rest.PANTRY
+	_eq(
+		rests,
+		[pantry, pantry, pantry, pantry, pantry, OfficeRests.Rest.SEAT],
+		"the first five to go idle, from four zones, share it; the sixth sits"
 	)
-	office.manifest_path = MANIFESTS[0]
-	office.remember_theme = false
-	root.add_child(office)
-	_local(office).stop()
-	office.fleet._roster.stop()
-	_feed(office, first)
-	_feed_bee(office, _bee_snapshot("blocked"))
-	await _frames(2)
-	return office
-
-
-func _bee(office: OfficeDouble) -> HerdrClient:
-	return office.fleet._sites[1].client
-
-
-## Feed `bee` a fresh snapshot, live.
-func _feed_bee(office: OfficeDouble, snapshot: Dictionary) -> void:
-	var client := _bee(office)
-	client.stop()
-	client.online = true
-	client._apply_snapshot(snapshot.duplicate(true))
-	office.fleet.liveness_changed.emit()
-
-
-## bee's one floor, `hive`, with one agent in `status`.
-static func _bee_snapshot(status: String) -> Dictionary:
-	return {
-		"focused_pane_id": "hive:p1",
-		"workspaces": [{"workspace_id": "hive", "number": 1, "label": "hive"}],
-		"tabs": [{"tab_id": "hive:t1", "workspace_id": "hive", "number": 1, "label": "hive"}],
-		"panes":
-		[
-			{
-				"pane_id": "hive:p1",
-				"workspace_id": "hive",
-				"tab_id": "hive:t1",
-				"agent": "claude",
-				"agent_status": status,
-				"terminal_id": "term-hive-p1"
-			}
-		],
-		"agents": [],
-		"layouts": []
-	}
+	_done(office)
 
 
 ## The pane key of every seat whose stack of paper shows, in seat order.
@@ -915,7 +901,7 @@ func test_the_papers_and_the_minimap_count_unread_alike() -> void:
 	var api := HerdrFleet.pane_key(LOCAL, "api")
 	var done := _with(fixture, "api:p1", {"agent_status": "done"})
 	_feed(office, done)
-	var row := office.frame.find_floor(api).zone_model
+	var row := office.frame.find_zone(api).zone_model
 	_eq(row.done, 1, "one UNREAD on the minimap's row")
 	_eq(_shown_papers(office).size(), row.done, "and one stack of paper")
 	var malformed := _with(done, "api:p2", {"agent_status": "done"})
@@ -923,7 +909,7 @@ func test_the_papers_and_the_minimap_count_unread_alike() -> void:
 	_list(malformed, "panes").append(repeated.duplicate(true))
 	_feed(office, malformed)
 	_check(not office.layout_problems().is_empty(), "the repeated pane cannot be laid out")
-	row = office.frame.find_floor(api).zone_model
+	row = office.frame.find_zone(api).zone_model
 	_eq(row.done, 1, "the minimap's row counts the repeated pane not at all")
 	_eq(_shown_papers(office), [_pane("api:p1")], "the floor keeps its last valid paper")
 	_done(office)

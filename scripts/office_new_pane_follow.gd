@@ -9,20 +9,23 @@ extends RefCounted
 
 ## A pane a split made (HerdrFleet.pane_key) with its terminal, on its
 ## machine's `generation`: picked when a snapshot shows it, while the viewer's
-## pick is still `from_key`, the pane split, on the floor shown then (`floor_key`),
-## out of answer mode, and until `until_msec`.
+## pick is still `from_key`, the pane split, the viewer has not navigated since
+## (`nav_revision`), out of answer mode, and until `until_msec`.
 class PendingPick:
 	var key := ""
 	var pane_id := ""
 	var terminal_id := ""
 	var from_key := ""
-	var floor_key := ""
-	## OfficeNavigator.nav_revision then: recorded, not yet checked.
+	## OfficeNavigator.nav_revision then: any navigation the viewer asks for
+	## since (a zone picked, PageUp/PageDown, `N`, a counter, the list, NEWS,
+	## EVENTS, ...) is the viewer moving on. Panning (a drag, the wheel, the
+	## arrows) and herdr's focus moving are not.
 	var nav_revision := 0
 	var generation := 0
 	var until_msec := 0
-	## The pane is a new floor's shell (a space or a worktree the card made):
-	## picking it moves floors. Said for the record; the wait is the same.
+	## The pane is a new zone's shell (a space or a worktree the card made), on
+	## the same machine's map: picking it pans to that zone. Said for the record;
+	## the wait is the same.
 	var cross_floor := false
 
 
@@ -57,7 +60,6 @@ func later(target_key: String, pane_id: String, terminal_id: String, generation:
 	pending.pane_id = pane_id
 	pending.terminal_id = terminal_id
 	pending.from_key = target_key
-	pending.floor_key = _navigator.shown_key
 	pending.nav_revision = _navigator.nav_revision
 	pending.generation = generation
 	var wait: int = _wait_msec.call()
@@ -67,7 +69,7 @@ func later(target_key: String, pane_id: String, terminal_id: String, generation:
 
 ## The card made a new space or worktree from pane `from_key`, whose root
 ## pane `pane_id` (herdr's spelling) has terminal `terminal_id`, at the
-## machine's `generation`: wait for a snapshot to show it, on its new floor
+## machine's `generation`: wait for a snapshot to show it, in its new zone
 ## (follow() with `cross_floor`). A selection only, later.
 func later_space(
 	from_key: String, _workspace_id: String, pane_id: String, terminal_id: String, generation: int
@@ -78,14 +80,15 @@ func later_space(
 
 ## In a refresh, before the navigator settles: the new pane a split made is in
 ## `frame`, with the terminal herdr named, on the same connection, and the
-## viewer is still where the split left them (the pane split picked, the same
-## floor shown, out of answer mode): pick it, as a list pick does, and stop
-## waiting. The card then shows that shell; nothing is sent to it. Another pick
-## or connection: stop waiting. Another floor, answer mode, or the pane with
-## another terminal: stop waiting, and the card says why it was not picked.
-## A new floor's shell (`cross_floor`: a space or a worktree) is picked the
-## same way: locate() takes the pick to its floor, which the navigator then
-## shows; the viewer changing floor meanwhile still counts as moving on.
+## viewer is still where the split left them (the pane split picked, no
+## navigation since, out of answer mode): pick it, as a list pick does, and
+## stop waiting. The card then shows that shell; nothing is sent to it. Another
+## pick or connection: stop waiting. A navigation (the navigator's nav_revision
+## moved: another zone picked, PageUp/PageDown, `N`, ...), answer mode, or the
+## pane with another terminal: stop waiting, and the card says why it was not
+## picked. A new zone's shell (`cross_floor`: a space or a worktree) is picked
+## the same way, on the same map: the pick pans to its zone's pod. The office's
+## own pick (OfficeNavigator.follow_to()) does not count as the viewer moving.
 func follow(frame: OfficeFrame) -> void:
 	var pending := _pending
 	if pending == null or give_up():
@@ -94,7 +97,7 @@ func follow(frame: OfficeFrame) -> void:
 	if _navigator.picked_key != pending.from_key or _fleet.generation(machine) != pending.generation:
 		_pending = null
 		return
-	if _navigator.shown_key != pending.floor_key or _hud.inspector.answering():
+	if _navigator.nav_revision != pending.nav_revision or _hud.inspector.answering():
 		_leave(OfficePaneInspector.Unpicked.MOVED_ON)
 		return
 	var pane := frame.pane(pending.key)
@@ -106,7 +109,7 @@ func follow(frame: OfficeFrame) -> void:
 	_pending = null
 	_camera.cancel_press()
 	_hud.inspector.leave_answer()
-	_navigator.locate(frame, pane)
+	_navigator.follow_to(frame, pane)
 	# The split came from the opened panel: it stays open on the new pane, so
 	# its card offers START AGENT (a click of its own).
 	if not _hud.card_compact():

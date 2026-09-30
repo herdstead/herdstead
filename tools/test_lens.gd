@@ -106,7 +106,9 @@ func test_holding_l_adds_the_wait_line_and_letting_go_restores_everything() -> v
 		_eq(texts[row.key], OfficeAttention.compact_duration(wait.msec / 1000.0, wait.plus), "compact: " + row.key)
 		_eq(OverviewLine.for_text(row), OfficeAttention.wait_text(wait), "the OVERVIEW's FOR, same wait: " + row.key)
 		agents += 1
-	_eq(agents, 3, "api:p1, api:p2 and api:p4 each say how long")
+	# Every agent of the map says how long: api's three (p1, p2, p4), web's two,
+	# infra's three and data's two, every zone being drawn now.
+	_eq(agents, 10, "every agent of the map says how long")
 	_eq(_signals(office), signals, "the plates' words and the badges are as they were")
 	for station in _seats(office):
 		_eq(_plate(station).visible, not station.away(), "held, the plate shows at the desk: " + station.pane_key)
@@ -582,7 +584,7 @@ func test_hovering_a_news_item_points_at_its_desk_without_selecting() -> void:
 	_check(pointer.rect.encloses(target), "around its click area: %s holds %s" % [pointer.rect, target])
 	_eq(office.navigator.active_key, active, "nothing selected")
 	_eq(office.picked_key, "", "nothing picked")
-	_eq(office.navigator.shown_key, shown, "the same floor")
+	_eq(office.navigator.shown_key, shown, "the same map")
 	_eq(office.camera.pan, pan, "no pan")
 	_eq(_marks(office), marks, "no selection mark moved")
 	_eq(office.world.get_instance_id(), world, "nothing rebuilt")
@@ -594,32 +596,39 @@ func test_hovering_a_news_item_points_at_its_desk_without_selecting() -> void:
 	_done(office)
 
 
-## A list row for a pane on another floor marks that floor's FLOORS row (a
+## A list row for a pane on another machine marks its zone's FLOORS row (a
 ## 1-unit ink border, FloorRowPointed), never the current one, and draws
-## nothing in the world; leaving puts the row back.
+## nothing in the world; leaving puts the row back. A row for a pane in another
+## zone of the shown map points at its desk, as for any desk of the map.
 func test_hovering_a_row_for_another_floor_marks_its_floors_row() -> void:
-	var office := await _live_office()
-	var key := _pk("web:p1")
+	var office := await _two_machine_office()
+	var key := HerdrFleet.pane_key(BEE, "hive:p1")
 	var strip: Control = office.hud.get_node("%DrawerTab")
 	await _press(strip)
 	await _frames(3)
 	var row := office.hud.agent_list.row_for(key)
-	_check(row != null and row.is_visible_in_tree(), "web:p1 has a row in the open list")
+	_check(row != null and row.is_visible_in_tree(), "hive:p1 has a row in the open list")
 	if row == null:
 		_done(office)
 		return
-	var web := office.frame.floor_of(key)
-	_check(web != office.navigator.shown_key, "web is another floor")
-	var floor_row := office.hud.floors.row_for(web)
-	var shown_row := office.hud.floors.row_for(office.navigator.shown_key)
-	_eq(floor_row.theme_type_variation, &"FloorRow", "web's row as usual")
+	var hive := office.frame.zone_of(key)
+	_check(office.frame.find_zone(hive).building.key != office.navigator.shown_key, "hive is on another machine")
+	var floor_row := office.hud.floors.row_for(hive)
+	var shown_row := office.hud.floors.row_for(office.navigator.current_zone(office.frame))
+	_eq(floor_row.theme_type_variation, &"FloorRow", "hive's row as usual")
 	await _hover(row.get_global_rect().get_center())
-	_eq(floor_row.theme_type_variation, &"FloorRowPointed", "web's FLOORS row is marked")
-	_eq(shown_row.theme_type_variation, &"FloorRowCurrent", "the current floor's row keeps its look")
+	_eq(floor_row.theme_type_variation, &"FloorRowPointed", "hive's FLOORS row is marked")
+	_eq(shown_row.theme_type_variation, &"FloorRowCurrent", "the current zone's row keeps its look")
 	_check(not office.floor_view.pointer.visible, "nothing is pointed at in the world")
-	_eq(office.navigator.shown_key, office.frame.floor_of(_pk("api:p1")), "no floor change")
+	_eq(office.navigator.shown_key, LOCAL, "no map change")
 	await _hover(office.hud.world_rect().position + Vector2(4, 4))
 	_eq(floor_row.theme_type_variation, &"FloorRow", "leaving restores it")
+	var web := office.hud.agent_list.row_for(_pk("web:p1"))
+	var web_row := office.hud.floors.row_for(office.frame.zone_of(_pk("web:p1")))
+	await _hover(web.get_global_rect().get_center())
+	_check(office.floor_view.pointer.visible, "a row for web:p1, another zone of this map: its desk is pointed at")
+	_eq(office.floor_view.pointer.key, _pk("web:p1"), "that desk")
+	_eq(web_row.theme_type_variation, &"FloorRow", "and web's FLOORS row is not marked")
 	_done(office)
 
 
@@ -872,10 +881,10 @@ func _signal_nodes(office: OfficeDouble) -> Array[CanvasItem]:
 	return found
 
 
-## The tab key of the room pane `key` sits in on the shown floor.
+## The tab key of the room pane `key` sits in on the shown map.
 func _room_of(office: OfficeDouble, key: String) -> String:
-	var found := office.frame.find_floor(office.navigator.shown_key)
-	for room in found.zone_model.rooms:
+	var found := office.frame.map_of(office.navigator.shown_key)
+	for room in found.rooms:
 		for pane in room.panes:
 			if pane.key == key:
 				return room.key

@@ -250,7 +250,8 @@ func test_clicking_blocked_walks_the_longest_waits_like_n() -> void:
 		await _frames(3)
 		var key := office.picked_key
 		walked.append(key)
-		_eq(office.navigator.shown_key, office.frame.floor_of(key), "press %d shows the floor of %s" % [press, key])
+		var at := [office.navigator.shown_key, office.navigator.current_zone(office.frame)]
+		_eq(at, [LOCAL, office.frame.zone_of(key)], "press %d: the map of %s, its zone current" % [press, key])
 		_check(office.hud.world_rect().has_point(_desk_point(office, key)), "and brings its desk on screen")
 	_eq(walked, [_pane("infra:p1"), _pane("web:p1"), _pane("infra:p1")], "longest wait first, then round again")
 	office.picked_key = ""
@@ -278,7 +279,8 @@ func test_clicking_done_picks_the_oldest_unread() -> void:
 	await _press(counter)
 	await _frames(3)
 	_eq(office.picked_key, _pane("infra:p2"), "the one UNREAD longest")
-	_eq(office.navigator.shown_key, _floor("infra"), "on its floor")
+	var at := [office.navigator.shown_key, office.navigator.current_zone(office.frame)]
+	_eq(at, [LOCAL, _floor("infra")], "on its machine's map, its zone current")
 	_check(not office.hud.inspector.answering(), "not answering")
 	_check(not office.hud.card_expanded(), "and no card opened up for it")
 	await _press(counter)
@@ -629,8 +631,8 @@ func test_panes_no_floor_seats_wait_in_the_same_order() -> void:
 	quiet = _with(quiet, "api:p1", {"workspace_id": "web"})
 	quiet = _with(quiet, "api:p4", {"workspace_id": "web"})
 	var office := await _live_office(quiet)
-	_check(office.frame.floor_of(_pane("api:p1")).is_empty(), "no floor seats api:p1")
-	_check(office.frame.floor_of(_pane("api:p4")).is_empty(), "nor api:p4")
+	_check(office.frame.zone_of(_pane("api:p1")).is_empty(), "no floor seats api:p1")
+	_check(office.frame.zone_of(_pane("api:p4")).is_empty(), "nor api:p4")
 	var first := _with(quiet, "api:p4", {"agent_status": "blocked"})
 	_feed(office, first)
 	await _wait_seconds(1.2)

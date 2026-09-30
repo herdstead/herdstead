@@ -4,25 +4,33 @@ extends RefCounted
 ## The floor view, the presentation, the rests and the plan cache take a map,
 ## and the map planner (OfficeFloorLayout) lays every zone of it out at once.
 ##
-## The office still builds a map of exactly one zone (one workspace, or a
-## lobby) under that zone's key, never the machine's: the plan cache,
-## FloorPlan.floor_key, the world, the pans and the cold path all stay per
-## workspace. A map of several zones (of_zones()) is what the planner and its
-## tests lay out; the office moves to one map per machine later.
+## The office draws one map per machine (OfficeProjection.building() makes it
+## with of_zones() under the machine's key): the plan cache, FloorPlan.floor_key,
+## the world, the pans and the cold path are all the machine's. A machine with
+## no workspace is an empty map: no zone, nothing laid out but the shell.
 
-## The map's key: the wrapped zone's (see ZoneModel.key), or whatever of_zones() was given.
+## The map's key: the machine's for the office's maps (of_zones()), the wrapped
+## zone's for of(), which the planner's own tests use.
 var key := ""
 var zones: Array[ZoneModel] = []
 ## Every zone's rooms, in zone order, each zone's in its own order.
 var rooms: Array[RoomModel] = []
 
 
-## The map of the one zone `zone`, under its key.
+## The map of the one zone `zone`, under its key: a planner's test fixture;
+## the office's maps are the machines' (of_zones()).
 static func of(zone: ZoneModel) -> MapModel:
 	var map := MapModel.new()
 	map.key = zone.key
 	map.zones.append(zone)
 	map.rooms.append_array(zone.rooms)
+	return map
+
+
+## The empty map `map_key`: a machine with no workspace.
+static func empty(map_key: String) -> MapModel:
+	var map := MapModel.new()
+	map.key = map_key
 	return map
 
 
@@ -34,11 +42,6 @@ static func of_zones(map_key: String, list: Array[ZoneModel]) -> MapModel:
 		map.zones.append(zone)
 		map.rooms.append_array(zone.rooms)
 	return map
-
-
-## A map of one lobby: no workspace to lay out, only an empty floor.
-func lobby() -> bool:
-	return zones.size() == 1 and zones[0].lobby
 
 
 ## Changes that may require planning: the zones' geometry, sorted, and never

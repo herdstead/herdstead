@@ -232,7 +232,11 @@ func test_a_row_click_picks_the_pane_and_the_staff_panel_can_answer() -> void:
 	_eq(office.picked_key, key, "the click picks it")
 	_eq(line.theme_type_variation, &"OverviewRowCurrent", "its row reads selected")
 	_check(office.hud.overview_open(), "the overview stays open")
-	_eq(office.navigator.shown_key, HerdrFleet.pane_key(BEE, "alpha"), "its floor is the one shown now")
+	_eq(
+		[office.navigator.shown_key, office.navigator.current_zone(office.frame)],
+		[BEE, HerdrFleet.pane_key(BEE, "alpha")],
+		"its machine's map is the one shown now, its zone current"
+	)
 	_check(not office.world.visible, "and the world built for it stays out of sight")
 	var card := _card(office)
 	# The panel is one line until opened: Enter opens it, under the overview too.
@@ -430,11 +434,11 @@ func test_arrows_scroll_the_table_not_the_world() -> void:
 	_check(office.hud.holds_keyboard(), "the overview holds the keyboard")
 	await _hold(KEY_DOWN, 5)
 	_eq(office.camera.pan, pan, "the world does not pan under it")
-	var shown := office.navigator.shown_key
+	var shown := [office.navigator.shown_key, office.navigator.current_zone(office.frame)]
 	await _tap(KEY_A)
 	await _tap(KEY_PAGEUP)
 	_check(not office.hud.agent_list.has_keyboard(), "A: the list does not take the keyboard")
-	_eq(office.navigator.shown_key, shown, "PageUp: no other floor")
+	_eq([office.navigator.shown_key, office.navigator.current_zone(office.frame)], shown, "PageUp: no other zone")
 	_check(office.hud.overview_open(), "the overview is still open")
 	await _tap(KEY_O)
 	_check(not office.hud.holds_keyboard(), "closed, it lets go")

@@ -547,7 +547,7 @@ func _open_menu(key: String, at: Vector2) -> void:
 	var menu: PopupMenu = %Actions
 	menu.clear()
 	if entry.history != null:
-		var seated := not _office_frame.floor_of(entry.history.key).is_empty()
+		var seated := not _office_frame.zone_of(entry.history.key).is_empty()
 		menu.add_item("View" if entry.history.locatable and seated else "Details", Action.VIEW)
 		menu.set_item_disabled(menu.get_item_index(Action.VIEW), not entry.history.locatable)
 		_pop(menu, at)

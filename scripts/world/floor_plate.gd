@@ -1,35 +1,33 @@
 class_name OfficeFloorPlate
 extends Control
-## The plate over the shown floor's rooms (scenes/world/floor_plate.tscn):
-## `3F  LABEL`, or a mezzanine's `3A · CHECKOUT` with "worktree of 3F" after
-## it; a worktree group's accent before the title, one colour for the source
-## floor and all its mezzanines; the repository by its branch mark, with the
-## checkout a linked worktree stands in, or a lobby's note saying why its
-## building has no floors;
-## the machine and its live state once there is more than Local; the floor's
-## counts on the right; and under the band, why the floor cannot be laid out,
-## for as long as it cannot.
+## The machine plate over the map's zones (scenes/world/floor_plate.tscn): the
+## machine's name (`@ NAME` once there is more than Local), and then its live
+## state; a machine with no workspace says why it has none (its note); the
+## machine's counts on the right; and under the band, why its map cannot be
+## laid out, naming the zones at fault (`3 INFRA: invalid explicit seat hint`),
+## for as long as it cannot. Each zone's number, name, repository and checkout
+## are on its own sign (OfficeZoneSign), not here.
 ##
 ## World furniture that reads like the HUD: Labels in containers, styled by
 ## HudTheme's type variations, so this script places nothing. All it decides is
 ## how the band's width is shared out when it runs short (see _fit()). Its nodes
 ## are permanent: a new count, state or note is new text in the same Labels.
 
-## How much of the band's room the floor's own name may take first.
+## How much of the band's room the machine's name may take first.
 @export var title_share := 0.0
 ## How wide the repository line may grow, and how much more of it a linked
-## worktree's checkout directory gets after the repository name.
+## worktree's checkout directory gets after the repository name (unused on a
+## machine plate: the zone signs carry both).
 @export var repo_width := 0.0
 @export var worktree_width := 0.0
-## How wide a lobby's note may grow, and a mezzanine's "worktree of" line.
+## How wide an empty map's note may grow, and a mezzanine's "worktree of" line.
 @export var note_width := 0.0
 @export var source_width := 0.0
 @export var machine_width := 0.0
 
-var _lobby := false
+## The machine has no zone: its note says why.
+var _empty := false
 var _several := false
-var _worktree := false
-var _mezzanine := false
 
 
 func _ready() -> void:
@@ -53,52 +51,55 @@ func dress(art: ArtPack, look: Theme) -> void:
 	art.dress(mark, art.sprite_texture(spec), spec.pivot)
 
 
-## What the plate says about `floor_model` of `building`. `several` is there
-## being more than Local; `problems` are why the floor cannot be laid out, and
-## empty while it can. The machine's live state is show_state()'s.
-func show_floor(building: BuildingModel, floor_model: ZoneModel, several: bool, problems: PackedStringArray) -> void:
-	_lobby = floor_model.lobby
+## What the plate says about machine `building`'s map. `several` is there being
+## more than Local; `problems` are why the map cannot be laid out, and empty
+## while it can; `failing_zones` are the zones at fault (FloorPlanCache.failing_zones()),
+## which the problem line names. The machine's live state is show_state()'s.
+func show_map(
+	building: BuildingModel, several: bool, problems: PackedStringArray, failing_zones: PackedStringArray
+) -> void:
+	_empty = building.zones.is_empty()
 	_several = several
-	_worktree = not floor_model.worktree.is_empty()
-	_mezzanine = not floor_model.mezzanine_of.is_empty()
 	var title: Label = %Title
-	var number := OfficeFloorRow.number_text(floor_model)
-	title.text = "%s  %s" % [number, floor_model.label.to_upper()]
-	if _lobby:
-		title.text = "LOBBY"
-	elif _mezzanine:
-		# A mezzanine is named by its checkout, which says which branch it is.
-		title.text = "%s · %s" % [number, (floor_model.worktree if _worktree else floor_model.label).to_upper()]
+	title.text = ("@ " if several else "") + building.label.to_upper()
 	var source: Label = %WorktreeOf
 	source.text = ""
-	var group := floor_model.mezzanine_of
-	for other in building.zones:
-		if _mezzanine and other.key == floor_model.mezzanine_of:
-			source.text = "worktree of " + OfficeFloorRow.number_text(other)
-		elif not _mezzanine and other.mezzanine_of == floor_model.key:
-			group = floor_model.key
-	_show_accent(group)
-	# The repository, and after it the checkout directory a linked worktree
-	# stands in. Both go in one clipped label, so a narrow window trims the
-	# checkout first and the floor's own name, before it, never. A mezzanine's
-	# title already carries its checkout.
-	var repo_line := floor_model.repo
-	if _worktree and not _mezzanine:
-		repo_line = floor_model.worktree if repo_line.is_empty() else repo_line + " / " + floor_model.worktree
+	_show_accent("")
 	var repo_label: Label = %RepoLine
-	repo_label.text = repo_line
+	repo_label.text = ""
 	var machine_label: Label = %MachineLine
-	machine_label.text = "@ " + building.label.to_upper() if several else ""
+	machine_label.text = ""
 	var counts: Label = %Counts
 	counts.text = "%d SPACES / %d PANES" % [building.spaces, building.panes]
-	if not _lobby:
-		var tabs := floor_model.rooms.size()
-		var panes := floor_model.pane_count()
-		counts.text = "%d TAB%s / %d PANE%s" % [tabs, "" if tabs == 1 else "S", panes, "" if panes == 1 else "S"]
 	var problem: Label = %Problem
 	problem.visible = not problems.is_empty()
-	problem.text = "" if problems.is_empty() else "Layout unavailable: " + problems[0]
+	problem.text = (
+		"" if problems.is_empty() else "Layout unavailable: " + problem_line(building, problems, failing_zones)
+	)
 	_fit()
+
+
+## The first of `problems`, the zones at fault named as their signs name them
+## (`3 INFRA`): a zone's own problem (`zone <key>: …`) by that zone, a map-wide
+## one (a budget) after the zones `failing_zones` names.
+static func problem_line(
+	building: BuildingModel, problems: PackedStringArray, failing_zones: PackedStringArray
+) -> String:
+	if problems.is_empty():
+		return ""
+	var said := problems[0]
+	var names: Dictionary[String, String] = {}
+	for zone in building.zones:
+		names[zone.key] = "%s %s" % [zone.level_label, zone.label.to_upper()]
+	for key: String in names:
+		var prefix := "zone %s: " % key
+		if said.begins_with(prefix):
+			return names[key] + ": " + said.substr(prefix.length())
+	var named := PackedStringArray()
+	for key in failing_zones:
+		if names.has(key):
+			named.append(names[key])
+	return said if named.is_empty() else ", ".join(named) + ": " + said
 
 
 ## The machine's live state as the minimap shows it, and `reason`, its SSH
@@ -123,9 +124,8 @@ func show_state(state: MachineLiveness.State, reason: String) -> void:
 	_fit()
 
 
-## A worktree group (`group`, its source floor's key) wears one accent on every
-## plate of it, picked from the pack's accent colours by that key alone: decor
-## that follows the structure, never the state. A floor in no group wears none.
+## The accent before the title: none on a machine plate (each zone's sign wears
+## its worktree group's).
 func _show_accent(group: String) -> void:
 	var accent: Control = %Accent
 	accent.visible = not group.is_empty()
@@ -143,17 +143,29 @@ func state_text() -> String:
 	return state_label.text
 
 
-## A lobby's note, in full whatever the band has room to show; empty on a floor.
+## An empty map's note, in full whatever the band has room to show; empty on a
+## machine with zones.
 func note_text() -> String:
 	var note_label: Label = %Note
-	return note_label.text if _lobby else ""
+	return note_label.text if _empty else ""
+
+
+## What the plate names now: the machine (`@ NAME` among several).
+func title_text() -> String:
+	var title: Label = %Title
+	return title.text
+
+
+## The problem line under the band; empty while the map can be laid out.
+func problem_text() -> String:
+	var problem: Label = %Problem
+	return problem.text if problem.visible else ""
 
 
 ## Share the band's width out the way the plate is read when it runs short: the
-## counts keep their whole width on the right; the floor's own name comes first,
-## up to `title_share` of the room left of them; then the repository line (the
-## checkout, last in the same label, trims first), a mezzanine's "worktree of"
-## line (whole or hidden) or a lobby's note, each up to its width; then the
+## counts keep their whole width on the right; the machine's name comes first,
+## up to `title_share` of the room left of them; then an empty map's note, up to
+## its width; then the
 ## machine; the state gets what is left. A label left with no room is hidden,
 ## so the containers never lay out more than the band holds.
 func _fit() -> void:
@@ -187,19 +199,12 @@ func _fit() -> void:
 	repo.visible = not repo_label.text.is_empty()
 	if repo.visible:
 		var mark := branch.custom_minimum_size.x + repo.get_theme_constant("separation")
-		left -= mark + _allot(repo_label, repo_width + (worktree_width if _worktree else 0.0), left - mark) + gap
+		left -= mark + _allot(repo_label, repo_width, left - mark) + gap
 	source.visible = false
-	if _mezzanine and not source.text.is_empty():
-		# After the repository, which the title does not already say; and whole
-		# or not at all: "wo…" says nothing.
-		var source_room := _allot(source, source_width, left)
-		if source_room < _text_width(source):
-			source_room = _allot(source, 0.0, 0.0)
-		left -= source_room + (gap if source_room > 0.0 else 0.0)
-	note.visible = false
-	if _lobby:
-		var note_room := _allot(note, note_width, left)
-		left -= note_room + (gap if note_room > 0.0 else 0.0)
+	# A map that had no zone and has some now keeps the same plate: its note
+	# gives its room back, as a plate made afresh would have it.
+	var note_room := _allot(note, note_width if _empty else 0.0, left if _empty else 0.0)
+	left -= note_room + (gap if note_room > 0.0 else 0.0)
 	machine.visible = _several
 	if _several:
 		left -= _allot(machine_label, machine_width, left) + machine.get_theme_constant("separation")

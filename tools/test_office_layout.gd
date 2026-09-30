@@ -151,9 +151,9 @@ func test_projection_requires_matching_workspace_ownership() -> void:
 	var remote := OfficeProjection.building("remote", "Remote", HerdrSnapshot.from_wire(raw), states, false)
 	var buildings: Array[BuildingModel] = [local, remote]
 	_eq(local.panes, 1, "building count retains its conflicting pane")
-	_eq(OfficeProjection.floor_of(buildings, HerdrFleet.pane_key("local", "p")), "", "conflict is unlocatable")
+	_eq(OfficeProjection.zone_of(buildings, HerdrFleet.pane_key("local", "p")), "", "conflict is unlocatable")
 	_eq(
-		OfficeProjection.floor_of(buildings, HerdrFleet.pane_key("remote", "p")),
+		OfficeProjection.zone_of(buildings, HerdrFleet.pane_key("remote", "p")),
 		HerdrFleet.pane_key("remote", "A"),
 		"the remote legal control is still locatable"
 	)
@@ -168,7 +168,7 @@ func test_projection_requires_matching_workspace_ownership() -> void:
 		incomplete[missing] = []
 		var clean := HerdrSnapshot.from_wire(incomplete)
 		var building := OfficeProjection.building("local", "Local", clean, states, false)
-		_eq(OfficeProjection.floor_of([building], HerdrFleet.pane_key("local", "p")), "", missing + " absent")
+		_eq(OfficeProjection.zone_of([building], HerdrFleet.pane_key("local", "p")), "", missing + " absent")
 		_eq(OfficeProjection.panes_of(clean, states).size(), 1, "missing records do not hide attention")
 		_check(OfficeProjection.inspector_pane(clean, states, "local", "p") != null, "missing records retain details")
 
@@ -256,9 +256,8 @@ func test_linked_worktrees_are_mezzanines_of_their_source() -> void:
 		"the fixture: two worktrees under herdstead, notes has no worktree, ops lane has no source floor open"
 	)
 	_eq(_levels(building.zone_tree), _levels(building.zones), "already in tree order")
-	var lobby := OfficeProjection.building("m", "M", HerdrSnapshot.new(), PackedStringArray(), false)
-	_eq(lobby.zone_tree, lobby.zones, "a building of one lobby is its own tree")
-	_eq(lobby.zones[0].level_label, "", "a lobby has no number")
+	var empty := OfficeProjection.building("m", "M", HerdrSnapshot.new(), PackedStringArray(), false)
+	_eq([empty.zones.size(), empty.zone_tree.size()], [0, 0], "a building with no workspace has no zone, no tree")
 
 
 ## Several checkouts of one repository that are not linked worktrees: the lowest
@@ -989,20 +988,22 @@ func test_the_plan_cache_keeps_the_last_valid_plan_while_the_input_is_invalid() 
 	_eq(cache.attempt_count(), attempts + 1, "planned once")
 
 
-## A lobby is planned like any empty floor, walls, door, windows and walkways,
-## and kept; but it lays out nothing herdr sent, so no layout diagnostic reports it.
+## An empty map (a machine with no workspace) is planned like any other:
+## walls, door, windows and walkways, kept, and counted by the layout
+## diagnostics (the lobby it replaces was planned apart and counted nowhere).
 func test_the_plan_cache_plans_a_lobby_apart_from_the_layout() -> void:
 	var cache := FloorPlanCache.new()
-	var lobby := MapModel.of(OfficeProjection.lobby("machine"))
-	var plan := cache.prepare(lobby, _pen(), 640.0)
-	_check(plan != null and plan.desks.is_empty() and plan.zones.is_empty(), "a lobby is an empty planned floor")
-	_eq(plan.floor_key, lobby.key, "under its own key")
+	var empty := MapModel.empty("machine")
+	var plan := cache.prepare(empty, _pen(), 640.0)
+	_check(plan != null and plan.desks.is_empty() and plan.zones.is_empty(), "an empty map is an empty planned floor")
+	_eq(plan.floor_key, "machine", "under the machine's key")
 	_eq(OfficeFloorLayout.validate(plan, FloorLayoutPolicy.new()), PackedStringArray(), "with a walkable entrance")
-	_eq([cache.plan(lobby.key), cache.attempt_count()], [null, 0], "and no layout diagnostic counts it")
-	_eq(cache.problems(), PackedStringArray(), "or finds a problem with it")
-	_eq(cache.prepare(MapModel.of(OfficeProjection.lobby("machine")), _pen(), 1600.0), plan, "it is planned once")
+	_eq([cache.plan("machine"), cache.attempt_count()], [plan, 1], "held and counted like any map's")
+	_eq(cache.problems(), PackedStringArray(), "with no problem")
+	_eq(cache.prepare(MapModel.empty("machine"), _pen(), 1600.0), plan, "it is planned once")
+	_eq(cache.attempt_count(), 1, "the second ask a cache hit")
 	cache.prune([])
-	_check(cache.prepare(lobby, _pen(), 640.0) != plan, "a lobby that went away is planned afresh")
+	_check(cache.prepare(empty, _pen(), 640.0) != plan, "a machine that went away is planned afresh")
 
 
 ## Closing a workspace releases its plan and its history; another floor, only

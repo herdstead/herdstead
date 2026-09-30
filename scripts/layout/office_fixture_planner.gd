@@ -12,7 +12,7 @@ extends RefCounted
 ## geometry: the pantry stays at the left end when the map widens (the lift
 ## door moves with the main corridor), and nothing here reads who is on it.
 ##
-## Only a map with at least one desk gets it (a lobby and an empty workspace
+## Only a map with at least one desk gets it (an empty map and an empty workspace
 ## have nobody to idle); a band that cannot hold the counter and one spot has
 ## none. The fixture row stays a barrier on every map with desks, pantry or not
 ## (OfficeWalkGraph).

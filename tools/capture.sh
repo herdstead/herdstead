@@ -863,7 +863,7 @@ floors() {
 	[ "$scale" = zoom4 ] && zoom=4
 	CAPTURE_PREPARE=stage_bee godot_run --path "$ROOT" "$@" -- --socket="$WORK/herdr.sock" --read-only \
 		--machine-socket=bee="$WORK/bee.sock" --machine-socket=gone="$WORK/nobody.sock" \
-		--pack=res://assets/$pack/manifest.json --zoom="$zoom" --floor="$floor" \
+		--pack=res://assets/$pack/manifest.json --zoom="$zoom" --space="$floor" \
 		--wait=1.5 --capture="$OUT/$shot-$pack-$scale.png"
 	wait "$DROPPER"
 	DROPPER=""

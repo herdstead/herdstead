@@ -1,7 +1,7 @@
 class_name OfficeQuestionTips
 extends RefCounted
 ## What the question reader (OfficeQuestionReader) is told about the shown
-## floor, and the tooltip over a blocked agent's bubble that says what the
+## map, and the tooltip over a blocked agent's bubble that says what the
 ## reader found. Reads nothing itself and never writes: the reader's own gates
 ## decide every read (docs/WRITE_BOUNDARY.md, "Reads that are not gestures").
 
@@ -37,23 +37,22 @@ func attach(fleet: HerdrFleet, questions: OfficeQuestionReader) -> void:
 	_questions = questions
 
 
-## Tell the question reader which blocked agents the shown floor (`shown_key`,
-## drawn by `floor_view`) has, which of their bubbles are inside the world on
+## Tell the question reader which blocked agents the shown machine's map
+## (`machine`'s, every zone of it, drawn by `floor_view`) has, which of their bubbles are inside the world on
 ## screen (`view` -> Rect2, global; in wait order, longest first) and whether their
 ## machine may be read; nothing is on screen while the terminal monitor, the
 ## overview or the strategic view covers the world. A refresh and a timer call
 ## this: a pan moves bubbles on and off screen without a refresh. The tooltip
 ## over a bubble is written afresh from the reader here, and goes with the bubble.
-func watch(floor_view: OfficeFloorView, shown_key: String, view: Callable) -> void:
+func watch(floor_view: OfficeFloorView, machine: String, view: Callable) -> void:
 	if floor_view == null or _questions == null:
 		return
 	var frame: OfficeFrame = _frame.call()
 	var blocked: Dictionary[String, String] = {}
 	var seen: Array[PaneModel] = []
-	var found := frame.find_floor(shown_key)
+	var found := frame.map_of(machine)
 	var live := false
 	if found != null:
-		var machine := found.building.key
 		live = (
 			_fleet.has(machine)
 			and _fleet.snapshot_is_current(machine)
@@ -62,7 +61,7 @@ func watch(floor_view: OfficeFloorView, shown_key: String, view: Callable) -> vo
 			and not _hud.strategic_open()
 		)
 		var on_screen_rect: Rect2 = view.call()
-		for room in found.zone_model.rooms:
+		for room in found.rooms:
 			for pane in room.panes:
 				var seat := floor_view.seat(pane.key)
 				if seat == null or not _asking(pane):
@@ -123,7 +122,7 @@ func on_sign_hovered(zone_key: String, inside: bool) -> void:
 	if lens != null and lens.held:
 		return
 	var frame: OfficeFrame = _frame.call()
-	var found := frame.find_floor(zone_key)
+	var found := frame.find_zone(zone_key)
 	if found == null:
 		return
 	_tip_key = ""
@@ -148,7 +147,7 @@ static func sign_text(found: ZoneRef) -> String:
 	return "No repository" if parts.is_empty() else " · ".join(parts)
 
 
-## Take the tooltip away (a drag, a new floor, the overview, the lens, ...).
+## Take the tooltip away (a drag, another map, the overview, the lens, ...).
 func hide_tip() -> void:
 	_tip_key = ""
 	_sign_key = ""

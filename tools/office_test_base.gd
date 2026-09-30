@@ -8,6 +8,8 @@ extends "res://tools/test_base.gd"
 const AGENT_RECORD_ONLY: Array[String] = ["launch_pending", "name", "interactive_ready"]
 const MANIFESTS := ["res://assets/daylight/manifest.json"]
 const LOCAL := HerdrFleet.LOCAL
+## The second machine of the cases that need one (_two_machine_office()).
+const BEE := "socket:bee"
 ## The live office with a viewport size this suite decides; see the file.
 const OfficeDouble := preload("res://tools/office_double.gd")
 ## The window every case gives the office, and the one _live_office() tells it
@@ -136,10 +138,13 @@ func _open_tab_of(snapshot: Dictionary, workspace_id: String, tab_id: String) ->
 	return result
 
 
-## The task-lamp level of every seat with a pane on the shown floor, by pane id.
-func _lamps(office: OfficeDouble) -> Dictionary:
+## The task-lamp level of every seat with a pane on the shown map, by pane id;
+## only workspace `zone`'s (the fixture's pane ids begin with it) when given.
+func _lamps(office: OfficeDouble, zone := "") -> Dictionary:
 	var result := {}
 	for station in _seats(office):
+		if not zone.is_empty() and not HerdrFleet.split_key(station.pane_key)[1].begins_with(zone + ":"):
+			continue
 		result[HerdrFleet.split_key(station.pane_key)[1]] = _lamp_level(station.table, station.column, station.side)
 	return result
 
@@ -834,3 +839,108 @@ func _feet_size() -> Vector2:
 ## its first table: api:p1 far, api:p3 near.
 func _both_sides() -> Dictionary:
 	return _with(fixture, "api:p3", {"agent": "pi"})
+
+
+## Local and a second machine, `bee`, on a socket nobody answers: both clients
+## stopped, fed by hand.
+## `screen` is the window (the walking suites plan 488 wide: PLAN_SCREEN).
+func _two_machine_office(first := fixture, screen := Vector2(SCREEN)) -> OfficeDouble:
+	var office := OfficeDouble.new()
+	_live_offices.append(office)
+	office.test_screen = screen
+	office.test_args = AppArgs.parse(
+		PackedStringArray(
+			[
+				"--read-only",
+				"--socket=" + args.socket,
+				"--machine-socket=bee=" + args.work.path_join("bee-nowhere.sock")
+			]
+		)
+	)
+	office.manifest_path = MANIFESTS[0]
+	office.remember_theme = false
+	root.add_child(office)
+	_local(office).stop()
+	office.fleet._roster.stop()
+	_feed(office, first)
+	_feed_bee(office, _bee_snapshot("blocked"))
+	await _frames(2)
+	return office
+
+
+func _bee(office: OfficeDouble) -> HerdrClient:
+	return office.fleet._sites[1].client
+
+
+## Feed `bee` a fresh snapshot, live.
+func _feed_bee(office: OfficeDouble, snapshot: Dictionary) -> void:
+	var client := _bee(office)
+	client.stop()
+	client.online = true
+	client._apply_snapshot(snapshot.duplicate(true))
+	office.fleet.liveness_changed.emit()
+
+
+## bee's one workspace, `hive`, with one agent in `status`.
+static func _bee_snapshot(status: String) -> Dictionary:
+	return {
+		"focused_pane_id": "hive:p1",
+		"workspaces": [{"workspace_id": "hive", "number": 1, "label": "hive"}],
+		"tabs": [{"tab_id": "hive:t1", "workspace_id": "hive", "number": 1, "label": "hive"}],
+		"panes":
+		[
+			{
+				"pane_id": "hive:p1",
+				"workspace_id": "hive",
+				"tab_id": "hive:t1",
+				"agent": "claude",
+				"agent_status": status,
+				"terminal_id": "term-hive-p1"
+			}
+		],
+		"agents": [],
+		"layouts": []
+	}
+
+
+func _decor_signatures(plan: FloorPlan) -> PackedStringArray:
+	var found := PackedStringArray()
+	for placed in plan.decorations:
+		found.append(placed.geometry_signature())
+	found.sort()
+	return found
+
+
+func _decor_places(office: OfficeDouble) -> Array:
+	var found := _decor(office).map(func(piece: OfficeDecor) -> String: return "%s@%s" % [piece.piece, piece.position])
+	found.sort()
+	return found
+
+
+func _planned_places(plan: FloorPlan) -> Array:
+	var found := plan.decorations.map(
+		func(piece: DecorPlacement) -> String: return "%s@%s" % [piece.piece, piece.position]
+	)
+	found.sort()
+	return found
+
+
+## The instance id of `node` and of everything under it, in tree order.
+func _subtree_ids(node: Node) -> Array:
+	return (
+		[node.get_instance_id()]
+		+ node.find_children("*", "", true, false).map(func(each: Node) -> int: return each.get_instance_id())
+	)
+
+
+## Whether strip column `frame` is one of `track`'s frames.
+func _within(track: PixelPeople.Track, frame: Variant) -> bool:
+	var column: int = frame
+	return column >= track.start and column < track.start + track.frame_count()
+
+
+## Each partition sprite of `zone` on the shown map, as "texture@position".
+func _partitions_drawn(office: OfficeDouble, zone: String) -> Array:
+	return office.floor_view.partition_sprites(zone).map(
+		func(sprite: Sprite2D) -> String: return "%s@%s" % [sprite.texture.resource_path, sprite.position]
+	)

@@ -105,22 +105,23 @@ func test_news_shows_the_newest_first_in_herdr_words() -> void:
 
 
 ## A click on an entry picks its pane the way a row of the agent list does:
-## the pane is selected, its floor shown, its desk in the world's room, and
-## the card is not answering anything.
+## the pane is selected, its machine's map shown and panned to its zone, its
+## desk in the world's room, and the card is not answering anything.
 func test_a_news_click_picks_the_pane_like_the_list() -> void:
 	var office := await _live_office()
 	var key := _pk("web:p2")
 	_feed(office, _with(fixture, "web:p2", {"agent_status": "working"}))
 	await _frames(2)
-	var start_floor := office.navigator.shown_key
+	var start_zone := office.navigator.current_zone(office.frame)
 	var item := office.hud.news.item(0)
 	_check(item.visible and not item.disabled, "the newest entry can be clicked")
 	_eq(item.tooltip_text, NewsItem.TIP_PICK, "and says what a click does")
 	await _press(item)
 	await _frames(3)
 	_eq(office.picked_key, key, "the click picks web:p2")
-	_eq(office.navigator.shown_key, office.frame.floor_of(key), "its floor is shown")
-	_check(office.navigator.shown_key != start_floor, "another floor than the one before")
+	_eq(office.navigator.shown_key, LOCAL, "its machine's map is shown")
+	_eq(office.navigator.current_zone(office.frame), office.frame.zone_of(key), "its zone the current one")
+	_check(office.navigator.current_zone(office.frame) != start_zone, "another zone than the one before")
 	_check(office.hud.world_rect().has_point(_desk_point(office, key)), "its desk is in the world's room")
 	_check(not office.hud.inspector.answering(), "and nothing is being answered")
 	_done(office)
@@ -364,7 +365,8 @@ func test_an_events_row_click_picks_and_a_gone_one_is_disabled() -> void:
 	await _press(row)
 	await _frames(3)
 	_eq(office.picked_key, _pk("infra:p3"), "the click picks infra:p3")
-	_eq(office.navigator.shown_key, office.frame.floor_of(_pk("infra:p3")), "and shows its floor")
+	_eq(office.navigator.shown_key, LOCAL, "and shows its machine's map")
+	_eq(office.navigator.current_zone(office.frame), office.frame.zone_of(_pk("infra:p3")), "its zone the current one")
 	_eq(row.theme_type_variation, &"ListRowCurrent", "its row is the current one")
 	_feed(office, _without(blocked, "web:p2"))
 	_feed(office, _without(blocked, "web:p2"))

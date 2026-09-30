@@ -344,7 +344,7 @@ func test_the_line_names_the_table_floor_or_mezzanine_and_they_go() -> void:
 	await _click_control(closer)
 	await _until(func() -> bool: return office.frame.pane(p4) == null, "closed")
 	await _until(
-		func() -> bool: return office.frame.find_floor(hs) != null and _tables_of(office, hs) == 1, "its table went"
+		func() -> bool: return office.frame.find_zone(hs) != null and _tables_of(office, hs) == 1, "its table went"
 	)
 	# The last pane of a plain floor.
 	var notes := HerdrFleet.pane_key(HerdrFleet.LOCAL, "notes")
@@ -361,7 +361,7 @@ func test_the_line_names_the_table_floor_or_mezzanine_and_they_go() -> void:
 		"the last pane of a floor"
 	)
 	await _click_control(closer)
-	await _until(func() -> bool: return office.frame.find_floor(notes) == null, "the floor went")
+	await _until(func() -> bool: return office.frame.find_zone(notes) == null, "the floor went")
 	# The last pane of a mezzanine, its agent blocked: heavier words.
 	var hud := HerdrFleet.pane_key(HerdrFleet.LOCAL, "hud")
 	var hud_p1 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "hud:p1")
@@ -381,7 +381,7 @@ func test_the_line_names_the_table_floor_or_mezzanine_and_they_go() -> void:
 	_eq(_note(office), "Kills CLAUDE mid-question.", "a blocked agent dies with its question")
 	_eq(closer.text, "Close · kills", "the button says so")
 	await _click_control(closer)
-	await _until(func() -> bool: return office.frame.find_floor(hud) == null, "the mezzanine went")
+	await _until(func() -> bool: return office.frame.find_zone(hud) == null, "the mezzanine went")
 	_eq(
 		_writes_seen("control-a"),
 		PackedStringArray(["pane.close hs:p4", "pane.close notes:p1", "pane.close hud:p1"]),
@@ -390,7 +390,7 @@ func test_the_line_names_the_table_floor_or_mezzanine_and_they_go() -> void:
 	var closes := _list(_ctl("control-a", "stats"), "closes")
 	var cascade := func(record: Dictionary) -> Array: return [record.get("last_of_tab"), record.get("last_of_space")]
 	_eq(closes.map(cascade), [[true, false], [true, true], [true, true]], "as the fake cascaded")
-	_check(office.frame.find_floor(hs) != null, "the repo's own floor stays")
+	_check(office.frame.find_zone(hs) != null, "the repo's own floor stays")
 
 
 ## The last pane of the repo's own floor while its mezzanines are open is
@@ -894,5 +894,5 @@ func _line(office: OfficeDouble) -> String:
 
 ## How many tables the frame lays on floor `floor_key`.
 func _tables_of(office: OfficeDouble, floor_key: String) -> int:
-	var found := office.frame.find_floor(floor_key)
+	var found := office.frame.find_zone(floor_key)
 	return 0 if found == null else found.zone_model.rooms.size()

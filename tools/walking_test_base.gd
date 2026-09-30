@@ -8,8 +8,6 @@ extends "res://tools/office_test_base.gd"
 ## The frame rates walks are stepped at: the office in use, and minimized.
 const FPS := 30.0
 const MINIMIZED_FPS := 8.0
-## The second machine of the cases that need one (see _two_machine_office()).
-const BEE := "socket:bee"
 ## The window these suites lay floors out in: 628x480 plans a floor 488 units
 ## wide (OfficeHud.plan_width()). The walks, pantries and rows the
 ## cases here measure stand on that geometry.
@@ -180,6 +178,17 @@ func _without(snapshot: Dictionary, pane_id: String) -> Dictionary:
 		result[field] = _list(result, field).filter(func(each: Dictionary) -> bool: return each.pane_id != pane_id)
 	for layout: Dictionary in _list(result, "layouts"):
 		layout.panes = _list(layout, "panes").filter(func(each: Dictionary) -> bool: return each.pane_id != pane_id)
+	return result
+
+
+## `snapshot` with only workspace `workspace_id`: a map of that one zone, for
+## the cases about how a zone grows, with no other zone below it to move round.
+func _only(snapshot: Dictionary, workspace_id: String) -> Dictionary:
+	var result: Dictionary = snapshot.duplicate(true)
+	for field: String in ["workspaces", "tabs", "panes", "agents", "layouts"]:
+		result[field] = _list(result, field).filter(
+			func(each: Dictionary) -> bool: return str(each.get("workspace_id", "")) == workspace_id
+		)
 	return result
 
 

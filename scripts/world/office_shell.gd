@@ -104,8 +104,8 @@ static func door(plan: FloorPlan) -> Vector2:
 ## Where the top wall's windows are centred, left to right, WINDOW_SPACING
 ## apart. On a map with a pantry the run is centred in the free stretch of the
 ## top wall between the pantry's drawing and WINDOW_CLEARANCE short of the
-## door: as many as fit there, the same gap at both ends. A map without one (a
-## lobby, an empty workspace) keeps the run it always had: from 64 on, off the
+## door: as many as fit there, the same gap at both ends. A map without one (an
+## empty map, an empty workspace) keeps the run it always had: from 64 on, off the
 ## side walls and WINDOW_CLEARANCE from the door. Pure: the floor view draws
 ## exactly these, and the tests read them.
 static func window_xs(plan: FloorPlan, pen: OfficeDraw) -> Array[float]:

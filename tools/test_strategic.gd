@@ -253,10 +253,11 @@ func test_squares_wear_the_floors_window_scale() -> void:
 	}
 	for pane_id: String in wanted:
 		_eq(looks.get(_pk(pane_id), &""), wanted[pane_id], "the look of " + pane_id)
-	var floor_row := office.hud.floors.row_for(office.navigator.shown_key)
+	var zone := office.navigator.current_zone(office.frame)
+	var floor_row := office.hud.floors.row_for(zone)
 	var windows: Control = floor_row.get_node("%Windows")
 	var index := 0
-	var found := office.frame.find_floor(office.navigator.shown_key)
+	var found := office.frame.find_zone(zone)
 	for room in found.zone_model.rooms:
 		for pane in room.panes:
 			var look := OfficeFloorRow.window_look(pane, true)
@@ -413,46 +414,49 @@ func test_a_stale_floor_is_dark_and_says_no_wait() -> void:
 # --- floors, machines, other panels ----------------------------------------------------
 
 
-## PageDown and a FLOORS row show another floor with the view open: it stays
-## open and draws that floor, a mezzanine titled as its plate is.
+## PageDown and a FLOORS row with the view open: it stays open over the hidden
+## world; a zone of this machine (PageDown, a row) pans the map under it and
+## keeps it as it is, titled for the machine; a row of another machine's zone
+## redraws it for that machine. (Zone captions and sections are the SPACES
+## rail's step; a mezzanine was titled as its plate named it when a floor was
+## a map of its own.)
 func test_pgdn_and_a_floors_row_redraw_it_for_that_floor() -> void:
 	var on_notes := _focused_on(worktrees, "notes:p1")
 	on_notes.focused_workspace_id = "notes"
 	on_notes.focused_tab_id = "notes:t1"
-	var office := await _live_office(on_notes, WIDE)
+	var office := await _two_machine_office(on_notes, WIDE)
 	await _office_key(office, KEY_S)
-	var first := office.navigator.shown_key
+	var first := office.navigator.current_zone(office.frame)
 	var title := office.hud.strategic.title_text()
+	_eq(title, "@ LOCAL", "titled for the machine, among several")
+	var squares := _plan(office).seat_keys()
 	await _office_key(office, KEY_PAGEDOWN)
-	_check(office.navigator.shown_key != first, "PageDown shows another floor")
+	_check(office.navigator.current_zone(office.frame) != first, "PageDown pans to another zone")
 	_check(office.hud.strategic_open(), "the view stays open")
 	_check(not office.world.visible, "over a world still hidden")
-	_check(office.hud.strategic.title_text() != title, "titled for that floor: " + office.hud.strategic.title_text())
+	_eq(office.hud.strategic.title_text(), title, "the same machine, the same title")
+	_eq(_plan(office).seat_keys(), squares, "and the same squares")
 	_same_squares(office, "after PageDown")
 	var mezzanine := ""
 	for key: Variant in office.hud.floors.row_keys():
-		var ref := office.frame.find_floor(str(key))
-		if ref != null and not ref.zone_model.mezzanine_of.is_empty() and str(key) != office.navigator.shown_key:
+		var ref := office.frame.find_zone(str(key))
+		if ref != null and not ref.zone_model.mezzanine_of.is_empty():
 			mezzanine = str(key)
 			break
 	_check(not mezzanine.is_empty(), "the fixture has a mezzanine to click")
 	await _visit_floor(office, mezzanine)
 	await _frames(2)
-	_eq(office.navigator.shown_key, mezzanine, "the FLOORS row shows it")
+	_eq(office.navigator.current_zone(office.frame), mezzanine, "its FLOORS row pans to it")
 	_check(office.hud.strategic_open(), "still open")
-	var ref := office.frame.find_floor(mezzanine)
-	var source := office.frame.find_floor(ref.zone_model.mezzanine_of)
-	var wanted := (
-		"%s · %s · worktree of %s"
-		% [
-			OfficeFloorRow.number_text(ref.zone_model),
-			ref.zone_model.worktree.to_upper(),
-			OfficeFloorRow.number_text(source.zone_model)
-		]
-	)
-	_eq(office.hud.strategic.title_text(), wanted, "a mezzanine as its plate names it")
-	_check(wanted.begins_with("1A · "), "1A first: " + wanted)
+	_eq(office.hud.strategic.title_text(), title, "a row of this machine keeps the title")
 	_same_squares(office, "on the mezzanine")
+	await _visit_floor(office, HerdrFleet.pane_key(BEE, "hive"))
+	await _frames(2)
+	_eq(office.navigator.shown_key, BEE, "a row of bee's shows bee's map")
+	_check(office.hud.strategic_open(), "still open")
+	_eq(office.hud.strategic.title_text(), "@ BEE", "titled for that machine")
+	_eq(Array(_plan(office).seat_keys()), [HerdrFleet.pane_key(BEE, "hive:p1")], "its squares")
+	_same_squares(office, "on bee's map")
 	_done(office)
 
 
@@ -467,18 +471,17 @@ func test_several_machines_title_names_the_machine() -> void:
 	]
 	var frame := OfficeProjection.frame(machines, art.state_names())
 	_check(frame.several_machines(), "two machines")
-	var key := frame.floor_of(HerdrFleet.pane_key("socket:bee", "api:p1"))
-	var found := frame.find_floor(key)
+	var found := frame.building_of("socket:bee")
 	var rules := FloorLayoutPolicy.new()
 	rules.actor_footprint = PixelPerson.footprint()
 	rules.actor_draw_rect = PixelPerson.drawing_rect(art.people)
-	var plan := OfficeFloorLayout.plan(MapModel.of(found.zone_model), null, rules).plan
+	var plan := OfficeFloorLayout.plan(found.map, null, rules).plan
 	var live := StrategicModel.of(plan, found, true, MachineLiveness.State.LIVE, StateLog.new(), "", 0)
-	_eq(live.title, "1F  API @ bee", "the machine's label after the floor")
+	_eq(live.title, "@ BEE", "the machine's own label, among several")
 	_eq(live.state_text, "", "a live machine says nothing more")
 	_check(not live.stale, "and is not stale")
 	var alone := StrategicModel.of(plan, found, false, MachineLiveness.State.LIVE, StateLog.new(), "", 0)
-	_eq(alone.title, "1F  API", "one machine: no label")
+	_eq(alone.title, "BEE", "one machine: its label, no `@`")
 	var gone := StrategicModel.of(plan, found, true, MachineLiveness.State.OFFLINE, StateLog.new(), "", 0)
 	_eq(gone.state_text, "OFFLINE", "a dropped machine says so")
 	_check(gone.stale, "and is stale")
@@ -608,8 +611,8 @@ func test_n_keeps_it_open_and_moves_the_corners() -> void:
 	_done(office)
 
 
-## Hovering a list row about a pane on the shown floor dashes its square; one on
-## another floor dashes nothing here and marks that floor's FLOORS row.
+## Hovering a list row about a pane on the shown map dashes its square, in
+## whichever zone it sits.
 func test_hovering_a_list_row_dashes_its_square() -> void:
 	var office := await _live_office(fixture, WIDE)
 	var strip: Control = office.hud.get_node("%DrawerTab")
@@ -624,9 +627,9 @@ func test_hovering_a_list_row_dashes_its_square() -> void:
 	_check(plan.draws > draws, "drawn again for it")
 	var other := office.hud.agent_list.row_for(_pk("web:p1"))
 	await _hover(other.get_global_rect().get_center())
-	_eq(plan.pointed_key(), "", "a pane on another floor dashes nothing here")
-	var web := office.hud.floors.row_for(office.frame.floor_of(_pk("web:p1")))
-	_eq(web.theme_type_variation, &"FloorRowPointed", "it marks web's FLOORS row")
+	_eq(plan.pointed_key(), _pk("web:p1"), "a pane in another zone of this map dashes its own square")
+	var web := office.hud.floors.row_for(office.frame.zone_of(_pk("web:p1")))
+	_eq(web.theme_type_variation, &"FloorRow", "and marks no FLOORS row")
 	await _hover(office.hud.world_rect().get_center())
 	_eq(plan.pointed_key(), "", "leaving takes the dash away")
 	_done(office)
@@ -744,7 +747,7 @@ func test_the_stress_fit_at_2x_4x_and_min() -> void:
 	hud.queue_free()
 
 
-## A lobby, and a floor with no desk, say so and draw no square.
+## An empty map (a machine with no workspace) says so and draws no square.
 func test_a_lobby_says_no_desks() -> void:
 	var empty: Dictionary = fixture.duplicate(true)
 	for field: String in ["workspaces", "tabs", "panes", "layouts", "agents"]:
@@ -753,16 +756,16 @@ func test_a_lobby_says_no_desks() -> void:
 		empty.erase(field)
 	var office := await _live_office(empty, WIDE)
 	await _office_key(office, KEY_S)
-	_check(office.hud.strategic_open(), "S opens it in a lobby too")
+	_check(office.hud.strategic_open(), "S opens it on an empty map too")
 	var said: Label = office.hud.strategic.get_node("%Empty")
 	_check(said.visible, "it says there are no desks")
-	_eq(said.text, "No desks on this floor", "in these words")
+	_eq(said.text, "No desks on this machine", "in these words")
 	var scroll: Control = office.hud.strategic.get_node("%Scroll")
 	_check(not scroll.visible, "and draws no plan")
 	_eq(_plan(office).seat_keys().size(), 0, "no square")
 	_feed(office, fixture)
 	await _frames(2)
-	_check(not said.visible, "a floor with desks draws them")
+	_check(not said.visible, "a map with desks draws them")
 	_check(scroll.visible, "its plan")
 	_done(office)
 
@@ -965,10 +968,10 @@ func _same_squares(office: OfficeDouble, when: String) -> void:
 	_eq(keys, seats, "a square per seated pane " + when)
 
 
-## The tab key of the room pane `key` sits in on the shown floor.
+## The tab key of the room pane `key` sits in on the shown map.
 func _room_of(office: OfficeDouble, key: String) -> String:
-	var found := office.frame.find_floor(office.navigator.shown_key)
-	for room in found.zone_model.rooms:
+	var found := office.frame.map_of(office.navigator.shown_key)
+	for room in found.rooms:
 		for pane in room.panes:
 			if pane.key == key:
 				return room.key

@@ -483,8 +483,8 @@ func test_an_empty_workspace_is_a_zone_of_one_empty_row() -> void:
 	_eq(plan.zones[0].rows[0].desks.size(), 0, "with no desk in it")
 	_eq(plan.zones[0].cells.size, Vector2i(9, OfficeZoneLayout.pod_row_cells()), "one lane, one pod row")
 	_eq(plan.desks.size(), 0, "no invented table")
-	var lobby := OfficeFloorLayout.plan(MapModel.of(OfficeProjection.lobby("machine")), null, _real_rules()).plan
-	_eq([lobby.zones.size(), lobby.desks.size()], [0, 0], "a lobby has no zone")
+	var empty := OfficeFloorLayout.plan(MapModel.empty("machine"), null, _real_rules()).plan
+	_eq([empty.zones.size(), empty.desks.size()], [0, 0], "an empty map has no zone")
 
 
 ## A map's signature is its key and its zones' signatures, sorted: the order

@@ -73,14 +73,23 @@ func test_bubbles_read_blocked_panes_on_screen_one_at_a_time() -> void:
 	await _until_stats(
 		"control-b", func(_stats: Dictionary) -> bool: return _read_panes("control-b").size() >= 2, "the second read"
 	)
+	await _until_stats(
+		"control-b", func(_stats: Dictionary) -> bool: return _read_panes("control-b").size() >= 3, "the third read"
+	)
 	await _wait(1.5)
-	_eq(_read_panes("control-b"), ["alpha:p1", "alpha:p3"], "then the other, and neither again within ten seconds")
+	# bee's blocked bravo:p1 is another zone of the same map now, its bubble on
+	# screen under alpha's: it is read too, after alpha's two, in wait order.
+	_eq(
+		_read_panes("control-b"),
+		["alpha:p1", "alpha:p3", "bravo:p1"],
+		"then the other, then bravo's, one at a time, and none again within ten seconds"
+	)
 	_eq(
 		_sequence("control-b"),
-		PackedStringArray(["pane.read detection 200", "pane.read detection 200"]),
+		PackedStringArray(["pane.read detection 200", "pane.read detection 200", "pane.read detection 200"]),
 		"the card's own payload, nothing else asked of bee"
 	)
-	_eq(_read_panes("control-a"), [], "Local's blocked bravo:p1 is on a floor not shown: not read")
+	_eq(_read_panes("control-a"), [], "Local's blocked bravo:p1 is on a map not shown: not read")
 	var station := _station_of(office, HerdrFleet.pane_key(BEE, "alpha:p1"))
 	var p1 := HerdrFleet.pane_key(BEE, "alpha:p1")
 	await _until(
@@ -96,7 +105,7 @@ func test_bubbles_read_blocked_panes_on_screen_one_at_a_time() -> void:
 	)
 	await _until(func() -> bool: return not station.bubble().visible, "no longer blocked: no bubble")
 	await _wait(1.0)
-	_eq(_read_panes("control-b").size(), 2, "working, done and the shell are never read")
+	_eq(_read_panes("control-b").size(), 3, "working, done and the shell are never read")
 	_eq(_all_inputs(), 0, "no input went anywhere")
 	_eq(_count("control-a", "pane.focus") + _count("control-b", "pane.focus"), 0, "no switch either")
 	_eq(office.fleet.write_log().size(), 0, "and the audit has no write")
@@ -248,9 +257,9 @@ func test_a_pane_is_read_at_most_every_ten_seconds_whatever_it_does() -> void:
 	await _until(func() -> bool: return station.bubble().visible, "blocked again")
 	_eq(_question_of(office, p1), "", "blocked again: the old question is not kept")
 	await _navigate_key(office, KEY_PAGEUP)
-	_eq(office.navigator.shown_key, HerdrFleet.pane_key(BEE, "bravo"), "PageUp shows bee's bravo")
+	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(BEE, "bravo"), "PageUp pans to bee's bravo")
 	await _navigate_key(office, KEY_PAGEDOWN)
-	_eq(office.navigator.shown_key, HerdrFleet.pane_key(BEE, "alpha"), "PageDown brings alpha back")
+	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(BEE, "alpha"), "PageDown brings alpha back")
 	await _wait(1.0)
 	_eq(_read_panes("control-b").count("alpha:p1"), 1, "no second read of p1 within ten seconds")
 	_eq(_read_panes("control-b").count("alpha:p3"), 1, "nor of p3")
@@ -635,7 +644,11 @@ func test_a_blocked_counter_click_opens_answer_mode_once_the_question_is_shown()
 	await _click_control(office.hud.bar.counter(&"blocked"))
 	var key := HerdrFleet.pane_key(BEE, "alpha:p3")
 	_eq(office.picked_key, key, "the click picks the one blocked agent")
-	_eq(office.navigator.shown_key, HerdrFleet.pane_key(BEE, "alpha"), "on its floor")
+	_eq(
+		[office.navigator.shown_key, office.navigator.current_zone(office.frame)],
+		[BEE, HerdrFleet.pane_key(BEE, "alpha")],
+		"on its machine's map, its zone current"
+	)
 	_check(not card.answering(), "not answering before the question is shown")
 	await _until(func() -> bool: return card.preview_text() == QUESTION, "the question is shown")
 	await _until(card.answering, "then answer mode opens")

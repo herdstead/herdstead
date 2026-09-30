@@ -46,17 +46,17 @@ herdr machine list ─ Roster ┘        │      commands: CommandContext in, C
                                      ▼
           OfficeProjection (pure static functions) → one OfficeFrame per refresh (scripts/model)
                                      ▼
-   office.gd is the composition root: OfficeNavigator decides what to show, FloorPlanCache plans floors, OfficeCamera pans
+   office.gd is the composition root: OfficeNavigator decides what to show, FloorPlanCache plans each machine's map, OfficeCamera pans
    (OfficeAttention writes the window title and its (N); OfficeAlerts only reads the state log: bounces the Dock when not in front, optional chime)
                           │                         │
                           ▼                         ▼
-        OfficeFloorView + floor sign (scenes/world):   OfficeHud (scenes/ui):
-        Ground + Sorted (y-sort), table / station / person   top bar counters (OfficeTotals) / left FLOORS minimap (a narrow rail under 1280) + signpost at the world's right edge /
+        OfficeFloorView + machine plate (scenes/world):   OfficeHud (scenes/ui):
+        Ground + Sorted (y-sort), zones, pod / station / person   top bar counters (OfficeTotals) / left FLOORS minimap (a narrow rail under 1280; a row pans to its zone) + interim signposts at the world's right edge /
                                                              right drawer (closed at start): the AGENTS tab's agent list (AgentListModel; its History group comes from StateLog via AgentHistory) and the EVENTS tab /
                                                              bottom staff panel (agent card, `inspector`; compact by default: a card on tall screens, one row below) + NEXT (NextModel's verbs) / bottom row NEWS (NewsItem) /
                                                              OVERVIEW, opened by PANES or O (OverviewModel; the timeline is a Control drawn in _draw())
         OfficeLens: the lens while L is held (one duration row per station, carpet tint, furniture dimmed); OfficePointer: a dashed frame off the station while a HUD row is hovered
-        OfficeStrategic: the strategic view on `S` (a schematic of this floor over the world area; StrategicModel in, StrategicLayout lays out, %Plan's _draw() draws)
+        OfficeStrategic: the strategic view on `S` (a schematic of the shown machine's map over the world area; StrategicModel in, StrategicLayout lays out, %Plan's _draw() draws)
         OfficePresentation: people walk in and out of the lift doors, change seats, go to the pantry and back to their seats;
         who rests where is decided only by OfficeRests (pure functions); they walk on OfficeWalkGraph (the same graph FloorPlanCache's validator uses)
                           └── ArtPack + PixelPeople + TablePack (scripts/art, semantic ID → texture, palette)
@@ -77,7 +77,7 @@ herdr machine list ─ Roster ┘        │      commands: CommandContext in, C
    **The raw snapshot dictionary is read in exactly one place**: `HerdrSnapshot.from_wire()`, and a state event that changes a pane goes through the same rules (`HerdrSnapshot.Pane.apply_status()`);
    `HerdrClient` checks only the envelope (`result.snapshot` is an object, `panes` is a list). `OfficeProjection` and all other code take only the typed `HerdrSnapshot` and models.
    Do not reintroduce string-keyed dictionaries or "arrays as tuples" as models; a new field goes on a class in `scripts/model/`.
-3. **A pane id is unique only within one machine.** Wherever a station or a floor is identified, use the composite key (`HerdrFleet.pane_key`), never a bare `pane_id`.
+3. **A pane id is unique only within one machine.** Wherever a station or a zone is identified, use the composite key (`HerdrFleet.pane_key`), never a bare `pane_id`; a machine's map (its plan, world and pan) is identified by the machine key.
 4. **Disconnected is not idle.** A disconnected machine keeps its last picture, dimmed and frozen, with its counts at zero; never draw a lost connection as any kind of activity.
 5. **Depth comes only from Y-sort.** `z_index` takes exactly one value, `OfficeWorld.OVERLAY_Z`; the origin is the foot point; the in-table geometry constants live only in `scripts/world/table.gd`.
    The full rules are in the [world model](docs/WORLD_MODEL.md); an approach listed under its "Abandoned approaches" must not come back under any name.
@@ -135,7 +135,7 @@ herdr machine list ─ Roster ┘        │      commands: CommandContext in, C
       on an empty herdr the first workspace is focused regardless, and the tooltip says so.
       `worktree.create` sends only `workspace_id` (herdr's spelling, `wire_workspace_ids`) + `branch` + `label` (= branch) + `focus: false`, never `path` / `base` / `cwd` / `trust_repository`. The branch name is validated at the send point
       (`branch_refusal()`: whitespace, > 64 bytes, characters outside the set, shapes git refuses) and never rewritten, and refused if it changed between press and release; a mezzanine is never a source (`MEZZANINE_SOURCE`). Git's multi-line stderr keeps only a headline (`GitWords.headline()`:
-      sanitised, cluster-capped, 200 characters); the raw text is never shown and never audited. The new workspace / pane ids in the result are used only to select that shell across floors (selection only), never for a second write.
+      sanitised, cluster-capped, 200 characters); the raw text is never shown and never audited. The new workspace / pane ids in the result are used only to select that shell across maps (selection only), never for a second write.
     - **The one request a timer sends.** When a launch this run sent reaches its deadline (`LaunchWatch.TIMEOUT_MSEC`, 31 seconds) and the snapshot still shows the same terminal with the same name `launch_pending`,
       the boundary sends one read-only `agent.get` so that herdr settles its own launch timeout (its only side effect: releasing the pane and the name). At most once per launch, never asked again, never followed by a write;
       not asked when the machine was replaced or is gone, never for another client's launch; `--read-only` has no boundary, so it never asks.
@@ -153,7 +153,7 @@ herdr machine list ─ Roster ┘        │      commands: CommandContext in, C
       The monitor reads the screen only while it is open, the machine is online with a current snapshot and the window is not minimized: 5 reads per second with focus, 1 without, one extra read right after each input and another 50 ms later,
       at most one read at a time; reads and polling never write. Under `--read-only` the monitor opens but neither reads nor sends, and says so.
     - **Reads that are not gestures.** The station bubble reader (`OfficeQuestionReader`, for the hover tooltip) is not a gesture and never writes: it reads only on-screen blocked panes (`PaneModel.asks()`, including one blocked while starting)
-      on an online machine with a current snapshot, not covered by the terminal monitor or the OVERVIEW; one at a time, at least 10 seconds between the starts of two reads of the same pane (leaving blocked or changing floors does not reset it), none while minimized.
+      on an online machine with a current snapshot, not covered by the terminal monitor or the OVERVIEW; one at a time, at least 10 seconds between the starts of two reads of the same pane (leaving blocked or switching maps does not reset it), none while minimized.
       It never calls `preview_shown`, does not count as "seen", and does not unlock write-then-look.
       Clicks in NEWS, EVENTS and OVERVIEW only select a pane (the same path as a list click) and never write; neither do the state log and their refreshes.
 
@@ -195,7 +195,7 @@ herdr machine list ─ Roster ┘        │      commands: CommandContext in, C
   write-boundary cases live only in `tools/test_commands.gd`, `tools/test_raw_input.gd` (the monitor's pass-through input), `tools/test_answers.gd` (answer mode: keys and the one-line reply), `tools/test_bubbles.gd` (bubble reads, NEXT, counter clicks), `tools/test_monitor.gd`
   (terminal monitor: the grid and real input), `tools/test_overview.gd` (the staff panel answers as usual while the overview is open; the only deliberate write in that suite),
   `tools/test_launch.gd` (the boundary's `agent.prompt`, `agent.start` and `pane.split`, and the staff panel's START AGENT block), `tools/test_prompt.gd` (the card's one-line reply through `agent.prompt`),
-  `tools/test_split.gd` (NEW PANE BESIDE and auto-selecting the new pane), `tools/test_close.gd` (Close's two clicks, the scope wording, every refusal) and `tools/test_spaces.gd` (New space / Worktree: the exact params, the directory and branch gates, git's one-line refusal, selecting across floors), each against two fake herdrs of its own;
+  `tools/test_split.gd` (NEW PANE BESIDE and auto-selecting the new pane), `tools/test_close.gd` (Close's two clicks, the scope wording, every refusal) and `tools/test_spaces.gd` (New space / Worktree: the exact params, the directory and branch gates, git's one-line refusal, selecting the new zone's shell), each against two fake herdrs of its own;
   every case first does `reset`, then `allow`s the methods it needs, and the suite closes by checking that both fakes received only requests that were opened.
 
 ## Visual changes acceptance

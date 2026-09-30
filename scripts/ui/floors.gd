@@ -1,12 +1,14 @@
 class_name OfficeFloors
 extends HdPanel
-## The left column: the FLOORS minimap, one list per machine, highest floor on
-## top with each worktree's mezzanines hung just below the floor they were made
-## from (OfficeNavigator.section()). Each floor is a row with who needs a human
-## on it and a window per pane lit by its state; the shown floor's row is the
-## highlighted one, and a click on any row shows that floor at once. The office
-## draws one floor at a time, so this panel is what keeps a blocked agent on a
-## hidden floor in sight.
+## The left column: the FLOORS minimap (interim, until the SPACES rail), one
+## list per machine, highest zone on top with each worktree's mezzanines hung
+## just below the zone they were made from (OfficeNavigator.section()). Each
+## zone is a row with who needs a human on it and a window per pane lit by its
+## state; the current zone's row (OfficeNavigator.current_zone()) is the
+## highlighted one, and a click on any row pans to that zone at once (showing
+## its machine's map first when that is another machine's). The office draws
+## one machine's map at a time, so this panel is what keeps a blocked agent on
+## another machine in sight.
 ##
 ## Plain model data in, a picked floor key out. It knows no herdr, no machine
 ## and no client; the office decides what a pick means.

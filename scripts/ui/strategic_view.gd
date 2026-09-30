@@ -63,7 +63,7 @@ func close() -> void:
 
 ## Draw `model` in the room this view has at its size now: the title (and the
 ## machine's state when it is not answering), the schematic, or `No desks on
-## this floor` when the floor has no table. A stale floor's schematic is
+## this machine` when its map has no table. A stale map's schematic is
 ## tinted like the frozen world; the header is not.
 func show_model(shown: StrategicModel) -> void:
 	_model = shown

@@ -1,11 +1,12 @@
 extends "res://tools/office_test_base.gd"
-## The left column's FLOORS minimap:
-## highest floor on top with each worktree's mezzanine hung just below its
-## source floor, a strip of windows per floor lit by its panes' states, the
-## shown floor's row highlighted alone, a stale building dimmed with no lit
-## window, and the floor plate of a mezzanine; and the signposts over the
-## world's right edge to the other floors with agents blocked on them. Clicks,
-## hovers and keys go through real input. Run through run_tests.sh.
+## The left column's FLOORS minimap (interim, until the SPACES rail):
+## highest zone on top with each worktree's mezzanine hung just below its
+## source, a strip of windows per zone lit by its panes' states, the current
+## zone's row highlighted alone, a row click panning to its zone, a stale
+## building dimmed with no lit window, and each zone's sign; and the
+## signposts over the world's right edge to the zones whose blocked desks are
+## off screen, and other machines' zones with agents blocked. Clicks, hovers and
+## keys go through real input. Run through run_tests.sh.
 ##
 ## godot --headless --path . --script tools/test_floors.gd -- \
 ##     --read-only --socket=<a socket nobody listens on> --work=<short tmp dir>
@@ -84,28 +85,32 @@ func test_mezzanines_hang_below_their_source_floor() -> void:
 	_done(office)
 
 
-## PageUp and PageDown walk the rows as drawn: down from a source floor into its
-## mezzanines, up out of them back to it and on to the floor above. Each step
-## shows its floor at once: the floor drawn, and the row highlighted.
+## PageUp and PageDown walk the rows as drawn: down from a source zone into its
+## mezzanines, up out of them back to it and on to the zone above. Each step
+## pans to its zone at once, on the same map: the row highlighted, nothing rebuilt.
 func test_page_keys_step_through_the_rows_as_drawn() -> void:
 	var office := await _live_office()
-	_eq(office.navigator.shown_key, _floor("hs"), "herdr's focus is on 1F")
+	_eq(office.navigator.current_zone(office.frame), _floor("hs"), "herdr's focus is on 1F")
+	var world := office.world.get_instance_id()
 	var visited: Array[String] = []
-	var drawn: Array[String] = []
+	var drawn: Array = []
 	var highlighted: Array = []
 	for code: Key in [KEY_PAGEDOWN, KEY_PAGEDOWN, KEY_PAGEDOWN, KEY_PAGEUP, KEY_PAGEUP, KEY_PAGEUP, KEY_PAGEUP]:
 		var event := _key(code)
 		await _parsed(event)
 		event.pressed = false
 		await _parsed(event)
-		visited.append(office.navigator.shown_key)
-		drawn.append(office.layout_plan().floor_key)
+		visited.append(office.navigator.current_zone(office.frame))
+		drawn.append([office.layout_plan().floor_key, office.world.get_instance_id()])
 		highlighted.append_array(_current(office))
 	var wanted: Array[String] = [
 		_floor("hud"), _floor("data"), _floor("data"), _floor("hud"), _floor("hs"), _floor("notes"), _floor("ops")
 	]
 	_eq(visited, wanted, "1F, down into 1A and 1B, stops at the bottom, then back up past 1F to 4F and 5F")
-	_eq(drawn, wanted, "each floor drawn the moment its key is up")
+	var same: Array = []
+	for step in wanted.size():
+		same.append([LOCAL, world])
+	_eq(drawn, same, "each a pan of the one map, nothing rebuilt")
 	_eq(highlighted, Array(wanted), "and each row highlighted in turn, alone")
 	_done(office)
 
@@ -144,7 +149,7 @@ func test_windows_light_up_by_state_one_per_pane() -> void:
 	_done(office)
 
 
-## Hovering a window shows its pane, and clicking one switches to its floor
+## Hovering a window shows its pane, and clicking one pans to its zone
 ## exactly as a click anywhere else on the row does.
 func test_a_window_names_its_pane_and_a_click_on_it_switches_to_its_floor() -> void:
 	var office := await _live_office()
@@ -164,8 +169,8 @@ func test_a_window_names_its_pane_and_a_click_on_it_switches_to_its_floor() -> v
 	_eq(window.get_tooltip(window.get_local_mouse_position()), "codex · UNREAD", "which names its agent and state")
 	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, true))
 	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, false))
-	_eq(office.navigator.shown_key, _floor("data"), "a click on a window shows that window's floor at once")
-	_eq(office.layout_plan().floor_key, _floor("data"), "drawn")
+	_eq(office.navigator.current_zone(office.frame), _floor("data"), "a click on a window pans to its zone at once")
+	_eq(office.layout_plan().floor_key, LOCAL, "on the machine's map")
 	_done(office)
 
 
@@ -212,19 +217,19 @@ func test_a_stale_building_is_dimmed_with_every_window_dark() -> void:
 	_done(office)
 
 
-## The shown floor's row is the one highlighted, alone. A floor call moves the
-## highlight there in the same frame the floor is shown: no row in between ever
-## has it, and there is no car, no shaft and no ride left to show.
+## The current zone's row is the one highlighted, alone. A row click moves the
+## highlight there in the same frame the zone is panned to: no row in between
+## ever has it, and there is no car, no shaft and no ride left to show.
 func test_the_shown_floor_is_highlighted_alone() -> void:
 	var office := await _live_office()
 	var minimap := office.hud.floors
-	_eq(_current(office), [_floor("hs")], "the shown floor's row is highlighted, and only it")
+	_eq(_current(office), [_floor("hs")], "the current zone's row (herdr's focus) is highlighted, and only it")
 	var row := minimap.row_for(_floor("ops"))
 	var at := row.get_global_rect().get_center()
 	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, true))
 	_eq(_current(office), [_floor("hs")], "a press moves nothing")
 	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, false))
-	_eq(office.navigator.shown_key, _floor("ops"), "released: 5F is shown")
+	_eq(office.navigator.current_zone(office.frame), _floor("ops"), "released: 5F is current")
 	_eq(_current(office), [_floor("ops")], "and its row is highlighted alone, 4F passed over")
 	await _frames(12)
 	_eq(_current(office), [_floor("ops")], "and stays so")
@@ -233,47 +238,42 @@ func test_the_shown_floor_is_highlighted_alone() -> void:
 	_done(office)
 
 
-## A mezzanine's plate says which checkout it is and whose worktree; every
-## floor of the group wears one accent picked by the group, and a floor in no
-## group wears none.
+## The plate names the machine, not a zone; each zone's sign says its number
+## (a mezzanine's `1A`), and every zone of a worktree group wears the group's
+## one accent on its sign, a zone in no group its own. (The plate used to name
+## the floor, its checkout and whose worktree; the sign's tooltip says those now:
+## test_hovering_a_zone_sign_names_its_repo_and_checkout.)
 func test_a_mezzanine_plate_names_its_checkout_and_source() -> void:
 	var office := await _live_office()
-	_eq(_label(office.plate, "%Title").text, "1F  HERDSTEAD", "a source floor as before")
+	_eq(office.plate.title_text(), "LOCAL", "the plate names the machine")
 	_check(not _label(office.plate, "%WorktreeOf").visible, "with no worktree line")
-	var accent: Control = office.plate.get_node("%Accent")
-	_check(accent.visible, "a source floor wears its group's accent")
-	var look := accent.theme_type_variation
-	_check(str(look).begins_with("PlateAccent"), "one of the plate accents: " + str(look))
-	var row := office.hud.floors.row_for(_floor("hud"))
-	var at := row.get_global_rect().get_center()
-	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, true))
-	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, false))
-	accent = office.plate.get_node("%Accent")
-	_eq(_label(office.plate, "%Title").text, "1A · HUD-LANE", "a mezzanine's number and checkout")
-	_check(_label(office.plate, "%WorktreeOf").visible, "and a line saying whose worktree it is")
-	_eq(_label(office.plate, "%WorktreeOf").text, "worktree of 1F", "its source floor")
-	_eq(accent.theme_type_variation, look, "the group's one accent")
-	await _visit_floor(office, _floor("notes"))
-	accent = office.plate.get_node("%Accent")
-	_check(not accent.visible, "a floor in no group wears no accent")
-	_check(not _label(office.plate, "%WorktreeOf").visible, "and no worktree line")
-	await _visit_floor(office, _floor("ops"))
-	accent = office.plate.get_node("%Accent")
-	_check(not accent.visible, "nor does a worktree whose source is closed")
+	_check(not _node(office.plate, "%Accent").visible, "and no group's accent")
+	var numbers := {}
+	var stripes := {}
+	for id: String in ["hs", "hud", "data", "notes", "ops"]:
+		var board := office.floor_view.zone_sign(_floor(id))
+		numbers[id] = _label(board, "%Number").text
+		var accent: ColorRect = board.get_node("%Accent")
+		stripes[id] = accent.color
+	_eq(numbers, {"hs": "1", "hud": "1A", "data": "1B", "notes": "4", "ops": "5"}, "each sign's number")
+	_eq([stripes.hud, stripes.data], [stripes.hs, stripes.hs], "the group's one accent on each of its signs")
+	for id: String in ["notes", "ops"]:
+		var own: Color = office.art.color(ArtContract.ACCENTS[OfficeZoneSign.accent_of(_floor(id))])
+		_eq(stripes[id], own, "%s, in no group, wears its own" % id)
 	_done(office)
 
 
-## Every other floor with an agent blocked on it gets a signpost over the
-## world's right edge, pointing up or down the building from the floor shown,
-## with the floor's number and name as its row writes them and a pulsing
-## blocked badge with the count. A real click on one shows that floor; a floor
-## that starts waiting gets its own; a machine that drops takes them all away.
+## Every zone of the map with a blocked desk off screen gets a signpost over the
+## world's right edge, pointing up or down from the view, with the zone's
+## number and name as its row writes them and a pulsing blocked badge with the
+## count. A real click on one pans to that zone; a zone that starts waiting off
+## screen gets its own; a machine that drops takes them all away.
 func test_signposts_point_at_other_floors_with_blocked_agents() -> void:
 	var office := await _live_office()
 	var posts := office.hud.signposts
-	_eq(office.navigator.shown_key, _floor("hs"), "herdr's focus is on 1F")
+	_eq(office.navigator.current_zone(office.frame), _floor("hs"), "herdr's focus is on 1F")
 	await _frames(2)
-	_check(posts.visible, "a blocked agent on another floor puts the signposts up")
+	_check(posts.visible, "a blocked agent off screen, below, puts the signposts up")
 	_eq(_post_texts(office), ["↓ 1A hud-lane 1"], "one post: down to the mezzanine, its checkout, one blocked")
 	var post := posts.shown()[0]
 	_eq(post.key(), _floor("hud"), "it points at 1A")
@@ -284,13 +284,14 @@ func test_signposts_point_at_other_floors_with_blocked_agents() -> void:
 	var at := post.get_global_rect().get_center()
 	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, true))
 	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, false))
-	_eq(office.navigator.shown_key, _floor("hud"), "a click on it shows 1A at once")
-	_eq(office.layout_plan().floor_key, _floor("hud"), "drawn")
-	_check(not posts.visible, "and with no other floor waiting, the signposts go")
+	_eq(office.navigator.current_zone(office.frame), _floor("hud"), "a click on it pans to 1A at once")
+	_eq(office.layout_plan().floor_key, LOCAL, "on the same map")
+	await _frames(2)
+	_check(not posts.visible, "its blocked desk in view, and no other waiting off screen: the signposts go")
 	_check(not badge.is_in_group(StatusBadge.GROUP), "the hidden post's badge stops pulsing")
 	_feed(office, _with(fixture, "hs:p1", {"agent_status": "blocked"}))
 	await _frames(2)
-	_eq(_post_texts(office), ["↑ 1F herdstead 1"], "1F starts waiting: up to it from the mezzanine")
+	_eq(_post_texts(office), ["↑ 1F herdstead 1"], "1F starts waiting above the view: up to it")
 	_set_online(office, false)
 	await _frames(1)
 	_check(not posts.visible, "a machine that drops counts nobody waiting: no signpost")
@@ -425,7 +426,7 @@ func test_signposts_step_aside_for_the_rail_on_a_narrow_world() -> void:
 	var at := row.get_global_rect().get_center()
 	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, true))
 	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, false))
-	_eq(office.navigator.shown_key, _floor("hud"), "a click on the rail's row shows 1A")
+	_eq(office.navigator.current_zone(office.frame), _floor("hud"), "a click on the rail's row pans to 1A")
 	_done(office)
 
 
@@ -505,10 +506,10 @@ func test_a_blocked_start_lights_its_window_blocked_and_posts_a_signpost() -> vo
 	var row := minimap.row_for(_floor("data"))
 	_eq(_looks(row), [&"WindowDone", &"WindowBlocked"], "its window is lit blocked, not plainly")
 	_eq(_tips(row).slice(1), ["pi · NEEDS INPUT"], "and names it so, in the pack's words")
-	_eq(office.frame.find_floor(_floor("data")).zone_model.blocked, 1, "the row counts it")
+	_eq(office.frame.find_zone(_floor("data")).zone_model.blocked, 1, "the row counts it")
 	_check(_node(row, "%BlockedIcon").visible, "beside the blocked icon")
 	var keys := office.hud.signposts.shown().map(func(post: OfficeSignpost) -> String: return post.key())
-	_check(keys.has(_floor("data")), "a signpost points at 1B: " + str(_post_texts(office)))
+	_check(keys.has(_floor("data")), "a signpost points at 1B, off screen: " + str(_post_texts(office)))
 	_done(office)
 
 
@@ -600,27 +601,28 @@ func test_floor_names_show_from_the_scenes_width() -> void:
 	_done(office)
 
 
-## Every gesture that picks a floor counts one navigation (what a pick waiting
+## Every gesture that picks a zone counts one navigation (what a pick waiting
 ## for a new pane records): a signpost click, a FLOORS row click, PageDown,
 ## PageUp. Panning counts none: a real drag, a wheel notch; nor does a desk
-## click. pick_zone() shows a floor exactly as a click on its FLOORS row does.
+## click. pick_zone() pans to a zone exactly as a click on its FLOORS row does.
 func test_floor_gestures_count_as_navigation_and_panning_does_not() -> void:
 	var office := await _live_office()
 	var navigator := office.navigator
 	await _frames(2)
 	var revision := navigator.nav_revision
+	var zone := func() -> String: return navigator.current_zone(office.frame)
 	var post := office.hud.signposts.shown()[0]
 	await _click_at(post.get_global_rect().get_center())
-	_eq([navigator.shown_key, navigator.nav_revision], [_floor("hud"), revision + 1], "a signpost: one navigation")
+	_eq([zone.call(), navigator.nav_revision], [_floor("hud"), revision + 1], "a signpost: one navigation")
 	await _visit_floor(office, _floor("notes"))
-	_eq([navigator.shown_key, navigator.nav_revision], [_floor("notes"), revision + 2], "a FLOORS row: one")
-	var clicked := [navigator.shown_key, navigator.picked_floor, office.world_model, office.layout_plan().floor_key]
+	_eq([zone.call(), navigator.nav_revision], [_floor("notes"), revision + 2], "a FLOORS row: one")
+	var clicked := [zone.call(), navigator.picked_machine, office.world_model, office.camera.pan]
 	await _office_key(office, KEY_PAGEDOWN)
-	_eq([navigator.shown_key, navigator.nav_revision], [_floor("hs"), revision + 3], "PageDown: one")
+	_eq([zone.call(), navigator.nav_revision], [_floor("hs"), revision + 3], "PageDown: one")
 	var middle := office.hud.world_rect().get_center()
 	var pan := office.camera.pan
 	await _drag(middle, middle + Vector2(-80, -60))
-	_check(office.camera.pan != pan, "a real drag pans the floor")
+	_check(office.camera.pan != pan, "a real drag pans the map")
 	pan = office.camera.pan
 	var wheel := _wheel(MOUSE_BUTTON_WHEEL_UP)
 	wheel.position = middle
@@ -629,14 +631,14 @@ func test_floor_gestures_count_as_navigation_and_panning_does_not() -> void:
 	_check(office.camera.pan != pan, "so does a wheel notch")
 	await _click_desk(office, HerdrFleet.pane_key(LOCAL, "hs:p1"))
 	_eq(office.picked_key, HerdrFleet.pane_key(LOCAL, "hs:p1"), "a desk click picks")
-	_eq([navigator.shown_key, navigator.nav_revision], [_floor("hs"), revision + 3], "none of them navigates")
+	_eq([zone.call(), navigator.nav_revision], [_floor("hs"), revision + 3], "none of them navigates")
 	await _office_key(office, KEY_PAGEUP)
-	_eq([navigator.shown_key, navigator.nav_revision], [_floor("notes"), revision + 4], "PageUp: one")
+	_eq([zone.call(), navigator.nav_revision], [_floor("notes"), revision + 4], "PageUp: one")
 	await _office_key(office, KEY_PAGEDOWN)
 	navigator.pick_zone(_floor("notes"))
 	office.refresh()
-	var picked := [navigator.shown_key, navigator.picked_floor, office.world_model, office.layout_plan().floor_key]
-	_eq(picked, clicked, "pick_zone() shows the floor as its FLOORS row did")
+	var picked := [zone.call(), navigator.picked_machine, office.world_model, office.camera.pan]
+	_eq(picked, clicked, "pick_zone() pans to the zone as its FLOORS row did")
 	_eq(navigator.nav_revision, revision + 6, "and counts one navigation")
 	_done(office)
 
@@ -781,9 +783,8 @@ func test_hovering_a_zone_sign_names_its_repo_and_checkout() -> void:
 		_floor("notes"): "No repository",
 	}
 	for key: String in cases:
-		if office.navigator.shown_key != key:
-			await _visit_floor(office, key)
-		office.camera.pan = Vector2.ZERO
+		# A row click pans the sign's aisle row to the top of the world.
+		await _visit_floor(office, key)
 		await _frames(3)
 		var board := office.floor_view.zone_sign(key)
 		_check(board != null, key + ": the zone has its sign")

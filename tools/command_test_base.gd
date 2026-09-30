@@ -297,24 +297,22 @@ func _last_write(office: OfficeDouble) -> String:
 	return "" if writes.is_empty() else writes[writes.size() - 1].last_state()
 
 
-## Show bee's alpha floor and pick pane `pane_id` on it with a real click;
+## Show bee's map (a click on its alpha zone's row) and pick pane `pane_id` on it with a real click;
 ## with `open`, then open the staff panel from its line with Enter, as a viewer
 ## would (it reads nothing while it is one line).
 func _pick_bee(office: OfficeDouble, pane_id: String, open := true) -> void:
-	var floor_key := HerdrFleet.pane_key(BEE, "alpha")
-	if office.navigator.shown_key != floor_key:
-		await _floor_pick(office, floor_key)
+	if office.navigator.shown_key != BEE:
+		await _floor_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	await _click_visible_pane(office, HerdrFleet.pane_key(BEE, pane_id))
 	if open:
 		await _open_panel(office)
 
 
-## Pick Local's pane `pane_id` with a real click, on Local's alpha floor; with
+## Pick Local's pane `pane_id` with a real click, on Local's map (its alpha zone's row first when another machine's is shown); with
 ## `open`, then open the staff panel with Enter (see _pick_bee()).
 func _pick_local(office: OfficeDouble, pane_id: String, open := true) -> void:
-	var floor_key := HerdrFleet.pane_key(HerdrFleet.LOCAL, "alpha")
-	if office.navigator.shown_key != floor_key:
-		await _floor_pick(office, floor_key)
+	if office.navigator.shown_key != HerdrFleet.LOCAL:
+		await _floor_pick(office, HerdrFleet.pane_key(HerdrFleet.LOCAL, "alpha"))
 	await _click_visible_pane(office, HerdrFleet.pane_key(HerdrFleet.LOCAL, pane_id))
 	if open:
 		await _open_panel(office)

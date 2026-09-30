@@ -80,13 +80,14 @@ A map (`MapModel`: one or more workspaces, each a `ZoneModel`) is laid out by `O
 `FloorPlan`; `OfficeZoneLayout` lays out one zone's pod rows and `OfficeSeatPlanner` one tab's seats. `ZoneModel` /
 `RoomModel` / `PaneModel` hold no render nodes; `FloorPlan` / `ZonePlacement` / `RowPlan` / `DeskPlacement` /
 `SeatPlacement` hold grid bounds, table origins and seat bindings; `OfficeFloorView` / `OfficeDeskView` assemble nodes
-from the plan. The office still builds one map per workspace (`MapModel.of()`); a map of several zones
-(`MapModel.of_zones()`) plans the same way.
+from the plan. The office draws **one map per machine** (`BuildingModel.map`, `MapModel.of_zones()` under the machine's
+key): every workspace of the machine is a zone on it, planned, drawn and panned as one world.
 
-A building with no workspace still has one floor: LOBBY is an empty map, with no zone at all. It goes through the
-same planning, furnishing and assembly path as any map (outer walls, door, windows, walkways; no desk, so no pantry),
-places nothing herdr gives, and is left out of the layout diagnostics (`layout_plan()`, `layout_problems()`,
-`layout_attempt_count()`). Its notices (offline, waiting, ssh error) are on the floor plate. An empty workspace is a
+A machine with no workspace has an **empty map** (`MapModel.empty()`), with no zone at all (the lobby is retired). It
+goes through the same planning, furnishing and assembly path as any map (outer walls, door, windows, walkways; no
+desk, so no pantry), places nothing herdr gives, and is in the layout diagnostics like any map (`layout_plan()`,
+`layout_problems()`, `layout_attempt_count()`). Its notices (offline, waiting, ssh error) are on the machine plate.
+Workspaces arriving later are zones placed on that same map (its first plan fixed its width). An empty workspace is a
 zone of one empty pod row.
 
 The grid is fixed at **32 world units**. **The map is lanes** (`FloorLayoutPolicy`): across it a side wall (1 cell),
@@ -191,7 +192,7 @@ before its font applies.
 Below the top outer wall is a **96-unit entry band** of three cell rows: the first is inside the outer wall's drawing
 clearance, the second is the fixture row (y = 112), the third the walking lane (y = 144). The main corridor on the
 right is 64 wide, and each side outer wall takes 32. A map of one zone of one pod row is therefore 2 + 3 + 1 + 6 = 12
-cells deep (a pod row is 6); the lobby is 12 too, the least a map is.
+cells deep (a pod row is 6); an empty map is 12 too, the least a map is.
 
 `FloorPlan.floor_cells` is the one half-open integer rectangle. The base floor covers every cell of it, including
 under walls, in lane gaps and in gaps left by deletions; walkways draw over that full floor. The total
@@ -301,7 +302,7 @@ the fixture row.
 - **Windows** (`OfficeShell.window_xs()`, a pure function; the floor view only draws what it returns): on a map with a
   pantry, windows are `WINDOW_SPACING` (128) apart, centred on the top wall between the pantry's right drawing edge and
   `WINDOW_CLEARANCE` short of the lift door, as many as fit with equal margins at both ends (2 / 4 / 12 at 13 / 23 / 53
-  cells). Maps without a pantry (lobby, empty workspace) put one every 128 from x = 64, a cell off the side wall and
+  cells). Maps without a pantry (an empty map, an empty workspace) put one every 128 from x = 64, a cell off the side wall and
   `WINDOW_CLEARANCE` from the door. The shell's signature includes the fixtures; a fixture change redraws the shell.
 - **Left out when validation fails**, never moving a table group: `OfficeFloorLayout.plan()` validates once with the
   furniture and the pantry. If that fails, the second try drops the furniture (the pantry kept); if that fails too
@@ -322,13 +323,15 @@ columns; explicit seat conflicts may allocate extra columns and produce a diagno
 grows in place where it can, and moves only the affected groups when it cannot; other surviving groups keep their
 place.
 
-At run time `FloorPlanCache` keeps, per map key (still one per workspace in the office), the last valid plan with its
-display model, and the last attempt's input signature with its failure diagnostics and failing zones; `OfficeNavigator` keeps each floor's view. None of this is saved to
+At run time `FloorPlanCache` keeps, per map key (the machine's key), the last valid plan with its display model, and the
+last attempt's input signature with its failure diagnostics and failing zones; `OfficeNavigator` keeps each map's pan
+(`pan_of()`). None of this is saved to
 disk. Renames, state, focus and disconnects do not invalidate the geometry cache. The same failing input reuses the old
 picture and diagnostics without running the planner and never adopts an invalid display model; only a change of
 structure, theme, clearance policy or budget tries again. Window size does not change fixed rows; only when a new
 policy is incompatible with the old plan and has not yet laid out successfully does a width change retry a cold plan
-under that policy. Closing a workspace clears its valid plan and attempt record. Rebuilding the same plan keeps the
+under that policy. A machine going away clears its valid plan and attempt record (`prune()` by machine key); a
+workspace closing is a zone leaving its machine's map, planned like any change. Rebuilding the same plan keeps the
 gaps history made; a cold plan without that history is not an equivalent rebuild. Duplicate identities, illegal
 geometry or over-budget input never replace the last valid plan; the UI shows a layout error, and a first failure
 keeps a bounded empty map (no zone at all).
@@ -485,11 +488,13 @@ kept is the plan and the view, not the people's nodes or animation clocks across
   the worst observation on the stress floor (one table widening the whole floor, 47 people walking) routes in under
   10 ms; the `ROUTING_BUDGET` line of `make test` prints the whole observation's handling time (including starting and
   placing).
-- **Cold start.** A new floor view (first draw, floor change, theme change: the only paths that rebuild the world), a
+- **Cold start.** A new floor view (first draw, a **machine** switch, a theme change: the only paths that rebuild the
+  world; paging between zones of one map is a pan, never cold), a
   machine that was disconnected at the last presentation (the first snapshot after reconnecting already contains every
   change made meanwhile), or a layout problem at the last refresh (the floor was not updated then): everyone is placed
   at their goal, all ghosts are dropped, history is not replayed. Layout changes reconciled in place walk as usual.
-- **Disconnect (AGENTS.md invariant 4).** All ghosts are dropped; walking people freeze where they are: position, walk
+- **Disconnect (AGENTS.md invariant 4).** The **whole map** dims and freezes, every zone of it. All ghosts are dropped;
+  walking people freeze where they are: position, walk
   animation, remaining route and time all stop (time counts only unfrozen delta). Observation changes during the
   disconnect are placed, not walked, and the first observation after recovery is cold. After recovery and until the
   first observation is presented (indefinitely, if the recovery snapshot's layout fails), walking people stay frozen.
@@ -497,8 +502,11 @@ kept is the plan and the view, not the people's nodes or animation clocks across
 - **Ghost cap.** At most `OfficePresentation.MAX_GHOSTS` (32) at a time; beyond that the oldest disappears first.
   Ghosts are not counted in `OfficeDeskView.node_budget()`.
 - **Closing a table's last pane** closes that tab: the table is released at once and ghosts walk out from where the
-  table was. Closing a workspace's last pane is a floor change (cold), so nobody walks; the lobby has no stations, so
-  nobody walks there.
+  table was. **Closing a workspace's last pane** closes its zone, in place on the same map: its tables are released
+  and its people walk out as ghosts, bounded like any departure (`MAX_GHOSTS` 32, `ROUTING_BUDGET`, the 2880-unit
+  route cap, and none while the machine is frozen or the pass is cold); not every departure animates (whoever is left
+  over, or stands where the new plan puts furniture, is placed: gone at once). A new workspace is a new zone whose
+  people walk in from the lift door. An empty map has no stations, so nobody walks there.
 
 ## Seating and the chair asset boundary
 

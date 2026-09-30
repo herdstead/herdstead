@@ -184,7 +184,7 @@ static func _input_problems(map: MapModel, rules: FloorLayoutPolicy, failing: Pa
 			return found
 		zone_keys[zone.key] = true
 		# An empty workspace still lays out (and places) one empty pod row.
-		tables += maxi(zone.rooms.size(), 0 if zone.lobby else 1)
+		tables += maxi(zone.rooms.size(), 1)
 		panes_total += zone.pane_count()
 	if tables > rules.max_tables:
 		found.append("input exceeds table budget")
@@ -232,12 +232,10 @@ static func _input_problems(map: MapModel, rules: FloorLayoutPolicy, failing: Pa
 	return found
 
 
-## The zones laid out, in (number, key) order; a lobby lays out no zone.
+## The zones laid out, in (number, key) order; an empty map lays out none.
 static func _ordered(map: MapModel) -> Array[ZoneModel]:
 	var zones: Array[ZoneModel] = []
-	for zone in map.zones:
-		if not zone.lobby:
-			zones.append(zone)
+	zones.assign(map.zones)
 	zones.sort_custom(
 		func(a: ZoneModel, b: ZoneModel) -> bool: return a.key < b.key if a.number == b.number else a.number < b.number
 	)

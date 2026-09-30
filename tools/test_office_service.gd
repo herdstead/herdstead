@@ -35,7 +35,7 @@ func _serviced(floor_model: ZoneModel, width := 32, previous: FloorPlan = null) 
 ## The entry band is three cells deep: the top wall's drawing clearance, the
 ## fixture row and the walking lane. A map of one zone of one pod row is
 ## 2 + 3 + 1 + the pod row's cells deep (the wall, the band, the zone's aisle
-## row, the pod row: 6 cells on lane B1's pods, 12 in all); a lobby is still 12,
+## row, the pod row: 6 cells on lane B1's pods, 12 in all); an empty map is still 12,
 ## and so is nothing smaller. The threshold stays where the first walkable
 ## centre under the door is, and the first zone starts under the band and its
 ## aisle row.
@@ -49,8 +49,8 @@ func test_the_entry_band_is_three_cells_deep() -> void:
 	_eq(plan.zones[0].cells.position.y, 6, "the first zone starts under the band and its aisle row")
 	# An empty workspace is a zone of one empty pod row now: as deep as one table.
 	_eq(_plan(_floor([])).floor_cells.size.y, 2 + 3 + 1 + pod, "an empty workspace is one pod row deep")
-	var lobby := OfficeFloorLayout.plan(MapModel.of(OfficeProjection.lobby("machine")), null, _real_rules()).plan
-	_eq(lobby.floor_cells.size.y, 12, "a lobby stays 12 deep")
+	var empty := OfficeFloorLayout.plan(MapModel.empty("machine"), null, _real_rules()).plan
+	_eq(empty.floor_cells.size.y, 12, "an empty map (a machine with no workspace) stays 12 deep")
 	var graph := _graph_of(plan, rules)
 	_eq(graph.threshold, Vector2(OfficeShell.door(plan).x, 112), "the threshold is where it was")
 	_eq([graph.fixture_row, graph.walking_lane], [112.0, 144.0], "the fixture row and the walking lane under it")
@@ -103,12 +103,12 @@ func test_fixtures_stand_where_the_plan_puts_them() -> void:
 	_eq(widened.pantry.spots.slice(0, narrow.pantry.spots.size()), narrow.pantry.spots, "its spots where they were")
 
 
-## No pantry where there are no desks: the lobby and an empty workspace. No
+## No pantry where there are no desks: an empty map and an empty workspace. No
 ## plan has a reception.
 func test_no_fixtures_without_tables() -> void:
 	var cache := FloorPlanCache.new()
-	var lobby := cache.prepare(MapModel.of(OfficeProjection.lobby("machine")), _pen(), 640.0)
-	_eq(lobby.fixtures().size(), 0, "the lobby has none")
+	var lobby := cache.prepare(MapModel.empty("machine"), _pen(), 640.0)
+	_eq(lobby.fixtures().size(), 0, "an empty map has none")
 	var empty := cache.prepare(MapModel.of(_floor([])), _pen(), 640.0)
 	_eq(empty.fixtures().size(), 0, "nor has an empty workspace")
 	var tables := cache.prepare(MapModel.of(_floor([_room("a", 2)])), _pen(), 640.0)
@@ -418,7 +418,7 @@ func test_blocked_and_done_sit_on_a_floor_without_fixtures() -> void:
 ## stands there: the threshold is at (the door's column, 112), the fixture row
 ## at 112 and the walking lane at 144, no node on the fixture row left of the
 ## main corridor is walked to, and no route runs along it. A map without desks
-## (an empty workspace, a lobby) has neither: nobody walks there.
+## (an empty workspace, an empty map) has neither: nobody walks there.
 func test_the_barrier_and_the_lane_stand_with_or_without_a_pantry() -> void:
 	var rules := _real_rules(32)
 	var served := _serviced(_floor([_room("a", 4), _room("b", 2, 1)]), 32)

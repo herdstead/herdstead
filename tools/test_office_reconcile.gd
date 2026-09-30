@@ -402,6 +402,9 @@ func test_a_floor_planned_with_the_drawer_closed_keeps_its_plan_when_it_opens() 
 	var desks := _desk_ids(office, "")
 	var rightmost: OfficeStation = null
 	for station in _seats(office):
+		# api's pod: the other zones of the map hold shells the list does not show.
+		if not station.pane_key.begins_with(HerdrFleet.pane_key(LOCAL, "api:")):
+			continue
 		if rightmost == null or station.target_rect().end.x > rightmost.target_rect().end.x:
 			rightmost = station
 	var tab: Control = hud.get_node("%DrawerTab")
@@ -667,7 +670,7 @@ func _check_last_valid_people(office: OfficeScene, signature: String) -> void:
 			continue
 		_check(not keys.has(station.pane_key), "last-valid drawing contains no duplicate pane")
 		keys[station.pane_key] = true
-	_eq(keys.size(), 4, "last-valid floor still has exactly its four panes")
+	_eq(keys.size(), 13, "the last-valid map still has exactly its 13 panes, every zone's")
 	var first := _seat_node(office, "api:p1")
 	_check(first != null and first.actor() != null, "last-valid worker is reconstructed")
 	if first != null and first.actor() != null:
@@ -714,14 +717,19 @@ func test_invalid_input_keeps_last_valid_people_across_theme_and_floor_changes()
 	_eq(office.art.id, SECOND_PACK, "theme really switches while the snapshot is invalid")
 	_eq(office.layout_attempt_count(), attempts + 2, "a new theme retries the input once")
 	_check_last_valid_people(office, signature)
-	await _tap_key(KEY_PAGEUP)
-	_eq(office.layout_plan().floor_key, HerdrFleet.pane_key(LOCAL, "web"), "real key input leaves the invalid floor")
-	_check(office.layout_problems().is_empty(), "the other valid floor is not poisoned")
+	# Planning is atomic per machine (docs/WORLD_MODEL.md, "Caching"): web is
+	# a zone of the same map, drawn from the same last valid plan, so paging
+	# to it pans and neither replans nor clears the diagnostic, which used to
+	# be api's floor's alone.
 	attempts = office.layout_attempt_count()
+	await _tap_key(KEY_PAGEUP)
+	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "web"), "real key input pans to web")
+	_eq(office.layout_problems(), problems, "on the same map, which keeps its diagnostic")
+	_check_last_valid_people(office, signature)
 	await _tap_key(KEY_PAGEDOWN)
-	_eq(office.layout_plan().floor_key, HerdrFleet.pane_key(LOCAL, "api"), "real key input returns to the cached floor")
-	_eq(office.layout_attempt_count(), attempts, "returning to a failed floor does not replan")
-	_eq(office.layout_problems(), problems, "returning restores the failed floor's own diagnostic")
+	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "api"), "and back to api")
+	_eq(office.layout_attempt_count(), attempts, "paging between zones of a failed map does not replan")
+	_eq(office.layout_problems(), problems, "and the diagnostic stays the map's")
 	_check_last_valid_people(office, signature)
 	office.rebuild_world()
 	await _frames(2)
@@ -790,12 +798,13 @@ func test_first_budget_failure_is_cached_until_geometry_changes_or_floor_closes(
 	_eq(office.layout_plan(), fallback, "a second failure does not replace the bounded fallback")
 	_feed(office, {})
 	_check(
-		office.layout_plan() == null and office.layout_problems().is_empty(), "closing the floor shows a clean lobby"
+		office.layout_plan().zones.is_empty() and office.layout_problems().is_empty(),
+		"closing the workspace plans a clean empty map (an empty map is planned and counted like any other)"
 	)
 	_feed(office, invalid)
-	_eq(office.layout_attempt_count(), 5, "reopening forgets the failed attempt and builds a new fallback")
-	_check(office.layout_plan() != fallback, "closed floors release their retained geometry")
-	_eq(office.layout_problems(), problems, "reopened invalid floor is diagnosed again")
+	_eq(office.layout_attempt_count(), 5, "reopening forgets the failed attempt and tries again")
+	_check(office.layout_plan() != fallback, "the empty map's plan replaced the retained fallback")
+	_eq(office.layout_problems(), problems, "reopened invalid workspace is diagnosed again")
 	var corrected: Dictionary = invalid.duplicate(true)
 	corrected.panes = [{"pane_id": "wide-0", "tab_id": "wide", "workspace_id": "oversized"}]
 	_feed(office, corrected)
@@ -880,32 +889,32 @@ func test_render_budget_failure_keeps_old_nodes_and_first_failure_is_empty() -> 
 	_done(initial)
 
 
-## A floor planned for the first time is validated once, its standing furniture
+## A map planned for the first time is validated once, its standing furniture
 ## included: the planner furnishes the candidate before its one flood fill,
-## rather than validating the bare plan and then the furnished one again. In a
-## window wide enough for two lanes (a first plan 23 cells wide): the narrowest
-## map, one lane, has its top wall full of windows and no lane beside its zone,
-## so nothing to furnish.
+## rather than validating the bare plan and then the furnished one again. A
+## machine's map is first planned when it is first shown: bee's, on a real
+## click on its row, in a window wide enough for two lanes (a first plan 23
+## cells wide; the narrowest map, one lane, has its top wall full of windows and
+## no lane beside its zone, so nothing to furnish).
 func test_a_new_floor_is_validated_once_decor_included() -> void:
-	var office := await _live_office(fixture, Vector2(880, 480))
+	var office := await _two_machine_office(fixture, Vector2(880, 480))
 	var attempts := office.layout_attempt_count()
 	var before := OfficeFloorValidation.validations
-	await _visit_floor(office, HerdrFleet.pane_key(LOCAL, "web"))
-	_eq(office.layout_plan().floor_key, HerdrFleet.pane_key(LOCAL, "web"), "the new floor is shown")
-	_eq(office.layout_attempt_count(), attempts + 1, "which is planned once")
+	await _visit_floor(office, HerdrFleet.pane_key(BEE, "hive"))
+	_eq([office.navigator.shown_key, office.layout_plan().floor_key], [BEE, BEE], "bee's map is shown")
+	_eq(office.layout_attempt_count(), attempts + 1, "planned once")
 	_check(not office.layout_plan().decorations.is_empty(), "and furnished")
 	_eq(OfficeFloorValidation.validations - before, 1, "one validation covers the plan and its furniture")
 	_done(office)
 
 
-## Two workspaces are two floors, each planned, drawn and panned apart, as
-## before there were maps: A (one tab of 40 panes, a pod of 20 columns, 21
-## cells: three lanes, the map widened for them) plans (33,12); B (2 panes)
-## plans its own (23,12), the window's two lanes, rather than A's width; back on
-## A, its own plan again,
-## not planned anew. Every PageUp/PageDown between them is cold: a new world,
-## nobody walking. Each floor is back where the viewer dragged it.
-func test_each_workspace_keeps_its_own_plan_world_and_pan() -> void:
+## Two workspaces are two zones of one map (before maps: two floors): A (one
+## tab of 40 panes, a pod of 20 columns, 21 cells: three lanes, the map widened
+## for them) and B (2 panes) planned together, once. PageUp/PageDown between
+## them pan: the same plan object, the same zone rectangles, the same world,
+## nobody made to walk, and no replan. A drag moves the one map's pan, which
+## the next zone pick replaces (its aisle row at the top).
+func test_zones_on_one_map_keep_their_rectangles_and_the_world_when_paged() -> void:
 	var snapshot := {
 		"workspaces": [{"workspace_id": "a", "number": 1}, {"workspace_id": "b", "number": 2}],
 		"tabs":
@@ -922,37 +931,113 @@ func test_each_workspace_keeps_its_own_plan_world_and_pan() -> void:
 	var office := await _live_office(snapshot, Vector2(880, 480))
 	var a := HerdrFleet.pane_key(LOCAL, "a")
 	var b := HerdrFleet.pane_key(LOCAL, "b")
-	var plan_a := office.layout_plan()
-	_eq([plan_a.floor_key, plan_a.floor_cells.size], [a, Vector2i(33, 12)], "A is planned for its 40 panes")
+	var plan := office.layout_plan()
+	_eq([plan.floor_key, plan.lanes], [LOCAL, 3], "one map, the machine's, three lanes for A's pod")
+	var rects := [plan.zone(a).cells, plan.zone(b).cells]
+	_eq(rects[0].size, Vector2i(29, 6), "A spans the three lanes")
 	var middle := office.hud.world_rect().get_center()
-	var pan := office.camera.pan
 	await _drag(middle, middle + Vector2(-160, -60))
-	var pan_a := office.camera.pan
-	_check(pan_a != pan, "a real drag pans A: %s" % pan_a)
 	var attempts := office.layout_attempt_count()
 	var world := office.world.get_instance_id()
-	await _tap_key(KEY_PAGEUP)
-	var plan_b := office.layout_plan()
-	_eq([office.navigator.shown_key, plan_b.floor_key], [b, b], "PageUp shows B")
-	_eq(plan_b.floor_cells.size, Vector2i(23, 12), "planned for its own 2 panes, not at A's width")
-	_eq(office.layout_attempt_count(), attempts + 1, "once")
-	_check(office.world.get_instance_id() != world, "a cold switch: the world is built again")
-	_eq(office.floor_view.presentation.walkers(), [], "and nobody walks")
-	await _drag(middle, middle + Vector2(-40, -80))
-	var pan_b := office.camera.pan
-	_check(pan_b != pan_a, "a real drag pans B apart from A: %s" % pan_b)
-	world = office.world.get_instance_id()
-	await _tap_key(KEY_PAGEDOWN)
-	_eq([office.navigator.shown_key, office.layout_plan()], [a, plan_a], "PageDown: A again, on its own plan")
-	_eq(office.layout_plan().floor_cells.size, Vector2i(33, 12), "at its own size")
-	_eq(office.layout_attempt_count(), attempts + 1, "which is not planned again")
-	_check(office.world.get_instance_id() != world, "cold again")
-	_eq(office.floor_view.presentation.walkers(), [], "nobody walks")
-	_eq(office.camera.pan, pan_a, "A is where the viewer dragged it")
-	await _tap_key(KEY_PAGEUP)
-	_eq([office.navigator.shown_key, office.layout_plan()], [b, plan_b], "and B on its own plan")
-	_eq(office.layout_attempt_count(), attempts + 1, "not planned again either")
-	_eq(office.camera.pan, pan_b, "where the viewer dragged it")
+	for step: Array in [[KEY_PAGEUP, b], [KEY_PAGEDOWN, a], [KEY_PAGEUP, b]]:
+		var key: Key = step[0]
+		await _tap_key(key)
+		var zone: String = step[1]
+		_eq(
+			[office.navigator.shown_key, office.navigator.current_zone(office.frame)], [LOCAL, zone], "paged to " + zone
+		)
+		_eq(office.layout_plan(), plan, "the same plan object")
+		_eq([plan.zone(a).cells, plan.zone(b).cells], rects, "both zones keep their rectangles")
+		_eq(office.layout_attempt_count(), attempts, "nothing planned again")
+		_eq(office.world.get_instance_id(), world, "the same world, not built again")
+		_eq(office.floor_view.presentation.walkers(), [], "and nobody walks")
+		var reach := office.camera.world_size.y - office.camera.free_rect().size.y
+		_eq(office.camera.pan.y, minf(_sign_top(office, zone), reach), "panned to its sign, as far as the map goes")
+	_done(office)
+
+
+## Where the top of zone `zone`'s sign is drawn, in the world's coordinates:
+## what a zone pick puts at the top of the world (OfficeScene.reveal_zone()).
+func _sign_top(office: OfficeDouble, zone: String) -> float:
+	var board := office.floor_view.zone_sign(zone)
+	var holder := board.get_parent() as Node2D
+	return office.world.to_local(holder.to_global(board.drawn_rect().position)).y
+
+
+## PLAN_R2 §1.10, density: 1920×960 at 2x (the 960×480 view), the drawer
+## closed, the staff card one line; a real click on the first zone's FLOORS
+## row; the seats whose click rect (target_rect(), no chip) is wholly inside
+## world_rect() are counted. Two workspaces, one to a lane, each of four tabs of
+## 8, 4, 8 and 4 working agents (pods of 4, 2, 4 and 2 columns: two pod rows),
+## and again with the first two tabs only (one pod row). The floors before one
+## map per machine showed 12 in the same rect.
+func test_a_zone_call_shows_the_planned_density() -> void:
+	for rows: int in [2, 1]:
+		var office := await _live_office(_density(rows), Vector2(960, 480))
+		_check(not office.hud.drawer_open() and office.hud.card_compact(), "drawer closed, card one line")
+		_eq(office.hud.world_rect(), Rect2(96, 48, 820, 308), "the world's room at 1920×960, 2x")
+		var plan := office.layout_plan()
+		var a := plan.zone(HerdrFleet.pane_key(LOCAL, "a"))
+		var b := plan.zone(HerdrFleet.pane_key(LOCAL, "b"))
+		_eq([a.first_lane, a.lanes, b.first_lane, b.lanes], [0, 1, 1, 1], "%d: one zone to a lane" % rows)
+		_eq([a.rows.size(), b.rows.size()], [rows, rows], "%d pod rows each" % rows)
+		await _visit_floor(office, HerdrFleet.pane_key(LOCAL, "a"))
+		await _frames(3)
+		var room := office.hud.world_rect()
+		var seen := 0
+		for key: String in office.floor_view.seats:
+			var rect := office.floor_view.seats[key].node.target_rect()
+			if room.encloses(Rect2(rect.position - office.camera.position, rect.size)):
+				seen += 1
+		var wanted := 36 if rows == 2 else 24
+		print("DENSITY %d pod row(s): %d seats wholly in %s (plan: %d)" % [rows, seen, room, wanted])
+		_check(seen >= wanted, "%d pod row(s): at least %d seats wholly in view, %d" % [rows, wanted, seen])
+		_done(office)
+
+
+## Two workspaces `a` and `b`, each with tabs of 8, 4, 8 and 4 working claude
+## agents (`rows` 2), or of 8 and 4 (`rows` 1); focus on a's first pane.
+func _density(rows: int) -> Dictionary:
+	var snapshot := {"workspaces": [], "tabs": [], "panes": [], "layouts": [], "focused_pane_id": "a:t0:p0"}
+	for space: String in ["a", "b"]:
+		_list(snapshot, "workspaces").append({"workspace_id": space, "number": 1 if space == "a" else 2})
+		var sizes: Array[int] = [8, 4, 8, 4]
+		sizes.resize(2 * rows)
+		for tab in sizes.size():
+			var tab_id := "%s:t%d" % [space, tab]
+			_list(snapshot, "tabs").append({"workspace_id": space, "tab_id": tab_id, "number": tab + 1})
+			for index in sizes[tab]:
+				var pane := {"pane_id": "%s:p%d" % [tab_id, index], "tab_id": tab_id, "workspace_id": space}
+				pane.merge({"agent": "claude", "agent_status": "working", "terminal_id": "t-%s-%d" % [tab_id, index]})
+				_list(snapshot, "panes").append(pane)
+	return snapshot
+
+
+## A zone whose input cannot be laid out is named on the machine's plate, and
+## the whole map stays drawn from its previous plan (planning is atomic per
+## machine): the same world, the same desks, their nodes kept.
+func test_a_failing_zone_is_named_on_the_plate_and_the_map_stays() -> void:
+	var office := await _live_office()
+	var world := office.world.get_instance_id()
+	var desks := _desk_ids(office, "")
+	var plan := office.layout_plan()
+	var broken := fixture.duplicate(true)
+	var repeated: Dictionary = {}
+	for pane: Dictionary in _list(broken, "panes"):
+		if pane.pane_id == "web:p2":
+			repeated = pane.duplicate(true)
+	_list(broken, "panes").append(repeated)
+	_feed(office, broken)
+	_check(not office.layout_problems().is_empty(), "web's input cannot be laid out")
+	_eq(office.plans.failing_zones(LOCAL), PackedStringArray([HerdrFleet.pane_key(LOCAL, "web")]), "web is at fault")
+	var said := office.plate.problem_text()
+	print("PLATE_PROBLEM: " + said)
+	_check(said.begins_with("Layout unavailable: 2 WEB"), "the plate names the zone: " + said)
+	_eq(office.layout_plan(), plan, "the previous plan stays")
+	_eq(office.world.get_instance_id(), world, "the same world")
+	_eq(_desk_ids(office, ""), desks, "every desk of every zone keeps its nodes")
+	_feed(office, fixture)
+	_eq(office.plate.problem_text(), "", "valid again: no problem line")
 	_done(office)
 
 
@@ -967,8 +1052,10 @@ func test_one_workspace_is_drawn_as_a_zone() -> void:
 	var office := await _live_office()
 	var plan := office.layout_plan()
 	var view := office.floor_view
-	_eq(plan.zones.size(), 1, "one workspace, one zone")
-	var zone := plan.zones[0]
+	_eq(plan.zones.size(), 5, "the machine's five workspaces, five zones of its one map")
+	var zone := plan.zone(HerdrFleet.pane_key(LOCAL, "api"))
+	for each in plan.zones:
+		_check(not view.partition_sprites(each.zone_key).is_empty(), "%s has its partitions drawn" % each.zone_key)
 	var sprites := view.partition_sprites(zone.zone_key)
 	var planned := OfficeShell.partition_pieces(zone)
 	_eq(sprites.size(), planned.size(), "every planned partition piece is drawn")

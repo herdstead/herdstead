@@ -1,8 +1,8 @@
 class_name FloorPlanCache
 extends RefCounted
 ## Every map's last valid plan, and what was last tried for it, for as long as
-## the map exists. A map is kept under its key (the office still hands in one
-## per workspace), with its plan and history: a refresh plans a map again only
+## the map exists. A map is kept under its key (the office hands in one per
+## machine, under the machine's key), with its plan and history: a refresh plans a map again only
 ## when its geometry, the art pack or the clearance policy changed. Status,
 ## labels, focus and liveness never invalidate a plan. Not persisted: this is
 ## the run's memory.
@@ -15,10 +15,9 @@ extends RefCounted
 ## from its last valid plan. A map that never had one gets a bounded empty
 ## fallback (no zone at all), labelled by its problems.
 ##
-## A building's lobby is planned the same way (walls, door, windows, walkways,
-## decor; no zone and no pantry) but it lays out nothing herdr sent, so it has
-## no place in the layout diagnostics: layout_plan(), problems(), notes(),
-## failing_zones() and attempt_count() are about workspaces only.
+## A machine with no workspace is an empty map (no zone: walls, door, windows,
+## walkways, decor, no pantry). It is planned like any other, so it is in the
+## layout diagnostics too: layout_plan(), problems(), notes() and attempt_count().
 
 var _plans: Dictionary[String, FloorPlan] = {}
 ## The model each valid plan was drawn from: what a floor whose current input
@@ -29,9 +28,7 @@ var _attempt_problems: Dictionary[String, PackedStringArray] = {}
 var _notes: Dictionary[String, PackedStringArray] = {}
 ## The zones the last attempt of each map failed on; empty once it planned.
 var _failing: Dictionary[String, PackedStringArray] = {}
-var _lobbies: Dictionary[String, FloorPlan] = {}
-var _lobby_inputs: Dictionary[String, String] = {}
-## The problems of the floor prepare() was last asked for.
+## The problems of the map prepare() was last asked for.
 var _problems := PackedStringArray()
 var _attempts := 0
 ## The person prefab's feet, read once: PixelPerson.footprint() instantiates it.
@@ -40,7 +37,7 @@ var _footprint_read := false
 
 
 ## The plan to draw `map` with, `visible_width` units wide if it is planned for
-## the first time. For a workspace that is its valid plan for the current input;
+## the first time. That is its valid plan for the current input;
 ## while the input cannot be planned, its last valid plan (see problems() and
 ## planned_model()); and a bounded empty floor when it never had one. `pen`
 ## measures the furniture the plan is furnished with. The whole map goes to
@@ -50,9 +47,6 @@ func prepare(map: MapModel, pen: OfficeDraw, visible_width: float) -> FloorPlan:
 	policy.width_cells = maxi(1, floori(visible_width / FloorLayoutPolicy.GRID))
 	policy.actor_draw_rect = PixelPerson.drawing_rect(pen.art.people)
 	policy.actor_footprint = _actor_footprint()
-	if map.lobby():
-		_problems.clear()
-		return _lobby(map, pen, policy)
 	var previous: FloorPlan = _plans.get(map.key)
 	# Budgets can change acceptance without changing the retained row geometry.
 	var input := JSON.stringify(
@@ -94,9 +88,8 @@ func prepare(map: MapModel, pen: OfficeDraw, visible_width: float) -> FloorPlan:
 	if previous != null:
 		return previous
 	# A bad first snapshot still gets a bounded, empty, explicitly labelled map:
-	# no zone at all, like a lobby's.
-	var none: Array[ZoneModel] = []
-	var empty := MapModel.of_zones(map.key, none)
+	# no zone at all, like a machine's without workspaces.
+	var empty := MapModel.empty(map.key)
 	_attempts += 1
 	var fallback := OfficeFloorLayout.plan(empty, null, policy)
 	_plans[map.key] = fallback.plan
@@ -104,19 +97,19 @@ func prepare(map: MapModel, pen: OfficeDraw, visible_width: float) -> FloorPlan:
 	return fallback.plan
 
 
-## Why the floor prepare() was last asked for cannot be drawn from its current
-## input; empty while it can (and always for a lobby).
+## Why the map prepare() was last asked for cannot be drawn from its current
+## input; empty while it can.
 func problems() -> PackedStringArray:
 	return _problems.duplicate()
 
 
-## A workspace's plan as the cache holds it; null for a lobby or an unknown floor.
+## A map's plan as the cache holds it (by machine key for the office's maps); null for an unknown map.
 func plan(key: String) -> FloorPlan:
 	return _plans.get(key)
 
 
 ## The model the plan of `key` was made for, which is what to draw while the
-## floor's current input cannot be planned.
+## map's current input cannot be planned.
 func planned_model(key: String) -> MapModel:
 	return _planned_models.get(key)
 
@@ -134,18 +127,19 @@ func notes(key: String) -> PackedStringArray:
 	return found.duplicate()
 
 
-## Actual planner calls for workspaces, including empty fallbacks. Cache hits
-## and lobbies do not count.
+## Actual planner calls, empty maps and empty fallbacks included. Cache hits
+## do not count.
 func attempt_count() -> int:
 	return _attempts
 
 
-## Keep only the floors in `floor_keys` (every floor that exists now): closed
-## workspaces and lobbies that went away release their history, and a floor
-## that is merely not shown keeps it.
-func prune(floor_keys: Array[String]) -> void:
+## Keep only the maps in `map_keys` (every machine that exists now): a machine
+## that went away releases its history, and a map that is merely not shown
+## keeps it. A workspace coming or going is a zone of its machine's map, never
+## a map of its own: it releases nothing here.
+func prune(map_keys: Array[String]) -> void:
 	var present: Dictionary[String, bool] = {}
-	for key in floor_keys:
+	for key in map_keys:
 		present[key] = true
 	for key: String in _plans.keys():
 		if not present.has(key):
@@ -155,27 +149,6 @@ func prune(floor_keys: Array[String]) -> void:
 			_attempt_problems.erase(key)
 			_notes.erase(key)
 			_failing.erase(key)
-	for key: String in _lobbies.keys():
-		if not present.has(key):
-			_lobbies.erase(key)
-			_lobby_inputs.erase(key)
-
-
-## A lobby is an empty map (no zone): planned once per pack and clearance
-## policy, and kept, like any map's, when a new policy cannot be planned.
-func _lobby(map: MapModel, pen: OfficeDraw, policy: FloorLayoutPolicy) -> FloorPlan:
-	var previous: FloorPlan = _lobbies.get(map.key)
-	var input := JSON.stringify([map.geometry_signature(), pen.art.id, policy.geometry_signature()])
-	if previous != null and _lobby_inputs.get(map.key, "") == input:
-		return previous
-	var result := OfficeFloorLayout.plan(
-		map, previous, policy, OfficeDecorPlanner.new(pen), OfficeFixturePlanner.new(pen)
-	)
-	_lobby_inputs[map.key] = input
-	if result.plan == null:
-		return previous
-	_lobbies[map.key] = result.plan
-	return result.plan
 
 
 func _actor_footprint() -> Rect2:

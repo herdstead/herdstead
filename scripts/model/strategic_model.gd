@@ -1,7 +1,7 @@
 class_name StrategicModel
 extends RefCounted
-## What the strategic view (`S`, OfficeStrategic) draws for the shown floor:
-## its title, and per table of the floor's plan (its zones in the plan's order,
+## What the strategic view (`S`, OfficeStrategic) draws for the shown machine's
+## map: its title, and per table of the map's plan (its zones in the plan's order,
 ## each zone's pod rows in `index` order, empty rows left out, each row's
 ## tables left to right) the seats that have a
 ## pane, with the look of that pane's FLOORS window (OfficeFloorRow.window_look(),
@@ -10,8 +10,8 @@ extends RefCounted
 ## the OVERVIEW's FOR, the lens's line). A seat whose pane is gone is a vacancy,
 ## drawn as none; a pane the plan does not seat is the agent list's to show.
 ##
-## Pure: built by the office from the plan, the frame's floor, the machine's
-## state and the state log at a clock it is handed, never Time.*.
+## Pure: built by the office from the plan, the frame's building (the machine),
+## its state and the state log at a clock it is handed, never Time.*.
 
 
 ## One table: a tab of the floor, as the plan placed it.
@@ -54,27 +54,25 @@ class Seat:
 	var picked := false
 
 
-## `3F  API`, a mezzanine `3A · CHECKOUT · worktree of 3F`, `LOBBY`; ` @ machine`
-## after it while the office shows more than one machine.
+## The machine's name, upper case; `@ ` before it while the office shows more
+## than one machine.
 var title := ""
 ## `OFFLINE` or `CONNECTING` for a machine that is not answering; else empty.
 var state_text := ""
 ## The machine is not answering: every seat dark, no wait (invariant 4).
 var stale := false
-## The shown floor is a lobby: nothing herdr sent is laid out there.
-var lobby := false
 var tables: Array[Table] = []
 ## The clock the waits were read at.
 var now_msec := 0
 
 
-## The model of `found`'s floor laid out by `plan` (null for none: a lobby).
+## The model of machine `building`'s map laid out by `plan` (null for none).
 ## `several` is the office showing more than one machine, `state` how the
-## floor's machine answers, `ledger` the fleet's state log, `active_key` the
-## pane selected (picked or followed), `now_msec` the log's clock now.
+## machine answers, `ledger` the fleet's state log, `active_key` the pane
+## selected (picked or followed), `now_msec` the log's clock now.
 static func of(
 	plan: FloorPlan,
-	found: ZoneRef,
+	building: BuildingModel,
 	several: bool,
 	state: MachineLiveness.State,
 	ledger: StateLog,
@@ -88,21 +86,18 @@ static func of(
 		model.state_text = "OFFLINE"
 	elif state == MachineLiveness.State.CONNECTING:
 		model.state_text = "CONNECTING"
-	if found == null:
+	if building == null:
 		return model
-	var floor_model := found.zone_model
-	model.lobby = floor_model.lobby
-	model.title = _title(found)
-	if several:
-		model.title += " @ " + found.building.label
+	model.title = ("@ " if several else "") + building.label.to_upper()
 	if plan == null:
 		return model
 	var rooms: Dictionary[String, RoomModel] = {}
 	var panes: Dictionary[String, PaneModel] = {}
-	for room in floor_model.rooms:
-		rooms[room.key] = room
-		for pane in room.panes:
-			panes[pane.key] = pane
+	for zone in building.zones:
+		for room in zone.rooms:
+			rooms[room.key] = room
+			for pane in room.panes:
+				panes[pane.key] = pane
 	var bands: Array[RowPlan] = []
 	for zone in plan.zones:
 		var rows := zone.rows.duplicate()
@@ -135,7 +130,7 @@ static func of(
 ## adds the ones it writes in a square) and the pointer: a view drawn for one
 ## signature is drawn again only for another.
 func signature() -> String:
-	var parts: Array = [title, state_text, stale, lobby]
+	var parts: Array = [title, state_text, stale]
 	for table in tables:
 		var seats: Array = []
 		for each in table.seats:
@@ -161,23 +156,6 @@ func row_capacities() -> Array[PackedInt32Array]:
 			rows.append(PackedInt32Array())
 		rows[table.row].append(table.capacity)
 	return rows
-
-
-## The floor as its plate names it (OfficeFloorPlate.show_floor()), a mezzanine
-## with the floor its checkout belongs to.
-static func _title(found: ZoneRef) -> String:
-	var floor_model := found.zone_model
-	if floor_model.lobby:
-		return "LOBBY"
-	var number := OfficeFloorRow.number_text(floor_model)
-	if floor_model.mezzanine_of.is_empty():
-		return "%s  %s" % [number, floor_model.label.to_upper()]
-	var named := floor_model.worktree if not floor_model.worktree.is_empty() else floor_model.label
-	var said := "%s · %s" % [number, named.to_upper()]
-	for other in found.building.zones:
-		if other.key == floor_model.mezzanine_of:
-			said += " · worktree of " + OfficeFloorRow.number_text(other)
-	return said
 
 
 ## Far seats before near ones, each side left to right: the order they are drawn in.

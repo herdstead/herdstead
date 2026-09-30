@@ -323,8 +323,6 @@ static func _tree(frame: OfficeFrame, live_items: Dictionary[String, AttentionIt
 		result.append(machine)
 		var floor_groups: Dictionary[String, Entry] = {}
 		for floor_model in building.zone_tree:
-			if floor_model.lobby:
-				continue
 			var parent: Entry = floor_groups.get(floor_model.mezzanine_of, machine)
 			var name := "%s  %s" % [floor_model.level_label, floor_model.label]
 			var floor_group := _group("tree:f:" + floor_model.key, name.strip_edges(), parent.key, parent.depth + 1)
@@ -395,7 +393,7 @@ static func _pane_entry(
 			entry.presence in [Presence.BLOCKED, Presence.UNREAD] and (item.hidden or item.is_snoozed(now_msec))
 		)
 	entry.building_label = building.label
-	entry.floor_ref = frame.find_floor(frame.floor_of(pane.key))
+	entry.floor_ref = frame.find_zone(frame.zone_of(pane.key))
 	entry.note = note_of(entry, now_msec)
 	return entry
 

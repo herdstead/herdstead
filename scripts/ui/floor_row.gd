@@ -55,12 +55,10 @@ func _ready() -> void:
 	pressed.connect(func() -> void: floor_picked.emit(key))
 
 
-## The chip's text for `floor_model`: `L` for a lobby, a mezzanine's own level
-## label (`3A`), and every other floor's number with an F (`3F`). The floor
-## plate and the signposts write floors the same way.
+## The chip's text for `floor_model`: a mezzanine's own level label (`3A`),
+## and every other zone's number with an F (`3F`). The zone sign's tooltip and
+## the signposts write zones the same way.
 static func number_text(floor_model: ZoneModel) -> String:
-	if floor_model.lobby:
-		return "L"
 	if not floor_model.mezzanine_of.is_empty() and not floor_model.level_label.is_empty():
 		return floor_model.level_label
 	return "%dF" % floor_model.number

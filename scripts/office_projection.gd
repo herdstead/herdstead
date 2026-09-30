@@ -35,29 +35,32 @@ static func frame(machines: Array[MachineView], states: PackedStringArray) -> Of
 	return result
 
 
-## The buildings with their floors and seated panes indexed: a frame without
-## panes or focus, which is all the floor lookups below need.
+## The buildings with their zones and seated panes indexed: a frame without
+## panes or focus, which is all the zone lookups below need.
 static func frame_of(buildings: Array[BuildingModel]) -> OfficeFrame:
 	var result := OfficeFrame.new()
 	result.buildings = buildings
 	for building_model in buildings:
-		for floor_model in building_model.zones:
-			if not result.floor_by_key.has(floor_model.key):
-				result.floor_by_key[floor_model.key] = ZoneRef.new(building_model, floor_model)
-			result.floor_order.append(floor_model.key)
-			for room in floor_model.rooms:
+		if not result.building_by_key.has(building_model.key):
+			result.building_by_key[building_model.key] = building_model
+		for zone in building_model.zones:
+			if not result.zone_by_key.has(zone.key):
+				result.zone_by_key[zone.key] = ZoneRef.new(building_model, zone)
+			for room in zone.rooms:
 				for pane in room.panes:
-					if not result.floor_of_pane.has(pane.key):
-						result.floor_of_pane[pane.key] = floor_model.key
+					if not result.zone_of_pane.has(pane.key):
+						result.zone_of_pane[pane.key] = zone.key
+		for zone in OfficeNavigator.section(building_model.zones):
+			result.zone_order.append(zone.key)
 	return result
 
 
 # --- buildings ----------------------------------------------------------------
 
 
-## A machine as a building: its key, label, counts and floors. A building
-## without floors (offline, never loaded, or an empty session) gets a lobby, so
-## its state and SSH complaint stay readable.
+## A machine as a building: its key, label, counts, zones and its one map. A
+## machine without workspaces (offline, never loaded, or an empty session) has
+## no zone and an empty map; its plate keeps its state and SSH complaint readable.
 static func building(
 	key: String, label: String, snapshot: HerdrSnapshot, states: PackedStringArray, is_stale: bool
 ) -> BuildingModel:
@@ -70,20 +73,8 @@ static func building(
 	model.panes = snapshot.panes.size()
 	model.all_panes = panes_of(snapshot, states, key)
 	model.zones = project(snapshot, states, key, is_stale)
-	if model.zones.is_empty():
-		model.zones.append(lobby(key))
 	model.zone_tree = floor_tree(model.zones)
-	return model
-
-
-## The lobby's key has a second separator after the machine key: a cleaned
-## workspace id holds no control character, so no real floor can be the lobby,
-## not even a workspace whose id reads as empty.
-static func lobby(machine: String) -> ZoneModel:
-	var model := ZoneModel.new()
-	model.key = HerdrFleet.pane_key(machine, "") + HerdrFleet.KEY_SEPARATOR
-	model.label = "LOBBY"
-	model.lobby = true
+	model.map = MapModel.of_zones(key, model.zones)
 	return model
 
 
@@ -426,24 +417,25 @@ static func effective_selection(buildings: Array[BuildingModel], picked_key: Str
 	return indexed.effective_selection(picked_key)
 
 
-## Key of the floor a desk sits on, or empty.
-static func floor_of(buildings: Array[BuildingModel], pane_key: String) -> String:
-	return frame_of(buildings).floor_of(pane_key)
+## Key of the zone a desk sits in, or empty.
+static func zone_of(buildings: Array[BuildingModel], pane_key: String) -> String:
+	return frame_of(buildings).zone_of(pane_key)
 
 
-## The floor with this key and the building it stands in, or null.
-static func find_floor(buildings: Array[BuildingModel], key: String) -> ZoneRef:
-	return frame_of(buildings).find_floor(key)
+## The zone with this key and the building it stands in, or null.
+static func find_zone(buildings: Array[BuildingModel], key: String) -> ZoneRef:
+	return frame_of(buildings).find_zone(key)
 
 
-## See OfficeFrame.choose_floor.
-static func choose_floor(buildings: Array[BuildingModel], picked_floor: String, active_key: String) -> String:
-	return frame_of(buildings).choose_floor(picked_floor, active_key)
+## See OfficeFrame.choose_machine.
+static func choose_machine(buildings: Array[BuildingModel], picked_machine: String, active_key: String) -> String:
+	return frame_of(buildings).choose_machine(picked_machine, active_key)
 
 
-## Every floor bottom to top, building after building: the PageUp/PageDown order.
-static func floor_order(buildings: Array[BuildingModel]) -> Array[String]:
-	return frame_of(buildings).floor_order
+## Every zone as the FLOORS rail draws it, machine after machine: the
+## PageUp/PageDown order (see OfficeFrame.zone_order).
+static func zone_order(buildings: Array[BuildingModel]) -> Array[String]:
+	return frame_of(buildings).zone_order
 
 
 ## Desks whose agent needs a human, across every live building: blocked first,

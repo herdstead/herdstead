@@ -315,7 +315,7 @@ func test_the_boundary_sends_exact_params_and_an_empty_herdr_focuses_the_first()
 ## the pane's raw directory; the fake's new floor appears, herdr's focus
 ## stays, the office follows the root pane onto it (a pick across floors),
 ## whose card offers START AGENT; nothing is started.
-func test_new_space_sends_cwd_and_no_focus_and_the_office_follows_onto_the_new_floor() -> void:
+func test_new_space_sends_cwd_and_no_focus_and_the_office_follows_onto_its_new_zone() -> void:
 	var office := await _shell_local()
 	var card := _card(office)
 	var spacer := _space_button(office)
@@ -327,10 +327,11 @@ func test_new_space_sends_cwd_and_no_focus_and_the_office_follows_onto_the_new_f
 	)
 	_check(not "workspace.create" in spacer.tooltip_text, "and never names the method")
 	_check(not _control(office, "ManageNote").is_visible_in_tree(), "no note while no branch is typed")
-	var alpha := office.navigator.shown_key
+	var alpha := office.navigator.current_zone(office.frame)
+	var world := office.world.get_instance_id()
 	var w3 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "w3:p1")
 	await _click_control(spacer)
-	await _until(func() -> bool: return office.picked_key == w3, "the office picks the new floor's shell")
+	await _until(func() -> bool: return office.picked_key == w3, "the office picks the new zone's shell")
 	_eq(
 		_writes_seen("control-a"),
 		PackedStringArray(["workspace.create /home/tester/alpha focus:false"]),
@@ -343,10 +344,14 @@ func test_new_space_sends_cwd_and_no_focus_and_the_office_follows_onto_the_new_f
 	)
 	_eq(_dict(_ctl("control-a", "stats"), "snapshot").get("focused_pane_id"), "alpha:p1", "herdr's focus stays")
 	await _until(
-		func() -> bool: return office.navigator.shown_key == HerdrFleet.pane_key(HerdrFleet.LOCAL, "w3"),
-		"on the new floor"
+		func() -> bool:
+			return office.navigator.current_zone(office.frame) == HerdrFleet.pane_key(HerdrFleet.LOCAL, "w3"),
+		"its new zone current"
 	)
-	_check(office.navigator.shown_key != alpha, "another floor than the shell's")
+	_check(office.navigator.current_zone(office.frame) != alpha, "another zone than the shell's")
+	_eq([office.navigator.shown_key, office.world.get_instance_id()], [HerdrFleet.LOCAL, world], "on the same map")
+	await _frames(2)
+	_check(office.hud.world_rect().has_point(_desk_point(office, w3)), "panned: its desk in the world's room")
 	await _until(func() -> bool: return _title(office) == "START AGENT", "its card: START AGENT")
 	await _wait(1.0)
 	_eq(_count("control-a", "agent.start"), 0, "nothing started")
@@ -448,7 +453,9 @@ func test_new_worktree_sends_four_fields_and_the_mezzanine_hangs_under_its_paren
 	)
 	_eq(_chips(office).size(), chips_before.size() + 1, "one more floor")
 	await _until(
-		func() -> bool: return office.navigator.shown_key == HerdrFleet.pane_key(HerdrFleet.LOCAL, "w6"), "shown"
+		func() -> bool:
+			return office.navigator.current_zone(office.frame) == HerdrFleet.pane_key(HerdrFleet.LOCAL, "w6"),
+		"its zone current"
 	)
 	_eq(_dict(_ctl("control-a", "stats"), "snapshot").get("focused_pane_id"), "hs:p1", "herdr's focus stays")
 	await _floor_pick(office, hs)
@@ -647,7 +654,7 @@ func test_a_lost_space_or_worktree_answer_is_unknown_and_never_resent() -> void:
 		"the footer: no answer"
 	)
 	var w6 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "w6")
-	await _until(func() -> bool: return office.frame.find_floor(w6) != null, "the new floor shows")
+	await _until(func() -> bool: return office.frame.find_zone(w6) != null, "the new floor shows")
 	await _wait(1.0)
 	_eq(office.picked_key, hs_p3, "not picked: the office never learned its id")
 	_eq(_count("control-a", "workspace.create"), 1, "never sent again")
@@ -666,10 +673,39 @@ func test_a_lost_space_or_worktree_answer_is_unknown_and_never_resent() -> void:
 		"the footer: git may have run"
 	)
 	var w7 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "w7")
-	await _until(func() -> bool: return office.frame.find_floor(w7) != null, "the new floor shows")
+	await _until(func() -> bool: return office.frame.find_zone(w7) != null, "the new floor shows")
 	await _wait(1.0)
 	_eq(office.picked_key, hs_p3, "not picked")
 	_eq(_count("control-a", "worktree.create"), 1, "never sent again")
+	_eq(_writes_seen("control-b"), PackedStringArray(), "bee heard nothing")
+
+
+## The viewer navigating while a new space is on its way is moving on (codex
+## #5), even back to where they were: New space, then a real PageUp (a pan to
+## bravo on the same map) and PageDown (alpha again) before a snapshot shows the
+## new zone: its shell is not picked, the footer says so, and one space was made.
+func test_a_new_space_is_not_picked_after_the_viewer_paged_away() -> void:
+	var office := await _shell_local()
+	var card := _card(office)
+	var spacer := _space_button(office)
+	await _until(func() -> bool: return spacer.is_visible_in_tree() and not spacer.disabled, "New space offered")
+	var alpha := office.navigator.current_zone(office.frame)
+	var picked := office.picked_key
+	await _after_a_poll("control-a")
+	_ctl("control-a", "next", {"action": "delay", "method": "session.snapshot", "seconds": 2.5})
+	await _click_control(spacer)
+	await _until(func() -> bool: return card.outcome_text() == "New space w3", "herdr made w3")
+	await _navigate_key(office, KEY_PAGEUP)
+	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(HerdrFleet.LOCAL, "bravo"), "PageUp: bravo")
+	await _navigate_key(office, KEY_PAGEDOWN)
+	_eq(office.navigator.current_zone(office.frame), alpha, "PageDown: alpha again")
+	var w3 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "w3")
+	_check(office.frame.find_zone(w3) == null, "before any snapshot showed the new zone")
+	await _until(func() -> bool: return office.frame.find_zone(w3) != null, "a snapshot shows it")
+	await _wait(1.0)
+	_eq(office.picked_key, picked, "its shell is not picked: the viewer navigated meanwhile")
+	_eq(card.outcome_text(), "New space w3: not picked", "the footer says so")
+	_eq(_count("control-a", "workspace.create"), 1, "one space made")
 	_eq(_writes_seen("control-b"), PackedStringArray(), "bee heard nothing")
 
 
@@ -813,3 +849,12 @@ func _cwd_clean_of(snapshot: HerdrSnapshot, pane_id: String) -> bool:
 		if pane.pane_id == pane_id:
 			return pane.cwd_clean
 	return false
+
+
+## Right after fake `which` answered a snapshot poll: the next is
+## HerdrClient.SNAPSHOT_INTERVAL away, so the next snapshot it is asked for
+## is the one an event asks for (as tools/test_split.gd waits).
+func _after_a_poll(which: String) -> void:
+	var before := _count(which, "session.snapshot")
+	await _until(func() -> bool: return _count(which, "session.snapshot") > before, "a snapshot poll")
+	await _frames(2)

@@ -1,12 +1,11 @@
 class_name ZoneModel
 extends RefCounted
-## One herdr workspace as the office draws it: a floor of rooms, or the lobby of
-## a building that has no workspaces at all.
+## One herdr workspace as the office draws it: a zone of rooms on its machine's
+## map (MapModel). A machine with no workspace has no zone at all: its map is empty.
 
-## Machine key and workspace id together; a lobby's key carries a second
-## separator, so no real floor can collide with it.
+## Machine key and workspace id together (HerdrFleet.pane_key()).
 var key := ""
-## Herdr's own workspace number, which is the floor number; 0 for a lobby.
+## Herdr's own workspace number, which is the zone's number.
 var number := 0
 var label := ""
 ## Repository of the workspace's worktree; empty when it has none. The API
@@ -18,7 +17,7 @@ var repo := ""
 var worktree := ""
 ## The floor's number as the minimap and the plate write it: herdr's number
 ## ("3"), or, for a mezzanine, its source floor's number and a letter ("3A").
-## Empty for a lobby. See OfficeProjection.group_worktrees().
+## See OfficeProjection.group_worktrees().
 var level_label := ""
 ## Key of the floor this one is a mezzanine of: the workspace herdr made this
 ## linked worktree from, when it is open on the same machine. Empty for every
@@ -28,8 +27,6 @@ var mezzanine_of := ""
 ## 0-based among its source floor's mezzanines, in herdr's workspace order; -1
 ## when this is no mezzanine.
 var mezzanine_index := -1
-## This is a building's lobby, not a workspace: no rooms, a note instead.
-var lobby := false
 ## Agents seated on this floor, one still launching included.
 var agents := 0
 ## Panes whose agent needs a human (see OfficeAttention.count). A stale machine
@@ -45,7 +42,7 @@ func geometry_signature() -> String:
 	for room in rooms:
 		groups.append(room.geometry_signature())
 	groups.sort()
-	return JSON.stringify([key, lobby, groups])
+	return JSON.stringify([key, groups])
 
 
 ## Panes seated on this floor, for the plate's counts.

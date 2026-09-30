@@ -688,3 +688,96 @@ func _loop_clean_text(value: Variant) -> String:
 ## The second pack the pack-switching cases switch to (test_base.gd).
 func _second_pack() -> String:
 	return _second_pack_at(args.work.path_join("machines-pack-second"))
+
+
+func _attention_identity_fixture() -> Dictionary:
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://tools/fixtures/snapshot_basic.json"))
+	var data: Dictionary = parsed
+	var snapshot := _dict(data, "snapshot")
+	snapshot.agents = []
+	for pane: Dictionary in _list(snapshot, "panes"):
+		pane.erase("terminal_id")
+		pane.erase("agent_session")
+		pane.agent_status = "blocked" if pane.pane_id in ["alpha:p1", "alpha:p3"] else "idle"
+	return snapshot
+
+
+func _attention_machine(label: String, target: String, session := "") -> Dictionary:
+	return {"id": "attention", "label": label, "target": target, "session": session, "enabled": true}
+
+
+func _machine_attention(office: OfficeDouble, machine: String) -> Array[AttentionItem]:
+	var items: Array[AttentionItem] = []
+	for item in office.attention_store.current(Time.get_ticks_msec()):
+		if item.machine_key == machine:
+			items.append(item)
+	return items
+
+
+## Whether the bubble over pane `key`'s desk is inside the world on screen.
+func _bubble_on_screen(office: OfficeDouble, key: String) -> bool:
+	var seat := office.floor_view.seat(key)
+	if seat == null:
+		return false
+	var screen := office.get_viewport().get_canvas_transform() * seat.node.bubble_rect()
+	return screen.has_area() and office.hud.world_rect().intersects(screen)
+
+
+## A real key the staff panel reads by its position (Enter, Escape): keycode
+## and physical keycode both, pressed and released.
+func _card_key(code: Key) -> void:
+	for down: bool in [true, false]:
+		var event := InputEventKey.new()
+		event.keycode = code
+		event.physical_keycode = code
+		event.pressed = down
+		Input.parse_input_event(event)
+		Input.flush_buffered_events()
+		await physics_frame
+		await process_frame
+
+
+## char(), made at run time: `char(0)` with a constant argument is folded while
+## the script compiles, and loading the folded constant made the engine warn
+## "Unexpected NUL character" (make check-scripts).
+static func _char(code: int) -> String:
+	return char(code)
+
+
+## One layout slot carrying `rect` (none at all when null), as from_wire() reads
+## it: [x, y, width, height].
+func _rect_read(rect: Variant) -> Array:
+	var slot := {"pane_id": "p"} if rect == null else {"pane_id": "p", "rect": rect}
+	var read := HerdrSnapshot.from_wire({"layouts": [{"tab_id": "t", "panes": [slot]}]})
+	return _drawn_slot(read.layouts[0].panes[0]).slice(1)
+
+
+## A real drag in the world, from `from` by `by`, through the viewport.
+func _drag_world(from: Vector2, by: Vector2) -> void:
+	_button(from, MOUSE_BUTTON_LEFT, true)
+	var motion := InputEventMouseMotion.new()
+	motion.position = from + by
+	motion.global_position = from + by
+	motion.relative = by
+	motion.button_mask = MOUSE_BUTTON_MASK_LEFT
+	root.push_input(motion, true)
+	await process_frame
+	_button(from + by, MOUSE_BUTTON_LEFT, false)
+	await process_frame
+	await process_frame
+
+
+## One workspace `a` whose one tab holds `count` working claude agents, focus on the first.
+func _one_tab_of(count: int) -> Dictionary:
+	var big := {
+		"workspaces": [{"workspace_id": "a", "number": 1}],
+		"tabs": [{"workspace_id": "a", "tab_id": "a:t", "number": 1}],
+		"panes": [],
+		"layouts": [],
+		"focused_pane_id": "a:p0"
+	}
+	for index in count:
+		var pane := {"pane_id": "a:p%d" % index, "tab_id": "a:t", "workspace_id": "a", "agent": "claude"}
+		pane.merge({"agent_status": "working", "terminal_id": "term-a-%d" % index})
+		_list(big, "panes").append(pane)
+	return big

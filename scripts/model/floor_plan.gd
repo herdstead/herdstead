@@ -4,6 +4,7 @@ extends RefCounted
 ## entry band, the main corridor and the keep-outs between them. Planners never
 ## mutate the previous snapshot.
 
+## The map's key: the machine's, for the office's maps (MapModel.key).
 var floor_key := ""
 var policy_signature := ""
 ## The map's width in cells when it was first planned (FloorLayoutPolicy.map_width()).

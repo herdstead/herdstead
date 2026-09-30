@@ -1,22 +1,23 @@
 class_name OfficeScene
 extends Node2D
-## The live office: every herdr machine is a building, each workspace a floor,
-## each tab a shared table with its rug, each pane a seat. Only one floor is drawn at a
-## time; the FLOORS minimap on the left lists them all and who needs a human.
+## The live office: every herdr machine is one open-plan map, each workspace a
+## zone on it, each tab a pod of desks, each pane a seat. One machine's map is
+## drawn at a time; the FLOORS minimap on the left lists every zone of every
+## machine and who needs a human, and a row pans to its zone.
 ## This scene sends herdr nothing itself: the agent card's terminal preview and
 ## its one write go through HerdrFleet to HerdrCommands, which `--read-only`
 ## never constructs.
 ##
 ## The composition root. Every refresh the fleet's snapshots become one
 ## OfficeFrame (OfficeProjection); the navigator decides from it what the viewer
-## sees (OfficeNavigator); the plan cache lays that floor out (FloorPlanCache);
+## sees (OfficeNavigator); the plan cache lays that machine's map out (FloorPlanCache);
 ## the floor view, the plate and the HUD draw it; the camera shows it. This
 ## scene wires them together and owns the art pack; it reads no snapshot field.
 ##
 ## Pane ids repeat across machines, so a desk is known by its machine key and
-## pane id together (HerdrFleet.pane_key), and a floor by its machine key and
-## workspace id. Which floor is shown is the viewer's state; the fleet never
-## learns about it.
+## pane id together (HerdrFleet.pane_key), and a zone by its machine key and
+## workspace id. Which map is shown, and where it is panned, is the viewer's
+## state; the fleet never learns about it.
 
 ## A refresh for new data from the fleet has ended: the one refresh the frame's
 ## events were coalesced into (_queue_refresh()), or a click, resize or other
@@ -46,7 +47,7 @@ const MIN_SCREEN := Vector2i(480, 320)
 const ZOOM_MIN := 2
 const ZOOM_STEP := 2
 const ZOOM_MAX := 8
-## The floor plate band above the rooms.
+## The machine plate's band above the map.
 const PLATE_HEIGHT := 32
 ## How often the open overview is drawn again while nothing changes: its FOR
 ## and BLOCKED times and the timelines' now edge move with the clock.
@@ -88,7 +89,7 @@ var pacer: FramePacer
 var questions: OfficeQuestionReader
 ## Every runtime pack found at startup, sorted by pack directory (the pack id).
 var themes := PackedStringArray()
-## True while no machine at all is live; the shown floor also dims on its own.
+## True while no machine at all is live; the shown map also dims on its own.
 var stale := true
 ## Where the light comes from: CLOCK follows the local time (DayLight), DAY and
 ## NIGHT hold it (`--light=day|night`; a capture holds the day unless it asks,
@@ -115,16 +116,17 @@ var remember_theme := true
 var settings_path := SETTINGS_PATH
 ## What the viewer looks at and has asked for, and every decision about it.
 var navigator := OfficeNavigator.new()
-## Every floor's plan and what was last tried for it, for the whole run.
+## Every machine's map plan and what was last tried for it, for the whole run.
 var plans := FloorPlanCache.new()
 ## The last refresh's projection of every machine.
 var frame := OfficeFrame.new()
-## The shown floor as drawn: its shell, tables, seats and furniture.
+## The shown map as drawn: its shell, zones, pods, seats and furniture.
 var floor_view: OfficeFloorView
-## The shown floor's plate, above its rooms.
+## The shown machine's plate, above its map.
 var plate: OfficeFloorPlate
-## What the world was built for: the shown floor and the pack. Nothing else
-## replaces it; everything else updates it in place.
+## What the world was built for: the shown machine and the pack. Nothing else
+## replaces it (a workspace coming or going is a zone of the same world);
+## everything else updates it in place.
 var world_model := ""
 ## Composite pane key (see HerdrFleet.pane_key) the viewer picked. Empty means
 ## "follow what herdr has focused". The navigator's, for callers of the office;
@@ -149,9 +151,9 @@ var _light_left := 0.0
 ## The last live-machine count the bar was written with, to write it again
 ## when only the light changed.
 var _bar_live := 0
-## The machine of the floor the world was built for.
+## The machine the world was built for.
 var _world_machine := ""
-## The shown floor's drawing and its plate band, which the pan is clamped to.
+## The shown map's drawing and its plate band, which the pan is clamped to.
 var _content_size := Vector2.ZERO
 var _inbox_left := 0.0
 ## Until the bubbles on screen are looked at again: a pan moves them without a refresh.
@@ -179,9 +181,14 @@ var _strategic_tick: Timer
 ## The new pane a split (or a new space) from the card made, waited for and picked.
 var _new_pane: OfficeNewPaneFollow
 ## What a HUD line under the mouse points at (_show_pointer()): a pane, or a
-## floor (a signpost); empty for none.
+## zone (a signpost); empty for none.
 var _pointed_pane := ""
 var _pointed_floor := ""
+## The camera position and world room the signposts were last worked out for,
+## and what they said (_follow_view(), _show_signposts()).
+var _viewed_at := Vector2.INF
+var _viewed_room := Rect2()
+var _posted := ""
 ## The lens was last drawn held, so letting go has something to put back.
 var _lens_shown := false
 
@@ -206,7 +213,7 @@ func _ready() -> void:
 		return
 	if args.has("capture"):
 		remember_theme = false
-	navigator.wanted_floor = args.number("floor", navigator.wanted_floor)
+	navigator.wanted_space = args.number("space", navigator.wanted_space)
 	# An odd `--zoom` rounds down to the even level below it.
 	zoom = clampi(args.number("zoom", zoom) / ZOOM_STEP * ZOOM_STEP, ZOOM_MIN, ZOOM_MAX)
 	themes = _discover_themes()
@@ -247,7 +254,7 @@ func _ready() -> void:
 	add_child(camera)
 	camera.make_current()
 	hud.dress(art, pen.font)
-	hud.floor_picked.connect(_pick_floor)
+	hud.floor_picked.connect(_pick_zone)
 	hud.room_changed.connect(_on_room_changed)
 	hud.counter_pressed.connect(_on_counter)
 	hud.history_locate_requested.connect(_locate_history)
@@ -560,7 +567,18 @@ func _process(delta: float) -> void:
 	if _questions_left <= 0.0:
 		_questions_left = QUESTION_WATCH_SECONDS
 		_watch_questions()
+	_follow_view()
 	_new_pane.give_up()
+
+
+## The view moved without a refresh (a drag, the wheel, the arrows, a panel
+## giving the world more or less room): the signposts, which name the blocked
+## desks off screen, are worked out again. Only when the camera or the world's
+## room really moved; never a refresh.
+func _follow_view() -> void:
+	if floor_view == null or (camera.position == _viewed_at and hud.world_rect() == _viewed_room):
+		return
+	_show_signposts()
 
 
 ## Everything the office answers with a key or the wheel: zoom, theme, floor,
@@ -602,7 +620,7 @@ func _act_on(event: InputEvent) -> bool:
 	elif event.is_action_pressed(&"office_toggle_light"):
 		toggle_light()
 	elif floor_up or event.is_action_pressed(&"office_floor_down"):
-		_step_floor(1 if floor_up else -1)
+		_step_zone(-1 if floor_up else 1)
 	elif event.is_action_pressed(&"office_next_attention"):
 		_jump_to_next_human()
 	elif event.is_action_pressed(&"office_monitor"):
@@ -706,15 +724,16 @@ func _on_bubble_picked(key: String, at: Vector2) -> void:
 	hud.inspector.arm_answer()
 
 
-## A floor from the building section or a signpost: shown at once.
-func _pick_floor(key: String) -> void:
+## A zone from the building section or a signpost: panned to at once, on its
+## machine's map (another machine's is shown first).
+func _pick_zone(key: String) -> void:
 	navigator.pick_zone(key)
 	_refresh()
 
 
-## PageUp/PageDown: one floor up or down, from a building's top floor into the
-## next building's lowest. Stops at either end.
-func _step_floor(direction: int) -> void:
+## PageUp (-1) / PageDown (+1): the zone one row up or down the rail, from a
+## machine's last zone into the next machine's first. Stops at either end.
+func _step_zone(direction: int) -> void:
 	if navigator.step_zone(frame, direction):
 		_refresh()
 
@@ -818,9 +837,10 @@ func _on_liveness_changed() -> void:
 
 
 ## Project every machine once and bring what shows them up to date: the shown
-## floor by stable tab and pane identity (status and label changes keep its
-## geometry, structural changes keep the nodes they do not touch), the plate,
-## the minimap and the signposts, the bar, the inspector and attention.
+## machine's map by stable tab and pane identity (status and label changes keep
+## its geometry, structural changes keep the nodes they do not touch, a
+## workspace coming or going is a zone arriving or leaving), the plate, the
+## minimap and the signposts, the bar, the inspector and attention.
 func _refresh() -> void:
 	_refreshing = true
 	# Whatever the fleet said before this point is drawn by this refresh.
@@ -829,42 +849,46 @@ func _refresh() -> void:
 	frame = OfficeProjection.frame(_machines(), art.state_names())
 	_stamp_starts()
 	_new_pane.follow(frame)
-	plans.prune(frame.floor_order)
+	plans.prune(frame.building_by_key.keys())
 	var wanted := navigator.settle(frame)
-	# A new floor is shown at once: no ride, nothing held back.
-	var changed_floor := wanted != navigator.shown_key
-	if changed_floor:
+	# Another machine's map is shown at once: no ride, nothing held back.
+	if wanted != navigator.shown_key:
 		camera.cancel_press()
 		_tips.hide_tip()
-		navigator.show_floor(frame, wanted, camera.pan)
+		navigator.show_machine(frame, wanted, camera.pan)
 		camera.pan = navigator.pan_of(wanted)
-	var found := frame.find_floor(wanted)
+	var building := frame.building_of(wanted)
 	var live := fleet.live_count()
 	stale = live == 0
 	# free_rect() first: it lays the HUD out for this refresh's window (a resize
-	# refreshes before the camera's next frame), and a floor's first plan fixes
+	# refreshes before the camera's next frame), and a map's first plan fixes
 	# its width for good.
 	var room := camera.free_rect()
-	# The shown floor's map: one workspace, under that workspace's key.
-	var map := MapModel.of(found.zone_model)
+	# The shown machine's map: every zone of it, under the machine's key.
+	var map := building.map
 	var planned := plans.prepare(map, pen, hud.plan_width())
 	var problems := plans.problems()
 	var model := JSON.stringify([map.key, art.id])
 	if model != world_model:
 		world_model = model
-		_build(found, map, planned, problems)
+		_build(building, map, planned, problems)
 	elif problems.is_empty():
 		floor_view.reconcile(planned, map, _frozen())
 	if problems.is_empty():
 		floor_view.update_desks(map, navigator.active_key, _frozen())
 	else:
-		# Nothing on the floor followed this input: the next update that can be
+		# Nothing on the map followed this input: the next update that can be
 		# laid out brings all of it at once, with nobody walking.
 		floor_view.lose_track()
 	_content_size = floor_view.plan.render_bounds.end + Vector2(0, PLATE_HEIGHT)
 	world.position = room.position
-	_show_plate(found, problems)
-	# A floor seen for the first time opens on the selection's whole table.
+	_show_plate(building, problems)
+	# Where the navigator asked to look: a zone (its aisle row at the top), a
+	# desk (a map seen for the first time: its whole pod; herdr's focus moving:
+	# as far as it takes), and an explicit navigation's desk once it is drawn.
+	var zone := navigator.take_pan_zone()
+	if not zone.is_empty():
+		reveal_zone(zone)
 	var whole := navigator.pan_whole_table
 	var pan_to := navigator.take_pan_to()
 	if not pan_to.is_empty() and floor_view.seats.has(pan_to):
@@ -873,7 +897,7 @@ func _refresh() -> void:
 	if not arriving.is_empty() and floor_view.seats.has(arriving):
 		reveal(arriving)
 		navigator.revealed()
-	# After the camera is placed for this floor: which bubbles are on screen.
+	# After the camera is placed for this map: which bubbles are on screen.
 	_watch_questions()
 	_show_floors()
 	_show_signposts()
@@ -941,18 +965,18 @@ func refresh() -> void:
 	_refresh()
 
 
-## The shown workspace's plan; null in a lobby, which lays out nothing herdr sent.
+## The shown machine's map plan: every zone of it.
 func layout_plan() -> FloorPlan:
 	return plans.plan(navigator.shown_key)
 
 
-## Why the shown floor cannot be laid out from its current input; empty while it can.
+## Why the shown map cannot be laid out from its current input; empty while it can.
 func layout_problems() -> PackedStringArray:
 	return plans.problems()
 
 
-## Actual planner calls during this office's lifetime, including empty fallbacks.
-## Cache hits do not increment this diagnostic counter, and lobbies are not laid out.
+## Actual planner calls during this office's lifetime, empty maps and empty
+## fallbacks included. Cache hits do not increment this diagnostic counter.
 func layout_attempt_count() -> int:
 	return plans.attempt_count()
 
@@ -979,7 +1003,7 @@ func shown_machine() -> String:
 ## Pan just enough for the desk of `key`, its badge included, to be on screen:
 ## where it answers a click, which is where its worker rests (a pantry worker's
 ## own rectangle), and the bubble over a blocked one. With `whole_table`, the
-## framing a floor opens on: the desk and its whole table when that fits, else
+## framing a map opens on: the desk and its whole pod when that fits, else
 ## the desk alone. The world is what the pan is measured in.
 func reveal(key: String, whole_table := false) -> void:
 	var seat := floor_view.seat(key)
@@ -996,6 +1020,29 @@ func reveal(key: String, whole_table := false) -> void:
 		if _fits(bounds.merge(group)):
 			bounds = bounds.merge(group)
 	camera.reveal(Rect2(world.to_local(bounds.position), bounds.size))
+
+
+## Pan to zone `key` of the shown map: the top of its sign's drawing (in the
+## aisle row above the zone) at the top of the world, or the aisle row's top
+## for a zone with no sign drawn yet; and as little sideways as brings the
+## zone's width in (its left edge when it is wider than the view). The camera
+## clamps the pan to the map. Nothing for a zone the plan does not place.
+## (The sign's top, not the aisle row's, is the 14 units that let a two-pod-row
+## zone's second far row fit a 308-tall view: PLAN_R2 §1.10.)
+func reveal_zone(key: String) -> void:
+	var placed: ZonePlacement = null if floor_view.plan == null else floor_view.plan.zone(key)
+	if placed == null:
+		return
+	var grid := float(FloorLayoutPolicy.GRID)
+	var shown := camera.free_rect().size
+	var left := placed.cells.position.x * grid
+	var right := placed.cells.end.x * grid
+	camera.pan.y = (placed.cells.position.y - 1) * grid + PLATE_HEIGHT
+	var board := floor_view.zone_sign(key)
+	var holder := null if board == null else board.get_parent() as Node2D
+	if holder != null:
+		camera.pan.y = world.to_local(holder.to_global(board.drawn_rect().position)).y
+	camera.pan.x = left if right - left > shown.x else minf(maxf(camera.pan.x, right - shown.x), left)
 
 
 ## Whether `bounds` (global) fits the view, the camera's headroom included.
@@ -1067,15 +1114,16 @@ func _machines() -> Array[MachineView]:
 # --- world --------------------------------------------------------------------
 
 
-## Only changing floors or packs replaces the world; everything else goes
-## through OfficeFloorView, which retains the other desks and their animations.
-func _build(found: ZoneRef, map: MapModel, planned: FloorPlan, problems: PackedStringArray) -> void:
+## Only changing machines or packs replaces the world (the cold path: nobody
+## walks); everything else, a workspace coming or going included, goes through
+## OfficeFloorView, which retains the other desks and their animations.
+func _build(building: BuildingModel, map: MapModel, planned: FloorPlan, problems: PackedStringArray) -> void:
 	remove_child(world)
 	world.queue_free()
 	world = Node2D.new()
 	world.position = camera.free_rect().position
 	add_child(world)
-	_world_machine = found.building.key
+	_world_machine = building.key
 	var rooms := Node2D.new()
 	rooms.name = "FloorRooms"
 	rooms.position = Vector2(0, PLATE_HEIGHT)
@@ -1083,7 +1131,7 @@ func _build(found: ZoneRef, map: MapModel, planned: FloorPlan, problems: PackedS
 	floor_view = OfficeFloorView.new()
 	floor_view.setup(pen, rooms, _on_desk_picked, _on_bubble_picked, _tips.on_bubble_hovered, _tips.on_sign_hovered)
 	floor_view.set_night(night)
-	# A floor whose current input cannot be planned keeps drawing the model its
+	# A map whose current input cannot be planned keeps drawing the model its
 	# last valid plan was made for.
 	var drawn := map if problems.is_empty() else plans.planned_model(map.key)
 	floor_view.reconcile(planned, drawn, _frozen())
@@ -1094,11 +1142,12 @@ func _build(found: ZoneRef, map: MapModel, planned: FloorPlan, problems: PackedS
 	_apply_stale()
 
 
-## The plate names the shown floor over the width the world has; the pan's
-## reach is the wider of the floor and the plate.
-func _show_plate(found: ZoneRef, problems: PackedStringArray) -> void:
+## The plate names the shown machine over the width the world has, and the
+## zones its map cannot be laid out for; the pan's reach is the wider of the
+## map and the plate.
+func _show_plate(building: BuildingModel, problems: PackedStringArray) -> void:
 	plate.size = Vector2(camera.free_rect().size.x, plate.size.y)
-	plate.show_floor(found.building, found.zone_model, frame.several_machines(), problems)
+	plate.show_map(building, frame.several_machines(), problems, plans.failing_zones(building.key))
 	_show_plate_state()
 	camera.world_size = Vector2(maxf(_content_size.x, plate.size.x), _content_size.y)
 	var floor_width := (
@@ -1107,7 +1156,7 @@ func _show_plate(found: ZoneRef, problems: PackedStringArray) -> void:
 	floor_view.set_apron(OfficeFloorView.apron_cells(camera.free_rect(), _screen(), floor_width))
 
 
-## The plate's state line, and a lobby's note, from the shown machine's
+## The plate's state line, and an empty map's note, from the shown machine's
 ## liveness and SSH status. Never a rebuild: a flapping machine relabels.
 func _show_plate_state() -> void:
 	if plate == null or not fleet.has(_world_machine):
@@ -1115,7 +1164,7 @@ func _show_plate_state() -> void:
 	plate.show_state(_building_state(_world_machine), fleet.link_error(_world_machine))
 
 
-## A dropped connection keeps that machine's last floor on screen, dimmed and
+## A dropped connection keeps that machine's last map on screen, all of it dimmed and
 ## frozen; its plate stays readable. Never dress a lost connection up as idle.
 func _apply_stale() -> void:
 	if floor_view != null and fleet.has(_world_machine):
@@ -1123,7 +1172,7 @@ func _apply_stale() -> void:
 	_show_plate_state()
 
 
-## A worker drawn for a dropped machine starts frozen, like the rest of its floor.
+## A worker drawn for a dropped machine starts frozen, like the rest of its map.
 func _frozen() -> bool:
 	return fleet.has(_world_machine) and fleet.is_stale(_world_machine)
 
@@ -1136,7 +1185,7 @@ func _building_state(key: String) -> MachineLiveness.State:
 	return MachineLiveness.State.OFFLINE
 
 
-## Tell the question reader what the shown floor asks and which bubbles are on
+## Tell the question reader what the shown map asks and which bubbles are on
 ## screen (OfficeQuestionTips.watch()): a refresh, and a timer for a pan.
 func _watch_questions() -> void:
 	if floor_view != null:
@@ -1144,7 +1193,7 @@ func _watch_questions() -> void:
 
 
 ## The part of the world on screen, in global coordinates, from where the
-## camera is panned now: a refresh that just placed it for a new floor is
+## camera is panned now: a refresh that just placed it for a new map is
 ## counted before the camera's own frame moves there (OfficeCamera._process()
 ## clamps and rounds the pan the same way).
 func _visible_world() -> Rect2:
@@ -1217,52 +1266,80 @@ func _app_args() -> AppArgs:
 # --- screen-space UI ----------------------------------------------------------
 
 
-## Each building for the minimap: label, live state, and its floors' rows.
+## Each building for the minimap: label, live state, and its zones' rows; the
+## current zone (OfficeNavigator.current_zone()) is the highlighted row.
 func _show_floors() -> void:
 	var rows: Array[BuildingRows] = []
 	for building in frame.buildings:
 		rows.append(BuildingRows.of(building, _building_state(building.key)))
-	hud.floors.show_buildings(rows, navigator.shown_key, frame.several_machines())
+	hud.floors.show_buildings(rows, navigator.current_zone(frame), frame.several_machines())
 
 
-## The signposts over the world's right edge: every other floor with agents
-## blocked on it (_signposts()). None while the overview or the strategic view
-## covers the world.
+## The signposts over the world's right edge (_signposts()), worked out for the
+## view now; drawn again only when what they say changed. None while the
+## overview or the strategic view covers the world. A refresh and
+## _follow_view() call this.
 func _show_signposts() -> void:
+	_viewed_at = camera.position
+	_viewed_room = hud.world_rect()
 	if hud.overview_open() or hud.strategic_open():
 		hud.signposts.visible = false
+		_posted = ""
 		return
-	hud.show_signposts(_signposts())
+	var posts := _signposts()
+	var said := PackedStringArray()
+	for post in posts:
+		said.append("%s|%s|%s|%d|%s" % [post.key, post.floor_text, post.machine, post.blocked, post.up])
+	var text := "\n".join(said)
+	if text == _posted:
+		return
+	_posted = text
+	hud.show_signposts(posts)
 
 
-## Every floor but the shown one with agents blocked on it, on a machine that
-## is answering (a lost connection counts nobody, invariant 4), in the minimap's
-## order: building by building, highest floor first. Whether a floor is up or
-## down from the shown one is its place in OfficeNavigator.shaft_order(), which
-## PageUp and PageDown step through; a shown floor that is gone makes every
-## post point up until the navigator settles on another. A floor in another
-## building than the shown one carries its machine's label.
+## Interim, until the edge arrows: on the shown map, every zone with a blocked
+## desk whose bubble is outside the world on screen (up: above the view's
+## middle), counting those; on every other live machine, every zone with agents
+## blocked (a lost connection counts nobody, invariant 4), with its machine's
+## label (up: that machine comes before the shown one). In the rail's order.
 func _signposts() -> Array[SignpostModel]:
-	var order := OfficeNavigator.shaft_order(frame)
-	var at := order.find(navigator.shown_key)
+	var view := _visible_world()
+	var shown_at := frame.buildings.find(frame.building_of(navigator.shown_key))
 	var posts: Array[SignpostModel] = []
-	for building in frame.buildings:
+	for index in frame.buildings.size():
+		var building := frame.buildings[index]
 		if building.stale:
 			continue
-		for floor_model in OfficeNavigator.section(building.zones):
-			if floor_model.key == navigator.shown_key or floor_model.blocked <= 0:
+		var here := building.key == navigator.shown_key
+		for zone in OfficeNavigator.section(building.zones):
+			var blocked := zone.blocked
+			var up := index < shown_at
+			if here:
+				blocked = 0
+				var above := 0
+				for room in zone.rooms:
+					for pane in room.panes:
+						var seat := floor_view.seat(pane.key)
+						if seat == null or not pane.asks() or pane.launching() or pane.provider.is_empty():
+							continue
+						var bubble := seat.node.bubble_rect()
+						if bubble.has_area() and not bubble.intersects(view):
+							blocked += 1
+							above += 1 if bubble.get_center().y < view.get_center().y else 0
+				up = above * 2 >= blocked
+			if blocked <= 0:
 				continue
 			var post := SignpostModel.new()
-			post.key = floor_model.key
-			var title := floor_model.label
-			if not floor_model.mezzanine_of.is_empty() and not floor_model.worktree.is_empty():
-				title = floor_model.worktree
-			post.number_text = OfficeFloorRow.number_text(floor_model)
+			post.key = zone.key
+			var title := zone.label
+			if not zone.mezzanine_of.is_empty() and not zone.worktree.is_empty():
+				title = zone.worktree
+			post.number_text = OfficeFloorRow.number_text(zone)
 			post.floor_text = post.number_text + " " + title
-			post.machine = building.label if building.key != shown_machine() else ""
+			post.machine = "" if here else building.label
 			post.machine_key = building.key
-			post.blocked = floor_model.blocked
-			post.up = at < 0 or order.find(floor_model.key) > at
+			post.blocked = blocked
+			post.up = up
 			posts.append(post)
 	return posts
 
@@ -1376,7 +1453,7 @@ func _open_overview() -> void:
 	_tips.hide_tip()
 	hud.open_overview()
 	world.visible = false
-	hud.signposts.visible = false
+	_show_signposts()
 	_overview_tick.start()
 	_show_overview()
 	_watch_questions()
@@ -1416,7 +1493,7 @@ func close_overview() -> void:
 ## The open overview, from this refresh's frame and the fleet's state log, at
 ## the log's clock now; nothing while it is closed. A refresh, the tick, a
 ## sort and a chip call this; it projects nothing. A refresh that built a new
-## world (a pick on another floor) built it visible: it goes out of sight again.
+## world (a pick on another machine) built it visible: it goes out of sight again.
 func _show_overview() -> void:
 	if not hud.overview_open():
 		return
@@ -1449,7 +1526,7 @@ func _open_strategic() -> void:
 	_tips.hide_tip()
 	hud.open_strategic()
 	world.visible = _world_shown()
-	hud.signposts.visible = false
+	_show_signposts()
 	_strategic_tick.start()
 	_show_strategic()
 	_watch_questions()
@@ -1479,20 +1556,19 @@ func _on_strategic_picked(key: String) -> void:
 	_pick_from_list(key)
 
 
-## The open strategic view, from this refresh's plan of the shown floor, its
-## machine's state and the state log at the clock now; nothing while it is
+## The open strategic view, from this refresh's plan of the shown machine's
+## map, its state and the state log at the clock now; nothing while it is
 ## closed. A refresh and the tick call this. A refresh that built a new world
-## (another floor) built it visible: it goes out of sight again.
+## (another machine) built it visible: it goes out of sight again.
 func _show_strategic() -> void:
 	if not hud.strategic_open():
 		return
 	world.visible = _world_shown()
-	var found := frame.find_floor(navigator.shown_key)
-	var machine := "" if found == null else found.building.key
+	var machine := navigator.shown_key
 	var state := _building_state(machine) if fleet.has(machine) else MachineLiveness.State.OFFLINE
 	var model := StrategicModel.of(
-		plans.plan(navigator.shown_key),
-		found,
+		plans.plan(machine),
+		frame.building_of(machine),
 		frame.several_machines(),
 		state,
 		fleet.state_log(),
@@ -1727,7 +1803,7 @@ func _on_lens(held: bool) -> void:
 	_show_lens()
 
 
-## Draw the lens on the shown floor while it is held: each seat's line
+## Draw the lens on the shown map while it is held: each seat's line
 ## (OfficeLens.text_for(), the state log's wait at the lens's clock) and each
 ## table's wash (OfficeLens.tone_for()). A refresh and the lens's tick call it;
 ## let go, the first call puts everything back and the next ones do nothing.
@@ -1751,9 +1827,9 @@ func _show_lens() -> void:
 		if pane != null:
 			texts[key] = OfficeLens.text_for(pane, ledger.track(key), dropped, now)
 	var tones: Dictionary[String, StringName] = {}
-	var found := frame.find_floor(navigator.shown_key)
-	if found != null:
-		for room in found.zone_model.rooms:
+	var map := frame.map_of(navigator.shown_key)
+	if map != null:
+		for room in map.rooms:
 			tones[room.key] = OfficeLens.tone_for(room, dropped)
 	floor_view.show_lens(true, texts, tones)
 
@@ -1765,35 +1841,35 @@ func _point_at_pane(key: String) -> void:
 	_show_pointer()
 
 
-## A signpost for floor `key` is under the mouse (empty: none any more).
+## A signpost for zone `key` is under the mouse (empty: none any more).
 func _point_at_floor(key: String) -> void:
 	_pointed_floor = key
 	_pointed_pane = ""
 	_show_pointer()
 
 
-## Show what the hovered HUD line names: a pane seated on the shown floor gets
-## the dashed frame (OfficeFloorView.point()); one on another floor, or a
-## floor, marks that floor's FLOORS row (never the current one); the strategic
+## Show what the hovered HUD line names: a pane seated on the shown map gets
+## the dashed frame (OfficeFloorView.point()); one on another machine, or a
+## zone, marks that zone's FLOORS row (never the current one); the strategic
 ## view dashes the same pane's square. Nothing under the monitor or the
 ## OVERVIEW, and nothing for a pane that has gone. Only points: no selection,
-## no floor change, no pan, nothing read or written.
+## no map change, no pan, nothing read or written.
 func _show_pointer() -> void:
 	if floor_view == null:
 		return
 	var desk := ""
-	var floor_key := ""
+	var zone_key := ""
 	if not hud.monitor_open() and not hud.overview_open():
 		if not _pointed_pane.is_empty() and frame.pane(_pointed_pane) != null:
-			var on := frame.floor_of(_pointed_pane)
-			if on == navigator.shown_key:
+			var on := frame.find_zone(frame.zone_of(_pointed_pane))
+			if on != null and on.building.key == navigator.shown_key:
 				desk = _pointed_pane if floor_view.seats.has(_pointed_pane) else ""
-			else:
-				floor_key = on
-		elif not _pointed_floor.is_empty() and frame.find_floor(_pointed_floor) != null:
-			floor_key = _pointed_floor
-	if floor_key == navigator.shown_key:
-		floor_key = ""
+			elif on != null:
+				zone_key = on.zone_model.key
+		elif not _pointed_floor.is_empty() and frame.find_zone(_pointed_floor) != null:
+			zone_key = _pointed_floor
+	if zone_key == navigator.current_zone(frame):
+		zone_key = ""
 	floor_view.point(desk)
 	hud.point_strategic(desk)
-	hud.floors.point(floor_key)
+	hud.floors.point(zone_key)

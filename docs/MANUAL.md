@@ -59,7 +59,7 @@ Other office options (mostly for screenshots and tests):
 | Option | Effect |
 |---|---|
 | `--pack=<manifest>` | Start with this art pack (`res://…` or an absolute path) |
-| `--floor=<number>` | Select Local's floor with this herdr workspace number once |
+| `--space=<number>` | Pan to Local's zone with this herdr workspace number, once, when Local has it (`--floor` is gone, no alias) |
 | `--zoom=<2\|4\|6\|8>` | Start at this pixel scale; odd values round down to even (`--zoom=3` and `--zoom=1` are 2) |
 | `--capture=<png>` | Screenshot after the first snapshot is drawn (or the OFFLINE screen after 8 s), then quit; prints `CAPTURE_OK:` |
 | `--wait=<s>` | With `--capture=`, wait this many more seconds |
@@ -97,12 +97,12 @@ wider window only shows more floor. New tabs fill gaps first, tables grow in pla
 Nothing is compacted when things go away. Renames, state, focus and window changes never re-lay out tables. The plan and
 camera position are kept per floor for the run.
 
-**Floor plate.** Above every floor: `3F  WORKSPACE LABEL`, plus the repo name next to a branch icon when herdr gives
-`worktree.repo_name` (herdr's API has no branch name, so none is shown). A mezzanine shows `3A · CHECKOUT` and a line
-"worktree of 3F"; a source floor and its mezzanines share one colour tag. With more machines than Local it adds
-`@ building` and LIVE / OFFLINE / CONNECTING with any ssh error. The right side shows the floor's tab and pane counts.
-A building with no floors (offline, never connected, or no workspace) shows a LOBBY: an empty planned floor whose plate
-carries the state and ssh error.
+**Machine plate.** Above the map: the machine's name (`@ NAME` once there is more than Local, then LIVE / OFFLINE /
+CONNECTING with any ssh error), and on the right the machine's space and pane counts. While the map cannot be laid out,
+a line under it names the zone at fault (`Layout unavailable: 3 INFRA: invalid explicit seat hint`). Each zone's own
+number, name, repository and checkout are on its sign (hover it); a source zone and its mezzanines share one colour
+stripe. A machine with no workspace (offline, never connected, or an empty session) is an empty map: walls and door,
+no zone, and the plate's note says why.
 
 **State on the seats.**
 
@@ -118,21 +118,25 @@ carries the state and ssh error.
 
 **People walk.** When a pane gets an agent, a person walks in from the lift door to the seat; when a pane goes, they
 walk out as a ghost you cannot click. Name plate, badge, bubble, papers and click area change the moment herdr says so;
-the body follows within at most 6 seconds. An offline machine freezes in place; reconnecting, changing floor or changing
-theme places everyone directly. Floor changes are instant, with no transition.
+the body follows within at most 6 seconds. A new workspace is a new zone its people walk into; closing one, its people
+walk out (not every departure animates). An offline machine freezes in place; reconnecting, changing machine or
+changing theme places everyone directly. Panning between zones and switching machines are instant, with no transition.
 
 **Monitors and lamps.** Only seats with a pane have a monitor. The desk lamp has four levels (off / low / on / strong)
 showing herdr's focused pane and whether its tab is the one open in its workspace.
 
 **Selection.** herdr's focused pane is selected by default. Click a seat to select it yourself; when the selected pane
-disappears, selection returns to herdr's focus. Clicking a seat never changes floor.
+disappears, selection returns to herdr's focus. Clicking a seat never changes the map or pans.
 
-**Which floor is shown.** A floor you picked (FLOORS, a signpost, PageUp / PageDown, `N`) while it exists; otherwise
-the selected pane's floor (your pick, else herdr's focus, Local first); otherwise the first floor of the first building
-that has one; otherwise Local's lobby.
+**Which map is shown, and where.** One machine's map at a time: the machine you went to (a FLOORS row or signpost of
+one of its zones, PageUp / PageDown, `N`, a list pick) while it exists; otherwise the selected pane's machine (your
+pick, else herdr's focus, Local first); otherwise the first machine with a workspace; otherwise Local's empty map. A
+row click pans to its zone, its sign at the top of the world. While you have picked nothing, herdr's focus moving pans
+to the new desk as far as it takes (and to another machine's map if it is there). A map seen for the first time opens
+on the selected pane's pod, else on its first zone; each map keeps where you left it panned.
 
 **Disconnected is not idle.** When a socket goes away or the event stream breaks, the office keeps the last picture,
-dims it, stops the people and shows OFFLINE (with several machines, only that machine's floors), and its counts drop to
+dims it, stops the people and shows OFFLINE (with several machines, only that machine's map), and its counts drop to
 zero. It reconnects with exponential backoff from 0.5 s to 5 s.
 
 **People and looks.** Everyone in the office is a pixel person: six layers (legs < top < body < glasses < hair <
@@ -178,9 +182,10 @@ Below 1280 logical units of screen width, FLOORS is a 72-unit narrow rail: floor
 windows right under the number; name, UNREAD count and mezzanine indent move into the tooltip
 (`3F  infra · 1 blocked · 1 UNREAD`), and building names are truncated with the full name in the tooltip.
 
-**Signposts.** When another floor on an online machine has a blocked agent, a signpost appears inside the world's
-top-right corner, one per floor: `↑ 3F infra ! 1`. The arrow is the direction in PageUp / PageDown order; another
-building's floor adds `@ building`. At most 6; the sixth says `+N floors`. Click one to go there. A signpost covers the
+**Signposts** (until the edge arrows). A zone of the shown map whose blocked desk is out of view, and a zone of another
+online machine with a blocked agent, each get a signpost inside the world's top-right corner: `↓ 3F infra ! 1`. On
+this map the arrow says whether the desk is above or below the view (and the posts follow a drag or the wheel at once);
+another machine's zone adds `@ machine`. At most 6; the sixth says `+N floors`. Click one to pan there. A signpost covers the
 world, so a bubble under it cannot be clicked. When the world is narrower than 360 units (the 480×320 minimum screen)
 signposts give way to the narrow rail, whose row carries the blocked badge; NEXT and the top bar reach it too.
 
@@ -416,7 +421,7 @@ pane in the FLOORS colours, and the wait written in each blocked cell. It shows 
 done / working / idle and where they sit. The hover tip gives provider, state, time and place. Click a cell to select
 that pane, close the view and pan its seat into view. `S` or `Esc` closes it. FLOORS, the drawer, the staff panel, NEWS,
 `N` and PageUp / PageDown keep working; arrows and the wheel do not pan the world. The top bar's theme cell reads
-`STRATEGIC · S`, the panel title shows `S · Esc`, and a floor with no tables shows `No desks on this floor`. `S` does
+`STRATEGIC · S`, the panel title shows `S · Esc`, and a machine whose map has no tables shows `No desks on this machine`. `S` does
 nothing while the monitor or OVERVIEW is open or a text box has the keyboard.
 
 ## Keyboard
@@ -424,7 +429,7 @@ nothing while the monitor or OVERVIEW is open or a text box has the keyboard.
 | Key | Effect |
 |---|---|
 | Drag, arrows, wheel (outside panels) | Pan |
-| `PageUp` / `PageDown` | Previous / next row in FLOORS order: from a source floor down into its mezzanines, from a mezzanine up to its source; past a building's top into the next building's bottom; stops at the ends |
+| `PageUp` / `PageDown` | Pan to the previous / next row in FLOORS order (a zone of the map; the map of another machine only past its ends): from a source zone down into its mezzanines, from a mezzanine up to its source; PageDown from a machine's lowest zone into the next machine's highest, PageUp the other way; stops at the ends |
 | `N` | Next agent that needs you, across every online machine and floor: only blocked ones while any are blocked, otherwise UNREAD (longest wait first; unknown start counts as longest). Selects it, goes to its floor, pans to it and expands the panel per NEXT's verb. Never sends. To see done agents while some are blocked, click DONE |
 | `Enter` (or keypad Enter) | Expand the staff panel; on an answerable picked agent whose question shows, press again for answer mode |
 | `1`–`9`, `y` | In answer mode: send that key |
@@ -610,7 +615,7 @@ CAPTURE_SET=ci make capture   # only the key set: showrooms, pixel people and of
 # One native-viewport shot. The live scene waits for the first snapshot; with herdr unreachable it shoots OFFLINE after 8 s.
 godot --path . -- --capture=/absolute/path/office.png
 godot --path . -- --wait=20 --capture=/absolute/path/office.png   # wait 20 more seconds
-godot --path . -- --floor=3 --capture=/absolute/path/office.png    # Local's 3F (by herdr workspace number)
+godot --path . -- --space=3 --capture=/absolute/path/office.png    # Local's zone 3 (by herdr workspace number)
 
 godot --path . scenes/preview.tscn -- --capture=/absolute/path/preview.png
 godot --path . scenes/preview.tscn -- --offline --capture=/absolute/path/offline.png
@@ -640,7 +645,7 @@ unset and `xvfb` is installed.
 Performance is also measured in a window:
 
 ```sh
-# medium (3 floors, 36 panes) and stress (1 floor, 80 panes) against a fake herdr, default cap and --fps=0:
+# medium (3 workspaces, 36 panes, all drawn: one map) and stress (1 workspace, 80 panes) against a fake herdr, default cap and --fps=0:
 # CPU, fps, nodes, draw calls, texture memory and refresh() time, median of 3 rounds
 make perf
 make perf RUNS=5 FIGURES=1    # more rounds, plus 80 seated working people

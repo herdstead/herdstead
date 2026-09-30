@@ -1,6 +1,6 @@
 class_name OfficePresentation
 extends RefCounted
-## What the shown floor's people do between one observation of it and the next:
+## What the shown map's people do between one observation of it and the next:
 ## who walks in at the lift door, who walks out, who goes to the pantry or back
 ## to the seat, and who walks to a new seat. An observation (a MapModel laid out on a
 ## FloorPlan) says where everyone belongs, at once: the plate, the badge and the
@@ -45,7 +45,7 @@ extends RefCounted
 ## placed where they belong.
 ##
 ## Placed, not walked (everyone is where they belong at once, and ghosts are
-## gone): every observation of a new floor view (a new floor, a theme), the
+## gone): every observation of a new floor view (another machine's map, a theme), the
 ## first one after the shown machine was stale, the first after a refresh whose
 ## input could not be laid out (lose_track()); and one person at a time,
 ## whoever has no clear way there, stands inside an obstacle when the floor

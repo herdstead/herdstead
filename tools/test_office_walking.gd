@@ -58,21 +58,30 @@ func test_an_arrival_walks_in_from_the_door_to_the_seat() -> void:
 	_done(office)
 
 
-## A worker whose pane closes, moves to another floor or loses its agent leaves:
-## the same body, taken out of its seat at once into the sorted root, walks from
-## where it sat to the lift door and is gone. It is a ghost: no plate, no badge,
-## nothing that answers a click, and the seat it left is empty at once.
+## A worker whose pane closes or loses its agent leaves: the same body, taken
+## out of its seat at once into the sorted root, walks from where it sat to the
+## lift door and is gone. It is a ghost: no plate, no badge, nothing that
+## answers a click, and the seat it left is empty at once. A pane moving to
+## another workspace (another zone of the same map now, not another floor)
+## changes seats instead: the same worker walks over to it.
 func test_a_departure_walks_out_as_a_ghost() -> void:
 	var closed := _without(fixture, "api:p2")
 	var moved := _with(fixture, "api:p2", {"workspace_id": "web", "tab_id": "web:t1"})
 	var shell := _with(fixture, "api:p2", {"agent": null})
-	for leaving: Dictionary in [closed, moved, shell]:
-		var office := await _live_office()
+	var office := await _live_office()
+	var mover := _station(office, _pane("api:p2")).actor()
+	_feed(office, moved)
+	_eq(_ids(_ghosts(office)), [], "moved to web's zone: nobody walks out")
+	_eq(_station(office, _pane("api:p2")).actor(), mover, "the same worker, now web's seat's")
+	_eq(_last(_route(office, mover)), _seat_of(office, "api:p2"), "walking over to it")
+	_done(office)
+	for leaving: Dictionary in [closed, shell]:
+		office = await _live_office()
 		var station := _station(office, _pane("api:p2"))
 		var body := station.actor()
 		var seat := _seat_of(office, "api:p2")
 		_feed(office, leaving)
-		var how := "closed" if leaving == closed else "moved" if leaving == moved else "a shell"
+		var how := "closed" if leaving == closed else "a shell"
 		_eq(station.actor(), null, how + ": the seat lets its worker go at once")
 		_eq(_ids(_ghosts(office)), _ids([body]), how + ": the same worker walks out")
 		_eq(body.get_parent(), office.floor_view.sorted, how + ": straight in the sorted root")
@@ -301,12 +310,17 @@ func test_the_last_pane_of_a_tab_walks_out_from_where_its_table_was() -> void:
 	_done(office)
 
 
-## Closing the last pane of a workspace closes the floor: another is shown, drawn
-## afresh, and nobody walks anywhere.
-func test_the_last_pane_of_a_workspace_walks_nobody() -> void:
+## Closing a workspace's last pane closes its zone, in place on the same map:
+## its tables are released and its people walk out to the lift door as ghosts
+## (a floor used to close, another shown cold, nobody walking). Many at once are
+## bounded: at most MAX_GHOSTS on their way out, and whoever the routing budget
+## or the route cap leaves over is placed (gone) rather than walked.
+func test_closing_a_workspace_walks_its_people_out() -> void:
 	var office := await _live_office()
-	_feed(office, _without(_with(fixture, "api:p1", {"agent_status": "idle"}), "api:p2"))
-	_check(not _walkers(office).is_empty() and not _ghosts(office).is_empty(), "someone walks on api, someone leaves")
+	var world := office.world.get_instance_id()
+	var bodies: Array = []
+	for pane_id: String in ["api:p1", "api:p2", "api:p4"]:
+		bodies.append(_station(office, _pane(pane_id)).actor())
 	var gone: Dictionary = fixture.duplicate(true)
 	for field: String in ["workspaces", "tabs", "panes", "agents", "layouts"]:
 		gone[field] = _list(gone, field).filter(
@@ -314,18 +328,102 @@ func test_the_last_pane_of_a_workspace_walks_nobody() -> void:
 		)
 	gone.focused_pane_id = "web:p1"
 	_feed(office, gone)
-	_check(office.navigator.shown_key != HerdrFleet.pane_key(LOCAL, "api"), "another floor is shown")
-	_eq([_ids(_walkers(office)), _ids(_ghosts(office))], [[], []], "and nobody walks")
+	_eq([office.navigator.shown_key, office.world.get_instance_id()], [LOCAL, world], "the same map, the same world")
+	_eq(office.layout_plan().zone(HerdrFleet.pane_key(LOCAL, "api")), null, "api's zone is gone from it")
+	var ghosts := _ghosts(office)
+	_check(not ghosts.is_empty(), "its people walk out")
+	for body: PixelPerson in bodies:
+		if ghosts.has(body):
+			_eq(_last(_route(office, body)), _door(office), "the same body, as a ghost, to the lift door")
+		else:
+			_check(not is_instance_valid(body) or not body.is_inside_tree(), "or, not walked, gone at once")
+	_step(office, 1.0 / FPS, ceili(7.0 * FPS))
+	_eq(_ids(_ghosts(office)), [], "and are gone")
+	_done(office)
+	# A crowd leaving at once: one workspace of 60 agents closes.
+	var crowd: Dictionary = fixture.duplicate(true)
+	_list(crowd, "workspaces").append({"workspace_id": "crowd", "number": 9, "label": "crowd"})
+	_list(crowd, "tabs").append({"workspace_id": "crowd", "tab_id": "crowd:t", "number": 1, "label": "crowd"})
+	for index in 60:
+		var pane := {"pane_id": "crowd:p%02d" % index, "tab_id": "crowd:t", "workspace_id": "crowd"}
+		pane.merge({"agent": "claude", "agent_status": "working", "terminal_id": "term-crowd-%02d" % index})
+		_list(crowd, "panes").append(pane)
+	office = await _live_office(crowd, Vector2(1600, 480))
+	var everyone: Array = []
+	for index in 60:
+		everyone.append(_station(office, _pane("crowd:p%02d" % index)).actor())
+	_feed(office, fixture)
+	var leaving := _ghosts(office)
+	_check(leaving.size() <= OfficePresentation.MAX_GHOSTS, "at most MAX_GHOSTS walk out: %d" % leaving.size())
+	_check(leaving.size() < 60, "the rest are not walked: %d of 60 walk" % leaving.size())
+	for body: PixelPerson in everyone:
+		_check(
+			leaving.has(body) or not is_instance_valid(body) or not body.is_inside_tree(),
+			"each walks out as a ghost or is gone at once"
+		)
+	_check_routes(office.floor_view, office.art.people, "after the crowd's zone closed")
 	_done(office)
 
 
 # --- cold passes ------------------------------------------------------------------
 
 
-## A floor drawn afresh (another theme, or another floor and back) shows
-## everyone where they belong, walks nobody and has no ghosts.
-func test_a_new_theme_or_floor_walks_nobody() -> void:
+## A new workspace is a new zone of the same map, placed in place (the world
+## is not built again, nobody else moves), and its people walk in from the lift
+## door to their seats.
+func test_a_new_workspace_is_a_zone_its_people_walk_into() -> void:
 	var office := await _live_office()
+	var world := office.world.get_instance_id()
+	var zones := {}
+	for zone in office.layout_plan().zones:
+		zones[zone.zone_key] = zone.cells
+	var grown: Dictionary = fixture.duplicate(true)
+	_list(grown, "workspaces").append({"workspace_id": "ops", "number": 6, "label": "ops"})
+	_list(grown, "tabs").append({"workspace_id": "ops", "tab_id": "ops:t1", "number": 1, "label": "ops"})
+	for index in 2:
+		var pane := {"pane_id": "ops:p%d" % index, "tab_id": "ops:t1", "workspace_id": "ops"}
+		pane.merge({"agent": "claude", "agent_status": "working", "terminal_id": "term-ops-%d" % index})
+		_list(grown, "panes").append(pane)
+	_feed(office, grown)
+	_eq(office.world.get_instance_id(), world, "the same world")
+	_check(office.layout_plan().zone(HerdrFleet.pane_key(LOCAL, "ops")) != null, "the new zone is placed")
+	for key: String in zones:
+		_eq(office.layout_plan().zone(key).cells, zones[key], "%s keeps its rectangle" % key)
+	for index in 2:
+		var body := _station(office, _pane("ops:p%d" % index)).actor()
+		_check(_walkers(office).has(body), "ops:p%d walks in" % index)
+		var route := _route(office, body)
+		_check(not route.is_empty() and route[0] == _door(office), "from the lift door")
+		_eq(_last(route), _seat_of(office, "ops:p%d" % index), "to their seat in the new zone")
+	_check_routes(office.floor_view, office.art.people, "after a zone arrived")
+	_done(office)
+
+
+## PageUp pans to another zone of the same map: the world is not built again,
+## so it is no cold pass: whoever was walking walks on, along the same route.
+func test_a_pageup_pans_without_rebuilding() -> void:
+	var office := await _live_office()
+	_feed(office, _with(fixture, "api:p1", {"agent_status": "idle"}))
+	var body := _station(office, _pane("api:p1")).actor()
+	_step(office, 1.0 / FPS, 3)
+	_check(_walkers(office).has(body), "api:p1 is on its way to the pantry")
+	var route := _route(office, body)
+	var world := office.world.get_instance_id()
+	var pan := office.camera.pan
+	await _office_key(office, KEY_PAGEUP)
+	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "web"), "PageUp pans to web")
+	_check(office.camera.pan != pan, "the camera moved")
+	_eq(office.world.get_instance_id(), world, "the world is not built again")
+	_check(_walkers(office).has(body), "api:p1 still walks: no cold pass")
+	_eq(_route(office, body), route, "along the same route")
+	_done(office)
+
+
+## A map drawn afresh (another theme, or another machine's map and back) shows
+## everyone where they belong, walks nobody and has no ghosts. (Another zone of
+## the same map is no longer drawn afresh: test_a_pageup_pans_without_rebuilding.)
+func test_a_new_theme_or_floor_walks_nobody() -> void:
+	var office := await _two_machine_office(fixture, PLAN_SCREEN)
 	_feed(office, _without(_with(fixture, "api:p1", {"agent_status": "idle"}), "api:p2"))
 	_check(_walkers(office).size() == 2 and _ghosts(office).size() == 1, "one worker goes to the pantry, one leaves")
 	_step(office, 1.0 / FPS, 5)
@@ -336,9 +434,11 @@ func test_a_new_theme_or_floor_walks_nobody() -> void:
 	_eq(_floor_point(office, body), resting.position + resting.rest_position(), "the idle worker is in the pantry")
 	_feed(office, fixture)
 	_check(_walkers(office).size() == 2, "going back to the seat walks, and so does coming back")
-	await _visit_floor(office, HerdrFleet.pane_key(LOCAL, "web"))
+	await _visit_floor(office, HerdrFleet.pane_key(BEE, "hive"))
+	_eq(office.navigator.shown_key, BEE, "bee's map")
 	await _visit_floor(office, HerdrFleet.pane_key(LOCAL, "api"))
-	_eq([_ids(_walkers(office)), _ids(_ghosts(office))], [[], []], "another floor and back walks nobody")
+	_eq(office.navigator.shown_key, LOCAL, "and Local's again")
+	_eq([_ids(_walkers(office)), _ids(_ghosts(office))], [[], []], "another machine and back walks nobody")
 	body = _station(office, _pane("api:p1")).actor()
 	_eq(_floor_point(office, body), _seat_of(office, "api:p1"), "the worker sits where they belong")
 	_done(office)
@@ -733,9 +833,11 @@ func test_a_walker_a_table_moves_over_is_placed_not_walked_through() -> void:
 ## they were on, from where they are, and nobody's route is searched for on the
 ## new floor.
 func test_a_plan_change_keeps_the_walks_it_does_not_touch() -> void:
-	# api:t1 alone on the first row (_stacked()), so it can grow where it is.
-	var office := await _live_office(_with(_stacked(fixture), "api:p4", {"agent": null}))
-	_feed(office, _stacked(fixture))
+	# api:t1 alone on the first row (_stacked()), so it can grow where it is;
+	# api alone on its map, so its zone can grow down (with the fixture's other
+	# zones stacked below it in the one lane, it would move instead).
+	var office := await _live_office(_only(_with(_stacked(fixture), "api:p4", {"agent": null}), "api"))
+	_feed(office, _only(_stacked(fixture), "api"))
 	var body := _station(office, _pane("api:p4")).actor()
 	_step(office, 1.0 / FPS, 20)
 	var here := _floor_point(office, body)
@@ -745,7 +847,7 @@ func test_a_plan_change_keeps_the_walks_it_does_not_touch() -> void:
 	var rows := office.layout_plan().zones[0].rows.size()
 	# A new tab api:t3 of nine panes (5 columns, 6 cells): more than the 5 cells
 	# api:t2 leaves on its pod row, so it takes a new one.
-	var more := _four_tabs(fixture, 1)
+	var more := _only(_four_tabs(fixture, 1), "api")
 	var seed_pane: Dictionary = _list(more, "panes").back()
 	for index in 8:
 		var extra: Dictionary = seed_pane.duplicate(true)
@@ -1031,7 +1133,10 @@ func test_a_walker_between_two_tables_sorts_by_their_feet() -> void:
 	_list(grown, "panes").append(extra)
 	_feed(office, _stacked(grown))
 	var body := _station(office, _pane("api:p5")).actor()
-	var tables: Array[OfficeTable] = office.floor_view.tables.duplicate()
+	# api's two tables (the map's other zones have theirs).
+	var tables: Array[OfficeTable] = []
+	for tab: String in ["api:t1", "api:t2"]:
+		tables.append(office.floor_view.desks[JSON.stringify([LOCAL, "api", tab])].table)
 	tables.sort_custom(func(a: OfficeTable, b: OfficeTable) -> bool: return a.global_position.y < b.global_position.y)
 	_check(tables.size() == 2, "two tables, one behind the other")
 	var between := false

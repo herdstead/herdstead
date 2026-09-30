@@ -787,7 +787,7 @@ func test_the_reply_box_and_the_office_keep_their_keys() -> void:
 	var card := _card(office)
 	var night := office.night
 	var picked := office.picked_key
-	var shown := office.navigator.shown_key
+	var shown := [office.navigator.shown_key, office.navigator.current_zone(office.frame)]
 	await _open_answer(office)
 	var box := _reply_box(office)
 	await _click_control(box)
@@ -796,7 +796,12 @@ func test_the_reply_box_and_the_office_keep_their_keys() -> void:
 	await _tap(KEY_PAGEDOWN)
 	_eq(box.text, "tna1y", "every key typed")
 	_eq(
-		[office.night, office.picked_key, office.navigator.shown_key, office.hud.holds_keyboard()],
+		[
+			office.night,
+			office.picked_key,
+			[office.navigator.shown_key, office.navigator.current_zone(office.frame)],
+			office.hud.holds_keyboard()
+		],
 		[night, picked, shown, false],
 		"no light, no next, no floor, no agent list"
 	)
