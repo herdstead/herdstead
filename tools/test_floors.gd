@@ -600,6 +600,53 @@ func test_floor_names_show_from_the_scenes_width() -> void:
 	_done(office)
 
 
+## Every gesture that picks a floor counts one navigation (what a pick waiting
+## for a new pane records): a signpost click, a FLOORS row click, PageDown,
+## PageUp. Panning counts none: a real drag, a wheel notch; nor does a desk
+## click. pick_zone() shows a floor exactly as a click on its FLOORS row does.
+func test_floor_gestures_count_as_navigation_and_panning_does_not() -> void:
+	var office := await _live_office()
+	var navigator := office.navigator
+	await _frames(2)
+	var revision := navigator.nav_revision
+	var post := office.hud.signposts.shown()[0]
+	await _click_at(post.get_global_rect().get_center())
+	_eq([navigator.shown_key, navigator.nav_revision], [_floor("hud"), revision + 1], "a signpost: one navigation")
+	await _visit_floor(office, _floor("notes"))
+	_eq([navigator.shown_key, navigator.nav_revision], [_floor("notes"), revision + 2], "a FLOORS row: one")
+	var clicked := [navigator.shown_key, navigator.picked_floor, office.world_model, office.layout_plan().floor_key]
+	await _office_key(office, KEY_PAGEDOWN)
+	_eq([navigator.shown_key, navigator.nav_revision], [_floor("hs"), revision + 3], "PageDown: one")
+	var middle := office.hud.world_rect().get_center()
+	var pan := office.camera.pan
+	await _drag(middle, middle + Vector2(-80, -60))
+	_check(office.camera.pan != pan, "a real drag pans the floor")
+	pan = office.camera.pan
+	var wheel := _wheel(MOUSE_BUTTON_WHEEL_UP)
+	wheel.position = middle
+	wheel.global_position = middle
+	await _parsed(wheel)
+	_check(office.camera.pan != pan, "so does a wheel notch")
+	await _click_desk(office, HerdrFleet.pane_key(LOCAL, "hs:p1"))
+	_eq(office.picked_key, HerdrFleet.pane_key(LOCAL, "hs:p1"), "a desk click picks")
+	_eq([navigator.shown_key, navigator.nav_revision], [_floor("hs"), revision + 3], "none of them navigates")
+	await _office_key(office, KEY_PAGEUP)
+	_eq([navigator.shown_key, navigator.nav_revision], [_floor("notes"), revision + 4], "PageUp: one")
+	await _office_key(office, KEY_PAGEDOWN)
+	navigator.pick_zone(_floor("notes"))
+	office.refresh()
+	var picked := [navigator.shown_key, navigator.picked_floor, office.world_model, office.layout_plan().floor_key]
+	_eq(picked, clicked, "pick_zone() shows the floor as its FLOORS row did")
+	_eq(navigator.nav_revision, revision + 6, "and counts one navigation")
+	_done(office)
+
+
+## A real left click at `at`, in viewport pixels.
+func _click_at(at: Vector2) -> void:
+	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, true))
+	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, false))
+
+
 # --- helpers ------------------------------------------------------------------
 
 

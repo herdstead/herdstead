@@ -379,6 +379,46 @@ func test_an_events_row_click_picks_and_a_gone_one_is_disabled() -> void:
 	_done(office)
 
 
+## Every locate counts one navigation (what a pick waiting for a new pane
+## records), however it is asked for: `N`, a top-bar counter, `›` and `‹` on
+## the staff panel's line, a NEWS entry, an EVENTS row and a row of the agent
+## list, each a real click or key.
+func test_every_locate_counts_one_navigation() -> void:
+	var office := await _live_office()
+	var navigator := office.navigator
+	_feed(office, _with(fixture, "web:p2", {"agent_status": "working"}))
+	await _frames(2)
+	var revision := navigator.nav_revision
+	await _office_key(office, KEY_N)
+	_eq(navigator.nav_revision, revision + 1, "`N`: one")
+	await _press(office.hud.bar.counter(&"blocked"))
+	await _frames(2)
+	_eq(navigator.nav_revision, revision + 2, "BLOCKED: one")
+	var on: Button = office.hud.inspector.get_node("%StepOn")
+	var back: Button = office.hud.inspector.get_node("%StepBack")
+	_check(on.is_visible_in_tree() and not on.disabled and not back.disabled, "`‹ ›` are on the line")
+	await _press(on)
+	await _frames(2)
+	_eq(navigator.nav_revision, revision + 3, "`›`: one")
+	await _press(back)
+	await _frames(2)
+	_eq(navigator.nav_revision, revision + 4, "`‹`: one")
+	await _press(office.hud.news.item(0))
+	await _frames(2)
+	_eq([office.picked_key, navigator.nav_revision], [_pk("web:p2"), revision + 5], "a NEWS entry: one")
+	await _press_tab(office, OfficeHud.DrawerTab.EVENTS)
+	var events := office.fleet.state_log().events()
+	await _press(office.hud.event_list.row_for(events[events.size() - 1].id))
+	await _frames(2)
+	_eq(navigator.nav_revision, revision + 6, "an EVENTS row: one")
+	await _press_tab(office, OfficeHud.DrawerTab.AGENTS)
+	var key := _pk("infra:p1")
+	await _press(office.hud.agent_list.row_for(key))
+	await _frames(2)
+	_eq([office.picked_key, navigator.nav_revision], [key, revision + 7], "an agent-list row: one")
+	_done(office)
+
+
 ## `A` on the EVENTS page shows AGENTS and gives the list the keyboard, and so
 ## does a WORKING counter's filter: the list takes keys, or is filtered, only
 ## where it can be seen.

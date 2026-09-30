@@ -198,6 +198,8 @@ class PendingPick:
 	var terminal_id := ""
 	var from_key := ""
 	var floor_key := ""
+	## OfficeNavigator.nav_revision then: recorded, not yet checked.
+	var nav_revision := 0
 	var generation := 0
 	var until_msec := 0
 	## The pane is a new floor's shell (a space or a worktree the card made):
@@ -721,18 +723,17 @@ func _on_bubble_picked(key: String, at: Vector2) -> void:
 	hud.inspector.arm_answer()
 
 
-## A floor from the building section or PageUp/PageDown: shown at once.
+## A floor from the building section or a signpost: shown at once.
 func _pick_floor(key: String) -> void:
-	navigator.pick_floor(key)
+	navigator.pick_zone(key)
 	_refresh()
 
 
 ## PageUp/PageDown: one floor up or down, from a building's top floor into the
 ## next building's lowest. Stops at either end.
 func _step_floor(direction: int) -> void:
-	var next := navigator.step_floor(frame, direction)
-	if not next.is_empty():
-		_pick_floor(next)
+	if navigator.step_zone(frame, direction):
+		_refresh()
 
 
 ## `N` and NEXT: select the next agent that needs a human, show its floor and
@@ -880,8 +881,11 @@ func _refresh() -> void:
 	_content_size = floor_view.plan.render_bounds.end + Vector2(0, PLATE_HEIGHT)
 	world.position = room.position
 	_show_plate(found, problems)
-	if navigator.reveals_table(changed_floor) and floor_view.seats.has(navigator.active_key):
-		reveal(navigator.active_key, true)
+	# A floor seen for the first time opens on the selection's whole table.
+	var whole := navigator.pan_whole_table
+	var pan_to := navigator.take_pan_to()
+	if not pan_to.is_empty() and floor_view.seats.has(pan_to):
+		reveal(pan_to, whole)
 	var arriving := navigator.reveal_on_arrival
 	if not arriving.is_empty() and floor_view.seats.has(arriving):
 		reveal(arriving)
@@ -1753,6 +1757,7 @@ func _follow_new_pane_later(target_key: String, pane_id: String, terminal_id: St
 	pending.terminal_id = terminal_id
 	pending.from_key = target_key
 	pending.floor_key = navigator.shown_key
+	pending.nav_revision = navigator.nav_revision
 	pending.generation = generation
 	pending.until_msec = Time.get_ticks_msec() + pending_pick_msec
 	_pending_pick = pending

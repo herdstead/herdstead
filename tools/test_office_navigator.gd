@@ -530,6 +530,65 @@ func test_locating_a_pane_selects_it_and_reveals_it_on_arrival() -> void:
 	_eq(navigator.reveal_on_arrival, "", "picking another floor drops the pending reveal")
 
 
+## pick_zone() picks a zone as pick_floor() picks its floor, and counts one
+## navigation; so do PageUp/PageDown (step_zone(), which past either end picks
+## and counts nothing) and every locate: `N`, `‹ ›`, a counter, a list pick.
+## A desk pick is no navigation.
+func test_navigations_count_and_a_zone_is_picked_like_a_floor() -> void:
+	var frame := _frame(floors)
+	var by_floor := _showing(frame, _local("api"))
+	var by_zone := _showing(frame, _local("api"))
+	by_floor.locate(frame, frame.pane(_local("infra:p2")))
+	by_zone.locate(frame, frame.pane(_local("infra:p2")))
+	var counted := by_zone.nav_revision
+	by_floor.pick_floor(_local("web"))
+	by_zone.pick_zone(_local("web"))
+	_eq(
+		[by_zone.picked_floor, by_zone.reveal_on_arrival, by_zone.settle(frame)],
+		[by_floor.picked_floor, by_floor.reveal_on_arrival, by_floor.settle(frame)],
+		"pick_zone() picks, drops the pending reveal and settles as pick_floor() does"
+	)
+	_eq(by_zone.nav_revision, counted + 1, "and counts one navigation")
+	var navigator := _showing(frame, _local("api"))
+	var revision := navigator.nav_revision
+	_check(not navigator.step_zone(frame, -1), "nothing below the ground floor")
+	_eq([navigator.picked_floor, navigator.nav_revision], ["", revision], "picks and counts nothing")
+	_check(navigator.step_zone(frame, 1), "one up")
+	_eq([navigator.picked_floor, navigator.nav_revision], [_local("web"), revision + 1], "picks it, one navigation")
+	_check(navigator.next_human(frame), "`N`")
+	_eq(navigator.nav_revision, revision + 2, "one more")
+	_check(navigator.step(frame, 1) and navigator.step(frame, -1), "`›` then `‹`")
+	_eq(navigator.nav_revision, revision + 4, "one each")
+	_check(navigator.next_of(frame, "blocked"), "BLOCKED")
+	_eq(navigator.nav_revision, revision + 5, "one")
+	navigator.locate(frame, frame.pane(_local("api:p1")))
+	_eq(navigator.nav_revision, revision + 6, "a list pick: one")
+	navigator.pick_desk(_local("api:p2"))
+	_eq(navigator.nav_revision, revision + 6, "a desk pick: none")
+
+
+## A floor shown for the first time in this run asks the office, once, to pan
+## to the selection's whole table; one shown before keeps its pan and asks
+## nothing. The navigator knows the machine whose floor it shows.
+func test_a_first_arrival_asks_once_to_pan_to_the_selection() -> void:
+	var frame := _frame(floors, basic)
+	var navigator := OfficeNavigator.new()
+	navigator.settle(frame)
+	_eq([navigator.shown_machine(), navigator.take_pan_to()], ["", ""], "nothing shown, nothing to pan to")
+	navigator.show_floor(frame, _local("api"), Vector2.ZERO)
+	_check(not navigator.active_key.is_empty(), "herdr's focus is the selection")
+	_eq([navigator.pan_to, navigator.pan_whole_table], [navigator.active_key, true], "its whole table")
+	_eq(navigator.take_pan_to(), navigator.active_key, "taken once")
+	_eq(navigator.take_pan_to(), "", "then forgotten")
+	_eq(navigator.shown_machine(), LOCAL, "on Local")
+	navigator.show_floor(frame, _local("web"), Vector2(10, 20))
+	_eq(navigator.take_pan_to(), navigator.active_key, "the next floor seen for the first time asks too")
+	navigator.show_floor(frame, _local("api"), Vector2(30, 40))
+	_eq(navigator.take_pan_to(), "", "a floor shown before keeps its pan")
+	navigator.show_floor(frame, _bee("bravo"), Vector2.ZERO)
+	_eq(navigator.shown_machine(), BEE, "a floor of bee's is shown on bee")
+
+
 # --- the command line ---------------------------------------------------------
 
 

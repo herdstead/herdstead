@@ -27,10 +27,26 @@ var picked_floor := ""
 var shown_key := ""
 ## Explicit attention navigation reveals this pane after its floor is drawn.
 var reveal_on_arrival := ""
+## Counts the navigations the viewer asked for: a floor picked (pick_zone()),
+## PageUp/PageDown (step_zone()), and every locate: `N`, `‹ ›`, a top-bar
+## counter, the agent list, NEWS, EVENTS, the overview and the strategic view
+## (next_human(), step(), next_of(), locate()). Never panning (a drag, the
+## wheel, the arrow keys) and never a desk click. A pick waiting for a new pane
+## records it (office.gd's PendingPick), for when navigating stops meaning a
+## floor switch.
+var nav_revision := 0
+## One-shot: the pane whose desk the office pans to after it next draws the
+## shown floor, framing its whole table with `pan_whole_table`; empty for none.
+## Set when a floor is shown for the first time in this run (show_floor()), for
+## the selection; the office takes it (take_pan_to()) whether or not it is drawn.
+var pan_to := ""
+var pan_whole_table := false
 ## `--floor=<number>`: a Local floor to pick once Local has it; -1 when done.
 var wanted_floor := -1
 ## Floor key -> where the viewer left it panned, for the floors left this run.
 var _floor_pans: Dictionary[String, Vector2] = {}
+## The machine of the floor drawn now (shown_machine()).
+var _shown_machine := ""
 
 # --- a refresh ----------------------------------------------------------------
 
@@ -93,6 +109,23 @@ func show_floor(frame: OfficeFrame, key: String, pan: Vector2) -> void:
 	if frame.find_floor(shown_key) != null:
 		_floor_pans[shown_key] = pan
 	shown_key = key
+	var found := frame.find_floor(key)
+	_shown_machine = "" if found == null else found.building.key
+	if not _floor_pans.has(key):
+		pan_to = active_key
+		pan_whole_table = true
+
+
+## The machine whose floor is shown; empty before the first.
+func shown_machine() -> String:
+	return _shown_machine
+
+
+## pan_to, forgotten: the office asks once, after drawing the shown floor.
+func take_pan_to() -> String:
+	var key := pan_to
+	pan_to = ""
+	return key
 
 
 ## Where the viewer left `key`; zero for a floor not left before in this run.
@@ -120,6 +153,23 @@ func revealed() -> void:
 func pick_floor(key: String) -> void:
 	picked_floor = key
 	reveal_on_arrival = ""
+
+
+## The viewer picks zone `key` (a FLOORS row, a signpost): for now its floor is
+## shown, as pick_floor() does, and it counts as a navigation (nav_revision).
+func pick_zone(key: String) -> void:
+	pick_floor(key)
+	nav_revision += 1
+
+
+## PageUp/PageDown: pick the zone one row up or down (step_floor()), as
+## pick_zone() does; false at either end, where nothing is picked or counted.
+func step_zone(frame: OfficeFrame, direction: int) -> bool:
+	var next := step_floor(frame, direction)
+	if next.is_empty():
+		return false
+	pick_zone(next)
+	return true
 
 
 ## PageUp/PageDown: one row up or down the building section from the shown
@@ -191,6 +241,7 @@ func _queue(frame: OfficeFrame) -> Array[String]:
 func _pick_in_queue(frame: OfficeFrame, key: String) -> bool:
 	if key.is_empty():
 		return false
+	nav_revision += 1
 	picked_key = key
 	var picked := frame.pane(key)
 	picked_identity = "" if picked == null else picked.identity_key()
@@ -211,6 +262,7 @@ func next_of(frame: OfficeFrame, state: String) -> bool:
 	if queue.is_empty():
 		return false
 	var next := queue[(queue.find(picked_key) + 1) % queue.size()]
+	nav_revision += 1
 	picked_key = next
 	var picked := frame.pane(next)
 	picked_identity = "" if picked == null else picked.identity_key()
@@ -252,6 +304,7 @@ static func _seated_in_state(frame: OfficeFrame, state: String) -> Array[PaneMod
 ## Attention's "View": select `pane`, show its floor when it has one, and
 ## reveal its desk once that floor is drawn.
 func locate(frame: OfficeFrame, pane: PaneModel) -> void:
+	nav_revision += 1
 	picked_key = pane.key
 	picked_identity = pane.identity_key()
 	var floor_key := frame.floor_of(pane.key)
