@@ -1,9 +1,10 @@
 extends "res://tools/office_test_base.gd"
 ## The info lens and the hover mark.
 ## Holding `L` adds one time line per agent (the OVERVIEW's FOR, from
-## StateLog.wait_of()), hides the blocked bubble's parts, washes every rug in
-## its table's most urgent state on the FLOORS windows' scale and dims the
-## furnishing; letting go puts everything back. Hovering a NEWS item, a list
+## StateLog.wait_of(), in the in-world compact form), shows every seat's name
+## plate, hides the blocked chip's parts, washes every pod's floor in its most
+## urgent state on the FLOORS windows' scale and dims the furnishing; letting
+## go puts everything back. Hovering a NEWS item, a list
 ## row, an EVENTS row or a signpost points at the desk it names (a dashed frame
 ## of its own) or, on another floor, at that floor's FLOORS row, and never
 ## selects, pans, reads or writes. Keys and the pointer go through real input.
@@ -15,7 +16,7 @@ extends "res://tools/office_test_base.gd"
 ## No herdr at all: the fleet's Local client is stopped and snapshots are handed
 ## to it directly, as the NEWS / EVENTS suite does.
 
-const BUBBLE_PARTS: Array[String] = ["%Frame", "%Wait", "%Track", "%Fill"]
+const BUBBLE_PARTS: Array[String] = ["%Frame", "%Wait"]
 
 
 func _initialize() -> void:
@@ -63,11 +64,13 @@ func _after_case() -> void:
 # --- the lens -----------------------------------------------------------------
 
 
-## Held, every agent's desk says how long it has been in its state, in the
-## OVERVIEW's own words at the same moment; a shell says nothing. The plates
-## and badges do not change, and the top bar's theme line says the lens is on.
-## Let go, every line hides, the furnishing is as bright as before, the rugs
-## plain again and the theme line the pack's.
+## Held, every agent's desk says how long it has been in its state, the
+## OVERVIEW's own wait at the same moment in the in-world compact form; a shell
+## says nothing. Every seat at its desk shows its name plate (which, without
+## the lens, only a hovered or selected seat does); the plates' words and the
+## badges do not change, and the top bar's theme line says the lens is on.
+## Let go, every line and plate hides, the furnishing is as bright as before,
+## the pods' floors plain again and the theme line the pack's.
 func test_holding_l_adds_the_wait_line_and_letting_go_restores_everything() -> void:
 	var office := await _live_office()
 	var one := _with(fixture, "api:p1", {"agent_status": "blocked"})
@@ -77,8 +80,12 @@ func test_holding_l_adds_the_wait_line_and_letting_go_restores_everything() -> v
 	await _frames(2)
 	var signals := _signals(office)
 	var theme := office.hud.bar.theme_line()
+	var plates := {}
 	for station in _seats(office):
 		_check(not _lens(station).visible, "no lens line before L: " + station.pane_key)
+		# Only the selected seat's plate shows before L (nothing is hovered).
+		plates[station.pane_key] = _plate(station).visible
+	_check(plates.values().count(false) > 1, "most plates are hidden before L")
 	await _hold()
 	_check(office.lens.held, "L held is the lens")
 	# One read of the clock and the lines, with no frame between them.
@@ -95,20 +102,25 @@ func test_holding_l_adds_the_wait_line_and_letting_go_restores_everything() -> v
 		if pane.provider.is_empty() and not pane.launching():
 			_eq(texts[row.key], "", "a shell has no line: " + row.key)
 			continue
-		_eq(texts[row.key], OverviewLine.for_text(row), "the OVERVIEW's FOR: " + row.key)
+		var wait := StateLog.wait_of(office.fleet.state_log().track(row.key), now)
+		_eq(texts[row.key], OfficeAttention.compact_duration(wait.msec / 1000.0, wait.plus), "compact: " + row.key)
+		_eq(OverviewLine.for_text(row), OfficeAttention.wait_text(wait), "the OVERVIEW's FOR, same wait: " + row.key)
 		agents += 1
 	_eq(agents, 3, "api:p1, api:p2 and api:p4 each say how long")
-	_eq(_signals(office), signals, "the plates and badges are as they were")
+	_eq(_signals(office), signals, "the plates' words and the badges are as they were")
+	for station in _seats(office):
+		_eq(_plate(station).visible, not station.away(), "held, the plate shows at the desk: " + station.pane_key)
 	_eq(office.hud.bar.theme_line(), "LENS · hold L", "the top bar says the lens is on")
 	await _let_go()
 	_check(not office.lens.held, "let go: no lens")
 	for station in _seats(office):
 		_check(not _lens(station).visible, "no lens line after L: " + station.pane_key)
+		_eq(_plate(station).visible, plates[station.pane_key], "let go, the plate as before: " + station.pane_key)
 	for node in _furnishing(office):
 		_eq(node.modulate, Color.WHITE, "furnishing as bright as before: " + str(node.name))
 	for tab: String in office.floor_view.desks:
-		_check(not office.floor_view.desks[tab].wash.visible, "the rug is plain again: " + tab)
-	_eq(_signals(office), signals, "the plates and badges still as they were")
+		_check(not office.floor_view.desks[tab].wash.visible, "the pod's floor is plain again: " + tab)
+	_eq(_signals(office), signals, "the plates' words and the badges still as they were")
 	_eq(office.hud.bar.theme_line(), theme, "the theme line is the pack's again")
 	_done(office)
 
@@ -158,8 +170,10 @@ func test_the_lens_hides_the_bubble_parts_but_not_the_blocked_seat() -> void:
 
 ## A shell has nobody to time: no line, held or not. A pane the state log has
 ## no track of says `?`; a machine that dropped says nothing (invariant 4); an
-## agent says StateLog.wait_of() in OfficeAttention.wait_text(), the one
-## formatter the OVERVIEW's FOR uses too.
+## agent says StateLog.wait_of() in OfficeAttention.compact_duration(), the
+## in-world form of the wait the OVERVIEW's FOR writes in wait_text(): one wait,
+## two spellings. (The line used to be wait_text() itself; `1h 05m+` does not
+## fit a 30-unit lens row, and `99h 59m+` would not either.)
 func test_shells_have_no_wait_line_and_unknown_tracks_say_question_mark() -> void:
 	var office := await _live_office()
 	await _hold()
@@ -174,21 +188,31 @@ func test_shells_have_no_wait_line_and_unknown_tracks_say_question_mark() -> voi
 	_eq(OfficeLens.text_for(agent, track, true, now), "", "a dropped machine: nothing")
 	_eq(OfficeLens.text_for(office.frame.pane(_pk("api:p3")), track, false, now), "", "a shell: nothing")
 	var wait := StateLog.wait_of(track, now)
-	_eq(OfficeLens.text_for(agent, track, false, now), OfficeAttention.wait_text(wait), "the one formatter")
+	_eq(
+		OfficeLens.text_for(agent, track, false, now),
+		OfficeAttention.compact_duration(wait.msec / 1000.0, wait.plus),
+		"the in-world form"
+	)
 	_eq(OverviewLine.duration_text(wait.msec, wait.plus), OfficeAttention.wait_text(wait), "FOR says the same")
 	var unwatched := StateLog.Wait.new()
 	unwatched.msec = 65000
 	unwatched.plus = true
 	_eq(OfficeAttention.wait_text(unwatched), "1m+", "at least a minute")
+	_eq(OfficeAttention.compact_duration(unwatched.msec / 1000.0, unwatched.plus), "1m+", "in the world too")
+	unwatched.msec = 3900000
+	_eq(OfficeAttention.wait_text(unwatched), "1h 05m+", "the HUD's hours and minutes")
+	_eq(OfficeAttention.compact_duration(unwatched.msec / 1000.0, unwatched.plus), "65m+", "the world's minutes")
 	await _let_go()
 	_done(office)
 
 
-## Held, each table's rug is washed in its most urgent pane's state, on the
+## Held, each pod's floor is washed in its most urgent pane's state, on the
 ## FLOORS windows' own scale (HudTheme.SECTION_PANELS through
 ## OfficeFloorRow.WINDOW_LOOKS): blocked, then done (UNREAD), working, idle or
 ## starting (cream), unknown (muted); a table of shells only is slate. The wash
-## covers the rug exactly and lies right over it.
+## covers the cells under the pod's drawing and lies first in its background,
+## under the shadows, the sign and the title. (It used to lie over a rug; the
+## pods stand on the floor itself.)
 func test_each_rug_washes_in_its_tables_most_urgent_state_on_the_floors_scale() -> void:
 	var scale := {
 		&"WindowBlocked": ArtContract.BLOCKED,
@@ -207,14 +231,14 @@ func test_each_rug_washes_in_its_tables_most_urgent_state_on_the_floors_scale() 
 	_eq(_wash_tone(office, main), ArtContract.WORKING, "main: api:p1 works, p2 idles, p3 is a shell")
 	_eq(_wash_tone(office, tests), ArtContract.WORKING, "tests: api:p4 works")
 	var desk := office.floor_view.desks[main]
-	var rug := desk.background.get_child(0) as TileMapLayer
-	_check(rug != null, "the rug is the background's first child")
-	if rug != null:
-		var cells := rug.get_used_rect()
-		var grid := float(FloorLayoutPolicy.GRID)
-		var drawn := Rect2(rug.position + Vector2(cells.position) * grid, Vector2(cells.size) * grid)
-		_eq(Rect2(desk.wash.position, desk.wash.size), drawn, "the wash covers the rug exactly")
-	_eq(desk.wash.get_index(), 1, "right over the rug, under the shadows, sign and title")
+	_eq(desk.background.find_children("*", "TileMapLayer", true, false), [], "no rug")
+	var grid := float(FloorLayoutPolicy.GRID)
+	var visual := desk.placement.measure.render_rect
+	var start := (visual.position / grid).floor() * grid
+	var end := (visual.end / grid).ceil() * grid
+	var cells := Rect2(desk.placement.origin + start, end - start)
+	_eq(Rect2(desk.wash.position, desk.wash.size), cells, "the wash covers the cells under the pod's drawing")
+	_eq(desk.wash.get_index(), 0, "first, under the shadows, sign and title")
 	var steps: Array = [
 		[_with(fixture, "api:p2", {"agent_status": "blocked"}), main, ArtContract.BLOCKED, "blocked beats working"],
 		[_with(fixture, "api:p4", {"agent_status": "done"}), tests, ArtContract.UNREAD, "done"],
@@ -255,17 +279,17 @@ func test_each_rug_washes_in_its_tables_most_urgent_state_on_the_floors_scale() 
 
 
 ## Held, only the furnishing steps back: the floor, walkways, walls, door,
-## windows and framed pictures (the shell), every plant and cabinet, the counters and each table's
-## own trinkets, all by LENS_DIM. The tables, their laptops, lamps and paper,
-## the people, what floats over them, the rugs and their washes, the signs and
-## titles stay as bright as they were.
+## windows and framed pictures (the shell), every plant and cabinet and the
+## counters, all by LENS_DIM. The pods, their laptops, lamps and paper, the
+## people, what floats over them, the washes, the signs and titles stay as
+## bright as they were.
 func test_only_furnishing_dims_while_held() -> void:
 	# Wide enough that the row wall hangs framed pictures beside its two signs.
 	var office := await _live_office(_with(fixture, "api:p4", {"agent_status": "done"}), Vector2(1600, 800))
 	office.settle()
 	await _frames(2)
 	var furnishing := _furnishing(office)
-	_check(furnishing.size() > 3, "the shell, decor and trinkets are there: %d" % furnishing.size())
+	_check(furnishing.size() > 3, "the shell, decor and counters are there: %d" % furnishing.size())
 	_check(not _decor(office).is_empty(), "the floor has plants or cabinets")
 	# The wall-foot run and the spare bay's plant are among them: every
 	# planned piece is drawn, and every drawn one is in what dims.
@@ -788,13 +812,14 @@ func _lens_ids(office: OfficeDouble) -> Array:
 	return ids
 
 
-## What each seat signals besides the lens: its plate and its badge.
+## What each seat signals besides the lens: its plate's words and its badge.
+## (Whether the plate shows is the lens's too: held, every seat's does.)
 func _signals(office: OfficeDouble) -> Dictionary:
 	var shown := {}
 	for station in _seats(office):
 		var plate := _plate(station)
 		var badge: Sprite2D = station.get_node("Overlay/Badge")
-		shown[station.pane_key] = [plate.text, plate.visible, badge.visible, badge.texture]
+		shown[station.pane_key] = [plate.text, badge.visible, badge.texture]
 	return shown
 
 
@@ -806,8 +831,7 @@ func _marks(office: OfficeDouble) -> Dictionary:
 	return shown
 
 
-## The furnishing the lens dims: the shell, the decor, the counters and each
-## table's trinkets.
+## The furnishing the lens dims: the shell, the decor and the counters.
 func _furnishing(office: OfficeDouble) -> Array[CanvasItem]:
 	var found: Array[CanvasItem] = []
 	var shell := office.floor_view.ground.get_node_or_null("Shell") as CanvasItem
@@ -817,21 +841,18 @@ func _furnishing(office: OfficeDouble) -> Array[CanvasItem]:
 		found.append(decor)
 	for fixture_node in _fixtures(office):
 		found.append(fixture_node)
-	for table in office.floor_view.tables:
-		found.append(table.get_node("%Decorations") as CanvasItem)
 	return found
 
 
-## What the lens leaves as bright as it was: tables and everything on them but
-## their trinkets, the seats, the people, the backgrounds (rugs, washes,
-## shadows, signs, titles) and the pointer.
+## What the lens leaves as bright as it was: pods and everything on them, the
+## seats, the people, the backgrounds (washes, shadows, signs, titles) and the
+## pointer.
 func _signal_nodes(office: OfficeDouble) -> Array[CanvasItem]:
 	var found: Array[CanvasItem] = [office.floor_view.pointer]
 	for table in office.floor_view.tables:
 		found.append(table)
-		var trinkets := table.get_node("%Decorations")
 		for child in table.get_children():
-			if child != trinkets and child is CanvasItem:
+			if child is CanvasItem:
 				found.append(child as CanvasItem)
 	for station in _seats(office):
 		found.append(station)

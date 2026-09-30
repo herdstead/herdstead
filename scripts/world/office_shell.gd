@@ -37,12 +37,13 @@ const DECOR_FROM_END := 40.0
 ## another piece stands empty.
 const WALL_RUN_PITCH := 160.0
 const WALL_RUN_GAP := 8.0
-## The spare bay: where a row's last table ends at least SPARE_BAY_CELLS
-## short of the main corridor, one plant stands in the middle of the gap, its
-## foot level with the tables' near edge (BAY_PLANT_FOOT from the row's top),
-## on a cell centre, so a full free cell column stays on each side of it.
+## The spare bay: where a row's last pod ends at least SPARE_BAY_CELLS
+## short of the main corridor, one piece stands in the middle of the gap, its
+## foot level with the pods' near edge (BAY_PLANT_FOOT from the row's top: the
+## wall's two cells and the pod reservation's four above its near edge), on a
+## cell centre, so a full free cell column stays on each side of it.
 const SPARE_BAY_CELLS := 3
-const BAY_PLANT_FOOT := 256.0
+const BAY_PLANT_FOOT := 192.0
 ## Framed pictures on the row walls: furnishing hung on a row's back wall
 ## beside its signs, never a signal. They hang on a grid of the wall itself,
 ## never placed by the tables, so no count or place of them follows a tab. The

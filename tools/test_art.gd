@@ -277,7 +277,7 @@ func test_a_broken_item_block_refuses_the_pack() -> void:
 
 
 ## Every pool a scene draws from has members, and each stands where its pool
-## is drawn; the done paper stack, a signal, is never in one.
+## is drawn; the done paper stack (the pod's small one), a signal, is never in one.
 func test_the_contract_names_an_empty_or_misplaced_pool() -> void:
 	var catless := func(m: Dictionary) -> void:
 		for cat: String in ["cat_loaf", "cat_sleep", "cat_sit"]:
@@ -290,9 +290,9 @@ func test_the_contract_names_an_empty_or_misplaced_pool() -> void:
 	_check(
 		problems.has("props: plant_b is in the plant pool but stands on the desk"), "a misplaced member: %s" % problems
 	)
-	var pooled := func(m: Dictionary) -> void: m.props.done_stack.item.group = "desk"
+	var pooled := func(m: Dictionary) -> void: m.props.done_stack_small.item.group = "desk"
 	problems = ArtContract.problems(ArtPack.from_manifest(_mutated_pack("pool-signal", pooled)))
-	_check(problems.has("props: done_stack is a signal, never in a pool"), "a signal in a pool: %s" % problems)
+	_check(problems.has("props: done_stack_small is a signal, never in a pool"), "a signal in a pool: %s" % problems)
 
 
 func test_art_pack_rejects_wrong_json_containers() -> void:
@@ -592,12 +592,14 @@ func test_art_contract_names_ids_no_scene_asks_for() -> void:
 		["wall.front_center", "wall.front_left", "wall.front_right", "wall.threshold"],
 		"the front wall nothing lays: it would cover the near seats (docs/WORLD_MODEL.md)"
 	)
-	# The open-plan art lands before the code that draws it (lanes B1, B2):
-	# exactly these ids are shipped and not drawn yet.
+	# The pods of desks draw the pod's art (lane B1); what the long table, the
+	# big paper stack and the big selection frame drew is shipped and drawn by
+	# nothing now, until lane C prunes it from the pack. The zone partitions
+	# (lane B2) and the side table land before the code that draws them.
 	_eq(
 		Array(unused[&"props"]),
 		[
-			"done_stack_small",
+			"done_stack",
 			"partition_corner_bl",
 			"partition_corner_br",
 			"partition_h",
@@ -607,22 +609,22 @@ func test_art_contract_names_ids_no_scene_asks_for() -> void:
 			"partition_v",
 			"side_table",
 		],
-		"every prop but the pod's paper, the zone partitions and the side table is placed somewhere"
+		"every prop but the long table's paper, the zone partitions and the side table is placed somewhere"
 	)
-	_eq(Array(unused[&"ui"]), ["selection_seat"], "every UI image but the seat mark is drawn somewhere")
+	_eq(Array(unused[&"ui"]), ["selection"], "every UI image but the long table's frame is drawn somewhere")
 	_eq(
 		Array(unused[&"table"]),
 		[
-			"desk_left",
-			"desk_mid_a",
-			"desk_mid_b",
-			"desk_right",
-			"leg_short",
-			"screen_left",
-			"screen_mid",
-			"screen_right",
+			"divider_left",
+			"divider_mid",
+			"divider_right",
+			"leg",
+			"surface_left",
+			"surface_mid_a",
+			"surface_mid_b",
+			"surface_right",
 		],
-		"every shared-table module but the pod's is laid or is a furniture view"
+		"every shared-table module but the long table's is laid or is a furniture view"
 	)
 	for id in ArtContract.tile_ids():
 		_check(not Array(unused[&"tiles"]).has(str(id)), "a wanted tile is never called unused: " + id)

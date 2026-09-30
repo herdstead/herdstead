@@ -182,7 +182,7 @@ func hud_panel() -> ArtSprite:
 
 ## The frame drawn around the selected seat. Never null in a valid pack.
 func selection_mark() -> ArtSprite:
-	return ui_sprite(ArtContract.UI_SELECTION)
+	return ui_sprite(ArtContract.UI_SELECTION_SEAT)
 
 
 ## What one herdr state looks like here, or null when the pack does not draw it

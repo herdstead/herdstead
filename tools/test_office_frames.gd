@@ -372,7 +372,10 @@ func test_a_moved_sign_moves_the_frames_out_of_its_way() -> void:
 	var width := 20
 	var first_model := _floor([_room("a", 5)])
 	var first := _planned(first_model, width, null, false)
-	var grown_model := _floor([_room("a", 9)])
+	# Twenty-eight panes: a fourteen-desk pod, 448 wide, whose sign (centred at
+	# 256) reaches the first bay's picture at 312; nine panes no longer do, now
+	# that a desk is 32 wide.
+	var grown_model := _floor([_room("a", 28)])
 	var grown := _planned(grown_model, width, first, false)
 	if first == null or grown == null:
 		return

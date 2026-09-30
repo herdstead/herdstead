@@ -27,10 +27,10 @@ class Seat:
 
 
 ## What the lens (`L` held) multiplies the furnishing by: the shell (floor,
-## walkways, walls, door, windows), the plants and cabinets, the counters and
-## each table's trinkets. Signals stay as bright as they are.
+## walkways, walls, door, windows), the plants and cabinets, and the counters.
+## Signals stay as bright as they are.
 const LENS_DIM := Color(0.55, 0.55, 0.55)
-## How opaque the lens's wash over a rug is (OfficeDeskView.wash).
+## How opaque the lens's wash over a pod's floor is (OfficeDeskView.wash).
 const LENS_WASH_ALPHA := 0.75
 
 ## The floor's own node (FloorRooms in the office): what dims as a whole when
@@ -169,7 +169,8 @@ func update_desks(model: MapModel, active_key: String, frozen: bool) -> void:
 
 
 ## The lens (OfficeLens) is `held`: each seat's line says `texts[pane key]`
-## (OfficeStation.show_lens(); missing is nothing), each table's rug is washed
+## (OfficeStation.show_lens(), which also shows its name plate; missing is
+## nothing), each pod's floor is washed
 ## in `tones[tab key]`, a palette key, at LENS_WASH_ALPHA (missing: no wash),
 ## and the furnishing dims by LENS_DIM. Let go (`held` false), every line and
 ## wash hides and the furnishing is Color.WHITE again. Only visibility, text,
@@ -197,8 +198,8 @@ func show_lens(held: bool, texts: Dictionary[String, String], tones: Dictionary[
 		node.modulate = tint
 
 
-## What the lens dims: the shell, every decor piece, the counters and each
-## table's trinkets (its `%Decorations`).
+## What the lens dims: the shell, every decor piece and the counters. A pod
+## carries no furnishing: nothing but signals stands on a desk.
 func furnishing() -> Array[CanvasItem]:
 	var found: Array[CanvasItem] = []
 	if _shell != null:
@@ -207,8 +208,6 @@ func furnishing() -> Array[CanvasItem]:
 		found.append(_decor[key])
 	for key: String in _fixtures:
 		found.append(_fixtures[key])
-	for table in tables:
-		found.append(table.get_node("%Decorations") as CanvasItem)
 	return found
 
 

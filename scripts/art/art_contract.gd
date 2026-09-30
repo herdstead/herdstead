@@ -119,10 +119,11 @@ const PROP_WALL_FRAME := &"wall_frame"
 ## no herdr field at all (the space in front of it stays empty).
 const PROP_RECEPTION := &"reception"
 const PROP_PANTRY := &"pantry"
-## A signal, not furniture: the stack of paper the table puts beside the laptop
-## of a seat whose agent is done and not yet looked at (OfficeTable.show_papers()).
-## Never in a pool (ITEM_GROUPS): it is placed by code, by state.
-const PROP_DONE_STACK := &"done_stack"
+## A signal, not furniture: the small stack of paper the pod puts beside the
+## laptop of a seat whose agent is done and not yet looked at
+## (OfficeTable.show_papers()). Never in a pool (ITEM_GROUPS): it is placed by
+## code, by state.
+const PROP_DONE_STACK_SMALL := &"done_stack_small"
 const PROP_IDS: Array[StringName] = [
 	PROP_SIGN,
 	PROP_WINDOW,
@@ -147,7 +148,8 @@ const UI_PANEL := &"panel"
 ## The dark HUD's panels (HdPanel); `panel` stays the world's and the tools'
 ## light one (the blocked bubble, the Avatar Studio, the showroom's notes).
 const UI_HUD_PANEL := &"hud_panel"
-const UI_SELECTION := &"selection"
+## The corner marks round a selected seat, and round a worker resting away.
+const UI_SELECTION_SEAT := &"selection_seat"
 const UI_BRANCH := &"branch"
 ## Three display overlays, not herdr states: a pane whose agent is still
 ## starting, a machine that has dropped, and one that is answering. The
@@ -185,20 +187,21 @@ const TRACK_DRINK := &"drink"
 
 # --- the shared table -----------------------------------------------------------
 
-## The modules OfficeTable lays along the table, and the two pieces of furniture
-## it and OfficeStation place on and beside it.
+## The modules OfficeTable lays along a pod (its desks, apron, low screen, the
+## two short legs and a bracket per desk), and the two pieces of furniture it
+## and OfficeStation place on and beside it.
 const TABLE_MODULES: Array[StringName] = [
-	&"surface_left",
-	&"surface_mid_a",
-	&"surface_mid_b",
-	&"surface_right",
+	&"desk_left",
+	&"desk_mid_a",
+	&"desk_mid_b",
+	&"desk_right",
 	&"apron_left",
 	&"apron_mid",
 	&"apron_right",
-	&"divider_left",
-	&"divider_mid",
-	&"divider_right",
-	&"leg",
+	&"screen_left",
+	&"screen_mid",
+	&"screen_right",
+	&"leg_short",
 	&"bracket",
 ]
 const FURNITURE_CHAIR := &"chair"
@@ -236,9 +239,9 @@ static func problems(pack: ArtPack) -> PackedStringArray:
 		for member in members:
 			if member.item.place != ITEM_GROUPS[group]:
 				found.append("props: %s is in the %s pool but stands on the %s" % [member.id, group, member.item.place])
-	var stack := pack.prop_sprite(PROP_DONE_STACK)
+	var stack := pack.prop_sprite(PROP_DONE_STACK_SMALL)
 	if stack != null and stack.item != null and not stack.item.group.is_empty():
-		found.append("props: %s is a signal, never in a pool" % PROP_DONE_STACK)
+		found.append("props: %s is a signal, never in a pool" % PROP_DONE_STACK_SMALL)
 	for image in ui_ids():
 		if pack.ui_sprite(image) == null:
 			found.append("ui: no image named " + image)
@@ -296,7 +299,7 @@ static func ui_ids() -> Array[StringName]:
 	return [
 		UI_PANEL,
 		UI_HUD_PANEL,
-		UI_SELECTION,
+		UI_SELECTION_SEAT,
 		UI_BRANCH,
 		UI_STARTING,
 		UI_OFFLINE,
@@ -401,7 +404,7 @@ static func _file_problems(pack: ArtPack) -> PackedStringArray:
 ## Every prop a scene places by its id; the pools' members are drawn by group.
 static func prop_ids() -> Array[StringName]:
 	var ids: Array[StringName] = PROP_IDS.duplicate()
-	ids.append(PROP_DONE_STACK)
+	ids.append(PROP_DONE_STACK_SMALL)
 	return ids
 
 

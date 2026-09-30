@@ -5,8 +5,8 @@ extends RefCounted
 var table: OfficeTable
 var background: Node2D
 var title: Label
-## The lens's wash over the rug (OfficeFloorView.show_lens()): hidden until `L`
-## is held, then the table's most urgent state. Made with the background, so a
+## The lens's wash over the pod's floor (OfficeFloorView.show_lens()): hidden
+## until `L` is held, then the pod's most urgent state. Made with the background, so a
 ## zoom or a lens change never makes another; only its `visible` and `color` change.
 var wash: ColorRect
 var stations: Array[OfficeStation] = []
@@ -18,18 +18,23 @@ var _sorted: Node2D
 var _name := ""
 
 
-## Node upper bound for a measured table and everything this view owns, even
+## Node upper bound for a measured pod and everything this view owns, even
 ## when every retained slot gains a person. Measured on the dressed prefabs
-## (the geometry suite's count): 33 fixed nodes (27 of the table, 6 of the
-## background: itself, the rug, the lens's rug wash, the contact holder, the
-## sign and the title) and 79 per column (24 of the table's equipment, decor and
-## trinkets, 1 contact shadow, two 17-node stations and two 10-node people).
-## The bound decides which floors fit FloorLayoutPolicy.max_desk_nodes. Geometry tests
-## count real dressed prefabs so changes to the scenes cannot silently
-## invalidate this allocation contract. This bounds the settled live group, not
-## temporary queue_free replacements.
+## (the geometry suite's count, test_desk_node_budget_bounds_real_prefabs_and_retained_empty_slots,
+## at 2, 4, 18 and 250 columns: 168, 310, 1304 and 17776 nodes with everybody
+## seated): 26 fixed nodes (21 of the pod: its body, 12 holders, the footprint,
+## the overlay, the frame and its 4 bars, and the 2 short legs; 5 of the
+## background: itself, the lens's wash, the contact holder, the sign and the
+## title) and 71 per column (20 of the pod's: a desk, an apron and a screen
+## module, a bracket, 2 laptops, 2 three-node grommets, 2 lamps, 2 papers, 2
+## seat and 2 standing markers; 1 contact shadow; two 15-node stations and two
+## 10-node people). The bound decides which floors fit
+## FloorLayoutPolicy.max_desk_nodes. Geometry tests count real dressed prefabs
+## so changes to the scenes cannot silently invalidate this allocation
+## contract. This bounds the settled live group, not temporary queue_free
+## replacements.
 static func node_budget(capacity: int) -> int:
-	return 33 + 79 * capacity
+	return 26 + 71 * capacity
 
 
 func setup(drawing: OfficeDraw, ground: Node2D, sorted: Node2D, tab_key: String) -> void:
@@ -136,12 +141,12 @@ func _draw_background(next: DeskPlacement, wall_y: float) -> void:
 	background = Node2D.new()
 	background.name = _name + "Ground"
 	_ground.add_child(background)
+	# No rug: the pod stands on the floor itself. The lens's wash covers the
+	# cells under the pod's drawing, under the contact shadows, the sign and the title.
 	var visual := next.measure.render_rect
 	var grid := float(FloorLayoutPolicy.GRID)
 	var start := (visual.position / grid).floor()
 	var end := (visual.end / grid).ceil()
-	_pen.rug(background, next.origin + start * grid, int(end.x - start.x), int(end.y - start.y))
-	# Right over the rug, under the contact shadows, the sign and the title.
 	wash = _pen.box(background, Rect2(next.origin + start * grid, (end - start) * grid), ArtContract.SLATE)
 	wash.name = "LensWash"
 	wash.visible = false

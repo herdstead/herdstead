@@ -1,8 +1,8 @@
 extends "res://tools/walking_test_base.gd"
 ## Who rests where by state (OfficeRests) on the live office, and how they get
 ## there. Every state but idle rests at its own seat: a blocked agent
-## sits with a hand up and a bubble over the head (its question's excerpt, how
-## long it has waited, a patience bar), a done one sits with a stack of paper
+## sits with a hand up and a chip on the badge's row (its question's excerpt in
+## the tooltip, how long it has waited), a done one sits with a stack of paper
 ## beside the laptop, and an idle one takes a pantry spot with a cup while the
 ## pantry has one; the full pantry seats the rest. A newcomer never displaces
 ## anyone; cold passes place everyone; a stale floor never re-ranks; clicks by
@@ -35,7 +35,10 @@ func test_a_blocked_agent_stays_seated_with_a_hand_up_and_a_bubble() -> void:
 	_eq([_ids(_walkers(office)), _ids(_ghosts(office))], [[], []], "nobody walks")
 	_eq(_floor_point(office, body), _seat_of(office, "api:p2"), "still in the chair")
 	_eq([str(body.look.context), body.track], ["desk", &"desk_blocked"], "hand up at the desk")
-	_check(_plate(station).visible, "the plate stays on the seat")
+	# The plate names the seat only while it is hovered, selected or under the
+	# lens (it used to show always; a 30-wide plate row is transient now).
+	_eq(_plate(station).text, "CODEX", "the plate still names the seat")
+	_check(not _plate(station).visible, "and shows only on hover, selection or the lens")
 	var bubble := station.bubble()
 	_check(bubble.visible, "the bubble shows at once")
 	_eq(bubble.position, OfficeStation.BUBBLE_AT[station.side], "over this side's head")
@@ -121,10 +124,10 @@ func test_a_done_agent_sits_with_papers_on_the_desk() -> void:
 	_eq(_floor_point(office, station.actor()), _seat_of(office, "api:p1"), "still in the chair")
 	_eq(_shown_papers(office), [_pane("api:p1")], "only its seat has paper")
 	var stack := station.table.papers(station.column, station.side)
-	var decor := OfficeTable.DECOR_FAR if station.side == "far" else OfficeTable.DECOR_NEAR
+	var plane := OfficeTable.PAPERS_FAR if station.side == "far" else OfficeTable.PAPERS_NEAR
 	_eq(
 		stack.position,
-		Vector2(station.table.columns[station.column] + OfficeTable.PAPERS_ASIDE, decor),
+		Vector2(station.table.columns[station.column] + OfficeTable.PAPERS_ASIDE, plane),
 		"beside the laptop, on its side's working plane"
 	)
 	_check(station.bubble().visible == false, "and no bubble")
@@ -209,19 +212,22 @@ func test_a_bubble_follows_its_agent_and_its_machine() -> void:
 	_feed(office, blocked)
 	await _text_tick()
 	_check(station.bubble().visible and not target.disabled, "blocked again: back")
-	var track: ColorRect = station.bubble().get_node("%Track")
-	var fill: ColorRect = station.bubble().get_node("%Fill")
 	var frame: NinePatchRect = station.bubble().get_node("%Frame")
+	var badge: Sprite2D = station.get_node("Overlay/Badge")
 	_check(not _wait_text(office, _pane("api:p2")).is_empty(), "live: a wait")
-	_check(track.visible and fill.visible, "and a bar")
-	_check(frame.visible, "in the bubble's frame")
+	_check(frame.visible, "in the chip's frame")
+	_eq(
+		badge.position,
+		OfficeStation.BADGE_AT[station.side] + OfficeStation.CHIP_BADGE_SHIFT,
+		"and the badge in the chip's left half"
+	)
 	_set_online(office, false)
 	await _text_tick()
-	_check(station.bubble().is_visible_in_tree(), "dropped: the bubble stays")
+	_check(station.bubble().is_visible_in_tree(), "dropped: the chip stays")
 	_eq(office.floor_view.root.modulate, office.art.stale_tint, "dimmed with the floor")
 	_eq(_wait_text(office, _pane("api:p2")), "", "no wait")
-	_check(not track.visible and not fill.visible, "and no bar")
 	_check(not frame.visible, "nor an empty frame")
+	_eq(badge.position, OfficeStation.BADGE_AT[station.side], "the badge back in the middle of its row")
 	_check(not target.disabled, "its rectangle stays where it was")
 	_done(office)
 
@@ -274,35 +280,38 @@ func test_the_question_excerpt_is_the_asking_line() -> void:
 	_eq(OfficeQuestionReader.excerpt("a\r\nwhy?\r\n"), "why?", "carriage returns are blanks")
 
 
-## The patience bar is full when the wait starts and empties over ten minutes,
-## always in the pack's `blocked` colour: only its length says anything. The
-## fill never goes below two units. Without a known wait there is no bar.
-func test_the_patience_bar_shortens_with_the_wait() -> void:
+## The chip says a known wait in its right half, compactly
+## (OfficeAttention.compact_duration(), never `+`), in its frame, and the
+## badge moves into its left half; without a known wait there is no number
+## and no frame, and the badge is back in the middle of the tag row. (It
+## replaces the patience bar's case, test_the_patience_bar_shortens_with_the_wait:
+## the bar is gone, the chip keeps only the number.)
+func test_the_chip_says_the_wait_and_takes_the_badge() -> void:
 	var office := await _live_office(_with(fixture, "api:p2", {"agent_status": "blocked"}))
-	var bubble := _station(office, _pane("api:p2")).bubble()
-	var track: ColorRect = bubble.get_node("%Track")
-	var fill: ColorRect = bubble.get_node("%Fill")
+	var station := _station(office, _pane("api:p2"))
+	var bubble := station.bubble()
+	var frame: NinePatchRect = bubble.get_node("%Frame")
 	var wait: Label = bubble.get_node("%Wait")
-	var widths := {0.0: 40.0, 60.0: 36.0, 300.0: 20.0, 600.0: 2.0, 900.0: 2.0}
-	for seconds: float in widths:
+	var badge: Sprite2D = station.get_node("Overlay/Badge")
+	var middle: Vector2 = OfficeStation.BADGE_AT[station.side]
+	var forms := {0.0: "0s", 60.0: "1m", 300.0: "5m", 5999.0: "99m", 7200.0: "2h", 400000.0: "4d"}
+	for seconds: float in forms:
 		bubble.show_wait(seconds)
-		_eq(fill.size.x, widths[seconds], "%d s: the fill's width" % seconds)
-		_eq(fill.color, office.art.color(ArtContract.BLOCKED), "%d s: always the blocked colour" % seconds)
-		_check(track.visible and fill.visible, "%d s: a bar" % seconds)
-		_eq(wait.text, OfficeBubble.wait_text(seconds), "%d s: the wait, in the bubble's short form" % seconds)
-	_eq(OfficeBubble.patience(0.0), 1.0, "full at the start")
-	_eq(OfficeBubble.patience(300.0), 0.5, "half after five minutes")
-	_eq(OfficeBubble.patience(900.0), 0.0, "empty after ten")
-	_eq(track.color, office.art.color(ArtContract.MUTED), "the track is muted")
+		_eq(wait.text, forms[seconds], "%d s: the wait, compactly" % seconds)
+		_check(frame.visible and wait.visible, "%d s: in its frame" % seconds)
+		_eq(badge.position, middle + OfficeStation.CHIP_BADGE_SHIFT, "%d s: the badge in the chip" % seconds)
+	_check(bubble.get_node_or_null("%Track") == null and bubble.get_node_or_null("%Fill") == null, "no bar")
 	bubble.show_wait(-1.0)
-	_check(not track.visible and not fill.visible, "no known wait: no bar")
+	_check(not frame.visible and not wait.visible, "no known wait: no frame")
 	_eq(wait.text, "", "and no number")
+	_eq(badge.position, middle, "and the badge in the middle of its row")
 	_done(office)
 
 
-## The bubble's wait is at most three characters, so it fits beside the badge
-## at its larger size: seconds under a minute, minutes under 100, then whole
-## hours; nothing below 0. Every form, at the bubble's own font, fits its label.
+## The chip's wait is at most three characters (compact_duration() without its
+## `+`): seconds under a minute, minutes under 100, hours under 100, then whole
+## days up to 99; nothing below 0. Every form, in the chip's own face, fits its
+## label: the pack's display face at 8, in a 14-unit slot.
 func test_the_bubble_wait_is_short_enough_to_read() -> void:
 	var forms := {
 		-1.0: "",
@@ -314,14 +323,17 @@ func test_the_bubble_wait_is_short_enough_to_read() -> void:
 		7199.0: "1h",
 		7200.0: "2h",
 		359999.0: "99h",
+		360000.0: "4d",
+		1.0e9: "99d",
 	}
 	for seconds: float in forms:
-		_eq(OfficeBubble.wait_text(seconds), forms[seconds], "%d s" % seconds)
+		_eq(OfficeAttention.compact_duration(seconds, false), forms[seconds], "%d s" % seconds)
 	var office := await _live_office(_with(fixture, "api:p2", {"agent_status": "blocked"}))
 	var wait: Label = _station(office, _pane("api:p2")).bubble().get_node("%Wait")
-	_eq(wait.get_theme_font_size("font_size"), OfficeBubble.WAIT_PIXELS, "larger than a plate's 10")
+	_eq(wait.get_theme_font_size("font_size"), OfficeBubble.WAIT_PIXELS, "the display face's native 8")
+	_eq(wait.get_theme_font("font"), office.pen.display, "in the display face")
 	var font := wait.get_theme_font("font")
-	for text: String in ["59s", "99m", "99h"]:
+	for text: String in ["59s", "99m", "99h", "99d"]:
 		var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, OfficeBubble.WAIT_PIXELS).x
 		_check(width <= wait.size.x, "%s is %s wide, within the label's %s" % [text, width, wait.size.x])
 	_done(office)
@@ -346,9 +358,7 @@ func test_hovering_a_bubble_shows_a_tooltip() -> void:
 	_eq(_wait_text(office, key), "", "blocked in the first snapshot: no wait to tell")
 	_check(bubble.visible, "the bubble is there")
 	var frame: NinePatchRect = bubble.get_node("%Frame")
-	var track: ColorRect = bubble.get_node("%Track")
 	_check(not frame.visible, "but draws no frame")
-	_check(not track.visible, "nor a bar")
 	_eq(station.actor().track, &"desk_blocked", "the hand is up")
 	var badge: Sprite2D = station.get_node("Overlay/Badge")
 	_check(badge.visible, "and the badge shows")

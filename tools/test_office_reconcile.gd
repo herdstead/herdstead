@@ -364,9 +364,10 @@ func _check_floor_cells(office: OfficeScene) -> void:
 
 
 func test_complete_floor_and_unique_wall_cells_follow_the_plan() -> void:
-	# 628 wide: the floor is planned 488 units wide; its tables wrap to a
-	# second row there.
-	var office := await _live_office(fixture, Vector2(628, 480))
+	# 628 wide: the floor is planned 488 units wide; with a dozen more agents
+	# on api its pods wrap to a second row there (the fixture's own two pods
+	# of 32-unit desks fit one row).
+	var office := await _live_office(_wide_api(12), Vector2(628, 480))
 	_check(office.layout_plan().rows.size() > 1, "fixture exercises multiple wall rows")
 	_check_floor_cells(office)
 	var signature := office.layout_plan().geometry_signature()
@@ -387,14 +388,9 @@ func test_complete_floor_and_unique_wall_cells_follow_the_plan() -> void:
 ## the list picks it and the camera pans it into view (reveal()). And a click
 ## on the open drawer over a desk is the list's: it picks no desk.
 func test_a_floor_planned_with_the_drawer_closed_keeps_its_plan_when_it_opens() -> void:
-	# api with a dozen more agents: its tables reach across the whole plan.
-	var grown: Dictionary = fixture.duplicate(true)
-	var first: Dictionary = _list(grown, "panes")[0]
-	for index in 12:
-		var extra: Dictionary = first.duplicate(true)
-		extra.pane_id = "api:wide-%d" % index
-		_list(grown, "panes").append(extra)
-	var office := await _live_office(grown)
+	# api with 33 more agents: its pod of 18 desks reaches across the whole
+	# plan (a dozen more agents did with the long tables; a desk is 32 wide).
+	var office := await _live_office(_wide_api(33))
 	await _frames(4)
 	var hud := office.hud
 	_check(not hud.drawer_open(), "the drawer starts closed")
@@ -492,7 +488,9 @@ func test_a_floor_planned_with_the_drawer_closed_keeps_its_plan_when_it_opens() 
 ## click and no wheel there (the user's choice: a dead gap). A real click on a
 ## desk seen through the gap picks nothing; a wheel notch there pans nothing.
 func test_the_gap_between_the_card_and_next_takes_no_click() -> void:
-	var office := await _live_office()
+	# api with 27 more agents, so a pod reaches the middle of the screen,
+	# where the gap is (the fixture's own pods stand in its left third).
+	var office := await _live_office(_wide_api(27))
 	await _frames(4)
 	var hud := office.hud
 	_check(hud.inspector.card(), "800x480 is tall enough for the card")
@@ -745,6 +743,18 @@ func test_invalid_input_keeps_last_valid_people_across_theme_and_floor_changes()
 	_done(office)
 
 
+## The fixture with `count` more agents on api's first tab, so its pod grows
+## that many seats wider.
+func _wide_api(count: int) -> Dictionary:
+	var grown: Dictionary = fixture.duplicate(true)
+	var first: Dictionary = _list(grown, "panes")[0]
+	for index in count:
+		var extra: Dictionary = first.duplicate(true)
+		extra.pane_id = "api:wide-%d" % index
+		_list(grown, "panes").append(extra)
+	return grown
+
+
 func test_first_budget_failure_is_cached_until_geometry_changes_or_floor_closes() -> void:
 	var invalid := {
 		"workspaces": [{"workspace_id": "oversized", "number": 1}],
@@ -752,9 +762,10 @@ func test_first_budget_failure_is_cached_until_geometry_changes_or_floor_closes(
 		"panes": [],
 		"layouts": []
 	}
-	# 506 panes need 254 paired-growth columns: their measured reserved width
-	# plus the outer walls and corridor exceeds the 512-cell production budget.
-	for index in 506:
+	# 1014 panes need 508 paired-growth columns: their measured reserved width
+	# (a pod packs a column into one cell) plus the outer walls and corridor
+	# exceeds the 512-cell production budget.
+	for index in 1014:
 		_list(invalid, "panes").append({"pane_id": "wide-%d" % index, "tab_id": "wide", "workspace_id": "oversized"})
 	var office := await _live_office(invalid)
 	_eq(office.layout_attempt_count(), 2, "first failure plans once and constructs one bounded fallback")
@@ -849,8 +860,9 @@ func test_render_budget_failure_keeps_old_nodes_and_first_failure_is_empty() -> 
 	# must not add, remove or replace any candidate rendering nodes.
 	var floor_root := office.world.get_node("FloorRooms")
 	var nodes := floor_root.find_children("*", "", true, false)
+	# Two hundred empty tabs: 200 minimum pods at 168 nodes each, over 32768.
 	var excessive: Dictionary = fixture.duplicate(true)
-	for index in 187:
+	for index in 200:
 		_list(excessive, "tabs").append(
 			{"workspace_id": "api", "tab_id": "empty-%d" % index, "number": index + 10, "label": "empty"}
 		)

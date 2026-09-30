@@ -34,8 +34,9 @@ func _serviced(floor_model: ZoneModel, width := 32, previous: FloorPlan = null) 
 
 
 ## The entry band is three cells deep: the top wall's drawing clearance, the
-## fixture row and the walking lane. A floor with one row of tables is 18 cells
-## deep, a lobby or an empty workspace still 12; the threshold stays where the
+## fixture row and the walking lane. A floor with one row of pods is 15 cells
+## deep (it was 18 with the long tables' 13-cell rows), a lobby or an empty
+## workspace still 12; the threshold stays where the
 ## first walkable centre under the door is, and the first row wall starts under
 ## the band.
 func test_the_entry_band_is_three_cells_deep() -> void:
@@ -43,7 +44,7 @@ func test_the_entry_band_is_three_cells_deep() -> void:
 	_eq(rules.entry_cells, 3, "the policy's entry band")
 	var plan := _serviced(_floor([_room("a", 2)]), 20)
 	_eq(plan.entry_cells, Rect2i(1, 2, 18, 3), "under the top wall, between the side walls")
-	_eq(plan.floor_cells.size.y, 18, "one row of tables: 2 + 3 + 13 cells")
+	_eq(plan.floor_cells.size.y, 15, "one row of pods: 2 + 3 + 10 cells")
 	_eq(plan.rows[0].wall_cells.position.y, 5, "the first row wall starts under the band")
 	_eq(_plan(_floor([])).floor_cells.size.y, 12, "an empty workspace stays 12 deep")
 	var graph := _graph_of(plan, rules)
@@ -95,7 +96,8 @@ func test_fixtures_stand_where_the_plan_puts_them() -> void:
 	var last := pantry.spots[pantry.spots.size() - 1].x + OfficeShell.SPOT_PITCH / 2.0
 	_check(tail - last >= OfficeShell.FIXTURE_GAP, "the queue and the pantry stand apart: %s" % (tail - last))
 	_eq(_serviced(model, 20).geometry_signature(), plan.geometry_signature(), "the same plan twice")
-	model.rooms.append(_room("c", 6, 2))
+	# Twenty panes: a ten-desk pod, 11 cells, more than the 10 the row has left.
+	model.rooms.append(_room("c", 20, 2))
 	var grown := _serviced(model, 20, plan)
 	_check(grown.rows.size() > plan.rows.size(), "a new row")
 	for fixture in plan.fixtures():

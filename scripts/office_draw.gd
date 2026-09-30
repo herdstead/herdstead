@@ -12,6 +12,11 @@ var art: ArtPack
 ## The bundled face keeps Latin text consistent across platforms. System CJK
 ## fonts fill missing glyphs without replacing the pack's Latin typography.
 var font: Font
+## The pack's display face (ArtPack.display_font, a pixel font drawn at its
+## native 8) for the small world labels: the name plates, the chip's wait and
+## the lens line. The same system fallbacks fill glyphs it lacks (an agent's
+## name may be anything). A pack without one uses `font`.
+var display: Font
 
 
 func _init(pack: ArtPack) -> void:
@@ -34,6 +39,12 @@ func _init(pack: ArtPack) -> void:
 	readable.variation_opentype = {text_server.name_to_tag("wght"): 500.0, text_server.name_to_tag("opsz"): 10.0}
 	readable.fallbacks = [system]
 	font = readable
+	display = readable
+	if art.display_font != null:
+		var small := FontVariation.new()
+		small.base_font = art.display_font
+		small.fallbacks = [system]
+		display = small
 
 
 func box(parent: Node, bounds: Rect2, color_key: StringName) -> ColorRect:
@@ -59,6 +70,17 @@ func style(
 	target.add_theme_font_size_override("font_size", pixels)
 	target.add_theme_color_override("font_color", art.color(color_key))
 	target.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+## The same, in the display face (`display`): the world's small labels.
+func style_display(
+	target: Label,
+	pixels: int = 8,
+	color_key: StringName = ArtContract.INK,
+	align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT
+) -> void:
+	style(target, pixels, color_key, align)
+	target.add_theme_font_override("font", display)
 
 
 func label(
@@ -151,17 +173,8 @@ func layer(parent: Node, at: Vector2) -> TileMapLayer:
 	return result
 
 
-func rug(parent: Node, at: Vector2, columns: int, rows: int) -> void:
-	var tiles := layer(parent, at)
-	for y in rows:
-		for x in columns:
-			var row := ArtContract.RUG_ROWS[0 if y == 0 else 2 if y == rows - 1 else 1]
-			var column := ArtContract.RUG_COLUMNS[0 if x == 0 else 2 if x == columns - 1 else 1]
-			tiles.set_cell(Vector2i(x, y), 0, art.cell(ArtContract.rug_cell(row, column)))
-
-
-## A shared table in `sorted` (a floor's y-sorted root) with the left end of
-## its near edge at `near_left`, seat columns at `columns` along that edge, and
+## A pod of desks (OfficeTable) in `sorted` (a floor's y-sorted root) with the
+## left end of its near edge at `near_left`, seat columns at `columns` along that edge, and
 ## its seats' contact shadows in `ground`. Null when the width is refused.
 ## `id` names the table node, and its stations after it.
 func table(sorted: Node2D, ground: Node2D, id: String, near_left: Vector2, width: float, columns: Array) -> OfficeTable:
@@ -170,7 +183,6 @@ func table(sorted: Node2D, ground: Node2D, id: String, near_left: Vector2, width
 		result.free()
 		return null
 	result.name = id
-	result.decorate(id)
 	result.position = near_left
 	sorted.add_child(result)
 	result.contact_shadows(ground)

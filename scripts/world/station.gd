@@ -1,35 +1,41 @@
 class_name OfficeStation
 extends Node2D
-## One seat at a shared table: scenes/world/station.tscn.
+## One seat at a pod of desks: scenes/world/station.tscn.
 ##
 ## The origin is the seat. The station is y-sorted and merges into the floor's
 ## sort group, so its chair and worker sort against everything else by their
 ## own feet: the far chair just behind its worker, the near chair just in
 ## front. The Overlay floats above the world (OVERLAY_Z) and holds the name
-## plate, the selection mark, herdr's state badge and, while the agent is
-## blocked, the bubble over the head (OfficeBubble). A done agent's stack of
-## paper is on the table, which is the table's (OfficeTable.show_papers()).
+## plate, the lens line, the selection mark, herdr's state badge and, while the
+## agent is blocked, the chip on the badge's row (OfficeBubble). A done agent's
+## stack of paper is on the desk, which is the pod's (OfficeTable.show_papers()).
+##
+## Rows, 30 units wide and centred on the column, stacked away from the pod:
+## the tag row (the badge, or the chip), the lens row (only while `L` is held)
+## and the plate row (the provider, only while the seat is hovered, selected or
+## `L` is held). Far workers face the viewer, so theirs rise above the head;
+## near workers show their back, so theirs hang below the chair.
 ##
 ## A seat with no pane is vacant: a chair and nothing else. A pane with no
-## agent is a SHELL: a plate but nobody sitting there. furnish() and select()
-## change the station in place; a new state for the same worker only changes
-## what that worker plays, so their animation carries on.
+## agent is a SHELL: a laptop with a prompt and nobody in the chair. furnish()
+## and select() change the station in place; a new state for the same worker
+## only changes what that worker plays, so their animation carries on.
 ##
 ## On a floor, its people walk (OfficePresentation): a worker coming in, going
 ## to the pantry or back, or changing seats is still this seat's Actor, but while
 ## `walking` the seat leaves their place and pose to the presentation and only
 ## remembers what to seat them with; land() hands them back. The plate, the
-## badge, the bubble, the paper and the click target never wait for the walk:
+## badge, the chip, the paper and the click target never wait for the walk:
 ## they are the signal.
 ##
 ## The seat answers a click itself: `Target` is an Area2D on OfficeWorld.PICKABLE
-## holding both sides' rectangles, the bubble's and the pantry's, and the
+## holding both sides' rectangles, the chip's and the pantry's, and the
 ## viewport picks it. A click on the seat's rectangle picks the pane (`picked`),
-## one on the bubble asks to answer it (`asked`). A vacant seat is not pickable
-## at all.
+## one on the chip asks to answer it (`asked`). A vacant seat is not pickable
+## at all. The pointer over the seat's or the chip's rectangle shows the plate.
 ##
 ## A worker rests where their state says (OfficeRests, set by the presentation
-## with rest_at()): at the seat — blocked with a hand up and the bubble, done
+## with rest_at()): at the seat — blocked with a hand up and the chip, done
 ## with the paper beside the laptop — or, idle, away from it in the floor's
 ## pantry. What hangs over them hangs where they rest. While they are away the
 ## seat itself still answers a click for the same pane (its empty chair and
@@ -49,76 +55,71 @@ signal asked(key: String, at: Vector2)
 signal bubble_hovered(key: String, inside: bool)
 
 const PERSON_SCENE := preload("res://scenes/people/pixel_person.tscn")
-## Plate and badge, relative to the seat. Far workers face the viewer, so their
-## labels float above the head; near workers show their back, so theirs sit
-## below the chair, clear of the table.
+## The rows over a seat, relative to it (the far seat is at pod y -36, the near
+## one at 22), measured on the pixel people: seated, the head reaches y -31
+## over the seat and a blocked worker's raised hand -36 (pod -72 on the far
+## side); the near chair is opaque down to seat + 6 (pod 28). Every row is
+## 30 wide, so two neighbours' rows (32 apart) keep 2 units between them.
 ##
-## The lens line (OfficeLens, while `L` is held): how long this agent has been
-## in its state, one line of it. Far: left of the badge, level with its top
-## rows and right over the plate (x -30..18, y -63..-51; the badge is drawn at
-## x 18..34), where the bubble would be and is not drawn meanwhile; table-local
-## it starts at -131, inside the -150 the decor is planned around. Near: under
-## the plate, as wide (y 34..46, table-local 56..68, inside the 72). Over a
-## worker resting away: above their badge (y -75..-63 over the feet; the badge
-## is drawn at -63..-47).
-const LENS_AT := {"far": Vector2(-30, -63), "near": Vector2(-38, 34)}
-const LENS_SIZE := {"far": Vector2(48, 12), "near": Vector2(76, 12)}
-const AWAY_LENS_AT := Vector2(-24, -75)
-const AWAY_LENS_SIZE := Vector2(48, 12)
-## Measured on the pixel people (every frame of the track, both layers, x and y
-## from the feet): seated, the head reaches y = -31 and a blocked worker's
-## raised hand -36 (the bent arm); standing
-## (in the pantry), the head spans y -37..-25; every figure is x -8..8 (12
-## with a raised hand). The plate's
-## text is 11 units from its top to the baseline at this font. A far plate's
-## baseline sits 9 above the seated head: 4 above a raised hand, which it never
-## touches. The far badge rests on the plate's row; near labels hang off the
-## chair, not the head.
-const PLATE_SIZE := Vector2(76, 12)
-const PLATE_AT := {"far": Vector2(-38, -51), "near": Vector2(-38, 22)}
-const BADGE_AT := {"far": Vector2(26, -51), "near": Vector2(30, 20)}
-## The mark has not moved: its top corners ran level with the far plate's
-## text, which now sits 2 lower; its foot is 17 below the seat.
-const SELECTION_AT := Vector2(0, 13)
-## The click target of each side, as scenes/world/station.tscn places it: a far
-## worker's labels float above the head, a near worker's sit below the chair.
-## The far one reaches up to -70, over the badge (drawn at x 18..34, y -67..-51:
-## its pivot is its foot), except while the bubble shows: then it stops at
-## -53, 2 over the plate's top row, FAR_UNDER_BUBBLE, and the bubble's own rectangle,
-## which the badge's area lies in, answers above it. Never both under a point.
-const TARGET_OF := {"far": ^"Target/Far", "near": ^"Target/Near"}
-const FAR_AT := Vector2(0, -31)
-const FAR_UNDER_BUBBLE_AT := Vector2(0, -22.5)
-const FAR_UNDER_BUBBLE_SIZE := Vector2(56, 61)
-## The bubble over a blocked worker (OfficeBubble), by its top-left corner
-## relative to the seat. 60 wide because the columns are 64 apart
-## (OfficeTable.measure()), so two neighbours' bubbles never meet; 28 tall
-## because everything a station draws stays inside the table's render_rect
-## (table-local y -150..72), which the floor's decor is planned around. The far
-## one therefore spans table-local -150..-122, right under that top edge, and
-## the far seat's rectangle starts below it while it shows; the near one spans
-## -58..-30, 2 clear of the near rectangle's top (-28) and of the far one's foot
-## (-60), over the divider and the near laptop, above the near worker's head.
-## The far badge lies over the far bubble's right end (bubble x 48..64, y
-## 13..28): the badge is drawn above it (Overlay order) and the bubble keeps
-## nothing there (OfficeBubble's layout).
+## The tag row is 16 tall: the badge (opaque 15 wide, 16 tall over its foot)
+## stands on BADGE_AT, centred, at pod [-88, -72) far and [30, 46) near. Its
+## pulse (OfficeAttention.PULSES) lifts it up to 2: [-90, -72) touches the
+## raised hand and [28, 46) the chair, overlapping neither.
+const BADGE_AT := {"far": Vector2(0, -36), "near": Vector2(0, 24)}
+## The chip (OfficeBubble, 30 by 16) is on the tag row, by its top-left corner;
+## while its frame is drawn the badge moves CHIP_BADGE_SHIFT left, into the
+## chip's left half and one unit over its left edge (x [-16, -1)), so the wait
+## has daylight on both sides (OfficeBubble.WAIT_RECT); the left neighbour's
+## rows still end a unit short of it.
 const BUBBLE_SIZE := OfficeBubble.SIZE
-const BUBBLE_AT := {"far": Vector2(-30, -82), "near": Vector2(-30, -80)}
-## The bubble's click rectangle (scenes/world/station.tscn), 60 by 28: _place()
-## lays it over the bubble.
+const BUBBLE_AT := {"far": Vector2(-15, -52), "near": Vector2(-15, 8)}
+const CHIP_BADGE_SHIFT := Vector2(-8.5, 0)
+## The lens row (OfficeLens, while `L` is held), 30 by 12, next out from the
+## tag row: pod [-102, -90) far and [46, 58) near. It holds the compact wait
+## (OfficeAttention.compact_duration(): 18 wide at most).
+const LENS_AT := {"far": Vector2(-15, -66), "near": Vector2(-15, 24)}
+const LENS_SIZE := Vector2(30, 12)
+## The plate row, 30 by 12, outermost: pod [-114, -102) far and [58, 70) near.
+## The provider in upper case, in the display face at 8, cut with a forced
+## ellipsis when it is wider (the card and the list say the whole name).
+const PLATE_SIZE := Vector2(30, 12)
+const PLATE_AT := {"far": Vector2(-15, -78), "near": Vector2(-15, 36)}
+## The seat mark (ui `selection_seat`, 32 by 48 over its foot) frames the seated
+## figure: pod [-72, -24) far, [-20, 28) near.
+const SELECTION_AT := {"far": Vector2(0, 10), "near": Vector2(0, 4)}
+## The lens row and the plate row are transient: they show only while `L` is
+## held or the seat is hovered or selected, and are exempt from the pod's
+## render_rect (the stationary drawing).
+##
+## The click target of each side, as scenes/world/station.tscn places it, 30
+## wide: far pod [-90, -32) (the tag row's pulse envelope down to the desk's far
+## plane), near pod [-21, 46) (the near laptop down to the tag row). While the
+## chip shows, the seat's rectangle gives the tag row to the chip's
+## (CHIP_TARGET): far [-72, -32), near [-21, 28). Never both under a point.
+const TARGET_OF := {"far": ^"Target/Far", "near": ^"Target/Near"}
+const SEAT_TARGET_AT := {"far": Vector2(0, -25), "near": Vector2(0, -9.5)}
+const UNDER_CHIP_AT := {"far": Vector2(0, -16), "near": Vector2(0, -18.5)}
+const UNDER_CHIP_SIZE := {"far": Vector2(30, 40), "near": Vector2(30, 49)}
+## The chip's click rectangle (scenes/world/station.tscn), 30 by 18: the tag
+## row with the badge's pulse envelope, far pod [-90, -72), near [28, 46).
+## _place() lays it over the chip, CHIP_TARGET_AT from the chip's corner.
 const BUBBLE_TARGET := ^"Target/Bubble"
+const CHIP_TARGET_AT := Vector2(15, 7)
 ## Over a worker resting away (the pantry), relative to where they stand: the
 ## badge right over the head; no plate: who is who is their coat, and a click on
-## them opens their card (the Away rectangle, scenes/world/station.tscn, 38 wide).
+## them opens their card (the Away rectangle, scenes/world/station.tscn, 38
+## wide). The seat mark frames the standing figure (head -37), the lens row
+## hangs above the badge.
 const AWAY_BADGE_AT := Vector2(0, -47)
-const AWAY_SELECTION_AT := Vector2(0, 17)
+const AWAY_SELECTION_AT := Vector2(0, 4)
+const AWAY_LENS_AT := Vector2(-15, -75)
 const AWAY_TARGET := ^"Target/Away"
 ## The Away rectangle's centre over the feet: its foot 2 below them.
 const AWAY_TARGET_AT := Vector2(0, -26)
 
-## The far rectangle while the bubble shows (FAR_UNDER_BUBBLE_SIZE), made once
-## and shared: a shape resource of the scene is shared by every station.
-static var _far_under_bubble: RectangleShape2D
+## Each side's rectangle while the chip shows (UNDER_CHIP_SIZE), made once and
+## shared: a shape resource of the scene is shared by every station.
+static var _under_chip: Dictionary[String, RectangleShape2D] = {}
 
 var art: ArtPack
 var pen: OfficeDraw
@@ -147,8 +148,15 @@ var chair_view := &""
 ## remembers what to seat them with; the plate, the badge and the click target
 ## still follow every observation at once.
 var walking := false
-## The far rectangle as the scene has it, kept when the bubble swaps it out.
-var _far_shape: Shape2D
+## Each side's rectangle as the scene has it, kept when the chip swaps it out.
+var _seat_shapes: Dictionary[String, Shape2D] = {}
+## Which of this seat's rectangles the pointer is over now (the seat's own or
+## the chip's), by shape node: the plate shows while any is.
+var _hovered: Dictionary[Node, bool] = {}
+## The seat is selected (select()), and the lens is held (show_lens()): the
+## plate shows while either is.
+var _selected := false
+var _lens_held := false
 ## The semantic animation the last furnish() asked the worker to play.
 var _animation := &""
 
@@ -164,10 +172,12 @@ func setup(drawing: OfficeDraw, at_table: OfficeTable, at_column: int, seat_side
 	pen = drawing
 	art = drawing.art
 	var plate: Label = $Overlay/Plate
-	pen.style(plate, 10, ArtContract.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	pen.style_display(plate, 8, ArtContract.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	# The box again once the face is on: a Label is 23 tall before it.
 	plate.size = PLATE_SIZE
 	var lens: Label = $Overlay/Lens
-	pen.style(lens, 10, ArtContract.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	pen.style_display(lens, 8, ArtContract.INK, HORIZONTAL_ALIGNMENT_CENTER)
+	lens.size = LENS_SIZE
 	var mark := art.selection_mark()
 	var selection: Sprite2D = $Overlay/Selection
 	art.dress(selection, art.sprite_texture(mark), mark.pivot)
@@ -277,7 +287,7 @@ func furnish(
 	var plate: Label = $Overlay/Plate
 	var named := starting and provider.is_empty() and not agent_name.is_empty()
 	plate.text = agent_name.to_upper() if named else "SHELL" if provider.is_empty() else provider.to_upper()
-	plate.visible = true
+	_show_plate()
 	var badge: StatusBadge = $Overlay/Badge
 	badge.stop_pulsing()
 	if starting or not provider.is_empty():
@@ -303,8 +313,8 @@ func vacate() -> void:
 	bubble().clear()
 	_drop_actor()
 	var plate: Label = $Overlay/Plate
-	plate.visible = false
 	plate.text = ""
+	_hovered.clear()
 	var lens: Label = $Overlay/Lens
 	lens.visible = false
 	var badge: StatusBadge = $Overlay/Badge
@@ -318,20 +328,37 @@ func vacate() -> void:
 
 ## The lens (OfficeLens) is `held`, or not: the lens line says `text` while
 ## it is, on a seat somebody's pane has and when there is anything to say (a
-## shell, a dropped machine: nothing), and the bubble draws none of itself
-## meanwhile (OfficeBubble.set_lensed()). Nothing is rebuilt: the text only
-## when it changes, the line's visibility, the bubble's parts.
+## shell, a dropped machine: nothing), the plate shows, and the chip draws none
+## of itself meanwhile (OfficeBubble.set_lensed()). Nothing is rebuilt: the
+## text only when it changes, the line's and the plate's visibility, the chip's parts.
 func show_lens(held: bool, text: String) -> void:
 	var line: Label = $Overlay/Lens
 	if held and line.text != text:
 		line.text = text
 	line.visible = held and not vacant and not text.is_empty()
+	_lens_held = held
 	bubble().set_lensed(held)
+	_show_plate()
 
 
 func select(selected: bool) -> void:
 	var mark: Sprite2D = $Overlay/Selection
 	mark.visible = selected and not vacant
+	_selected = selected
+	_show_plate()
+
+
+## Whether the plate shows now: a seat somebody's pane has, worked at here
+## (not away), and hovered, selected or under the held lens.
+func plate_shown() -> bool:
+	return not vacant and not away() and (not _hovered.is_empty() or _selected or _lens_held)
+
+
+func _show_plate() -> void:
+	var plate: Label = $Overlay/Plate
+	var shown := plate_shown()
+	if plate.visible != shown:
+		plate.visible = shown
 
 
 ## Burn this seat's task lamp at `level`. Separate from furnish() because which
@@ -390,13 +417,14 @@ func away() -> bool:
 	return rest == OfficeRests.Rest.PANTRY
 
 
-## The bubble over this seat (OfficeBubble), shown only while its agent is blocked.
+## The chip on this seat's tag row (OfficeBubble), shown only while its agent is blocked.
 func bubble() -> OfficeBubble:
 	return $Overlay/Bubble
 
 
-## Where the bubble is drawn, in global coordinates; an empty rectangle while
-## it is hidden. What reveal() and the question reader look at.
+## Where the chip is drawn, in global coordinates (its 30 by 16 frame, drawn
+## or not); an empty rectangle while it is hidden. What reveal() and the
+## question reader look at.
 func bubble_rect() -> Rect2:
 	var shown := bubble()
 	if not shown.visible:
@@ -459,26 +487,37 @@ func _on_target_input_event(_viewport: Node, event: InputEvent, shape_index: int
 		picked.emit(pane_key, click.position)
 
 
-## The pointer entered or left one of this seat's rectangles: only the
-## bubble's is anybody's business.
+## The pointer entered or left one of this seat's rectangles: the seat's own
+## and the chip's show the plate while it is over them; the chip's is also the
+## office's business (the question's tooltip).
 func _on_target_mouse_shape_entered(shape_index: int) -> void:
-	if _is_bubble_shape(shape_index):
+	var shape := _shape_at(shape_index)
+	if shape == _target_of(side) or shape == get_node(BUBBLE_TARGET):
+		_hovered[shape] = true
+		_show_plate()
+	if shape == get_node(BUBBLE_TARGET):
 		bubble_hovered.emit(pane_key, true)
 
 
 func _on_target_mouse_shape_exited(shape_index: int) -> void:
-	if _is_bubble_shape(shape_index):
+	var shape := _shape_at(shape_index)
+	if _hovered.erase(shape):
+		_show_plate()
+	if shape == get_node(BUBBLE_TARGET):
 		bubble_hovered.emit(pane_key, false)
 
 
-func _is_bubble_shape(shape_index: int) -> bool:
+func _shape_at(shape_index: int) -> Node:
 	var target: Area2D = $Target
-	return target.shape_owner_get_owner(target.shape_find_owner(shape_index)) == get_node(BUBBLE_TARGET)
+	return target.shape_owner_get_owner(target.shape_find_owner(shape_index))
 
 
 func _pickable(can_pick: bool) -> void:
 	var target: Area2D = $Target
 	target.input_pickable = can_pick
+	if not can_pick:
+		_hovered.clear()
+		_show_plate()
 
 
 func _target_of(of_side: String) -> CollisionShape2D:
@@ -527,48 +566,74 @@ func _play(worker: PixelPerson) -> void:
 ## Hang the labels and the click targets where whoever is here rests: seated,
 ## or away (see rest_at()). Only moves the nodes that are already there and
 ## switches which rectangles answer a click: this side's seat rectangle always
-## (the other side's never), the bubble's while it shows, and while away the
+## (the other side's never), the chip's while it shows, and while away the
 ## Away one too.
 func _place() -> void:
 	var away_here := away()
 	var at := rest_position()
 	var plate: Label = $Overlay/Plate
 	plate.position = at + PLATE_AT[side]
-	plate.visible = not vacant and not away_here
-	var badge: StatusBadge = $Overlay/Badge
+	# Out of the tree the face is not on yet and a Label keeps the default
+	# font's 23-unit height; in it, the row is its own height again.
+	plate.size = PLATE_SIZE
 	var selection: Sprite2D = $Overlay/Selection
 	var lens: Label = $Overlay/Lens
+	lens.size = LENS_SIZE
 	if away_here:
-		badge.position = at + AWAY_BADGE_AT
 		selection.position = at + AWAY_SELECTION_AT
 		lens.position = at + AWAY_LENS_AT
-		lens.size = AWAY_LENS_SIZE
 	else:
-		badge.position = at + BADGE_AT[side]
-		selection.position = at + SELECTION_AT
+		selection.position = at + SELECTION_AT[side]
 		lens.position = at + LENS_AT[side]
-		lens.size = LENS_SIZE[side]
 	var shown := bubble()
 	var bubble_at: Vector2 = BUBBLE_AT[side]
 	shown.position = bubble_at
 	var bubble_target: CollisionShape2D = get_node(BUBBLE_TARGET)
-	bubble_target.position = bubble_at + BUBBLE_SIZE / 2.0
+	bubble_target.position = bubble_at + CHIP_TARGET_AT
 	bubble_target.disabled = vacant or not shown.visible
+	var under := not bubble_target.disabled
 	for each: String in OfficeTable.SIDES:
-		_target_of(each).disabled = each != side
-	# The far rectangle gives the bubble the badge's rows while the bubble shows.
-	var far: CollisionShape2D = _target_of("far")
-	if _far_shape == null:
-		_far_shape = far.shape
-	var under := side == "far" and not bubble_target.disabled
-	if under and _far_under_bubble == null:
-		_far_under_bubble = RectangleShape2D.new()
-		_far_under_bubble.size = FAR_UNDER_BUBBLE_SIZE
-	far.shape = _far_under_bubble if under else _far_shape
-	far.position = FAR_UNDER_BUBBLE_AT if under else FAR_AT
+		var box := _target_of(each)
+		box.disabled = each != side
+		if not _seat_shapes.has(each):
+			_seat_shapes[each] = box.shape
+		if not _under_chip.has(each):
+			var made := RectangleShape2D.new()
+			made.size = UNDER_CHIP_SIZE[each]
+			_under_chip[each] = made
+		# This side's rectangle gives the tag row to the chip while it shows.
+		var swapped := under and each == side
+		box.shape = _under_chip[each] if swapped else _seat_shapes[each]
+		box.position = UNDER_CHIP_AT[each] if swapped else SEAT_TARGET_AT[each]
 	var away_target: CollisionShape2D = get_node(AWAY_TARGET)
 	away_target.disabled = not away_here
 	away_target.position = at + AWAY_TARGET_AT
+	# A rectangle that stopped answering is not hovered any more.
+	for shape: Node in _hovered.keys():
+		var box := shape as CollisionShape2D
+		if box == null or box.disabled:
+			_hovered.erase(shape)
+	_place_badge()
+	_show_plate()
+
+
+## The badge on the tag row: centred, or in the chip's left half while the
+## chip's frame is drawn; over the head of a worker resting away.
+func _place_badge() -> void:
+	var badge: StatusBadge = $Overlay/Badge
+	if away():
+		badge.position = rest_position() + AWAY_BADGE_AT
+		return
+	var at: Vector2 = BADGE_AT[side]
+	var shown := bubble()
+	if shown.visible and shown.framed():
+		at += CHIP_BADGE_SHIFT
+	badge.position = at
+
+
+## The chip's frame came or went (OfficeBubble.framed_changed): move the badge.
+func _on_bubble_framed(_framed: bool) -> void:
+	_place_badge()
 
 
 func _drop_actor() -> void:

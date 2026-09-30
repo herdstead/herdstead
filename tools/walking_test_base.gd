@@ -14,6 +14,10 @@ const BEE := "socket:bee"
 ## wide (OfficeHud.plan_width()). The walks, pantries and rows the
 ## cases here measure stand on that geometry.
 const PLAN_SCREEN := Vector2(628, 480)
+## How many agents api:t1 takes on in _stacked(): enough that its pod (nine
+## cells) and api:t2's no longer share a row of the suites' 15-cell floor, so
+## api:t2 is laid out on the row below, as the long tables always were.
+const STACKED := 10
 
 
 func _initialize() -> void:
@@ -204,6 +208,12 @@ func _grown(snapshot: Dictionary, count: int) -> Dictionary:
 		extra.terminal_id = "term-grow-%d" % index
 		_list(result, "panes").append(extra)
 	return result
+
+
+## `snapshot` with api:t1 STACKED agents larger (_grown()): api:t1 alone on the
+## first row, api:t2 on the second.
+func _stacked(snapshot: Dictionary) -> Dictionary:
+	return _grown(snapshot, STACKED)
 
 
 ## An office of the shared fixture in the suites' window (PLAN_SCREEN).

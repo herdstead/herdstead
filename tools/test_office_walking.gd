@@ -455,14 +455,15 @@ func test_a_table_that_moves_under_a_route_reroutes_its_walker() -> void:
 ## and the row walls run on over where it was. Whoever is inside a wall now is
 ## put where they belong at once; nobody walks through it.
 func test_a_walker_the_floor_grows_over_is_put_where_they_belong() -> void:
-	var office := await _live_office()
+	# api:t1 alone on the first row, api:t2 on the second (_stacked()).
+	var office := await _live_office(_stacked(fixture))
 	var grown: Dictionary = fixture.duplicate(true)
 	var source: Dictionary = _list(grown, "panes")[3]
 	var extra := source.duplicate(true)
 	extra.pane_id = "api:p5"
 	extra.terminal_id = "term-api-p5"
 	_list(grown, "panes").append(extra)
-	_feed(office, grown)
+	_feed(office, _stacked(grown))
 	var body := _station(office, _pane("api:p5")).actor()
 	var wall := office.layout_plan().rows[1].wall_cells
 	var band := Rect2(Vector2(wall.position) * 32.0, Vector2(wall.size) * 32.0)
@@ -476,7 +477,9 @@ func test_a_walker_the_floor_grows_over_is_put_where_they_belong() -> void:
 	_check(reached, "they walk down the main corridor past row 1's wall")
 	var here := _floor_point(office, body)
 	var width := office.layout_plan().floor_cells.size.x
-	_feed(office, _grown(grown, 9))
+	# Twelve agents more than _stacked(): a pod of fourteen desks, 15 cells, over
+	# the row's 11.
+	_feed(office, _grown(grown, STACKED + 12))
 	_check(office.layout_plan().floor_cells.size.x > width, "api:t1 grew too wide for its row and widened the floor")
 	var moved := Rect2(
 		Vector2(office.layout_plan().rows[1].wall_cells.position) * 32.0,
@@ -682,19 +685,35 @@ func test_a_near_seat_is_entered_and_left_beside_the_chair() -> void:
 
 
 ## A walker a table moves over is placed, never walked through it. Growing
-## api:t1 nine agents at once widens the floor and moves the table over the
+## api:t1 twelve agents at once widens the floor and moves the table over the
 ## corridor a newcomer was walking down; the newcomer's pane closes in the same
 ## snapshot, and their ghost, standing inside the table now, is gone at once.
 ## Every walk that is left keeps to the rules (_check_routes()).
 func test_a_walker_a_table_moves_over_is_placed_not_walked_through() -> void:
-	var office := await _live_office()
-	_feed(office, _grown(fixture, 1))
-	var newcomer := _station(office, _pane("api:grow-0")).actor()
-	_step(office, 1.0 / FPS, 70)
+	# api:t1 alone on the first row (_stacked()), so growing too wide for it
+	# widens the floor in place, over the main corridor.
+	var office := await _live_office(_stacked(fixture))
+	var t1 := JSON.stringify([LOCAL, "api", "api:t1"])
+	var origin := office.layout_plan().desk(t1).origin
+	var newcomer_id := "api:grow-%d" % STACKED
+	_feed(office, _grown(fixture, STACKED + 1))
+	var newcomer := _station(office, _pane(newcomer_id)).actor()
+	# Down the corridor into the rows of the desk it will stand over (the
+	# growth keeps api:t1's origin), right of where it ends now: past the middle
+	# of its depth, so the walk graph's nearest cell centre is on the desk too
+	# (the far edge itself is a walkable row of centres).
+	var desk_rows := Vector2(origin.y - OfficeTable.SURFACE_DEPTH / 2.0, origin.y - 2)
+	var desk_end := origin.x + office.layout_plan().desk(t1).measure.table_width
 	var here := _floor_point(office, newcomer)
+	for frame in 400:
+		if here.x > desk_end and here.y > desk_rows.x and here.y < desk_rows.y:
+			break
+		_step(office, 1.0 / FPS)
+		here = _floor_point(office, newcomer)
 	_check(_walkers(office).has(newcomer), "the newcomer is walking down the corridor at %s" % here)
-	_feed(office, _without(_grown(fixture, 9), "api:grow-0"))
-	var table := office.layout_plan().desk(JSON.stringify([LOCAL, "api", "api:t1"]))
+	# Twelve agents more than _stacked(), less the newcomer's pane.
+	_feed(office, _without(_grown(fixture, STACKED + 12), newcomer_id))
+	var table := office.layout_plan().desk(t1)
 	var footprint := table.measure.physical_rect
 	footprint.position += table.origin
 	_check(footprint.has_point(here), "api:t1 stands where the newcomer was: %s in %s" % [here, footprint])
@@ -710,8 +729,9 @@ func test_a_walker_a_table_moves_over_is_placed_not_walked_through() -> void:
 ## was) goes on along the very route they were on, from where they are, and
 ## nobody's route is searched for on the new floor.
 func test_a_plan_change_keeps_the_walks_it_does_not_touch() -> void:
-	var office := await _live_office(_with(fixture, "api:p4", {"agent": null}))
-	_feed(office, fixture)
+	# api:t1 alone on the first row (_stacked()), so it can grow where it is.
+	var office := await _live_office(_with(_stacked(fixture), "api:p4", {"agent": null}))
+	_feed(office, _stacked(fixture))
 	var body := _station(office, _pane("api:p4")).actor()
 	_step(office, 1.0 / FPS, 20)
 	var here := _floor_point(office, body)
@@ -719,7 +739,8 @@ func test_a_plan_change_keeps_the_walks_it_does_not_touch() -> void:
 	var segment := _segment_of(here, before)
 	var width := office.layout_plan().floor_cells.size.x
 	var capacity := office.layout_plan().desk(JSON.stringify([LOCAL, "api", "api:t1"])).capacity
-	_feed(office, _grown(fixture, 2))
+	# Four agents more: from eight desks to ten, which its row still holds.
+	_feed(office, _grown(fixture, STACKED + 4))
 	_eq(office.layout_plan().floor_cells.size.x, width, "api:t1 grew where it was: the floor is as wide as before")
 	_check(
 		office.layout_plan().desk(JSON.stringify([LOCAL, "api", "api:t1"])).capacity > capacity, "api:t1 really grew"
@@ -787,7 +808,8 @@ func test_routing_stops_at_its_budget_and_places_the_rest() -> void:
 		var walking := view.presentation.walkers().size()
 		_check(walking > 40, "budget %d: %d walk in" % [budget, walking])
 		view.presentation.routing_budget = budget
-		var grown := MapModel.of(_stress_model(true, 12))
+		# 28 more on tab 0: a pod of 18 desks, 19 cells, over a 20-cell floor's 16.
+		var grown := MapModel.of(_stress_model(true, 28))
 		var next := plans.prepare(grown, pen, 20 * 32.0)
 		_check(next.floor_cells.size.x > 20, "budget %d: tab 0 grew too wide and widened the floor" % budget)
 		var graph := OfficeWalkGraph.of(next, PixelPerson.footprint(), PixelPerson.drawing_rect(art.people))
@@ -868,13 +890,14 @@ func test_a_reconnect_with_a_layout_problem_keeps_walkers_frozen() -> void:
 ## another agent, is seated at the family's own pace, like any seated worker
 ## and like a rebuild.
 func test_a_stale_provider_swap_leaves_no_walk_pace() -> void:
-	var office := await _live_office(_with(fixture, "api:p4", {"agent": null}))
-	_feed(office, fixture)
+	# api:t2 on the second row (_stacked()): a walk long enough to be paced up.
+	var office := await _live_office(_with(_stacked(fixture), "api:p4", {"agent": null}))
+	_feed(office, _stacked(fixture))
 	var body := _station(office, _pane("api:p4")).actor()
 	_check(body.paced() > 1.0, "api:p4 walks in faster than the walk's own pace: %s" % body.paced())
 	_step(office, 1.0 / FPS, 10)
 	_set_online(office, false)
-	_feed(office, _with(fixture, "api:p4", {"agent": "codex"}), false)
+	_feed(office, _with(_stacked(fixture), "api:p4", {"agent": "codex"}), false)
 	var worker := _station(office, _pane("api:p4")).actor()
 	_eq(worker.paced(), 1.0, "the seated worker plays at the family's own pace")
 	await _same_as_rebuild(office, "after another agent took the pane while stale")
@@ -978,14 +1001,15 @@ func test_clicks_pick_nobody_leaving_and_anybody_arriving() -> void:
 ## front of the table behind them and behind the one in front, through nothing
 ## that is not y-sorted.
 func test_a_walker_between_two_tables_sorts_by_their_feet() -> void:
-	var office := await _live_office()
+	# api:t1 on the first row, api:t2 behind it on the second (_stacked()).
+	var office := await _live_office(_stacked(fixture))
 	var grown: Dictionary = fixture.duplicate(true)
 	var source: Dictionary = _list(grown, "panes")[3]
 	var extra := source.duplicate(true)
 	extra.pane_id = "api:p5"
 	extra.terminal_id = "term-api-p5"
 	_list(grown, "panes").append(extra)
-	_feed(office, grown)
+	_feed(office, _stacked(grown))
 	var body := _station(office, _pane("api:p5")).actor()
 	var tables: Array[OfficeTable] = office.floor_view.tables.duplicate()
 	tables.sort_custom(func(a: OfficeTable, b: OfficeTable) -> bool: return a.global_position.y < b.global_position.y)

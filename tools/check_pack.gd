@@ -50,9 +50,11 @@ func _initialize() -> void:
 func _check_office_loaders(art: ArtPack, missing: Array[String]) -> void:
 	var pen := OfficeDraw.new(art)
 	var ground := Node2D.new()
-	var table := pen.table(ground, ground, "Table0", Vector2.ZERO, 160.0, [80.0])
+	# The smallest pod the office builds, measured the way the office measures it.
+	var measured := OfficeTable.measure(2)
+	var table := pen.table(ground, ground, "Table0", Vector2.ZERO, measured.table_width, measured.columns)
 	if table == null:
-		missing.append("OfficeTable refused a 160-wide table")
+		missing.append("OfficeTable refused the minimum pod, %s wide" % measured.table_width)
 		ground.free()
 		return
 	for side: String in OfficeTable.SIDES:

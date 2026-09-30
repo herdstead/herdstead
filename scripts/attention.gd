@@ -67,10 +67,32 @@ static func format_duration(seconds: float) -> String:
 	return "%dh %02dm" % [floori(minutes / 60.0), minutes % 60]
 
 
+## The in-world form of a duration: whole units of the largest that fits, so it
+## is never wider than a chip's slot or a lens row. Under a minute `Ns`, under
+## 100 minutes `Nm`, under 100 hours `Nh`, else whole days `Nd`, capped at
+## `99d`; `plus` (the state began before this office watched) adds `+`.
+## Unknown (below 0) is empty. The station chip never passes `plus`: a start
+## this office never saw draws no number there. The HUD keeps wait_text().
+static func compact_duration(seconds: float, plus: bool) -> String:
+	if seconds < 0.0:
+		return ""
+	var text := ""
+	if seconds < 60.0:
+		text = "%ds" % floori(seconds)
+	elif seconds < 6000.0:
+		text = "%dm" % floori(seconds / 60.0)
+	elif seconds < 360000.0:
+		text = "%dh" % floori(seconds / 3600.0)
+	else:
+		text = "%dd" % mini(99, floori(seconds / 86400.0))
+	return text + ("+" if plus else "")
+
+
 ## How long a pane has been in its state (StateLog.wait_of()), in
 ## format_duration()'s words with `+` when that state began before this office
-## watched: `12m`, `5s+`. The one way a wait is written: the OVERVIEW's FOR,
-## the top bar's `max`, the counters' hover and the lens line all say this.
+## watched: `12m`, `5s+`. The one way the HUD writes a wait: the OVERVIEW's FOR,
+## the top bar's `max` and the counters' hover say this; the world (the lens
+## line, the chip) says the same wait in compact_duration().
 static func wait_text(wait: StateLog.Wait) -> String:
 	return format_duration(wait.msec / 1000.0) + ("+" if wait.plus else "")
 
@@ -212,10 +234,10 @@ func _longest_wait() -> String:
 	return wait_text(StateLog.longest(_blocked_tracks, Time.get_ticks_msec()))
 
 
-## How long each blocked agent has been kept waiting, in their bubble and on
-## their list row, on the same beat and in the same words as the inspector's.
+## How long each blocked agent has been kept waiting, in their chip and on
+## their list row, on the same beat as the inspector's.
 ## Only blocked: an agent who is working or done is not waiting on anybody. A
-## machine that dropped shows no number and no bar at all — they would go on
+## machine that dropped shows no number at all — it would go on
 ## growing off a snapshot nobody is receiving any more — and a wait whose start
 ## this machine never saw shows none either, the same way the inspector shows none.
 func _update_waits() -> void:

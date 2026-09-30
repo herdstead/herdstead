@@ -29,8 +29,8 @@ var rest_offset := Vector2.ZERO
 ## the inspector's. A minimap icon stands for a whole floor, which nobody is
 ## waiting on, so not every badge has one, and every writer checks.
 var wait: Label
-## A seat's badge says the same in the bubble over its blocked agent
-## (OfficeBubble: the wait and the patience bar), on the same beat.
+## A seat's badge says the same in the chip on its blocked agent's tag row
+## (OfficeBubble: the wait, in the compact form), on the same beat.
 var bubble: OfficeBubble
 
 
@@ -79,7 +79,7 @@ func stop_pulsing() -> void:
 ## number at all (OfficeAttention.format_duration() writes nothing for it).
 ## The label only ever changes its text, never its visibility: an empty label
 ## draws nothing, and a node that came and went would make an in-place update
-## differ from a rebuild of the same data. The bubble hides its bar the same way.
+## differ from a rebuild of the same data. The chip hides its frame the same way.
 func show_wait(seconds: float) -> void:
 	var text := OfficeAttention.format_duration(seconds)
 	if is_instance_valid(wait) and wait.text != text:

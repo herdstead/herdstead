@@ -478,7 +478,8 @@ func _far_agent(office: OfficeDouble) -> OfficeStation:
 	return null
 
 
-## Where the far badge of `station` is drawn, its middle, in the world.
+## The middle of the far tag row of `station`, in the world: where its badge is
+## drawn at rest, and inside the chip while one shows.
 static func _badge_middle(station: OfficeStation) -> Vector2:
 	return station.global_position + OfficeStation.BADGE_AT["far"] + Vector2(0, -8)
 
@@ -538,6 +539,59 @@ func test_a_click_on_a_blocked_seat_only_picks() -> void:
 	await _until(func() -> bool: return card.preview_text() == QUESTION, "the question is shown")
 	await _wait(0.5)
 	_check(not card.answering(), "and answer mode stays shut: the seat's click, and Enter's opening, answer nothing")
+	_eq(_all_inputs(), 0, "nothing was sent")
+
+
+## Bee's alpha floor shown, and the station of one of its agents on the near side.
+func _near_agent(office: OfficeDouble) -> OfficeStation:
+	await _floor_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
+	for pane_id: String in ["alpha:p1", "alpha:p2", "alpha:p3"]:
+		var station := _station_of(office, HerdrFleet.pane_key(BEE, pane_id))
+		if station.side == "near" and station.actor() != null:
+			return station
+	_fail("bee's alpha has no near agent")
+	return null
+
+
+## A near agent's chip hangs below the chair, on the tag row: a click on the
+## seat itself (the chair and the worker) only picks, and answer mode stays
+## shut; a click on the chip, where its badge is drawn in its left half, picks
+## and opens answer mode once the question is shown. Neither sends anything.
+func test_a_near_chip_answers_and_the_near_seat_only_picks() -> void:
+	_fakes()
+	# alpha:p2 sits on the near side; the fixture has it a shell, so an agent here.
+	var near := _changed(_raw(), "alpha:p2", {"agent": "claude", "agent_status": "working"})
+	_ctl("control-b", "set_snapshot", {"snapshot": near})
+	var office := await _office_with()
+	var station := await _near_agent(office)
+	var pane_id := HerdrFleet.split_key(station.pane_key)[1]
+	_ctl("control-b", "set_preview", {"pane_id": pane_id, "source": "detection", "text": QUESTION})
+	_ctl("control-b", "status", {"pane_id": pane_id, "agent_status": "blocked"})
+	await _until(func() -> bool: return station.bubble().visible, "the chip shows")
+	var frame: NinePatchRect = station.bubble().get_node("%Frame")
+	await _until(func() -> bool: return frame.visible, "blocked while watched: a wait, in its frame")
+	var badge: Sprite2D = station.get_node("Overlay/Badge")
+	var on_badge := badge.get_global_transform() * badge.get_rect()
+	# Across, in the chip's left half; up and down it pulses (by up to 2), so
+	# only its columns are compared.
+	var chip := station.bubble_rect()
+	_check(
+		(
+			on_badge.position.x >= chip.position.x - 1.5
+			and on_badge.end.x <= chip.position.x + OfficeBubble.BADGE_SLOT + 0.5
+		),
+		"the badge is in the chip's left half, a unit over its edge: %s in %s" % [on_badge, chip]
+	)
+	var body := station.target_rect().get_center()
+	_check(not station.bubble_rect().has_point(body), "the seat's middle is not the chip's")
+	_check(body.y < station.bubble_rect().position.y, "the chip hangs below the seat")
+	await _click_world(office, station.pane_key, body)
+	_eq(office.picked_key, station.pane_key, "the seat's click picks the pane")
+	await _wait(0.5)
+	_check(not _card(office).answering(), "and opens no answer mode")
+	await _click_world(office, station.pane_key, on_badge.get_center())
+	_eq(office.picked_key, station.pane_key, "the chip's click picks the same pane")
+	await _until(_card(office).answering, "and answer mode opens, once the question is shown")
 	_eq(_all_inputs(), 0, "nothing was sent")
 
 

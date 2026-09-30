@@ -220,6 +220,10 @@ func _walked(office: OfficeDouble, when: String) -> void:
 ## Compare the world after in-place updates with a rebuild from the same data.
 func _same_as_rebuild(office: OfficeDouble, when: String) -> void:
 	await _frames(2)
+	# A seat under the pointer shows its plate, and physics picking finds what
+	# is under a still pointer again every physics frame: sample both worlds
+	# after it has run, so both are hovered alike.
+	await _physics_frames(2)
 	# Text normally updates on a 250ms beat. Sample both worlds after that same
 	# text evaluation, not one before its first wait label tick and one after it.
 	office.attention._update_waits()
@@ -232,6 +236,7 @@ func _same_as_rebuild(office: OfficeDouble, when: String) -> void:
 	office.rebuild_world()
 	_check(office.world.get_instance_id() != world_id, "the rebuild really rebuilt " + when)
 	await _frames(2)
+	await _physics_frames(2)
 	office.attention._update_waits()
 	var rebuilt := _fingerprint(office.world)
 	_eq(updated.size(), rebuilt.size(), "node count " + when)
@@ -628,6 +633,11 @@ func _row_count(office: OfficeDouble) -> int:
 func _frames(count: int) -> void:
 	for i in count:
 		await process_frame
+
+
+func _physics_frames(count: int) -> void:
+	for i in count:
+		await physics_frame
 
 
 func _visit_floor(office: OfficeScene, key: String) -> void:

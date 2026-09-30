@@ -1,66 +1,77 @@
 class_name OfficeTable
 extends StaticBody2D
-## One shared table: scenes/world/table.tscn. A tab of herdr is one of these.
+## One pod of single desks: scenes/world/table.tscn. A tab of herdr is one of these.
 ##
-## The origin is the LEFT END OF THE NEAR EDGE, so the table y-sorts as one
-## piece at the edge nearest the viewer and x runs 0..width along it. The table
-## itself is not y-sorted: what stands on it is its children, drawn in tree
-## order (supports, surface, apron, grommets, task lights, far monitors,
-## divider, near monitors, decorations, papers), so nothing on the table needs
-## a depth rule.
+## A pod is a row of 32-unit desks, one column per desk, with a seat on each
+## side of it (two facing rows). The origin is the LEFT END OF THE NEAR EDGE, so
+## the pod y-sorts as one piece at the edge nearest the viewer and x runs
+## 0..width along it. The pod itself is not y-sorted: what stands on it is its
+## children, drawn in tree order (supports, desktops, apron, grommets, task
+## lights, far laptops, the low screen, near laptops, papers), so nothing on the
+## pod needs a depth rule.
 ##
-## Every seat gets its monitor, its grommet, its task lamp and its stack of
-## paper when the table is built, and what a seat carries afterwards is only
+## Every seat gets its laptop, its grommet, its task lamp and its stack of
+## paper when the pod is built, and what a seat carries afterwards is only
 ## which of them are shown and how hard the lamp burns: equip(), light() and
-## show_papers() never add or drop a node.
+## show_papers() never add or drop a node. Nothing else stands on a desk: the
+## trinkets and the cat are on side tables (OfficeDecor), never on a pod.
 ##
-## Every number about the table's cross-section lives here and nowhere else.
-## y is table-local: the near edge is 0, the far edge is -SURFACE_DEPTH.
+## Every number about the pod's cross-section lives here and nowhere else.
+## y is pod-local: the near edge is 0, the far edge is -SURFACE_DEPTH.
 
 ## How hard one seat's task lamp burns. A seat with no pane is OFF; the other
 ## three say what herdr is doing with the terminal on it, and who gets which is
 ## OfficeFloorView.lamp_of()'s to decide.
 enum Lamp { OFF, DIM, ON, FOCUS }
 
+## One desk module, one seat column: columns are MODULE apart, at x 16 + 32i.
 const MODULE := 32
-const MIN_WIDTH := 160
-const SURFACE_DEPTH := 80
+## The narrowest pod: two desks (capacity is always even, OfficeSeatPlanner).
+const MIN_WIDTH := 64
+## The desktop, far edge to near edge: the far working plane (-48..-32), the
+## low screen (SCREEN_TOP..SCREEN_TOP + SCREEN_HEIGHT below the far edge) and
+## the near working plane (-26..-8).
+const SURFACE_DEPTH := 48
 ## The painted surface ends at -5; its three-unit lip joins this three-unit
 ## apron. The working top still ends at -8, so equipment need not move.
 const NEAR_SURFACE_EDGE := -8
 const APRON_HEIGHT := 3
 const APRON_DROP := -5
-## Below the far edge: a far worker's feet are inside the table's footprint,
-## so the table (sorted at its near edge, drawn later) hides their legs.
+## Below the far edge: a far worker's feet are inside the pod's footprint,
+## so the pod (sorted at its near edge, drawn later) hides their legs.
 const FAR_SEAT := 12
 ## Below the near edge: a near worker is wholly in front of the apron.
 const NEAR_SEAT := 22
 ## The cell beside a seat that the near seat's leg turns round the chair at
 ## (OfficeWalkGraph.leg_to_seat(); DeskMeasure calls it the standing spot).
 ## Nobody stands there: done agents sit with their paper, and these numbers
-## stay so no floor is planned differently. Beside
-## the seat column, clear of the chair; the far one FAR_STAND above the far
-## edge, off the table's footprint; the near one at the seat's depth.
-const STAND_ASIDE := 24
+## stay so the walk graph is planned the same way. Half a column beside the
+## seat, in the 16-unit gap between two chairs (x+8..x+24: the near leg's feet,
+## x+10..x+22, keep 2 units each side); the far one FAR_STAND above the far
+## edge, off the pod's footprint; the near one at the seat's depth.
+const STAND_ASIDE := 16
 const FAR_STAND := 6
 const NEAR_STAND := NEAR_SEAT
-## A laptop belongs at the sitter's edge, not by the divider like a monitor.
-## The rear view ends at its hinge; the front view ends at its palmrest, just
-## inside the near working edge. Both stay on the seat's x.
+## A laptop belongs at the sitter's edge. The rear view ends at its hinge
+## (-48..-40, clear of the far worker, who shows only above the far edge); the
+## front view ends at its palmrest, just inside the near working edge
+## (-21..-10). Both stay on the seat's x.
 const FAR_LAPTOP_INSET := 8
 const NEAR_LAPTOP_INSET := 10
-## Divider's top below the far edge, and its height.
-const DIVIDER_TOP := 28
-const DIVIDER_HEIGHT := 24
-## A task-light wedge: narrow at the lamp, wide where it spreads.
-const LAMP_HALF_WIDTH := 9.0
-const LIGHT_HALF_WIDTH := 28.0
+## The low screen between the two rows: its top below the far edge, and its
+## height (-32..-26).
+const SCREEN_TOP := 16
+const SCREEN_HEIGHT := 6
+## A task-light wedge: narrow at the screen, wide at the sitter's edge, within
+## the seat's own desk.
+const LAMP_HALF_WIDTH := 4.0
+const LIGHT_HALF_WIDTH := 14.0
+## How much the selection frame darkens under the lens (set_lensed()).
+const LENS_FRAME := Color(0.3, 0.3, 0.3)
 ## The alpha of that wedge at each Lamp level, on a daylight pack, in enum
 ## order. Picked by looking at both packs at zoom 2 and 3: FOCUS reads as a lit
 ## lamp across the floor, ON and DIM are a step apart on the wood, and DIM is
 ## still plainly a lamp rather than the whole-floor dimming of a lost machine.
-## How much the selection frame darkens under the lens (set_lensed()).
-const LENS_FRAME := Color(0.3, 0.3, 0.3)
 const LAMP_ALPHA: Array[float] = [0.0, 0.10, 0.22, 0.52]
 ## A lamp-lit studio pack draws all four this much harder, the same way it
 ## draws the contact shadows harder. The pack says which it is; nothing here
@@ -69,33 +80,35 @@ const LAMP_STRONG := 1.4
 ## A station's chair relative to its seat: the far chair (front view) sorts
 ## just behind its worker, the near chair (back view) in front. The painted
 ## office chair is 22 units tall; a small offset leaves the upper back clear.
+## The near chair is opaque down to seat + 6, pod y 28.
 const CHAIR_OFFSET := {"far": -4, "near": 6}
-## The selection frame encloses the whole workstation island (both rows of
-## workers with their plates and badges), so it never crosses a seated worker.
-const FRAME_ABOVE_FAR := 70
-const FRAME_BELOW_NEAR := 70
-## Where the three legs stand and where a bracket hangs, below the near edge.
-## The taller native leg reaches the same floor y=37 from its lifted mount.
+## The stationary drawing of a pod (render_rect), above the far edge and below
+## the near one: the far tag row's pulse envelope reaches -90, the near one 46.
+const DRAWN_ABOVE_FAR := 42
+const DRAWN_BELOW_NEAR := 46
+## The reservation (reserved_rect): FAR_RESERVE above the far edge (the far
+## approach row and the far tag rows), NEAR_RESERVE below the near edge (the
+## near approach row), and one passage cell right of the pod.
+const FAR_RESERVE := 80
+const NEAR_RESERVE := 64
+## The two short legs stand under the end columns' near chairs (x 16 and
+## w - 16), which hide them whenever somebody sits there; LEG_DROP hangs their
+## mount under the apron, and their foot ends at pod y 19, above the chair's
+## gas lift (the art lane's measurement). A bracket hangs under each desk.
 const LEG_DROP := -2
 const BRACKET_DROP := -11
 const SIDES := ["far", "near"]
-## Static objects sit left of a laptop, entirely on one working plane. The
-## occasional cat uses the first near slot, independent of table capacity.
-const DECOR_OFFSET := -28
-const DECOR_FAR := -55
-const DECOR_NEAR := -9
-## The pools a table draws its trinkets from (ItemSpec.group in the pack): one
-## per column from DESK_GROUP, and now and then a cat from CAT_GROUP.
-const DESK_GROUP := &"desk"
-const CAT_GROUP := &"cat"
-## A done seat's stack of paper (ArtContract.PROP_DONE_STACK) stands this far
-## right of the seat column, on the same working plane as the decorations
-## (DECOR_FAR or DECOR_NEAR). Measured: the laptop is opaque over x-7..x+6
-## and the stack, 11 wide, over x+10.5..x+21.5, so it stands just right of the
-## laptop, clear of the worker (x±10; the figure itself is x±8) and of the next
-## column's decoration, whose leftmost opaque pixel is at x+27. The left of the
-## laptop is the decoration slot, which never changes with state.
-const PAPERS_ASIDE := 16
+## A done seat's stack of paper (ArtContract.PROP_DONE_STACK_SMALL, 6 wide and
+## 9 tall, opaque x-3..x+3 about its foot) stands PAPERS_ASIDE right of the
+## seat column: opaque over x+10..x+16, clear of the laptop (x-7..x+7), of the
+## worker and their raised hand (x-8..x+12), of the next column's worker
+## (from x+22) and raised hand (from x+24), and inside the desktop on the last
+## column (x+16 is the pod's right edge). Its foot is on its side's working
+## plane: PAPERS_FAR puts it at -42..-33 (far plane -48..-32), PAPERS_NEAR at
+## -24..-15 (near plane -26..-8), above the near raised hand's top (-14).
+const PAPERS_ASIDE := 13
+const PAPERS_FAR := -33
+const PAPERS_NEAR := -15
 
 var art: ArtPack
 var width := 0.0
@@ -112,7 +125,6 @@ var night := 0.0
 var _lamp_levels: Dictionary[String, Lamp] = {}
 var _shell_seats: Dictionary[String, bool] = {}
 var _shadow_holder: Node2D
-var _decoration_identity := ""
 
 
 ## The planner and renderer share these dimensions. Capacity is columns, with
@@ -121,8 +133,8 @@ static func measure(capacity: int) -> DeskMeasure:
 	var count := maxi(2, capacity)
 	var seat_columns: Array[float] = []
 	for index in count:
-		seat_columns.append(MODULE * 1.5 + MODULE * 2.0 * index)
-	return _measure_columns(maxf(MIN_WIDTH, count * MODULE * 2.0 + MODULE), seat_columns)
+		seat_columns.append(MODULE * 0.5 + MODULE * index)
+	return _measure_columns(maxf(MIN_WIDTH, count * MODULE), seat_columns)
 
 
 static func _measure_columns(table_width: float, seat_columns: Array[float]) -> DeskMeasure:
@@ -131,10 +143,13 @@ static func _measure_columns(table_width: float, seat_columns: Array[float]) -> 
 	result.table_width = table_width
 	result.columns.assign(seat_columns)
 	result.physical_rect = Rect2(0, -SURFACE_DEPTH, table_width, SURFACE_DEPTH)
-	# Includes side passages and full-body clearance behind the far approaches.
-	result.reserved_rect = Rect2(-MODULE, -6 * MODULE, table_width + 2 * MODULE, 9 * MODULE)
+	# Six cells: the far approach row and the far tags above the desk, the near
+	# chairs and approach row below it, and a one-cell passage on the right.
+	result.reserved_rect = Rect2(
+		0, -SURFACE_DEPTH - FAR_RESERVE, table_width + MODULE, FAR_RESERVE + SURFACE_DEPTH + NEAR_RESERVE
+	)
 	result.render_rect = Rect2(
-		-8, -SURFACE_DEPTH - FRAME_ABOVE_FAR, table_width + 16, FRAME_ABOVE_FAR + SURFACE_DEPTH + FRAME_BELOW_NEAR + 2
+		0, -SURFACE_DEPTH - DRAWN_ABOVE_FAR, table_width, DRAWN_ABOVE_FAR + SURFACE_DEPTH + DRAWN_BELOW_NEAR
 	)
 	for x in seat_columns:
 		result.far_seats.append(Vector2(x, -SURFACE_DEPTH + FAR_SEAT))
@@ -146,8 +161,8 @@ static func _measure_columns(table_width: float, seat_columns: Array[float]) -> 
 	return result
 
 
-## Why a table this wide cannot be built; empty when it can. The surface is
-## made of whole 32-unit modules and needs both end caps plus a middle.
+## Why a pod this wide cannot be built; empty when it can. The desktop is
+## made of whole 32-unit modules and needs both end caps.
 static func width_error(value: float) -> String:
 	if not is_finite(value):
 		return "table width must be finite"
@@ -205,61 +220,8 @@ func setup(pack: ArtPack, table_width: float, seat_columns: Array) -> bool:
 		shape.shape = footprint
 	footprint.size = geometry.physical_rect.size
 	shape.position = geometry.physical_rect.get_center()
-	_sync_decorations()
 	_sync_shadows()
 	return true
-
-
-## Choose a static arrangement after setup(), using the table's stable identity
-## (including machine in live floors). No pane, status, focus or clock is read.
-func decorate(identity: String) -> void:
-	_decoration_identity = identity
-	_sync_decorations()
-
-
-func _sync_decorations() -> void:
-	if _decoration_identity.is_empty():
-		return
-	var holder: Node2D = %Decorations
-	var retained: Array[StringName] = []
-	var rng := RandomNumberGenerator.new()
-	rng.seed = _decoration_identity.hash()
-	var cats := art.items_in(CAT_GROUP)
-	var items := art.items_in(DESK_GROUP)
-	var has_cat := not columns.is_empty() and rng.randf() < 0.28
-	var cat := ArtPack.pick(cats, rng) if has_cat else null
-	if cat != null:
-		_decoration(&"Cat", cat.id, Vector2(columns[0] + DECOR_OFFSET, DECOR_NEAR))
-		retained.append(&"Cat")
-	for index in columns.size():
-		# A separate stream per column keeps all old choices when a desk grows.
-		rng.seed = ("%s:%d" % [_decoration_identity, index]).hash()
-		if rng.randf() >= 0.75:
-			continue
-		var item := ArtPack.pick(items, rng)
-		if item == null:
-			continue
-		var far := rng.randi_range(0, 1) == 0 or (cat != null and index == 0)
-		var id := StringName("Item%d" % index)
-		_decoration(id, item.id, Vector2(columns[index] + DECOR_OFFSET, DECOR_FAR if far else DECOR_NEAR))
-		retained.append(id)
-	for child in holder.get_children():
-		if child.name not in retained:
-			holder.remove_child(child)
-			child.free()
-
-
-func _decoration(id: StringName, prop_id: StringName, at: Vector2) -> void:
-	var holder: Node2D = %Decorations
-	var spec := art.prop_sprite(prop_id)
-	var image := holder.get_node_or_null(NodePath(id)) as Sprite2D
-	if image == null:
-		image = art.sprite(spec)
-		image.name = id
-		holder.add_child(image)
-	else:
-		art.dress(image, art.sprite_texture(spec), spec.pivot)
-	image.position = at
 
 
 ## Change capacity without replacing this table or any retained seat marker.
@@ -296,12 +258,14 @@ func _rebuild_modules() -> void:
 	var far := -SURFACE_DEPTH
 	for index in count:
 		var end := "left" if index == 0 else "right" if index == count - 1 else "mid"
-		var grain := "surface_" + end if end != "mid" else "surface_mid_b" if index % 2 == 1 else "surface_mid_a"
+		var grain := "desk_" + end if end != "mid" else "desk_mid_b" if index % 2 == 1 else "desk_mid_a"
 		_module($Surface, StringName(grain), Vector2(index * MODULE, far))
 		_module($Apron, StringName("apron_" + end), Vector2(index * MODULE, APRON_DROP))
-		_module($Divider, StringName("divider_" + end), Vector2(index * MODULE, far + DIVIDER_TOP))
-	for leg_x: float in [10.0, width / 2 - 10, width - 30]:
-		_module($Supports, &"leg", Vector2(leg_x, LEG_DROP))
+		_module($Divider, StringName("screen_" + end), Vector2(index * MODULE, far + SCREEN_TOP))
+	# Centred on the end columns by the module's own width (units).
+	var leg_width := float(art.table.modules[&"leg_short"].size.x)
+	for leg_x: float in [columns[0], columns[columns.size() - 1]]:
+		_module($Supports, &"leg_short", Vector2(leg_x - leg_width / 2.0, LEG_DROP))
 	for x in columns:
 		_module($Supports, &"bracket", Vector2(x - 6, BRACKET_DROP))
 	var frame := geometry.render_rect
@@ -344,11 +308,11 @@ func _sync_seat(index: int, side: String) -> void:
 		lamp = Polygon2D.new()
 		lamp.name = id
 		$TaskLights.add_child(lamp)
-	var from_y := float(-SURFACE_DEPTH + DIVIDER_TOP + (0 if is_far else DIVIDER_HEIGHT))
+	var from_y := float(-SURFACE_DEPTH + SCREEN_TOP + (0 if is_far else SCREEN_HEIGHT))
 	var to_y := float(-SURFACE_DEPTH if is_far else NEAR_SURFACE_EDGE)
 	lamp.polygon = _lamp(x, from_y, to_y)
 	var stack := $Papers.get_node_or_null(NodePath(id)) as Sprite2D
-	var spec := art.prop_sprite(ArtContract.PROP_DONE_STACK)
+	var spec := art.prop_sprite(ArtContract.PROP_DONE_STACK_SMALL)
 	if stack == null:
 		stack = art.sprite(spec)
 		stack.name = id
@@ -356,7 +320,7 @@ func _sync_seat(index: int, side: String) -> void:
 		$Papers.add_child(stack)
 	else:
 		art.dress(stack, art.sprite_texture(spec), spec.pivot)
-	stack.position = Vector2(x + PAPERS_ASIDE, DECOR_FAR if is_far else DECOR_NEAR)
+	stack.position = Vector2(x + PAPERS_ASIDE, PAPERS_FAR if is_far else PAPERS_NEAR)
 	_sync_marker($Seats, id, geometry.seat_position(index, side))
 	_sync_marker($Standing, id, geometry.standing_position(index, side))
 	var shell: bool = _shell_seats.get(id, false)
@@ -469,13 +433,13 @@ func set_night(amount: float) -> void:
 	_sync_shadows()
 
 
-## Show or hide the four-bar selection frame around the table.
+## Show or hide the four-bar selection frame around the pod.
 func set_selected(selected: bool) -> void:
 	var frame: Node2D = $Overlay/Frame
 	frame.visible = selected
 
 
-## Under the lens the rug is washed, a blocked one in the frame's own colour:
+## Under the lens the pod's floor is washed, a blocked one in the frame's own colour:
 ## the frame darkens by LENS_FRAME so the pick still reads on it (same shape,
 ## same meaning), and is exactly as before once the lens is let go.
 func set_lensed(on: bool) -> void:
@@ -484,7 +448,7 @@ func set_lensed(on: bool) -> void:
 
 
 ## Ground-only contact shadows owned by this table. Repeated calls reuse the
-## holder; a replacement ground (for a rebuilt rug/sign group) safely adopts it.
+## holder; a replacement ground (for a rebuilt wash/sign group) safely adopts it.
 func contact_shadows(ground: Node2D) -> void:
 	if not is_instance_valid(ground):
 		push_error("OfficeTable: contact shadows need a ground node")

@@ -161,21 +161,37 @@ func test_one_square_per_seated_pane_in_plan_order() -> void:
 	var expected: Array = []
 	var rows := layout.rows.duplicate()
 	rows.sort_custom(func(a: RowPlan, b: RowPlan) -> bool: return a.index < b.index)
+	# A plan row's tables run left to right along one line (a row holds several
+	# pods of 32-unit desks); the next row starts under it, at its newspaper
+	# column's left edge, or at the top of the next column, right of all so far.
 	var previous := Rect2()
 	var column_left := -1.0
+	var all_right := -INF
+	var band_bottom := -INF
 	for band: RowPlan in rows:
 		var desks := band.desks.duplicate()
 		desks.sort_custom(func(a: DeskPlacement, b: DeskPlacement) -> bool: return a.origin.x < b.origin.x)
+		var first_in_band := true
+		var this_bottom := -INF
 		for desk: DeskPlacement in desks:
 			var box := plan.table_rect(desk.tab_key)
 			_check(box.has_area(), "a box for " + desk.tab_key)
 			if previous.has_area():
-				if is_equal_approx(box.position.x, column_left):
-					_check(box.position.y > previous.position.y, "down the column: " + desk.tab_key)
+				if not first_in_band:
+					_check(
+						box.position.x > previous.end.x and is_equal_approx(box.position.y, previous.position.y),
+						"along its row, right of the last: " + desk.tab_key
+					)
+				elif is_equal_approx(box.position.x, column_left):
+					_check(box.position.y > band_bottom, "down the column: " + desk.tab_key)
 				else:
-					_check(box.position.x > previous.end.x, "the next column, right of the last: " + desk.tab_key)
-			if not is_equal_approx(box.position.x, column_left):
-				column_left = box.position.x
+					_check(box.position.x > all_right, "the next column, right of the last: " + desk.tab_key)
+			if first_in_band:
+				if not is_equal_approx(box.position.x, column_left):
+					column_left = box.position.x
+			first_in_band = false
+			all_right = maxf(all_right, box.end.x)
+			this_bottom = maxf(this_bottom, box.end.y)
 			previous = box
 			for side: String in OfficeTable.SIDES:
 				var columns: Array[SeatPlacement] = []
@@ -196,6 +212,8 @@ func test_one_square_per_seated_pane_in_plan_order() -> void:
 						_check(here.end.y < there.position.y, "far over near: " + seat.pane_key)
 					elif other.side == seat.side and other.column > seat.column:
 						_check(here.end.x < there.position.x, "left to right: " + seat.pane_key)
+		if not desks.is_empty():
+			band_bottom = this_bottom
 	_eq(drawn, expected, "in plan order")
 	_done(office)
 	# api's second table seats api:p4 alone: its three vacant seats draw nothing.
@@ -710,13 +728,15 @@ func test_the_stress_fit_at_2x_4x_and_min() -> void:
 			_check(fit.size.x <= room.x and fit.size.y <= room.y, "fits: %s in %s" % [fit.size, room])
 		else:
 			_check(fit.size.x <= room.x and fit.size.y > room.y, "as wide as fits and taller: " + str(fit.size))
-	# The stress floor as the office plans it at 2x: one table of four per row.
+	# The stress floor as the office plans it at 2x: four pods of four desks to
+	# a row, three rows (the long tables took a row each, ten rows: the pure
+	# fits above keep that shape of input).
 	var office := await _live_office(_stress(), WIDE)
 	var laid := office.layout_plan()
 	var per_row: Array[int] = []
 	for band in laid.rows:
 		per_row.append(band.desks.size())
-	_eq(per_row, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], "ten rows of one table")
+	_eq(per_row, [4, 4, 2], "three rows of pods")
 	print("STRATEGIC stress render_bounds %s" % laid.render_bounds)
 	_done(office)
 	hud.queue_free()

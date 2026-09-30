@@ -531,13 +531,15 @@ func test_oversized_growth_moves_only_owner_and_keeps_row_exclusive() -> void:
 	var a := _room("a", 2)
 	var floor_model := _floor([a, _room("b", 2)])
 	var first := _plan(floor_model, null, rules)
-	a.panes = _room("a", 20).panes
+	# Forty panes: twenty desks, 21 cells, wider than the 14-cell bay (a pod
+	# packs a column into one cell, so twenty panes no longer outgrow it).
+	a.panes = _room("a", 40).panes
 	var wider := _plan(floor_model, first, rules)
 	_eq(wider.desk("b").origin, first.desk("b").origin, "other desk is fixed")
 	_check(wider.desk("a").row != wider.desk("b").row, "growth leaves shared row")
 	_eq(wider.rows[wider.desk("a").row].exclusive_tab_key, "a", "dedicated row ownership")
 	_check(wider.main_corridor_cells.position.x > first.main_corridor_cells.position.x, "right corridor moves outward")
-	floor_model.rooms.append(_room("huge", 40, 3))
+	floor_model.rooms.append(_room("huge", 80, 3))
 	var widest := _plan(floor_model, wider, rules)
 	floor_model.rooms.append(_room("small", 2, 4))
 	var filled := _plan(floor_model, widest, rules)
@@ -693,7 +695,9 @@ func test_decorations_are_validated_and_thin_obstacles_block_graph_edges() -> vo
 
 
 func test_budget_diagnostics_reject_input_before_seat_allocation() -> void:
-	var too_wide := OfficeFloorLayout.plan(_floor([_room("wide", 1000)]))
+	# 506 desks fit the 512-cell width budget (one cell a column, plus the
+	# side walls, the corridor and the pod's passage cell): 1100 panes do not.
+	var too_wide := OfficeFloorLayout.plan(_floor([_room("wide", 1100)]))
 	_eq(too_wide.plan, null, "table cannot fit the measured width budget")
 	_check(
 		"; ".join(too_wide.problems).contains("tab exceeds measured width budget"),
@@ -739,16 +743,16 @@ func test_moving_panes_cannot_hide_retained_capacity() -> void:
 
 
 func test_desk_node_budget_boundary_includes_fixed_cost_and_both_sides() -> void:
-	# One empty two-column table (191) plus a four-column table (349): 33 fixed
-	# (the lens's rug wash among them) and 79 a column (a bubble at each seat, a
-	# stack of paper each, the lens line).
+	# One empty two-column pod (168) plus a four-column pod (310): 26 fixed
+	# (the lens's wash among them) and 71 a column (a chip at each seat, a
+	# stack of paper each, the lens line), as the geometry suite counts them.
 	# Expected costs are independent of the implementation's accounting helper.
 	var model := _floor([_room("empty"), _room("full", 8)])
-	for limit: int in [539, 540, 541]:
+	for limit: int in [477, 478, 479]:
 		var rules := FloorLayoutPolicy.new()
 		rules.max_desk_nodes = limit
 		var result := OfficeFloorLayout.plan(model, null, rules)
-		_eq(result.plan != null, limit >= 540, "exact boundary is inclusive")
+		_eq(result.plan != null, limit >= 478, "exact boundary is inclusive")
 		if result.plan != null:
 			_eq(result.plan.desk("empty").capacity, 2, "empty table reserves both pairs of seats")
 			_eq(result.plan.desk("full").capacity, 4, "occupied table has four columns, not eight")
@@ -762,7 +766,9 @@ func test_desk_node_budget_boundary_includes_fixed_cost_and_both_sides() -> void
 
 func test_repeated_migrations_retain_seats_until_cumulative_budget_is_full() -> void:
 	var rules := FloorLayoutPolicy.new()
-	rules.max_desk_nodes = 3000
+	# An eight-column pod costs 26 + 71 * 8 = 594: four fit (2376), five
+	# (2970) do not.
+	rules.max_desk_nodes = 2800
 	var model := _floor([])
 	var panes := _room("traveller", 16).panes
 	var previous := _plan(model, null, rules)
@@ -775,12 +781,12 @@ func test_repeated_migrations_retain_seats_until_cumulative_budget_is_full() -> 
 		var result := OfficeFloorLayout.plan(model, previous, rules)
 		_eq(model.pane_count(), 16, "every step carries the same sixteen panes")
 		if step == 4:
-			_check(result.plan == null, "five retained eight-column tables cost 3325, not 3000")
+			_check(result.plan == null, "five retained eight-column pods cost 2970, not 2800")
 			_eq(result.problems, PackedStringArray(["floor exceeds desk node budget"]), "cumulative refusal")
 			_eq(previous.desks.size(), 4, "failed addition never mutates previous table membership")
 			_check(previous.seat(panes[0].key) != null, "previous pane binding survives rejection")
 			continue
-		_eq(result.problems, PackedStringArray(), "four tables cost 2660 and fit")
+		_eq(result.problems, PackedStringArray(), "four pods cost 2376 and fit")
 		_check(result.plan != null, "migration within budget succeeds")
 		if result.plan == null:
 			return
@@ -807,11 +813,11 @@ func test_previous_empty_capacity_is_validated_against_current_budgets() -> void
 	var signature := empty.geometry_signature()
 	_eq(empty.desks[0].seats.size() + empty.desks[1].seats.size(), 0, "no current panes remain")
 	_eq(empty.desks[0].capacity + empty.desks[1].capacity, 500, "1000 empty slots still exist")
-	# Two 250-column tables: 2 * (33 + 79 * 250).
-	for limit: int in [39565, 39566, 39567]:
+	# Two 250-column pods: 2 * (26 + 71 * 250).
+	for limit: int in [35551, 35552, 35553]:
 		rules.max_desk_nodes = limit
-		_eq(OfficeFloorLayout.validate(empty, rules).is_empty(), limit >= 39566, "old allocation boundary")
-		_eq(OfficeFloorLayout.plan(model, empty, rules).plan != null, limit >= 39566, "old input uses same budget")
+		_eq(OfficeFloorLayout.validate(empty, rules).is_empty(), limit >= 35552, "old allocation boundary")
+		_eq(OfficeFloorLayout.plan(model, empty, rules).plan != null, limit >= 35552, "old input uses same budget")
 	_eq(empty.geometry_signature(), signature, "budget changes neither shrink nor reflow previous desks")
 	rules.max_tables = 1
 	_eq(
@@ -1075,7 +1081,10 @@ func _row_pieces(plan: FloorPlan, row: int) -> Array[DecorPlacement]:
 ## a spare bay), and the furnished floor still validates in one pass, so none
 ## of it is dropped. 11 cells is the exception the geometry leaves: its wall is
 ## full (plant, sign, cabinet) and its table reaches the main corridor, so it
-## keeps its base pieces. The added pieces close no walk: the only nodes the furniture
+## keeps its base pieces. So is a row of the stress floor at 20 cells that its
+## pods fill to the main corridor (no spare bay): with 32-unit desks such a row
+## holds more pods, and their signs fill its wall; the floor's last row, which
+## they do not fill, still stands more. The added pieces close no walk: the only nodes the furniture
 ## takes that the bare floor had are on the wall-foot row, cell row 2 of a band;
 ## the far lane under it and everything else stays open.
 func test_every_row_stands_more_furniture_and_still_validates_once() -> void:
@@ -1096,8 +1105,17 @@ func test_every_row_stands_more_furniture_and_still_validates_once() -> void:
 			var pieces := _row_pieces(plan, row.index)
 			var old := _old_pieces(plan, row.index)
 			print("PIECES_PER_ROW %s %d cells row %d: %d -> %d" % [what, width, row.index, old, pieces.size()])
+			var filled := false
+			for desk in row.desks:
+				filled = (
+					filled
+					or (desk.reserved_cells.end.x > plan.main_corridor_cells.position.x - OfficeShell.SPARE_BAY_CELLS)
+				)
 			if width == 11:
 				_check(pieces.size() >= old, "%s, 11 cells, row %d keeps its pieces" % [what, row.index])
+			elif what == "stress" and width == 20 and row.index < plan.rows.size() - 1:
+				_check(filled, "stress, 20 cells, row %d is filled to the corridor" % row.index)
+				_check(pieces.size() >= old, "stress, 20 cells, row %d keeps its pieces" % row.index)
 			else:
 				_check(pieces.size() > old, "%s, %d cells, row %d stands more pieces" % [what, width, row.index])
 		var rules := _real_rules(width)
@@ -1443,14 +1461,17 @@ func test_the_seat_and_standing_legs_are_validated() -> void:
 		"and only along its own length: not on past the seat, still inside the table"
 	)
 	_eq(OfficeFloorLayout.validate(plan, rules), PackedStringArray(), "which the validator allows")
-	plan.decorations.append(_decoration("post", Rect2(Vector2(far.x - 2, placed.origin.y - 84), Vector2(4, 2))))
+	# Between the corner (far standing row, -54) and the desk's far edge (-48).
+	plan.decorations.append(_decoration("post", Rect2(Vector2(far.x - 2, placed.origin.y - 52), Vector2(4, 2))))
 	_eq(
 		OfficeFloorLayout.validate(plan, rules),
 		PackedStringArray(["blocked seat leg: a column 0 far"]),
 		"a post between the corner and the table blocks the far seat leg alone"
 	)
 	plan.decorations.clear()
-	plan.decorations.append(_decoration("post", Rect2(Vector2(far.x + 11, placed.origin.y - 90), Vector2(2, 8))))
+	# On the step across (y -54, feet -58..-54), between the seat leg's feet
+	# (x +-6) and the standing spot's (x+10..x+22).
+	plan.decorations.append(_decoration("post", Rect2(Vector2(far.x + 7, placed.origin.y - 58), Vector2(2, 8))))
 	_eq(
 		OfficeFloorLayout.validate(plan, rules),
 		PackedStringArray(["blocked standing leg: a column 0 far"]),

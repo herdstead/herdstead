@@ -5,11 +5,11 @@ extends Node2D
 ## to whatever window it is opened in, and the pack's textures are the same at
 ## every window size, so a resize has nothing to rebuild.
 
-## A table's near edge, from the top of its room; the same as the live office.
-const TABLE_NEAR_Y := 232
-const TABLE_RUG_Y := 84
-const TABLE_RUG_ROWS := 5
-const TABLE_WIDTH := 256.0
+## A pod's near edge, from the top of its room; the same as the live office
+## (OfficeShell.BAY_PLANT_FOOT: the wall's two cells and four of the pod's).
+const TABLE_NEAR_Y := 192
+## Each room's pod: four desks, eight seats.
+const TABLE_COLUMNS := 4
 const ROOM_WIDTH := 288.0
 ## The showroom's own size.
 const SHOWROOM := Vector2(800, 480)
@@ -119,7 +119,7 @@ func _ready() -> void:
 			AvatarLook.LEGS: &"brown"
 		}
 	)
-	bystander(web.position + Vector2(TABLE_WIDTH - 18, -OfficeTable.SURFACE_DEPTH + 14), AvatarLook.FRONT, curly)
+	bystander(web.position + Vector2(web.width + 14, -OfficeTable.SURFACE_DEPTH + 14), AvatarLook.FRONT, curly)
 	var capped := AvatarLook.with_slots(
 		{
 			AvatarLook.HEADWEAR: &"cap",
@@ -128,7 +128,7 @@ func _ready() -> void:
 			AvatarLook.LEGS: &"taupe"
 		}
 	)
-	bystander(api.position + Vector2(14, 30), AvatarLook.BACK, capped)
+	bystander(api.position + Vector2(-14, 30), AvatarLook.BACK, capped)
 	var hall := pen.layer(ground, Vector2(16, 336))
 	for x in 19:
 		hall.set_cell(Vector2i(x, 0), 0, art.cell(ArtContract.FLOOR_WALKWAY))
@@ -150,7 +150,7 @@ func _ready() -> void:
 		hud.open_overview()
 		hud.show_overview(_mock_overview(mock), art)
 	print(
-		"PREVIEW_OK: 2 shared tables, 8 seats, 5 workers (2 done), 1 shell, 2 vacant, 2 bystanders, 5 Herdr states, starting/offline, generic fallback"
+		"PREVIEW_OK: 2 pods, 16 seats, 11 workers (3 done, 3 blocked), 1 shell, 4 vacant, 2 bystanders, 5 Herdr states, starting/offline, generic fallback"
 	)
 	if args.has("capture"):
 		await CaptureDriver.run(self, args, "preview")
@@ -174,9 +174,9 @@ func _record(target: String) -> void:
 	get_tree().quit()
 
 
-## One tab: a shared table with two seat columns and a station on both sides
-## of each. `split` (API) seats three workers and a shell and is selected; the
-## other (WEB) seats two workers and leaves its near seats vacant.
+## One tab: a pod of four desks and a station on both sides of each. `split`
+## (API) seats six workers and a shell and is selected; the other (WEB) seats
+## four workers and leaves its near seats vacant.
 func room(at: Vector2, title: String, branch: String, split: bool) -> OfficeTable:
 	var floor_layer := pen.layer(ground, at)
 	for y in 9:
@@ -203,10 +203,10 @@ func room(at: Vector2, title: String, branch: String, split: bool) -> OfficeTabl
 	else:
 		pen.prop(ground, ArtContract.PROP_WINDOW, at + Vector2(80, OfficeShell.WINDOW_FOOT))
 		pen.decor(sorted, ArtContract.PROP_CABINET, at + Vector2(ROOM_WIDTH - 56, OfficeShell.CABINET_FOOT))
-	var left := (ROOM_WIDTH - TABLE_WIDTH) / 2.0
-	pen.rug(ground, at + Vector2(left, TABLE_RUG_Y), int(TABLE_WIDTH / 32.0), TABLE_RUG_ROWS)
-	var columns: Array = [TABLE_WIDTH / 2.0 - 32.0, TABLE_WIDTH / 2.0 + 32.0]
-	var table := pen.table(sorted, ground, title, at + Vector2(left, TABLE_NEAR_Y), TABLE_WIDTH, columns)
+	var measured := OfficeTable.measure(TABLE_COLUMNS)
+	var left := (ROOM_WIDTH - measured.table_width) / 2.0
+	var columns: Array = measured.columns
+	var table := pen.table(sorted, ground, title, at + Vector2(left, TABLE_NEAR_Y), measured.table_width, columns)
 	table.set_selected(split)
 	pen.prop(ground, ArtContract.PROP_SIGN, at + Vector2(ROOM_WIDTH / 2.0, OfficeShell.SIGN_FOOT))
 	pen.clipped(
@@ -218,26 +218,35 @@ func room(at: Vector2, title: String, branch: String, split: bool) -> OfficeTabl
 		ArtContract.INK,
 		HORIZONTAL_ALIGNMENT_CENTER
 	)
+	# The branch just under the wall's foot (64), clear of the far plate row
+	# (from 78: the pod's near edge at 192, less 114).
 	pen.label(
-		ground, branch, at + Vector2(96, 70), Vector2(96, 12), 10, ArtContract.WOOD_DARK, HORIZONTAL_ALIGNMENT_CENTER
+		ground, branch, at + Vector2(96, 64), Vector2(96, 12), 10, ArtContract.WOOD_DARK, HORIZONTAL_ALIGNMENT_CENTER
 	)
 	var seats: Dictionary[String, OfficeStation] = {}
 	for column in columns.size():
 		for side: String in OfficeTable.SIDES:
 			seats["%d/%s" % [column, side]] = pen.station(sorted, table, column, side)
 	# WEB's first far worker is done: they sit with paper on the desk, as API's
-	# near done worker does. Both far-2 workers are blocked, under a bubble; the
-	# bubble shows the wait and the patience bar; the showroom has no clock, so
-	# they show one sample wait.
+	# near done workers do (one on the pod's last desk). A far worker on each pod
+	# and a near one on API are blocked, with a chip; the showroom has no clock,
+	# so API's chips show one sample wait each, and WEB's blocked worker, whose
+	# start this office never saw, shows the badge alone.
 	var first := ArtContract.STATE_WORKING if split else ArtContract.STATE_DONE
 	seats["0/far"].furnish("claude" if split else "pi", first, false, false, "far-1")
 	seats["1/far"].furnish("codex" if split else "claude", ArtContract.STATE_BLOCKED, split, false, "far-2")
-	seats["1/far"].bubble().show_wait(240.0)
+	if split:
+		seats["1/far"].bubble().show_wait(240.0)
+	seats["2/far"].furnish("pi" if split else "codex", ArtContract.STATE_WORKING, false, false, "far-3")
+	seats["3/far"].furnish("claude" if split else "pi", ArtContract.STATE_IDLE, false, false, "far-4")
 	if split:
 		seats["0/near"].furnish("", ArtContract.STATE_IDLE, false, false, "near-1")
 		seats["1/near"].furnish("pi", ArtContract.STATE_DONE, false, false, "near-2")
+		seats["2/near"].furnish("codex", ArtContract.STATE_BLOCKED, false, false, "near-3")
+		seats["2/near"].bubble().show_wait(4000.0)
+		seats["3/near"].furnish("claude", ArtContract.STATE_DONE, false, false, "near-4")
 	# API is the tab its workspace has open, with herdr's focus on its first
-	# seat; WEB is a tab nobody has open, so every lamp on it is dimmed. The two
+	# seat; WEB is a tab nobody has open, so every lamp on it is dimmed. The four
 	# near seats of WEB carry no pane at all: a chair, no screen, no lamp.
 	for spot: String in seats:
 		var level := OfficeTable.Lamp.ON if split else OfficeTable.Lamp.DIM
@@ -268,7 +277,7 @@ func legend(area: Rect2, left: float) -> void:
 	var lines := PackedStringArray(
 		[
 			"SPACES ARE FLOORS",
-			"TABS ARE SHARED TABLES",
+			"TABS ARE PODS OF DESKS",
 			"PANES ARE SEATS",
 			"",
 			"LAPTOPS ARE TERMINALS",
@@ -276,7 +285,8 @@ func legend(area: Rect2, left: float) -> void:
 			"THE LIT LAMP IS HERDR'S FOCUS",
 			"",
 			"PAPER = DONE, NOT YET SEEN",
-			"BUBBLE = BLOCKED (WAIT + PATIENCE)",
+			"CHIP = BLOCKED (BADGE + WAIT)",
+			"HOVER OR SELECT A SEAT FOR ITS NAME",
 			"THE TWO BYSTANDERS ARE NOBODY'S AGENT",
 		]
 	)

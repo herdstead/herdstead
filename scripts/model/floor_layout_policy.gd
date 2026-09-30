@@ -5,7 +5,9 @@ extends RefCounted
 const GRID := 32
 var version := 1
 var width_cells := 32
-var row_height_cells := 13
+## A row: its wall (wall_cells), one pod's reservation (OfficeTable.measure(),
+## 6 cells) and the cross corridor below it (cross_corridor_cells).
+var row_height_cells := 10
 var wall_cells := 2
 ## Three: the top wall's drawing clearance takes the first row, the fixture row
 ## (queue and pantry spots, OfficeFixturePlanner) the second, the walking lane the third.
@@ -22,7 +24,7 @@ var max_panes := 4096
 var max_tables := 1024
 ## Separate, cumulative Node upper bound for live desk groups, including empty
 ## historical columns. OfficeDeskView.node_budget owns the prefab accounting.
-## 32768 bounds roughly 830 fully furnished seats, or 172 minimum-size tables;
+## 32768 bounds roughly 920 fully furnished seats, or 195 minimum-size pods;
 ## this is an allocation ceiling, not a frame-time or memory guarantee.
 ## Floor tiles, shell and optional row decor remain bounded by the grid limits.
 var max_desk_nodes := 32768

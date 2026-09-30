@@ -228,7 +228,7 @@ func test_labels_follow_the_pose() -> void:
 			[
 				station.seat.global_position + OfficeStation.PLATE_AT[side],
 				station.seat.global_position + OfficeStation.BADGE_AT[side],
-				station.seat.global_position + OfficeStation.SELECTION_AT
+				station.seat.global_position + OfficeStation.SELECTION_AT[side]
 			],
 			"%s: seated, the labels hang off the seat" % key
 		)
@@ -413,7 +413,17 @@ func test_only_a_still_left_release_picks() -> void:
 ## panel: a Control takes the event in the viewport's GUI pass, which runs
 ## before both _unhandled_input and physics picking.
 func test_a_click_over_a_panel_picks_nothing() -> void:
-	var office := await _live_office()
+	# A pod long enough to reach under the right column: the pan is clamped
+	# to the floor, and the fixture's own pods of 32-unit desks all stand in
+	# its left half (the long tables reached further right).
+	var long: Dictionary = fixture.duplicate(true)
+	var panes := _list(long, "panes")
+	var first: Dictionary = panes[1]
+	for index in 22:
+		var extra := first.duplicate(true)
+		extra.pane_id = "api:p%d" % (20 + index)
+		panes.append(extra)
+	var office := await _live_office(long)
 	# Pan an actual seat beneath each panel. Floor geometry does not
 	# reflow on resize, so neither zero nor maximum pan implies an overlap.
 	office.test_screen = Vector2(480, 320)
@@ -423,23 +433,27 @@ func test_a_click_over_a_panel_picks_nothing() -> void:
 	await _click(tab.get_global_rect().get_center())
 	await _frames(2)
 	_check(office.hud.drawer_open(), "the tab opens the drawer")
-	var target := _station(office, HerdrFleet.pane_key(LOCAL, "api:p2"))
 	# The right column is the agent list's drawer; the card is the staff panel along the bottom.
 	for panel: Control in [office.hud.right_column, office.hud.floors, office.hud.inspector, office.hud.news]:
 		var bounds := office.hud.placed(panel)
 		# The seat goes under a spot of the panel with no button on it: a click
 		# on a minimap row or a list row is that panel's own gesture, not a desk's.
+		# Any seat will do: the pan is clamped to the floor, so which seats can
+		# be brought under a panel depends on where the floor's pods stand.
 		var station: OfficeStation = null
-		for aim: Vector2 in [bounds.get_center(), bounds.position + Vector2(bounds.size.x / 4.0, 12)]:
-			office.camera.pan = target.target_rect().get_center() - aim
-			await _frames(2)
-			station = _seat_under(office, bounds)
-			if (
-				station != null
-				and not _over_a_button(panel, station.target_rect().get_center() - office.camera.position)
-			):
+		for target in _seats(office):
+			for aim: Vector2 in [bounds.get_center(), bounds.position + Vector2(bounds.size.x / 4.0, 12)]:
+				office.camera.pan = target.target_rect().get_center() - aim
+				await _frames(2)
+				station = _seat_under(office, bounds)
+				if (
+					station != null
+					and not _over_a_button(panel, station.target_rect().get_center() - office.camera.position)
+				):
+					break
+				station = null
+			if station != null:
 				break
-			station = null
 		_check(station != null, "%s: a desk really is under the panel, clear of its buttons" % panel.name)
 		if station == null:
 			continue
@@ -785,7 +799,11 @@ func test_blocked_seats_show_the_wait_in_the_bubble() -> void:
 	_set_wait(office, "api:p2", 742.0)
 	await _text_tick()
 	_eq(_wait_text(office, blocked), "12m", "the blocked seat says how long it has been waiting")
-	_eq(_wait_text(office, blocked), OfficeBubble.wait_text(742.0), "in the bubble's short form of the same clock")
+	_eq(
+		_wait_text(office, blocked),
+		OfficeAttention.compact_duration(742.0, false),
+		"in the chip's compact form of the same clock"
+	)
 	_eq(_wait_text(office, working), "", "a working seat shows no number")
 	_eq(_wait_text(office, shell), "", "and neither does a shell nobody is waiting on")
 	await _frame_table(office, shell)
@@ -1929,9 +1947,9 @@ func test_actor_collision() -> void:
 ## The table refuses a width it cannot build out of whole modules.
 func test_table_width_is_validated() -> void:
 	var art := ArtPack.from_manifest(MANIFESTS[0])
-	for width: float in [240.0, 128.0, 150.0, 0.0]:
+	for width: float in [240.0, 32.0, 150.0, 0.0]:
 		_check(not OfficeTable.width_error(width).is_empty(), "width %s is refused" % width)
-	for width: float in [160.0, 256.0, 512.0]:
+	for width: float in [64.0, 128.0, 160.0, 256.0, 512.0]:
 		_eq(OfficeTable.width_error(width), "", "width %s is fine" % width)
 	var table: OfficeTable = OfficeDraw.TABLE_SCENE.instantiate()
 	_check(not table.setup(art, 240.0, [80.0]), "setup() refuses a 240-wide table")

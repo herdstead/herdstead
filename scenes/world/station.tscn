@@ -5,13 +5,13 @@
 [ext_resource type="PackedScene" path="res://scenes/world/bubble.tscn" id="3_bubble"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_far"]
-size = Vector2(56, 78)
+size = Vector2(30, 58)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_near"]
-size = Vector2(56, 86)
+size = Vector2(30, 67)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_bubble"]
-size = Vector2(60, 28)
+size = Vector2(30, 18)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_away"]
 size = Vector2(38, 56)
@@ -27,16 +27,16 @@ centered = false
 
 [node name="Plate" type="Label" parent="Overlay"]
 visible = false
-offset_right = 76.0
+offset_right = 30.0
 offset_bottom = 12.0
 mouse_filter = 2
 horizontal_alignment = 1
 clip_text = true
-text_overrun_behavior = 3
+text_overrun_behavior = 5
 
 [node name="Lens" type="Label" parent="Overlay"]
 visible = false
-offset_right = 48.0
+offset_right = 30.0
 offset_bottom = 12.0
 mouse_filter = 2
 horizontal_alignment = 1
@@ -62,17 +62,17 @@ monitoring = false
 monitorable = false
 
 [node name="Far" type="CollisionShape2D" parent="Target"]
-position = Vector2(0, -31)
+position = Vector2(0, -25)
 shape = SubResource("RectangleShape2D_far")
 disabled = true
 
 [node name="Near" type="CollisionShape2D" parent="Target"]
-position = Vector2(0, -7)
+position = Vector2(0, -9.5)
 shape = SubResource("RectangleShape2D_near")
 disabled = true
 
 [node name="Bubble" type="CollisionShape2D" parent="Target"]
-position = Vector2(0, -68)
+position = Vector2(0, -45)
 shape = SubResource("RectangleShape2D_bubble")
 disabled = true
 
@@ -84,3 +84,4 @@ disabled = true
 [connection signal="input_event" from="Target" to="." method="_on_target_input_event"]
 [connection signal="mouse_shape_entered" from="Target" to="." method="_on_target_mouse_shape_entered"]
 [connection signal="mouse_shape_exited" from="Target" to="." method="_on_target_mouse_shape_exited"]
+[connection signal="framed_changed" from="Overlay/Bubble" to="." method="_on_bubble_framed"]
