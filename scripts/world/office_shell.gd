@@ -3,7 +3,7 @@ extends RefCounted
 ## Where a floor's shell meets its walls: the lift door and the windows on the
 ## outer wall, a tab's sign and its lettering on a row wall, the framed pictures
 ## hung between the signs, and the standing furniture of a row: its plant, its
-## cabinet, the wall-foot run between them and the plant of a spare bay.
+## cabinet, the wall-foot run between them and the side table of a spare bay.
 ## Furniture, never a signal (see docs/VISUAL_LANGUAGE.md): every number here is
 ## a place on a wall, and none of them reads herdr.
 ##
@@ -38,7 +38,7 @@ const DECOR_FROM_END := 40.0
 const WALL_RUN_PITCH := 160.0
 const WALL_RUN_GAP := 8.0
 ## The spare bay: where a row's last pod ends at least SPARE_BAY_CELLS
-## short of the main corridor, one piece stands in the middle of the gap, its
+## short of the main corridor, one side table stands in the middle of the gap, its
 ## foot level with the pods' near edge (BAY_PLANT_FOOT from the row's top: the
 ## wall's two cells and the pod reservation's four above its near edge), on a
 ## cell centre, so a full free cell column stays on each side of it.

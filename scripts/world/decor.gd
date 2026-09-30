@@ -12,8 +12,17 @@ extends StaticBody2D
 ## walking is already decided and a walker's feet have to be stopped by a
 ## cabinet exactly the way they are stopped by a table.
 
+## Where a piece that carries something (a side table) has its top plane, over
+## its foot: the foot of what stands on it (hold()). Measured on the shipped
+## side_table: its top is solid wood over y -23.5..-19 across the middle 16
+## units, and an item's foot at -20 sits a unit behind the top's front edge,
+## the way a desk item sits behind a desk's working edge.
+const TOP_Y := -20.0
+
 ## The semantic id of the piece drawn here; empty until setup().
 var piece := &""
+## The id of what stands on the top (hold()); empty for nothing.
+var held_item := &""
 
 
 ## Stand `id` here. Refuses, draws nothing and answers false for a piece this
@@ -37,6 +46,34 @@ func setup(art: ArtPack, id: StringName) -> bool:
 	shape.shape = box
 	shape.position = Vector2(0, -size.y / 2.0)
 	return true
+
+
+## Stand `item_id` (a prop of `art`, a `desk` or `cat` pool member) on this
+## piece's top, its foot at TOP_Y; an empty id takes it away. Changes only the
+## one sprite in `%Top`, made the first time and dressed again after.
+func hold(art: ArtPack, item_id: StringName) -> void:
+	held_item = item_id
+	var top: Node2D = %Top
+	top.position = Vector2(0, TOP_Y)
+	var image := held()
+	var spec := art.prop_sprite(item_id) if not item_id.is_empty() else null
+	if spec == null:
+		if image != null:
+			image.visible = false
+		return
+	if image == null:
+		image = art.sprite(spec)
+		image.name = "Item"
+		top.add_child(image)
+	else:
+		art.dress(image, art.sprite_texture(spec), spec.pivot)
+	image.visible = true
+
+
+## The sprite standing on the top, or null before hold() put one there.
+func held() -> Sprite2D:
+	var top: Node2D = %Top
+	return top.get_node_or_null("Item") as Sprite2D
 
 
 ## Where this piece stands on the floor, in global coordinates: what a caller

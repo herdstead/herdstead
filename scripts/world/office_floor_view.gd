@@ -539,6 +539,9 @@ func _furnish(next: FloorPlan) -> void:
 	for placed in next.decorations:
 		_place_decor(placed.key, placed.piece, placed.position, wanted)
 		_decor[placed.key].name = "Decor_" + placed.key.replace("/", "_")
+		# A side table's piece on its top (the plan's pick, by place only).
+		if not placed.item.is_empty() or _decor[placed.key].held_item != placed.item:
+			_decor[placed.key].hold(_pen.art, placed.item)
 	_place_fixtures(next)
 
 

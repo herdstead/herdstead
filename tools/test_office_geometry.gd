@@ -135,6 +135,155 @@ func test_thin_front_joins_supports_without_moving_the_floor() -> void:
 			_check(point.y <= -8.0, "near light stops on the working top, not below the thin edge")
 
 
+## The desk decor's pools stand on side tables now (the pod carries none): the
+## spare bay's side table carries one piece picked by its placement key, and
+## that piece survives the pod growing (the table moving along the row, the
+## same node and the same piece), state updates at every seat, and a rebuild in
+## another theme (the same semantic piece, drawn from that pack). It replaces
+## test_desktop_decor_survives_growth_state_updates_and_theme_rebuilds.
+func test_side_table_items_survive_growth_state_updates_and_theme_rebuilds() -> void:
+	world = Node2D.new()
+	root.add_child(world)
+	var policy := FloorLayoutPolicy.new()
+	policy.width_cells = 32
+	policy.actor_footprint = PixelPerson.footprint()
+	policy.actor_draw_rect = PixelPerson.drawing_rect(art.people)
+	var model := ZoneModel.new()
+	model.key = "side-table-floor"
+	var room := RoomModel.new()
+	room.key = "tab-a"
+	room.label = "A"
+	model.rooms.append(room)
+	for index in 2:
+		room.panes.append(_side_pane(index))
+	var decor := OfficeDecorPlanner.new(pen)
+	var first := OfficeFloorLayout.plan(model, null, policy, decor).plan
+	var bay := _bay_of(first)
+	_check(bay != null, "the row has a spare bay")
+	if bay == null:
+		return
+	_eq(bay.piece, ArtContract.PROP_SIDE_TABLE, "the spare bay stands a side table")
+	_eq(bay.item, OfficeDecorPlanner.side_table_item(art, bay.key), "carrying its key's piece")
+	_check(art.prop_sprite(bay.item) != null, "a piece of the pack: " + bay.item)
+	var floor_root := Node2D.new()
+	world.add_child(floor_root)
+	var view := OfficeFloorView.new()
+	view.setup(pen, floor_root)
+	view.reconcile(first, MapModel.of(model))
+	view.update_desks(MapModel.of(model), "", false)
+	var node := _decor_node(floor_root, bay.key)
+	_check(node != null, "the side table is drawn")
+	if node == null:
+		return
+	var held := node.held()
+	_eq(node.held_item, bay.item, "it holds the plan's piece")
+	_eq(held.texture, art.sprite_texture(art.prop_sprite(bay.item)), "drawn from the pack")
+	_eq((node.get_node("%Top") as Node2D).position, Vector2(0, OfficeDecor.TOP_Y), "on its top")
+	for index in range(2, 6):
+		room.panes.append(_side_pane(index))
+	var grown := OfficeFloorLayout.plan(model, first, policy, decor).plan
+	var moved := _bay_of(grown)
+	_check(moved != null and moved.key == bay.key, "the grown row keeps its spare bay")
+	if moved == null:
+		return
+	_check(grown.desk(room.key).capacity > first.desk(room.key).capacity, "the pod really grew")
+	_eq(moved.item, bay.item, "the same piece where the table stands now")
+	view.reconcile(grown, MapModel.of(model))
+	view.update_desks(MapModel.of(model), "", false)
+	_eq(_decor_node(floor_root, bay.key), node, "the same side table node")
+	_eq(node.held(), held, "holding the same sprite")
+	_eq(node.position, moved.position, "moved with the bay")
+	for state: String in ["blocked", "done", "idle", "working"]:
+		for pane in room.panes:
+			pane.state = state
+		view.update_desks(MapModel.of(model), room.key, false)
+		_eq(
+			[node.held_item, held.texture],
+			[bay.item, art.sprite_texture(art.prop_sprite(bay.item))],
+			state + ": unchanged"
+		)
+	var other := ArtPack.from_manifest(_second_pack_at(_work_dir().path_join("geometry-pack-second")))
+	var themed := OfficeDraw.new(other)
+	var rebuilt_root := Node2D.new()
+	world.add_child(rebuilt_root)
+	var rebuilt := OfficeFloorView.new()
+	rebuilt.setup(themed, rebuilt_root)
+	rebuilt.reconcile(grown, MapModel.of(model))
+	var again := _decor_node(rebuilt_root, bay.key)
+	_check(again != null, "the rebuild in another theme draws it")
+	if again != null:
+		_eq(again.held_item, bay.item, "the same semantic piece")
+		_eq(again.held().texture, other.sprite_texture(other.prop_sprite(bay.item)), "from the other pack")
+
+
+## Over 64 placement keys, in both packs, the side tables' pieces vary: every
+## piece of the `desk` pool and a cat occur, cats on some tables and not most,
+## each key always the same piece. Stood on a real side table, a piece's foot is
+## on the top's solid wood (rows -23.5..-19 over the foot, OfficeDecor.TOP_Y
+## -20) and its pixels keep to the top's middle 16 units. It replaces
+## test_desktop_library_varies_without_covering_equipment_or_leaving_the_top.
+func test_side_table_items_vary_and_stay_on_the_top() -> void:
+	world = Node2D.new()
+	root.add_child(world)
+	for manifest: String in [
+		"res://assets/daylight/manifest.json", _second_pack_at(_work_dir().path_join("geometry-pack-second"))
+	]:
+		var pack := ArtPack.from_manifest(manifest)
+		var drawing := OfficeDraw.new(pack)
+		var seen: Dictionary[StringName, bool] = {}
+		var cats := 0
+		var cat_ids: Array[StringName] = []
+		for sprite in pack.items_in(OfficeDecorPlanner.CAT_GROUP):
+			cat_ids.append(sprite.id)
+		for sample in 64:
+			var key := "%06d/bay" % sample
+			var id := OfficeDecorPlanner.side_table_item(pack, key)
+			_eq(OfficeDecorPlanner.side_table_item(pack, key), id, "%s: the same piece every time" % key)
+			seen[id] = true
+			cats += int(id in cat_ids)
+			var table := drawing.decor(world, ArtContract.PROP_SIDE_TABLE, Vector2(200, 200))
+			table.hold(pack, id)
+			var item := table.held()
+			var drawn := (
+				table.get_global_transform().affine_inverse() * item.get_global_transform() * _opaque_local(item)
+			)
+			_eq(item.scale, pack.unit_scale(), "%s: the piece uses its family's density" % id)
+			_check(drawn.end.y >= -23.5 and drawn.end.y <= -19.0, "%s %s: its foot on the top's wood" % [pack.id, id])
+			_check(
+				drawn.position.x >= -8.0 and drawn.end.x <= 8.0,
+				"%s %s: inside the top's middle, %s" % [pack.id, id, drawn]
+			)
+			table.free()
+		for sprite in pack.items_in(OfficeDecorPlanner.DESK_GROUP):
+			_check(seen.has(sprite.id), "%s: the keys exercise %s" % [pack.id, sprite.id])
+		_check(cats > 0 and cats < 32, "%s: cats occur, on most tables not: %d of 64" % [pack.id, cats])
+
+
+## A pane of the side-table floor, working.
+func _side_pane(index: int) -> PaneModel:
+	var pane := PaneModel.new()
+	pane.pane_id = "p%d" % index
+	pane.key = "side:p%d" % index
+	pane.terminal_id = "term-p%d" % index
+	pane.provider = "claude"
+	pane.state = "working"
+	return pane
+
+
+## The spare bay's piece of `plan`, or null.
+func _bay_of(plan: FloorPlan) -> DecorPlacement:
+	for placed in plan.decorations:
+		if placed.key.ends_with("/bay"):
+			return placed
+	return null
+
+
+## The drawn standing piece keyed `key` under `floor_root` (OfficeFloorView names
+## it after its plan key), or null.
+func _decor_node(floor_root: Node, key: String) -> OfficeDecor:
+	return floor_root.find_child("Decor_" + key.replace("/", "_"), true, false) as OfficeDecor
+
+
 func test_laptops_align_with_workers_on_both_sides_after_growth() -> void:
 	var table := _table()
 	_check(table.resize(4), "include appended columns")
@@ -408,8 +557,15 @@ func test_labels_clear_the_heads_they_hang_on() -> void:
 			_check(not text.intersects(figure), "%s: the plate's text %s clears the figure %s" % [where, text, figure])
 			_check(not badge.intersects(figure), "%s: the badge %s clears the figure %s" % [where, badge, figure])
 			_check(mark.encloses(figure), "%s: the selection mark %s frames the figure %s" % [where, mark, figure])
+			# Without the lens the plate takes the lens row's slot, next to the tag
+			# row; with it, the lens line takes that slot and the plate moves out.
+			var slot: Vector2 = station.rest_position() + OfficeStation.LENS_AT[side]
+			_eq(_plate_of(station).position, slot, "%s: unheld, the plate in the lens row's slot" % where)
 			# The lens line clears the figure and the badge as the plate does.
 			station.show_lens(true, "99m+")
+			_eq(_plate_of(station).position, OfficeStation.PLATE_AT[side], "%s: held, the plate moves out" % where)
+			text = _plate_text(station)
+			_check(not text.intersects(figure), "%s: held, the plate's text %s clears the figure" % [where, text])
 			var lens := _lens_text(station)
 			_check(not lens.intersects(figure), "%s: the lens line %s clears the figure %s" % [where, lens, figure])
 			_check(not lens.intersects(badge), "%s: the lens line %s clears the badge %s" % [where, lens, badge])
@@ -805,6 +961,12 @@ func test_the_paper_stack_sits_beside_the_laptop_and_off_the_neighbours() -> voi
 				var plane: Rect2 = planes[side]
 				_check(plane.encloses(paper), "%s: the paper %s is on its plane %s" % [where, paper, plane])
 				_check(paper.position.x >= laptop.end.x, "%s: right of the laptop %s, clear of it" % [where, laptop])
+				# The pod's selection frame stands outside its desks: no bar on the paper.
+				table.set_selected(true)
+				for bar in _frame_bars(table):
+					var local := table.global_transform.affine_inverse() * bar
+					_check(not local.intersects(paper), "%s: the frame's bar %s clears the paper" % [where, local])
+				table.set_selected(false)
 				for other: String in ["%d/%s" % [column, side], "%d/%s" % [column + 1, side]]:
 					if workers.has(other):
 						_check(
@@ -946,12 +1108,44 @@ func test_rows_at_the_pod_pitch_never_meet() -> void:
 								]
 							)
 						)
+				# Every pod selected: its frame's bars meet nothing of another pod, nor
+				# its own seats' badges, chips, marks or click rectangles (its plate
+				# and lens Labels may reach under a bar with no ink there).
+				for table: OfficeTable in [upper, beside, lower]:
+					table.set_selected(true)
+					for bar in _frame_bars(table):
+						for index in parts.size():
+							var own := owners[index].table == table
+							if own and names[index] in ["plate", "lens"]:
+								continue
+							if bar.intersects(parts[index]):
+								clashes.append(
+									(
+										"%s frame %s / %s %s %s"
+										% [table.name, bar, owners[index].pane_key, names[index], parts[index]]
+									)
+								)
+						for other: OfficeTable in [upper, beside, lower]:
+							if other == table:
+								continue
+							for far_bar in _frame_bars(other):
+								if bar.intersects(far_bar):
+									clashes.append("%s frame %s / %s frame %s" % [table.name, bar, other.name, far_bar])
 				var where := "shift %d, wait %s, lens %s, lift %d" % [shift, known, held, lift]
 				_eq(clashes, PackedStringArray(), where + ": nothing meets")
 				if shift == 0.0:
 					_check_row_literals(upper, stations, known, held, lift)
 	for station in stations:
 		station.free()
+
+
+## The four bars of `table`'s selection frame, in global coordinates.
+func _frame_bars(table: OfficeTable) -> Array[Rect2]:
+	var bars: Array[Rect2] = []
+	for bar: Node in table.get_node("Overlay/Frame").get_children():
+		var control: Control = bar
+		bars.append(control.get_global_transform() * Rect2(Vector2.ZERO, control.size))
+	return bars
 
 
 ## Whether two parts of the same seat may not meet: the three rows (plate,
@@ -1013,7 +1207,9 @@ func _check_row_literals(
 		_eq(rows.has("lens"), held, "%s: the lens row only under the lens" % where)
 		if held:
 			_eq(to_pod * rows["lens"], Rect2(1, -102.0 if far else 46.0, 30, 12), "%s: the lens row" % where)
-		_eq(to_pod * rows["plate"], Rect2(1, -114.0 if far else 58.0, 30, 12), "%s: the plate row" % where)
+		# Held, the plate is the outermost row; unheld, it takes the lens row's slot.
+		var plate_top := (-114.0 if far else 58.0) if held else (-102.0 if far else 46.0)
+		_eq(to_pod * rows["plate"], Rect2(1, plate_top, 30, 12), "%s: the plate row" % where)
 		_eq(
 			to_pod * rows["chip rect"],
 			Rect2(1, -90.0 if far else 28.0, 30, 18),

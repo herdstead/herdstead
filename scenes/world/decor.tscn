@@ -9,4 +9,7 @@ script = ExtResource("1_decor")
 [node name="Body" type="Sprite2D" parent="."]
 centered = false
 
+[node name="Top" type="Node2D" parent="."]
+unique_name_in_owner = true
+
 [node name="Footprint" type="CollisionShape2D" parent="."]

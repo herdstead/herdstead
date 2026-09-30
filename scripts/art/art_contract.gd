@@ -111,6 +111,9 @@ const PROP_PLANT := &"plant"
 ## PROP_PLANT by place along a run (OfficeDecorPlanner.plant_at()).
 const PROP_PLANT_B := &"plant_b"
 const PROP_CABINET := &"cabinet"
+## A small table standing on the floor that carries one piece from the `desk`
+## or `cat` pool on its top (OfficeDecor.hold()): furniture, never a signal.
+const PROP_SIDE_TABLE := &"side_table"
 ## A framed picture on a row wall: furnishing hung beside the signs on a
 ## grid of the wall itself, never a signal.
 const PROP_WALL_FRAME := &"wall_frame"
@@ -132,6 +135,7 @@ const PROP_IDS: Array[StringName] = [
 	PROP_PLANT,
 	PROP_PLANT_B,
 	PROP_CABINET,
+	PROP_SIDE_TABLE,
 	PROP_WALL_FRAME,
 	PROP_RECEPTION,
 	PROP_PANTRY,

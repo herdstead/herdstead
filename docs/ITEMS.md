@@ -28,10 +28,10 @@ one pack and one list: no second list in Python or GDScript.
 
 | Field | Type | Meaning | Checked |
 |---|---|---|---|
-| `place` | `desk` / `floor` / `wall` | What it stands on: a table's working plane, the floor, a row's back wall. | one of the three |
+| `place` | `desk` / `floor` / `wall` | What it stands on: a working plane (a side table's top), the floor, a row's back wall. | one of the three |
 | `footprint` | `[w, d]` whole units | The area it occupies at its foot point: `w` centred on the pivot, `d` back from it. On the floor it is the collider and the walk obstacle (`OfficeDecor.footprint_of()`); on a desk, the plane space it takes. | `desk`, `floor`: required; 1 ≤ `w` ≤ canvas width; `d` ≥ 1 |
 | `blocks` | bool | People walk round it. | `floor` only, and only `true` for now: the walk graph takes every floor footprint as an obstacle |
-| `group` | id | The pool a place draws it from (`ArtPack.items_in()`, by id, never by file order). Today: a table's column draws from `desk`, its cat slot from `cat`, a wall-run or spare-bay pot from `plant` (by the place's parity). | `[a-z0-9_]+`; absent = placed by code by id only |
+| `group` | id | The pool a place draws it from (`ArtPack.items_in()`, by id, never by file order). Today: a side table's top draws one piece from `desk`, or now and then (28%) from `cat`, seeded by the side table's placement key (`OfficeDecorPlanner.side_table_item()`); a wall-run pot draws from `plant` (by the place's parity). A pod of desks draws nothing from a pool. | `[a-z0-9_]+`; absent = placed by code by id only |
 | `weight` | whole number ≥ 0 | Odds within its group (`ArtPack.pick()`); `0` = never drawn. Equal weights draw as one `randi_range()` over the pool. | only with a `group`; default `1` |
 
 Any other key refuses the pack (a misspelling must not read as an absent key). `ArtPack.from_manifest()` stays the
@@ -42,12 +42,12 @@ at build time:
 
 | Place | Rule | Why |
 |---|---|---|
-| `desk` | opaque only in unit rows 3..21 of its 24-unit canvas | fits the working plane under the divider, above the lip; the canvas, 28 left of its column, already clears the laptop and the paper stack. Keeping it smaller than the 14-unit laptop is the art's choice, not a rule |
+| `desk` | opaque only in unit rows 3..21 of its 24-unit canvas | its foot row lands on a working plane. Today that plane is the **side table's top**: `side_table` (32×32, pivot (16, 30), `{place: floor, footprint: [28, 10]}`, placed by code by id) is solid wood over rows −23.5..−19 above its foot across its middle 16 units, and `OfficeDecor.hold()` stands the piece's foot at `OfficeDecor.TOP_Y` = −20, a unit behind the top's front edge; every `desk` and `cat` piece keeps to that middle 16 (`tools/test_office_geometry.gd`). Keeping items smaller than the 14-unit laptop is the art's choice, not a rule |
 | `floor` | footprint inside the canvas width | the counters' and plants' existing rules still apply (`tools/test_assets.py`) |
 | `wall` | — | the frame band's own planner checks where it fits |
 
 **Signals stay out of the pools.** Visual-language rule 1 is unchanged: an item in a pool is furniture, drawn at
-random, never from state. A signal (`done_stack`) has no `group`: it is placed by code by id, and `ArtContract`
+random, never from state. A signal (`done_stack_small`) has no `group`: it is placed by code by id, and `ArtContract`
 refuses it in a pool. `ArtContract.ITEM_GROUPS` names the pools scenes draw from (`desk`, `cat`, `plant`), each of
 which must have a member standing where it is drawn; a pool's members count as used in `PACK_UNUSED`.
 

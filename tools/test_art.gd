@@ -594,8 +594,8 @@ func test_art_contract_names_ids_no_scene_asks_for() -> void:
 	)
 	# The pods of desks draw the pod's art (lane B1); what the long table, the
 	# big paper stack and the big selection frame drew is shipped and drawn by
-	# nothing now, until lane C prunes it from the pack. The zone partitions
-	# (lane B2) and the side table land before the code that draws them.
+	# nothing now, until lane C prunes it from the pack; the zone partitions
+	# land before lane B2 draws them: exactly these ids.
 	_eq(
 		Array(unused[&"props"]),
 		[
@@ -607,9 +607,8 @@ func test_art_contract_names_ids_no_scene_asks_for() -> void:
 			"partition_h_end_r",
 			"partition_post",
 			"partition_v",
-			"side_table",
 		],
-		"every prop but the long table's paper, the zone partitions and the side table is placed somewhere"
+		"every prop but the long table's paper and the zone partitions is placed somewhere"
 	)
 	_eq(Array(unused[&"ui"]), ["selection"], "every UI image but the long table's frame is drawn somewhere")
 	_eq(

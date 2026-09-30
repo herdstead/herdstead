@@ -1165,8 +1165,8 @@ func test_the_wall_run_keeps_its_place_when_a_table_grows() -> void:
 
 
 ## Two plants take turns along a run by their place on it: the row's
-## first plant is place 0, the wall-foot run's pieces are their grid step, the
-## spare bay's plant its cell column. Never a state, a tab or the time: the
+## first plant is place 0, the wall-foot run's pieces are their grid step (the
+## spare bay stands a side table now, not a plant). Never a state, a tab or the time: the
 ## planner reads no herdr, so the place is all there is to go by. Every plant a
 ## furnished floor stands is one of the two, the one its key's place names, and
 ## a run of two or more places reads as two kinds, not a stamp.
@@ -1188,6 +1188,9 @@ func test_the_wall_run_alternates_two_plants_by_place() -> void:
 			var run := 0
 			for placed in _row_pieces(plan, row.index):
 				if placed.piece == ArtContract.PROP_CABINET:
+					continue
+				if placed.piece == ArtContract.PROP_SIDE_TABLE:
+					_check(placed.key.ends_with("/bay"), "only the spare bay stands a side table: " + placed.key)
 					continue
 				_check(placed.piece in [plant, plant_b], "%s is one of the two plants: %s" % [placed.key, placed.piece])
 				var place := placed.key.get_slice("/", 1)

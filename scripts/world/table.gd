@@ -82,6 +82,12 @@ const LAMP_STRONG := 1.4
 ## office chair is 22 units tall; a small offset leaves the upper back clear.
 ## The near chair is opaque down to seat + 6, pod y 28.
 const CHAIR_OFFSET := {"far": -4, "near": 6}
+## How far outside render_rect the pod's selection frame is drawn: its 2-unit
+## bars then lie on [-92, -90) over the far rows, [46, 48) under the near ones
+## and one bar's width beside the end desks, clear of the last column's paper
+## (to x = width) and of the near chip (to 46). An overlay, never planned
+## around: it stays inside the passage cells between pods and the row's own band.
+const FRAME_OUTSIDE := 2.0
 ## The stationary drawing of a pod (render_rect), above the far edge and below
 ## the near one: the far tag row's pulse envelope reaches -90, the near one 46.
 const DRAWN_ABOVE_FAR := 42
@@ -268,7 +274,9 @@ func _rebuild_modules() -> void:
 		_module($Supports, &"leg_short", Vector2(leg_x - leg_width / 2.0, LEG_DROP))
 	for x in columns:
 		_module($Supports, &"bracket", Vector2(x - 6, BRACKET_DROP))
-	var frame := geometry.render_rect
+	# The frame stands FRAME_OUTSIDE outside the stationary drawing, so its bars
+	# cover neither the end desks' paper nor the near chips.
+	var frame := geometry.render_rect.grow(FRAME_OUTSIDE)
 	for bounds: Rect2 in [
 		Rect2(frame.position, Vector2(frame.size.x, 2)),
 		Rect2(frame.position.x, frame.end.y - 2, frame.size.x, 2),

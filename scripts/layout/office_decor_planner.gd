@@ -4,8 +4,9 @@ extends RefCounted
 ## the end of each row's wall bay and a plant at its start; between them the
 ## wall-foot run, more plants on a grid of the wall (OfficeShell.WALL_RUN_PITCH
 ## from the first plant, keyed by the place on that grid, "%06d/wall/%03d"); and
-## where the row's last table ends well short of the main corridor, one plant
-## in the middle of that spare bay ("%06d/bay"). A piece is kept only where its
+## where the row's last pod ends well short of the main corridor, one side
+## table in the middle of that spare bay ("%06d/bay"), carrying one piece from
+## the `desk` pool or, now and then, the `cat` one (side_table_item()). A piece is kept only where its
 ## drawing stays on the floor and clear of every walkway, table, sign and wall
 ## title, and of the pieces kept before it. Furniture is optional: a piece that
 ## does not fit is left out, never a desk moved for it. None of it reads herdr:
@@ -16,8 +17,13 @@ extends RefCounted
 ## furnished floor would close a path to any seat. Drawing it is
 ## OfficeFloorView's business.
 
-## The pool the wall-foot and spare-bay pots are drawn from (ItemSpec.group).
+## The pool the wall-foot pots are drawn from (ItemSpec.group).
 const PLANT_GROUP := &"plant"
+## The pools a side table's one piece is drawn from: a trinket, or now and
+## then (SIDE_TABLE_CAT of the tables) the white cat.
+const DESK_GROUP := &"desk"
+const CAT_GROUP := &"cat"
+const SIDE_TABLE_CAT := 0.28
 
 var _pen: OfficeDraw
 
@@ -28,8 +34,7 @@ func _init(pen: OfficeDraw) -> void:
 
 
 ## Which plant stands at place `index` of a run (the row's first plant is place
-## 0, the wall-foot run's pieces their grid step, the spare bay's plant its cell
-## column): the pack's plants (PLANT_GROUP, in the order it lists them) take
+## 0, the wall-foot run's pieces their grid step): the pack's plants (PLANT_GROUP, in the order it lists them) take
 ## turns by the place, so a run reads as kinds, not a stamp. Only the place:
 ## never a state, a tab or the time. Empty when the pack has no plant.
 static func plant_at(art: ArtPack, index: int) -> StringName:
@@ -37,6 +42,20 @@ static func plant_at(art: ArtPack, index: int) -> StringName:
 	if plants.is_empty():
 		return &""
 	return plants[posmod(index, plants.size())].id
+
+
+## What stands on the side table placed at `key`: a cat (SIDE_TABLE_CAT of the
+## keys) or a trinket, by weight (ArtPack.pick()), from a stream seeded by the
+## placement key alone: never a tab, a zone, a state or the time, so the same
+## place always carries the same piece. Empty when the pack has no pool.
+static func side_table_item(art: ArtPack, key: String) -> StringName:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = key.hash()
+	var cats := art.items_in(CAT_GROUP)
+	var trinkets := art.items_in(DESK_GROUP)
+	var pool := cats if rng.randf() < SIDE_TABLE_CAT and not cats.is_empty() else trinkets
+	var chosen := ArtPack.pick(pool, rng)
+	return chosen.id if chosen != null else &""
 
 
 ## Add every candidate that fits `next`, row by row. A new candidate plan can be
@@ -67,10 +86,12 @@ func furnish(next: FloorPlan) -> void:
 			step += 1
 		var bay := _spare_bay(next, row)
 		if bay >= 0:
+			var key := "%06d/bay" % row.index
 			var candidate := _candidate(
-				"%06d/bay" % row.index,
-				plant_at(_pen.art, bay),
-				Vector2((bay + 0.5) * grid, top + OfficeShell.BAY_PLANT_FOOT)
+				key,
+				ArtContract.PROP_SIDE_TABLE,
+				Vector2((bay + 0.5) * grid, top + OfficeShell.BAY_PLANT_FOOT),
+				side_table_item(_pen.art, key)
 			)
 			if _fits(next, row, placed, candidate, 0.0):
 				placed.append(candidate)
@@ -80,7 +101,7 @@ func furnish(next: FloorPlan) -> void:
 		next.decorations.append_array(placed)
 
 
-## The cell column the spare bay's plant stands in: the middle of the gap between
+## The cell column the spare bay's side table stands in: the middle of the gap between
 ## the row's last table and the main corridor, when that gap is at least
 ## SPARE_BAY_CELLS wide. -1 for a row without one, or without a table.
 static func _spare_bay(next: FloorPlan, row: RowPlan) -> int:
@@ -97,15 +118,22 @@ static func _by_key(a: DecorPlacement, b: DecorPlacement) -> bool:
 	return a.key < b.key
 
 
-func _candidate(key: String, piece: StringName, at: Vector2) -> DecorPlacement:
+## A piece `piece` standing at `at`, carrying `item` on its top (OfficeDecor.TOP_Y)
+## when that is not empty: its drawing covers both.
+func _candidate(key: String, piece: StringName, at: Vector2, item := &"") -> DecorPlacement:
 	var result := DecorPlacement.new()
 	result.key = key
 	result.piece = piece
 	result.position = at
+	result.item = item
 	var footprint := OfficeDecor.footprint_of(_pen.art, piece)
 	result.footprint = Rect2(at - Vector2(footprint.x / 2.0, footprint.y), footprint)
 	var sprite := _pen.art.prop_sprite(piece)
 	result.draw_rect = Rect2(at - sprite.pivot, Vector2(sprite.size))
+	var carried := _pen.art.prop_sprite(item) if not item.is_empty() else null
+	if carried != null:
+		var on_top := at + Vector2(0, OfficeDecor.TOP_Y)
+		result.draw_rect = result.draw_rect.merge(Rect2(on_top - carried.pivot, Vector2(carried.size)))
 	return result
 
 

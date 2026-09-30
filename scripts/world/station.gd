@@ -79,9 +79,12 @@ const CHIP_BADGE_SHIFT := Vector2(-8.5, 0)
 ## (OfficeAttention.compact_duration(): 18 wide at most).
 const LENS_AT := {"far": Vector2(-15, -66), "near": Vector2(-15, 24)}
 const LENS_SIZE := Vector2(30, 12)
-## The plate row, 30 by 12, outermost: pod [-114, -102) far and [58, 70) near.
-## The provider in upper case, in the display face at 8, cut with a forced
-## ellipsis when it is wider (the card and the list say the whole name).
+## The plate, 30 by 12: the provider in upper case, in the display face at 8,
+## cut with a forced ellipsis when it is wider (the card and the list say the
+## whole name). While the lens is not held its row is empty, so the plate
+## takes the lens row's slot, next to the tag row (LENS_AT: pod [-102, -90)
+## far, [46, 58) near); while the lens is held it moves out to the outermost
+## row, PLATE_AT: pod [-114, -102) far and [58, 70) near.
 const PLATE_SIZE := Vector2(30, 12)
 const PLATE_AT := {"far": Vector2(-15, -78), "near": Vector2(-15, 36)}
 ## The seat mark (ui `selection_seat`, 32 by 48 over its foot) frames the seated
@@ -338,6 +341,8 @@ func show_lens(held: bool, text: String) -> void:
 	line.visible = held and not vacant and not text.is_empty()
 	_lens_held = held
 	bubble().set_lensed(held)
+	var plate: Label = $Overlay/Plate
+	plate.position = rest_position() + _plate_at()
 	_show_plate()
 
 
@@ -352,6 +357,12 @@ func select(selected: bool) -> void:
 ## (not away), and hovered, selected or under the held lens.
 func plate_shown() -> bool:
 	return not vacant and not away() and (not _hovered.is_empty() or _selected or _lens_held)
+
+
+## Where the plate hangs over the seat: the lens row's slot, or while the lens
+## is held (and the lens line has that row) the outermost row.
+func _plate_at() -> Vector2:
+	return PLATE_AT[side] if _lens_held else LENS_AT[side]
 
 
 func _show_plate() -> void:
@@ -572,7 +583,7 @@ func _place() -> void:
 	var away_here := away()
 	var at := rest_position()
 	var plate: Label = $Overlay/Plate
-	plate.position = at + PLATE_AT[side]
+	plate.position = at + _plate_at()
 	# Out of the tree the face is not on yet and a Label keeps the default
 	# font's 23-unit height; in it, the row is its own height again.
 	plate.size = PLATE_SIZE

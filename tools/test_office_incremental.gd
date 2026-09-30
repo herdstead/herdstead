@@ -226,7 +226,8 @@ func test_labels_follow_the_pose() -> void:
 		_eq(
 			seated,
 			[
-				station.seat.global_position + OfficeStation.PLATE_AT[side],
+				# Without the lens the plate hangs in the lens row's slot.
+				station.seat.global_position + OfficeStation.LENS_AT[side],
 				station.seat.global_position + OfficeStation.BADGE_AT[side],
 				station.seat.global_position + OfficeStation.SELECTION_AT[side]
 			],

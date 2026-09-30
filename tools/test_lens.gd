@@ -351,7 +351,8 @@ func test_both_plants_are_drawn_where_planned_and_ignore_herdr() -> void:
 	for at: Vector2 in drawn:
 		var piece: OfficeDecor = drawn[at]
 		_eq(piece.piece, planned.get(at, &""), "the piece drawn at %s is the planned one" % at)
-		if piece.piece != ArtContract.PROP_CABINET:
+		# The spare bay's side table is furniture too, not a plant.
+		if piece.piece not in [ArtContract.PROP_CABINET, ArtContract.PROP_SIDE_TABLE]:
 			_check(piece.piece in [&"plant", &"plant_b"], "a plant is one of the two: %s" % piece.piece)
 			kinds[piece.piece] = (piece.get_node("Body") as Sprite2D).texture
 	_eq(kinds.size(), 2, "the floor shows both plants: %s" % [kinds.keys()])

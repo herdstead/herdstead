@@ -60,7 +60,7 @@ These were tried and dropped as a whole. Do not bring them back under any name.
 | `scenes/people/pixel_person.tscn` | `CharacterBody2D` | A pixel person: six layer sprites under `Layers` (`Legs`, `Top`, `Body`, `Glasses`, `Hair`, `Headwear`, bottom to top), one `AnimationPlayer`, a `Feet` collider, no chest badge. `configure` dresses, `play_state` picks the motion, `face` turns, `sit` / `stand_up`, `pace` sets the step rate; `drawing_rect()` / `footprint()` measure the person for layout. |
 | `scenes/world/table.tscn` | `StaticBody2D` | A pod of single desks built from 32-unit modules, one desk per column: desktops, apron, the low screen between the two rows, two short legs, a bracket per desk, footprint collider; per column and side a seat `Marker2D`, a standing `Marker2D` (`Standing`, `standing()`: the near seat leg's corner, nobody stands there), laptop, grommet, lamp and done's paper stack (`Papers`, `show_papers()` / `papers()`, built with the table, only `visible` changes). `measure()` gives the planner its size; `resize()` / `relocate()` update in place; `equip()`, `light()` and `show_papers()` switch existing nodes. **All table geometry constants live only in `scripts/world/table.gd`.** |
 | `scenes/world/station.tscn` | `Node2D` (y-sort) | One seat: chair, person (seated, or standing in the pantry when idle, rule 5), `Overlay` and `Target`. `Overlay` holds the name plate, lens line, seat mark (`selection_seat`), status badge and the blocked chip (`bubble.tscn`, `OfficeBubble`: a 30×16 `panel` with the same badge node moved into its left half and the wait in `OfficeAttention.compact_duration()` in its right half; with no writable wait (start not seen, disconnected) it draws nothing, not even the frame, the badge is back in the middle and its click area stays; it never shows the question, which is in the HUD tooltip `%BubbleTip`). The rows over a seat are listed in "Rows over a seat" below. The plate shows only while the seat's or the chip's rectangle is hovered, the seat is selected or `L` is held. Seated offsets (`PLATE_AT`, `BUBBLE_AT`, ...) are relative to the seat, the `AWAY_*` ones relative to where the person rests in the pantry, where there is no plate; a move only changes their `position`. `Target` is the click `Area2D`: this side's seat rectangle (while the chip shows it is swapped for a shorter one that leaves the tag row to the chip), `Bubble` (the chip's, enabled only while it shows; a click there emits `asked`, anywhere else `picked`; pointer enter/exit emits `bubble_hovered`; the badge draws over the chip) and `Away` (enabled with the seat rectangle while the person rests in the pantry). The other side's seat rectangle is never enabled. `rest_at()`, called by the presentation, hangs overlay and click area where the person rests. Every column has a station on both sides; one without a pane is an empty chair that cannot be clicked (no laptop, lamp off). `rebind()` rebinds the seat and sets position and click area absolutely, keeping the actor. A station hands its laptop, lamp and paper stack to the table and never touches the table's nodes. While the presentation walks the person (`walking`), `furnish()` / `rebind()` leave the person's position and motion alone, only recording the seated look, and `land()` applies it on arrival. |
-| `scenes/world/decor.tscn` | `StaticBody2D` | One standing piece of furniture (plant, filing cabinet, and the entry band's counters): a `Sprite2D` placed on its foot point plus a footprint on the `FURNITURE` layer. Footprint sizes come from each piece's `item` block in the pack (`OfficeDecor.footprint_of()`, including the two counters; [ITEMS](ITEMS.md)). **Furniture binds no herdr field**; its position comes only from the floor layout. |
+| `scenes/world/decor.tscn` | `StaticBody2D` | One standing piece of furniture (plant, filing cabinet, side table, and the entry band's counters): a `Sprite2D` placed on its foot point plus a footprint on the `FURNITURE` layer, and a `%Top` holder for what a side table carries (`hold()`, `held()`, `TOP_Y`). Footprint sizes come from each piece's `item` block in the pack (`OfficeDecor.footprint_of()`, including the two counters; [ITEMS](ITEMS.md)). **Furniture binds no herdr field**; its position comes only from the floor layout. |
 
 Floor assembly:
 
@@ -100,7 +100,7 @@ Coordinates are relative to the pod's origin at the left end of its near edge:
 | Capacity and width | `capacity` is at least 2 and counts columns per side; the planner grows it 2 columns at a time and keeps old capacity. Width is `max(64, capacity × 32)` (`MIN_WIDTH` 64) |
 | Column x | `16 + 32 × i`; growth never re-centres existing columns |
 | `physical_rect` | `(0, -48, width, 48)` (`SURFACE_DEPTH` 48), the desktop's collision footprint only |
-| `render_rect` | `(0, -90, width, 136)`: y [−90, 46), the stationary drawing: the tag rows' badge pulse envelopes, the chips, laptops, paper, the seat marks and the pod's selection frame. The plate and lens rows are transient (hover, selection, held `L`) and lie outside it |
+| `render_rect` | `(0, -90, width, 136)`: y [−90, 46), the stationary drawing: the tag rows' badge pulse envelopes, the chips, laptops, paper and the seat marks. The plate and lens rows are transient (hover, selection, held `L`) and lie outside it; so does the pod's selection frame, an overlay 2 units outside it (`FRAME_OUTSIDE`) so its bars cover neither the end desks' paper nor the near chips |
 | `reserved_rect` | `(0, -128, width + 32, 192)`: six cells, from the far approach row to the near one, with a one-cell passage on the right; bottom edge 64 |
 | Seats | far `(x, -36)` (`FAR_SEAT` 12 inside the far edge), near `(x, 22)` |
 | Laptops | same x as the seat; far foot `(x, -40)` (8 inside the far edge: the rear view −48..−40, clear of the far worker, who shows only above −48), near `(x, -10)` (−21..−10). 14 units wide; rear view 8 units tall, front view with keyboard 11. A shell's empty chair gets the same laptop as an agent |
@@ -124,9 +124,10 @@ half-open; the badge's pulse (`OfficeAttention.PULSES`) lifts it by 0, −1 or �
 | Tag (the badge, 15 opaque, centred) | [−88, −72); pulse envelope [−90, −72) | [30, 46); pulse envelope [28, 46) |
 | Chip (blocked with a known wait) | `panel` [−15, 15) × [−88, −72); the badge in x [−16, −1) (one unit over the chip's left edge), the wait's 14-wide label in [0, 14): the widest form inks 13 units, so daylight stays between it and the badge and before the frame's right border | the same, over [30, 46) |
 | Lens (held `L`), 30×12 | [−102, −90) | [46, 58) |
-| Plate (hover, selection, held `L`), 30×12, display face at 8, upper case, forced ellipsis | [−114, −102) | [58, 70) |
+| Plate (hover, selection, held `L`), 30×12, display face at 8, upper case, forced ellipsis | the lens row's slot [−102, −90); while `L` is held, [−114, −102) | the lens row's slot [46, 58); while `L` is held, [58, 70) |
 | Seat click rectangle | [−90, −32); [−72, −32) while the chip shows | [−21, 46); [−21, 28) while the chip shows |
 | Chip click rectangle | [−90, −72) | [28, 46) |
+| Pod selection frame (2-unit bars, `FRAME_OUTSIDE` 2 outside `render_rect`) | top bar [−92, −90), sides x [−2, 0) and [w, w + 2) | bottom bar [46, 48) |
 | Seat mark (`selection_seat`, 32×48, pivot (16, 46)) | `SELECTION_AT` (0, 10): [−72, −24) | `SELECTION_AT` (0, 4): [−20, 28) |
 
 At the 192-unit row pitch the next row's far plate starts at 192 − 114 = 78, past this row's near plate (70): 8 units
@@ -199,13 +200,16 @@ Each row's candidates, in order:
   within `WALL_RUN_GAP` (8) of a sign, title or other piece stays empty. The run stands on the same strip under the
   wall as the cabinet (foot y = row top + 76, `PLANT_FOOT`; cabinet `CABINET_FOOT` 80; footprint only in the row's
   second cell row, T+64..96), and the far walkway stays open;
-- last, the **spare bay** plant `%06d/bay`: when a row's last table's reservation ends at least `SPARE_BAY_CELLS` (3)
-  cells short of the main corridor, one plant stands on the cell centre in the middle of that gap, its foot level with
-  the pods' near edge (row top + `BAY_PLANT_FOOT`, 192), with at least one full free cell column on each side. An
-  empty row has no spare bay.
+- last, the **spare bay** side table `%06d/bay`: when a row's last pod's reservation ends at least
+  `SPARE_BAY_CELLS` (3) cells short of the main corridor, one `side_table` stands on the cell centre in the middle of
+  that gap, its foot level with the pods' near edge (row top + `BAY_PLANT_FOOT`, 192), with at least one full free
+  cell column on each side. It carries one piece (`DecorPlacement.item`) from the `desk` pool or, on 28% of keys, the
+  `cat` pool, picked by `OfficeDecorPlanner.side_table_item()` from a stream seeded by the placement key alone;
+  `OfficeDecor.hold()` stands it in the piece's `%Top` at `OfficeDecor.TOP_Y` (−20), and the candidate's drawing
+  covers both. An empty row has no spare bay.
 
-Which plant image is used comes from `OfficeDecorPlanner.plant_at(index)` by grid step (the spare bay by cell
-column); today it is always `plant`, and a second plant kind changes only that function, moving nothing.
+Which plant image is used comes from `OfficeDecorPlanner.plant_at(index)` by grid step; the two plant kinds take
+turns, moving nothing.
 
 Candidates and choices live in `OfficeDecorPlanner` (`scripts/layout/`). `OfficeFloorLayout.plan()` places them
 before the one validation a candidate plan gets; if the furnished plan fails, it drops the batch and validates the
@@ -255,6 +259,7 @@ wall.
   [the visual language](VISUAL_LANGUAGE.md), "Where people rest".
 
 Desk trinkets and the white cat are not a pod's: nothing stands on a desk but a seat's own equipment and its paper.
+They stand on side tables (see "Standing furniture" above; [ITEMS](ITEMS.md) for the top plane).
 
 ### Incremental updates and caching
 
