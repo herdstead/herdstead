@@ -985,7 +985,7 @@ func test_pruning_releases_only_the_floors_that_went_away() -> void:
 ## and its plan places that one zone over the plan's own rows: every desk names
 ## the zone it stands in, and the zone holds every desk.
 func test_a_one_zone_plan_places_its_zone_over_its_rows() -> void:
-	var floor_model := _keyed("machine/one", [_room("a", 4), _room("b", 2, 1), _room("c", 6, 2)])
+	var floor_model := _keyed("machine/one", [_room("a", 20), _room("b", 12, 1), _room("c", 24, 2)])
 	var map := MapModel.of(floor_model)
 	_eq([map.key, map.zones], [floor_model.key, [floor_model]], "a map wraps one zone under the workspace's key")
 	_eq(map.geometry_signature(), floor_model.geometry_signature(), "and has that zone's geometry signature")
