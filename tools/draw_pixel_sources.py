@@ -10,9 +10,10 @@ nothing else):
   (a kitchenette counter with a coffee machine);
 - the shared table family, through `build_table_assets.py`'s template path
   (see its docstring for what those drawings keep);
-- two pieces drawn texel by texel at the pack's density 2 instead: the small
+- pieces drawn texel by texel at the pack's density 2 instead: the small
   paper stack `done_stack_small` (a state signal, the done seat's paper on a
-  pod desk) and the seat selection mark `selection_seat` (ui).
+  pod desk), the seat selection mark `selection_seat` (ui) and the zone
+  partition kit (`partition_*`, props).
 
 It writes a complete tree into an empty directory: `props/`, `ui/` and `table/`, laid
 out exactly as `art/daylight/` is. Nothing here ever writes into `art/`, and
@@ -46,6 +47,15 @@ nothing else is opaque, so the middle (x 2..30, y 2..46) stays clear for the
 seated person it encloses (x -8..12 about the foot with a raised hand, y
 -36..0).
 
+What the partition kit keeps (PARTITION_SIZES has the canvases and feet):
+cream plaster under a thin honey-wood cap with a 1-texel ink outline, lit from
+the top-left, in the pack's palette. A bottom-run piece is at most 10 units
+tall from its foot and every column of its run is the same, so any run piece
+meets any other without a seam; a side-run piece is at most 6 units wide, no
+wider than its band, and every row is the same, so it tiles top-bottom and
+meets a corner's side strip without a seam. Each piece stands on its foot
+(its last opaque row is the one above the pivot's y) and is centred on it.
+
 What a fixture keeps (OfficeFixturePlanner stands a counter with its foot on
 the floor under the top wall): each drawing fills its canvas as
 `FIXTURE_SIZES` gives it, which is what art/daylight/pack.json declares, with
@@ -64,7 +74,7 @@ from pathlib import Path
 from PIL import Image
 
 from build_assets import ROOT, require
-from build_table_assets import generate_templates, image, pixel_map
+from build_table_assets import generate_templates, image, pixel_map, rgba
 
 ## Every desk piece: 24x24 canvas, foot at [12, 22], as art/daylight/pack.json declares.
 DESK_SIZE = (24, 24)
@@ -369,8 +379,11 @@ PAPERS_SMALL_LEGEND = {
 DENSE_AT = {"done_stack_small": (18, 26)}
 DENSE_SIZES = {"done_stack_small": (24, 24), "selection_seat": (32, 48)}
 DENSE_PIVOTS = {"done_stack_small": (12, 22), "selection_seat": (16, 46)}
-## selection_seat: each corner's arm length and the line weight, in units.
-SEAT_ARM = 6
+## selection_seat: each corner's arm length and the line weight, in units. Four,
+## not ui.selection's proportion (6): a seated worker's raised fist reaches
+## x +10..+12 about the foot at the top of the far mark (SELECTION_AT (0, 10)),
+## so the top-right arm must start at x +12 or further out.
+SEAT_ARM = 4
 SEAT_LINE = 2
 
 
@@ -400,6 +413,119 @@ def selection_seat(palette: dict[str, str]) -> Image.Image:
     for x in (0, width - line):
         for y in (0, height - arm):
             result.paste(mark, (x, y, x + line, y + arm))
+    return result
+
+
+## The zone partitions (the low half-wall round an open-plan zone), drawn texel
+## by texel at DENSE. One piece per 32-unit cell; the band a piece stands in is
+## PARTITION_BAND (6) units deep, inside the zone's edge. Canvases hug the
+## drawing, and every foot (pivot) is the band's near edge, where the piece
+## sorts, centred on the piece:
+## - partition_h / _end_l / _end_r 32x10, foot (16, 10): the bottom run, seen
+##   from the front, PARTITION_WALL (10) units tall from the foot;
+## - partition_v 6x32, foot (3, 32): a side run going away from the viewer,
+##   only its wood cap and a sliver of cream side face, the width of its band;
+## - partition_corner_bl / _br 32x32, foot (16, 32): the zone's bottom corner
+##   cell, where the side run turns into the bottom run;
+## - partition_post 6x12, foot (3, 12): the open top corners' short pillar,
+##   two units taller than the wall, the width of the band.
+PARTITION_BAND = 6
+PARTITION_WALL = 10
+PARTITION_SIZES = {
+    "partition_h": (32, 10), "partition_h_end_l": (32, 10), "partition_h_end_r": (32, 10),
+    "partition_v": (6, 32), "partition_corner_bl": (32, 32), "partition_corner_br": (32, 32),
+    "partition_post": (6, 12),
+}
+PARTITION_PIVOTS = {
+    "partition_h": (16, 10), "partition_h_end_l": (16, 10), "partition_h_end_r": (16, 10),
+    "partition_v": (3, 32), "partition_corner_bl": (16, 32), "partition_corner_br": (16, 32),
+    "partition_post": (3, 12),
+}
+## The bottom run's texel rows from its top (20 = PARTITION_WALL x DENSE): an ink
+## outline, the honey-wood cap lit on top and dark at its lip, the cap's shadow,
+## the cream plaster face, a slightly darker base line, the ink outline on the
+## floor. The same in every column, so a run tiles left-right.
+PARTITION_H_ROWS = ("ink", "wood_light", "wood", "wood", "wood_dark", "plaster",
+                    *(("cream",) * 10), "plaster", "plaster", "cream_shadow", "ink")
+## The side run's texel columns from its left (12 = PARTITION_BAND x DENSE):
+## ink, the cap lit on its left edge, the dark cap edge, a sliver of cream side
+## face in shade, ink. The same in every row, so a run tiles top-bottom.
+PARTITION_V_COLUMNS = ("ink", "wood_light", "wood", "wood", "wood", "wood", "wood", "wood_dark",
+                       "cream", "cream", "plaster", "ink")
+## The post's texel rows (24): a cap a texel proud of the pillar on each side,
+## then the pillar with ink sides.
+PARTITION_POST_CAP = ("ink", "wood_light", "wood", "wood", "wood_dark", "ink")
+PARTITION_POST_FACE = ("plaster", *(("cream",) * 13), "plaster", "plaster", "cream_shadow")
+
+
+def _partition_canvas(name: str) -> Image.Image:
+    width, height = PARTITION_SIZES[name]
+    return Image.new("RGBA", (width * DENSE, height * DENSE), (0, 0, 0, 0))
+
+
+def _run(target: Image.Image, palette: dict[str, str], top: int, end: str | None) -> None:
+    """The bottom run across the whole of `target`, its first texel row at `top`;
+    `end` closes its left or right end (lit on the left, shaded on the right)."""
+    for y, key in enumerate(PARTITION_H_ROWS):
+        target.paste(rgba(palette, key), (0, top + y, target.width, top + y + 1))
+    last = top + len(PARTITION_H_ROWS)
+    if end == "left":
+        target.paste(rgba(palette, "ink"), (0, top, 1, last))
+        target.paste(rgba(palette, "wood_light"), (1, top + 1, 2, top + 4))
+    elif end == "right":
+        target.paste(rgba(palette, "ink"), (target.width - 1, top, target.width, last))
+        target.paste(rgba(palette, "wood_dark"), (target.width - 2, top + 1, target.width - 1, top + 5))
+        target.paste(rgba(palette, "plaster"), (target.width - 2, top + 5, target.width - 1, last - 1))
+
+
+def _side(target: Image.Image, palette: dict[str, str], left: int, bottom: int) -> None:
+    """The side run's strip from the top of `target` down to texel row `bottom`, at texel column `left`."""
+    for x, key in enumerate(PARTITION_V_COLUMNS):
+        target.paste(rgba(palette, key), (left + x, 0, left + x + 1, bottom))
+
+
+def partition_piece(name: str, palette: dict[str, str]) -> Image.Image:
+    """One partition piece (see PARTITION_SIZES for the kit)."""
+    result = _partition_canvas(name)
+    wall = len(PARTITION_H_ROWS)
+    if name.startswith("partition_h"):
+        _run(result, palette, 0, {"partition_h_end_l": "left", "partition_h_end_r": "right"}.get(name))
+    elif name == "partition_v":
+        _side(result, palette, 0, result.height)
+    elif name.startswith("partition_corner"):
+        # The bottom run fills the cell's last PARTITION_WALL units; the side run
+        # comes down its band through the run's top outline and cap rows, so
+        # the run's cap butts into the side's: the side keeps its cap and its
+        # sliver down to the run's face, and only its inner outline stops, on
+        # the run's top outline, where the run's cap flows in.
+        left = name.endswith("_bl")
+        top = result.height - wall
+        _run(result, palette, top, "left" if left else "right")
+        column = 0 if left else result.width - len(PARTITION_V_COLUMNS)
+        _side(result, palette, column, top)
+        for x, key in enumerate(PARTITION_V_COLUMNS[1:-1], start=1):
+            result.paste(rgba(palette, key), (column + x, top, column + x + 1, top + 5))
+    elif name == "partition_post":
+        for y, key in enumerate(PARTITION_POST_CAP):
+            result.paste(rgba(palette, key), (0, y, result.width, y + 1))
+        result.paste(rgba(palette, "ink"), (0, 0, 1, len(PARTITION_POST_CAP)))
+        result.paste(rgba(palette, "ink"), (result.width - 1, 0, result.width, len(PARTITION_POST_CAP)))
+        result.paste(rgba(palette, "wood_light"), (1, 1, 2, 4))
+        result.paste(rgba(palette, "wood_dark"), (result.width - 2, 1, result.width - 1, 5))
+        face_top = len(PARTITION_POST_CAP)
+        for y, key in enumerate(PARTITION_POST_FACE):
+            result.paste(rgba(palette, key), (2, face_top + y, result.width - 2, face_top + y + 1))
+        body_bottom = face_top + len(PARTITION_POST_FACE)
+        result.paste(rgba(palette, "plaster"), (result.width - 3, face_top, result.width - 2, body_bottom))
+        result.paste(rgba(palette, "ink"), (1, face_top, 2, body_bottom + 1))
+        result.paste(rgba(palette, "ink"), (result.width - 2, face_top, result.width - 1, body_bottom + 1))
+        result.paste(rgba(palette, "ink"), (1, body_bottom, result.width - 1, body_bottom + 1))
+    else:
+        raise ValueError(f"no partition piece named {name}")
+    box = result.getchannel("A").getbbox()
+    pivot_x, pivot_y = (value * DENSE for value in PARTITION_PIVOTS[name])
+    require(box is not None and box[3] == pivot_y, f"{name}: does not stand on its foot")
+    require(box[0] + box[2] == 2 * pivot_x, f"{name}: not centred on its foot")
     return result
 
 
@@ -556,6 +682,7 @@ def draw(source: Path, output: Path) -> list[Path]:
     pieces = {name: desk_piece(name, palette) for name in DESK_PIECES}
     pieces.update({name: fixture_piece(name, palette) for name in FIXTURE_SIZES})
     pieces["done_stack_small"] = done_stack_small(palette)
+    pieces.update({name: partition_piece(name, palette) for name in PARTITION_SIZES})
     written = []
     (output / "props").mkdir(parents=True)
     for name, piece in pieces.items():
@@ -582,7 +709,7 @@ def main() -> None:
     except (ValueError, KeyError, OSError) as error:
         parser.exit(1, f"draw_pixel_sources: {error}\n")
     print(f"PIXEL_SOURCES_OK: {args.output} ({len(written)} files: {len(DESK_PIECES)} desk props, "
-          f"{len(FIXTURE_SIZES)} fixture props, {len(DENSE_SIZES)} density-{DENSE} pieces, the table family)")
+          f"{len(FIXTURE_SIZES)} fixture props, {len(DENSE_SIZES) + len(PARTITION_SIZES)} density-{DENSE} pieces, the table family)")
 
 
 if __name__ == "__main__":

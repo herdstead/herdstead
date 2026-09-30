@@ -812,8 +812,8 @@ class PixelSourceTests(unittest.TestCase):
         self.assertEqual(
             len(files),
             len(draw_pixel_sources.DESK_PIECES) + len(draw_pixel_sources.FIXTURE_SIZES)
-            + len(draw_pixel_sources.DENSE_SIZES) + 27,
-            "8 desk props, 2 fixture props, 2 density-2 pieces, 26 modules (legacy and pod), 1 manifest",
+            + len(draw_pixel_sources.DENSE_SIZES) + len(draw_pixel_sources.PARTITION_SIZES) + 27,
+            "8 desk props, 2 fixture props, 2 density-2 pieces, 7 partition pieces, 26 modules (legacy and pod), 1 manifest",
         )
         self.assertEqual(files, sorted(path.relative_to(second) for path in second.rglob("*") if path.is_file()))
         for relative in files:
@@ -882,6 +882,10 @@ class PixelSourceTests(unittest.TestCase):
                              "ui.selection's one colour")
             alpha = mark.getchannel("A")
             line, arm = draw_pixel_sources.SEAT_LINE * d, draw_pixel_sources.SEAT_ARM * d
+            # The top arms stay clear of a raised fist (x -8..+12 about the foot,
+            # the pivot's x 16): nothing opaque in canvas x 8..28 on the top rows.
+            self.assertIsNone(mark.getchannel("A").crop((8 * d, 0, 28 * d, line)).getbbox(),
+                              "the top arms leave x -8..+12 about the foot clear for a raised fist")
             self.assertEqual(alpha.getbbox(), (0, 0, mark.width, mark.height), "the corners reach the canvas edges")
             self.assertEqual(alpha.crop((line, line, mark.width - line, mark.height - line)).getextrema(), (0, 0),
                              "the middle stays clear for the seated person")
@@ -898,6 +902,100 @@ class PixelSourceTests(unittest.TestCase):
                 return row.getbbox()
             self.assertEqual(weight(mark), (0, 0, line, 1))
             self.assertEqual(weight(selection), (0, 0, line, 1), "the same weight as ui.selection")
+
+    def check_partition_kit(self, label, folder, palette):
+        """The partition kit's contract (draw_pixel_sources.py's docstring) on one set of PNGs."""
+        d = draw_pixel_sources.DENSE
+        named = {tuple(bytes.fromhex(palette[key])) + (255,)
+                 for key in ("cream", "cream_shadow", "plaster", "wood_light", "wood", "wood_dark", "ink")}
+        pieces = {}
+        for name, size in draw_pixel_sources.PARTITION_SIZES.items():
+            with Image.open(folder / f"{name}.png") as opened:
+                piece = pieces[name] = opened.convert("RGBA")
+            with self.subTest(tree=label, piece=name):
+                self.assertEqual(piece.size, (size[0] * d, size[1] * d))
+                colours = {colour for _, colour in piece.getcolors()}
+                self.assertLessEqual(colours - {(0, 0, 0, 0)}, named, "only the kit's seven palette colours")
+                self.assertLessEqual({colour[3] for colour in colours}, {0, 255}, "hard alpha")
+                box = piece.getchannel("A").getbbox()
+                pivot = draw_pixel_sources.PARTITION_PIVOTS[name]
+                self.assertEqual(box[3], pivot[1] * d, "stands on its foot")
+                self.assertEqual(box[0] + box[2], 2 * pivot[0] * d, "centred on its foot")
+                if name.startswith("partition_h"):
+                    self.assertLessEqual(box[3] - box[1], draw_pixel_sources.PARTITION_WALL * d, "at most 10 units tall")
+                if name in ("partition_v", "partition_post"):
+                    self.assertLessEqual(box[2] - box[0], draw_pixel_sources.PARTITION_BAND * d, "no wider than its band")
+
+        def column(image, x, top=0):
+            return image.crop((x, top, x + 1, image.height)).tobytes()
+
+        def row(image, y, left=0, width=None):
+            return image.crop((left, y, left + (width or image.width), y + 1)).tobytes()
+
+        run = pieces["partition_h"]
+        wall = run.height
+        with self.subTest(tree=label, join="run"):
+            # Every column of a run is the same, so runs of any length tile.
+            self.assertEqual({column(run, x) for x in range(run.width)}, {column(run, 0)})
+            # An end closes only its own end: the other edge meets a run.
+            self.assertEqual(column(pieces["partition_h_end_l"], run.width - 1), column(run, 0))
+            self.assertEqual(column(pieces["partition_h_end_r"], 0), column(run, 0))
+            self.assertNotEqual(column(pieces["partition_h_end_l"], 0), column(run, 0), "the left end is closed")
+            self.assertNotEqual(column(pieces["partition_h_end_r"], run.width - 1), column(run, 0), "the right end is closed")
+        side = pieces["partition_v"]
+        with self.subTest(tree=label, join="side"):
+            self.assertEqual({row(side, y) for y in range(side.height)}, {row(side, 0)}, "a side run tiles top-bottom")
+        for corner, inner in (("partition_corner_bl", -1), ("partition_corner_br", 0)):
+            piece = pieces[corner]
+            with self.subTest(tree=label, join=corner):
+                edge = piece.width - 1 if inner == -1 else 0
+                top = piece.height - wall
+                self.assertEqual(column(piece, edge, top), column(run, 0), "meets the bottom run without a seam")
+                self.assertEqual(piece.getchannel("A").crop((0, 0, piece.width, top)).getbbox()[2]
+                                 - piece.getchannel("A").crop((0, 0, piece.width, top)).getbbox()[0],
+                                 side.width, "above the run only the side strip")
+                strip = 0 if corner.endswith("_bl") else piece.width - side.width
+                self.assertEqual(row(piece, 0, strip, side.width), row(side, 0), "meets the side run without a seam")
+
+    def test_the_partition_kit_tiles_and_stands_on_its_feet(self):
+        drawn = self.draw("drawn")
+        palette = draw_pixel_sources.palette_of(ROOT / "art/daylight/pack.json")
+        self.check_partition_kit("drawn", drawn / "props", palette)
+        manifest = json.loads((ROOT / "art/daylight/pack.json").read_text())
+        if all(name in manifest["props"] for name in draw_pixel_sources.PARTITION_SIZES):
+            for name, size in draw_pixel_sources.PARTITION_SIZES.items():
+                declared = manifest["props"][name]
+                self.assertEqual((tuple(declared["size"]), tuple(declared["pivot"])),
+                                 (size, draw_pixel_sources.PARTITION_PIVOTS[name]), f"{name}: as pack.json declares it")
+                self.assertNotIn("item", declared, f"{name}: placed by code by id; the walk graph owns its band")
+            self.check_partition_kit("shipped", ROOT / "art/daylight/props", palette)
+
+    def test_the_side_table_stands_on_its_legs_under_its_footprint(self):
+        manifest = json.loads((ROOT / "art/daylight/pack.json").read_text())
+        if "side_table" not in manifest["props"]:
+            self.skipTest("the side table is not shipped yet")
+        declared = manifest["props"]["side_table"]
+        self.assertEqual((declared["size"], declared["pivot"]), ([32, 32], [16, 30]))
+        self.assertEqual(declared["item"], {"place": "floor", "footprint": [28, 10]})
+        d = 2
+        with Image.open(ROOT / "art/daylight/props/side_table.png") as table:
+            alpha = table.getchannel("A")
+            left, top, right, bottom = alpha.getbbox()
+            self.assertEqual(bottom, 30 * d, "the legs stand on its foot")
+            width = declared["item"]["footprint"][0] * d
+            centre = 16 * d
+            self.assertLessEqual(centre - width // 2, left, "the footprint covers the whole drawing")
+            self.assertGreaterEqual(centre + width // 2, right)
+            # The top plane OfficeDecor.TOP_Y will stand an item on: y -23.5..-19
+            # about the foot (texel rows 13..21) is the top's wood, not outline,
+            # across its middle 16 units.
+            palette = json.loads((ROOT / "art/daylight/pack.json").read_text())["palette"]
+            outline = {tuple(bytes.fromhex(palette[key])) for key in ("ink", "deep")}
+            for y in range(13, 22):
+                for x in range(centre - 8 * d, centre + 8 * d):
+                    pixel = table.getpixel((x, y))
+                    self.assertEqual(pixel[3], 255, f"the top plane is solid at {(x, y)}")
+                    self.assertNotIn(pixel[:3], outline, f"the top plane is wood at {(x, y)}")
 
     def test_refuses_an_occupied_output_and_writes_nothing(self):
         occupied = self.root / "occupied"
