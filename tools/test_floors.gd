@@ -764,3 +764,57 @@ func _post_of(key: String, floor_text: String, blocked: int) -> SignpostModel:
 	post.machine_key = LOCAL
 	post.blocked = blocked
 	return post
+
+
+## Hovering a zone's sign, by real mouse motion over its area and physics
+## frames, brings up the bubble tooltip naming the workspace's repository and
+## checkout, and for a mezzanine whose worktree it is; moving off hides it, and
+## so does moving just past the panel's right end (the hover area is the drawn
+## panel, as wide as what the sign says). It
+## reads nothing and writes nothing (this suite's office is read-only and never
+## reaches herdr).
+func test_hovering_a_zone_sign_names_its_repo_and_checkout() -> void:
+	var office := await _live_office()
+	var cases := {
+		_floor("hs"): "herdstead",
+		_floor("hud"): "herdstead · hud-lane · worktree of 1F",
+		_floor("notes"): "No repository",
+	}
+	for key: String in cases:
+		if office.navigator.shown_key != key:
+			await _visit_floor(office, key)
+		office.camera.pan = Vector2.ZERO
+		await _frames(3)
+		var board := office.floor_view.zone_sign(key)
+		_check(board != null, key + ": the zone has its sign")
+		if board == null:
+			continue
+		var panel: NinePatchRect = board.get_node("%Panel")
+		var drawn := Rect2(board.to_global(panel.position), panel.size * panel.scale)
+		var on := drawn.get_center() - office.camera.position
+		_check(office.hud.world_rect().has_point(on), "%s: the sign is on screen at %s" % [key, on])
+		_check(not office.hud.bubble_tip_shown(), key + ": no tooltip before the pointer comes")
+		await _pointer_to(on)
+		_check(office.hud.bubble_tip_shown(), key + ": hovering the sign shows the tooltip")
+		_eq(office.hud.bubble_tip_text(), cases[key], key + ": naming its repository and checkout")
+		await _pointer_to(on + Vector2(0, 120))
+		_check(not office.hud.bubble_tip_shown(), key + ": moving off hides it")
+		# The hover area is the drawn panel, sized to what the sign says: just
+		# inside its right end the tooltip shows, just past it it does not.
+		var middle := on.y
+		var end := drawn.end.x - office.camera.position.x
+		await _pointer_to(Vector2(end - 2.0, middle))
+		_check(office.hud.bubble_tip_shown(), key + ": just inside the panel's right end, the tooltip")
+		await _pointer_to(Vector2(end + 3.0, middle))
+		_check(not office.hud.bubble_tip_shown(), key + ": just past it, none")
+	_done(office)
+
+
+## A real pointer move to `at` (viewport pixels), then physics frames for the
+## picking to answer.
+func _pointer_to(at: Vector2) -> void:
+	var motion := InputEventMouseMotion.new()
+	motion.position = at
+	motion.global_position = at
+	await _parsed(motion)
+	await _frames(1)

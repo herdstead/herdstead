@@ -85,8 +85,8 @@ func test_a_blocked_agent_stays_seated_with_a_hand_up_and_a_bubble() -> void:
 
 
 ## However many are blocked, every one sits with their hand up and their own
-## bubble: there is no queue to fill and no `+N` anywhere; the reception is a
-## plain counter.
+## bubble: there is no queue to fill and no `+N` anywhere; there is no
+## reception counter at all.
 func test_every_blocked_agent_sits_however_many() -> void:
 	var crowd := _crowded(12)
 	var office := await _live_office(crowd)
@@ -103,10 +103,7 @@ func test_every_blocked_agent_sits_however_many() -> void:
 		_check(station.bubble().visible, key + ": with a bubble")
 		seated += 1
 	_eq(seated, 12, "all twelve at their seats")
-	var reception := office.floor_view.sorted.get_node_or_null("Fixture_reception")
-	_check(reception is OfficeDecor, "the reception is a plain counter")
-	if reception != null:
-		_check(reception.get_node_or_null("Overlay") == null, "with nothing written over it")
+	_eq(office.floor_view.sorted.get_node_or_null("Fixture_reception"), null, "no reception counter")
 	for label: Node in office.world.find_children("*", "Label", true, false):
 		_check(not (label as Label).text.begins_with("+"), "no +N anywhere: " + (label as Label).text)
 	_done(office)
@@ -433,11 +430,12 @@ func test_an_idle_agent_rests_in_the_pantry_with_a_cup() -> void:
 
 
 ## A pantry with no free spot seats whoever comes after it, idle at the desk.
+## Three residents hold three of the narrowest map's five spots first.
 func test_a_full_pantry_seats_the_rest() -> void:
-	var office := await _live_office()
+	var office := await _live_office(_with_residents(fixture))
 	var spots := office.layout_plan().pantry.spots.size()
-	var snapshot := _with(fixture, "api:p3", {"agent": "codex"})
-	var panes: Array[String] = ["api:p1", "api:p2", "api:p3", "api:p4"]
+	var snapshot := _with(_with_residents(fixture), "api:p3", {"agent": "codex"})
+	var panes: Array[String] = ["api:r0", "api:r1", "api:r2", "api:p1", "api:p2", "api:p3", "api:p4"]
 	_check(spots < panes.size(), "a pantry of %d for %d idle" % [spots, panes.size()])
 	for pane_id in panes:
 		snapshot = _with(snapshot, pane_id, {"agent_status": "idle"})
@@ -536,14 +534,14 @@ func test_another_agent_in_the_pantry_walks_out_and_in() -> void:
 ## the one who waited at the desk, and sits down there itself. The same body, no
 ## ghost.
 func test_a_new_session_in_the_pantry_ranks_from_then() -> void:
-	var office := await _live_office()
-	var snapshot := fixture
+	var office := await _live_office(_with_residents(fixture))
+	var snapshot := _with_residents(fixture)
 	for pane_id: String in ["api:p1", "api:p2", "api:p4"]:
 		OS.delay_msec(5)
 		snapshot = _with(snapshot, pane_id, {"agent_status": "idle"})
 		_feed(office, snapshot)
 	office.settle()
-	_eq(office.layout_plan().pantry.spots.size(), 2, "a pantry of two")
+	_eq(office.layout_plan().pantry.spots.size(), 5, "a pantry of five, three residents' already")
 	var rests := func() -> Array:
 		var found: Array = []
 		for pane_id: String in ["api:p1", "api:p2", "api:p4"]:
@@ -551,10 +549,12 @@ func test_a_new_session_in_the_pantry_ranks_from_then() -> void:
 		return found
 	var pantry := OfficeRests.Rest.PANTRY
 	var seat := OfficeRests.Rest.SEAT
-	_eq(rests.call(), [pantry, pantry, seat], "p1 and p2 idle first take the pantry, p4 sits")
+	_eq(rests.call(), [pantry, pantry, seat], "p1 and p2 idle first take the last two spots, p4 sits")
 	var p1 := _station(office, _pane("api:p1")).actor()
 	OS.delay_msec(5)
 	_feed(office, _with(snapshot, "api:p1", {"terminal_id": "term-api-p1-again"}))
+	for resident: String in ["api:r0", "api:r1", "api:r2"]:
+		_eq(_station(office, _pane(resident)).rest, pantry, resident + " keeps its spot")
 	_eq(_ids(_ghosts(office)), [], "nobody leaves")
 	_eq(_station(office, _pane("api:p1")).actor(), p1, "the same body")
 	_eq(rests.call(), [seat, pantry, pantry], "p1, its start now, sits; p4 takes the spot")
@@ -606,8 +606,8 @@ func test_a_cold_pass_places_the_pantry_and_the_seated() -> void:
 ## cold and ranks afresh: every start is unknown then, so the projection order
 ## decides.
 func test_a_stale_pantry_is_never_reranked() -> void:
-	var office := await _two_machine_office()
-	var snapshot := fixture
+	var office := await _two_machine_office(_with_residents(fixture))
+	var snapshot := _with_residents(fixture)
 	for pane_id: String in ["api:p4", "api:p2", "api:p1"]:
 		OS.delay_msec(5)
 		snapshot = _with(snapshot, pane_id, {"agent_status": "idle"})
@@ -654,7 +654,7 @@ func test_a_stale_pantry_is_never_reranked() -> void:
 
 
 ## Clicks, by real input: a worker in the pantry and the seat they left both
-## pick that pane; the counters and the empty floor beside them pick nothing.
+## pick that pane; the pantry counter picks nothing.
 func test_clicks_pick_pantry_workers_and_their_seats() -> void:
 	var office := await _live_office()
 	_feed(office, _with(fixture, "api:p2", {"agent_status": "idle"}))
@@ -677,7 +677,7 @@ func test_clicks_pick_pantry_workers_and_their_seats() -> void:
 	await _click(seat.global_position - office.camera.position)
 	_eq(office.picked_key, _pane("api:p2"), "and a click on the seat they left picks it too")
 	await _click_desk(office, other)
-	for fixture_key: String in ["reception", "pantry"]:
+	for fixture_key: String in ["pantry"]:
 		var counter: Node2D = office.floor_view.sorted.get_node("Fixture_" + fixture_key)
 		office.camera.reveal(Rect2(office.world.to_local(counter.global_position - Vector2(40, 60)), Vector2(80, 80)))
 		await _frames(2)
@@ -687,8 +687,8 @@ func test_clicks_pick_pantry_workers_and_their_seats() -> void:
 
 
 ## Depth is the feet's: a pantry worker (on the fixture row) draws in front of
-## the pantry, the reception counter sorts as itself, and a walker passing on
-## the walking lane draws in front of the pantry's people.
+## the pantry, the pantry counter sorts as itself, and a walker passing on the
+## walking lane draws in front of the pantry's people.
 func test_the_pantry_sorts_by_feet() -> void:
 	var office := await _live_office()
 	var snapshot := _with(fixture, "api:p2", {"agent_status": "idle"})
@@ -696,10 +696,9 @@ func test_the_pantry_sorts_by_feet() -> void:
 	office.settle()
 	var sorted := office.floor_view.sorted
 	var resting := _station(office, _pane("api:p2")).actor()
-	var reception: Node2D = sorted.get_node("Fixture_reception")
 	var pantry: Node2D = sorted.get_node("Fixture_pantry")
 	_eq(_entity_of(sorted, resting), resting, "the pantry worker sorts as themselves")
-	_eq(_entity_of(sorted, reception), reception, "and so does the reception counter")
+	_eq(_entity_of(sorted, pantry), pantry, "and so does the pantry counter")
 	_check(resting.global_position.y > pantry.global_position.y, "the pantry worker in front of the pantry")
 	_feed(office, _with(snapshot, "api:p4", {"agent_status": "idle"}))
 	var walker := _station(office, _pane("api:p4")).actor()
@@ -720,16 +719,17 @@ func test_the_pantry_sorts_by_feet() -> void:
 ## pantry is full (and so while every spot, its own hashed one included, is
 ## someone's), it sits at its desk: nobody in the pantry moves. The residents
 ## were there from the first snapshot, their starts unknown, and api:p1 is
-## projected before them, which is the order that decided it before.
+## projected before them, which is the order that decided it before. Three
+## more residents hold three of the narrowest map's five spots.
 func test_a_launched_agent_never_takes_a_pantry_spot() -> void:
-	var start := _with(_with(fixture, "api:p1", {"agent": null}), "api:p2", {"agent_status": "idle"})
+	var start := _with(_with(_with_residents(fixture), "api:p1", {"agent": null}), "api:p2", {"agent_status": "idle"})
 	start = _with(start, "api:p4", {"agent_status": "idle"})
 	var office := await _live_office(start)
 	office.settle()
 	var spots := office.layout_plan().pantry.spots
-	_eq(spots.size(), 2, "a pantry of two")
+	_eq(spots.size(), 5, "a pantry of five")
 	var residents: Dictionary[String, Vector2] = {}
-	for pane_id: String in ["api:p2", "api:p4"]:
+	for pane_id: String in ["api:r0", "api:r1", "api:r2", "api:p2", "api:p4"]:
 		var station := _station(office, _pane(pane_id))
 		_eq(station.rest, OfficeRests.Rest.PANTRY, pane_id + " rests in the pantry")
 		residents[pane_id] = station.position + station.rest_position()
@@ -798,10 +798,11 @@ func test_a_pass_after_a_layout_problem_places_the_pantry() -> void:
 		var station := _station(office, _pane(pane_id))
 		_eq(station.rest, OfficeRests.Rest.PANTRY, pane_id + " rests in the pantry")
 		stood.append(_floor_point(office, station.actor()))
-	stood.sort()
-	var wanted: Array = [spots[0], spots[1]]
-	wanted.sort()
-	_eq(stood, wanted, "both placed on the pantry's two spots")
+	for at: Vector2 in stood:
+		_check(spots.has(at), "placed on a spot of the pantry: %s" % at)
+	var first: Vector2 = stood[0]
+	var second: Vector2 = stood[1]
+	_check(first != second, "each on a spot of their own")
 	_done(office)
 
 
@@ -835,7 +836,7 @@ func test_revealing_a_pantry_worker_shows_them() -> void:
 
 ## Local and a second machine, `bee`, on a socket nobody answers: both clients
 ## stopped, fed by hand.
-func _two_machine_office() -> OfficeDouble:
+func _two_machine_office(first := fixture) -> OfficeDouble:
 	var office := OfficeDouble.new()
 	_live_offices.append(office)
 	# The suite's floors are planned 488 wide (PLAN_SCREEN, walking_test_base.gd).
@@ -854,7 +855,7 @@ func _two_machine_office() -> OfficeDouble:
 	root.add_child(office)
 	_local(office).stop()
 	office.fleet._roster.stop()
-	_feed(office, fixture)
+	_feed(office, first)
 	_feed_bee(office, _bee_snapshot("blocked"))
 	await _frames(2)
 	return office

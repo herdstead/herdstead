@@ -427,18 +427,20 @@ func test_a_stale_machine_freezes_walkers_where_they_are() -> void:
 
 ## A table that moves while someone walks to it (it grew too wide for its place)
 ## sends them on from where they are, to where the seat is now, with no jump.
+## Four tabs make api a zone of two lanes, two tables to a pod row: api:t1,
+## growing into api:t2 beside it, moves to a new row.
 func test_a_table_that_moves_under_a_route_reroutes_its_walker() -> void:
-	var office := await _wide_office()
+	var office := await _wide_office(_four_tabs(fixture))
 	var t1 := JSON.stringify([LOCAL, "api", "api:t1"])
 	var t2 := JSON.stringify([LOCAL, "api", "api:t2"])
 	var desks := office.layout_plan()
 	_eq(desks.desk(t1).row, desks.desk(t2).row, "the wide floor puts both tables in one row")
-	_feed(office, _with(fixture, "api:p3", {"agent": "codex"}))
+	_feed(office, _four_tabs(_with(fixture, "api:p3", {"agent": "codex"})))
 	var body := _station(office, _pane("api:p3")).actor()
 	_step(office, 1.0 / FPS, 12)
 	var here := _floor_point(office, body)
 	var origin := office.layout_plan().desk(t1).origin
-	_feed(office, _grown(_with(fixture, "api:p3", {"agent": "codex"}), 3))
+	_feed(office, _four_tabs(_grown(_with(fixture, "api:p3", {"agent": "codex"}), 3)))
 	_check(office.layout_plan().desk(t1).origin != origin, "api:t1 grew out of its place and moved")
 	_eq(_station(office, _pane("api:p3")).actor(), body, "the same worker")
 	_check(_floor_point(office, body).is_equal_approx(here), "not moved by the move")
@@ -450,10 +452,11 @@ func test_a_table_that_moves_under_a_route_reroutes_its_walker() -> void:
 	_done(office)
 
 
-## A floor that grows under someone walking can put a wall where they stand: a
-## table too wide for its row widens the floor, the main corridor moves right
-## and the row walls run on over where it was. Whoever is inside a wall now is
-## put where they belong at once; nobody walks through it.
+## A map that widens under someone walking can put an obstacle where they
+## stand: a table too wide for its zone widens the map, the main corridor and
+## the lift door move right, and the entry band's fixture-row barrier runs on
+## over the old door's threshold. Whoever is inside it now is put where they
+## belong at once; nobody walks through it.
 func test_a_walker_the_floor_grows_over_is_put_where_they_belong() -> void:
 	# api:t1 alone on the first row, api:t2 on the second (_stacked()).
 	var office := await _live_office(_stacked(fixture))
@@ -465,27 +468,25 @@ func test_a_walker_the_floor_grows_over_is_put_where_they_belong() -> void:
 	_list(grown, "panes").append(extra)
 	_feed(office, _stacked(grown))
 	var body := _station(office, _pane("api:p5")).actor()
-	var wall := office.layout_plan().rows[1].wall_cells
-	var band := Rect2(Vector2(wall.position) * 32.0, Vector2(wall.size) * 32.0)
+	var door := OfficeShell.door(office.layout_plan())
 	var reached := false
 	for frame in 400:
 		_step(office, 1.0 / FPS)
 		var at := _floor_point(office, body)
-		if at.y > band.position.y and at.y < band.end.y:
+		if is_equal_approx(at.x, door.x) and at.y > 96.0 and at.y < 128.0:
 			reached = true
 			break
-	_check(reached, "they walk down the main corridor past row 1's wall")
+	_check(reached, "they come in through the fixture row at the lift door's column")
 	var here := _floor_point(office, body)
 	var width := office.layout_plan().floor_cells.size.x
-	# Twelve agents more than _stacked(): a pod of fourteen desks, 15 cells, over
-	# the row's 11.
-	_feed(office, _grown(grown, STACKED + 12))
-	_check(office.layout_plan().floor_cells.size.x > width, "api:t1 grew too wide for its row and widened the floor")
-	var moved := Rect2(
-		Vector2(office.layout_plan().rows[1].wall_cells.position) * 32.0,
-		Vector2(office.layout_plan().rows[1].wall_cells.size) * 32.0
-	)
-	_check(moved.has_point(here), "row 1's wall now runs where they stand")
+	# Eleven agents: api:t1 a pod of 14 panes, 8 columns, 9 cells, more than a
+	# lane's 8 inner cells: its zone takes two lanes and the map widens.
+	_feed(office, _grown(grown, STACKED + 2))
+	var plan := office.layout_plan()
+	_check(plan.floor_cells.size.x > width, "api:t1 grew too wide for its zone and widened the map")
+	_check(OfficeShell.door(plan).x > door.x, "the lift door moved right")
+	var graph := OfficeWalkGraph.of(plan, PixelPerson.footprint(), PixelPerson.drawing_rect(office.art.people))
+	_check(graph.inside(here), "the fixture-row barrier now runs where they stand")
 	_check(not _walkers(office).has(body), "so they walk no further")
 	_eq(_floor_point(office, body), _seat_of(office, "api:p5"), "and sit where they belong")
 	_done(office)
@@ -524,7 +525,7 @@ func test_a_low_frame_rate_stays_on_the_route() -> void:
 
 
 ## Every arrival on the stress fixture's floor (ten tabs of eight agents), 20 and
-## 32 cells wide, either walks all its route within six seconds at 8 frames a
+## 32 cells asked (two lanes either way), either walks all its route within six seconds at 8 frames a
 ## second, never faster than TOP_SPEED and never off its route, or, when even
 ## TOP_SPEED would take longer, is placed at once, seated: no route is cut
 ## short or jumped.
@@ -536,7 +537,12 @@ func test_no_walk_on_the_stress_floor_needs_a_teleport() -> void:
 		var plans := FloorPlanCache.new()
 		var empty := MapModel.of(_stress_model(false))
 		var plan := plans.prepare(empty, pen, width * 32.0)
-		_eq(plan.floor_cells.size.x, width, "the stress floor is %d cells wide" % width)
+		# Its four-column pods (5 cells) fit one lane: the map is the one the
+		# width asked holds, one lane (13 cells) at 20, two (23) at 32.
+		var lanes := 1 if width == 20 else 2
+		_eq(
+			plan.floor_cells.size.x, 10 * lanes + 3, "the stress map, %d cells asked, is %d lanes wide" % [width, lanes]
+		)
 		var holder := Node2D.new()
 		root.add_child(holder)
 		var view := OfficeFloorView.new()
@@ -684,36 +690,33 @@ func test_a_near_seat_is_entered_and_left_beside_the_chair() -> void:
 	_done(office)
 
 
-## A walker a table moves over is placed, never walked through it. Growing
-## api:t1 twelve agents at once widens the floor and moves the table over the
-## corridor a newcomer was walking down; the newcomer's pane closes in the same
-## snapshot, and their ghost, standing inside the table now, is gone at once.
-## Every walk that is left keeps to the rules (_check_routes()).
+## A walker a table grows over is placed, never walked through it. api:t1 a
+## pod of five columns (6 cells) alone on its row leaves a passage inside the
+## zone's right edge; growing it to eight columns at once (9 cells, more than a
+## lane's 8 inner) widens its zone (and the map) and draws the pod on over that
+## passage, where a newcomer was walking down beside it; the newcomer's pane
+## closes in the same snapshot, and their ghost, standing inside the pod now, is
+## gone at once. Every walk that is left keeps to the rules (_check_routes()).
 func test_a_walker_a_table_moves_over_is_placed_not_walked_through() -> void:
-	# api:t1 alone on the first row (_stacked()), so growing too wide for it
-	# widens the floor in place, over the main corridor.
-	var office := await _live_office(_stacked(fixture))
-	var t1 := JSON.stringify([LOCAL, "api", "api:t1"])
-	var origin := office.layout_plan().desk(t1).origin
-	var newcomer_id := "api:grow-%d" % STACKED
-	_feed(office, _grown(fixture, STACKED + 1))
-	var newcomer := _station(office, _pane(newcomer_id)).actor()
-	# Down the corridor into the rows of the desk it will stand over (the
-	# growth keeps api:t1's origin), right of where it ends now: past the middle
-	# of its depth, so the walk graph's nearest cell centre is on the desk too
-	# (the far edge itself is a walkable row of centres).
-	var desk_rows := Vector2(origin.y - OfficeTable.SURFACE_DEPTH / 2.0, origin.y - 2)
-	var desk_end := origin.x + office.layout_plan().desk(t1).measure.table_width
-	var here := _floor_point(office, newcomer)
+	var office := await _live_office(_grown(fixture, 6))
+	_feed(office, _grown(fixture, 7))
+	var newcomer := _station(office, _pane("api:grow-6")).actor()
+	var before := office.layout_plan().desk(JSON.stringify([LOCAL, "api", "api:t1"]))
+	# Right of the pod, in the rows of the desks it will stand over: past the
+	# middle of its depth, so the walk graph's nearest cell centre is on the
+	# desk too (the far edge itself is a walkable row of centres; lane B1).
+	var desk_rows := Vector2(before.origin.y - OfficeTable.SURFACE_DEPTH / 2.0, before.origin.y - 2)
+	var desk_end := before.origin.x + before.measure.table_width
+	var here := Vector2.INF
 	for frame in 400:
-		if here.x > desk_end and here.y > desk_rows.x and here.y < desk_rows.y:
-			break
 		_step(office, 1.0 / FPS)
-		here = _floor_point(office, newcomer)
-	_check(_walkers(office).has(newcomer), "the newcomer is walking down the corridor at %s" % here)
-	# Twelve agents more than _stacked(), less the newcomer's pane.
-	_feed(office, _without(_grown(fixture, STACKED + 12), newcomer_id))
-	var table := office.layout_plan().desk(t1)
+		var at := _floor_point(office, newcomer)
+		if at.x > desk_end and at.y > desk_rows.x and at.y < desk_rows.y:
+			here = at
+			break
+	_check(_walkers(office).has(newcomer), "the newcomer is walking down beside the table at %s" % here)
+	_feed(office, _without(_grown(fixture, 14), "api:grow-6"))
+	var table := office.layout_plan().desk(JSON.stringify([LOCAL, "api", "api:t1"]))
 	var footprint := table.measure.physical_rect
 	footprint.position += table.origin
 	_check(footprint.has_point(here), "api:t1 stands where the newcomer was: %s in %s" % [here, footprint])
@@ -725,9 +728,10 @@ func test_a_walker_a_table_moves_over_is_placed_not_walked_through() -> void:
 
 
 ## A plan change leaves alone every walk it does not touch: a worker walking in
-## to api:t2 while api:t1 grows in place (its own row, the floor as wide as it
-## was) goes on along the very route they were on, from where they are, and
-## nobody's route is searched for on the new floor.
+## to api:t2 while a new tab's table takes a new pod row under the others (the
+## zone grows down, the map as wide as it was) goes on along the very route
+## they were on, from where they are, and nobody's route is searched for on the
+## new floor.
 func test_a_plan_change_keeps_the_walks_it_does_not_touch() -> void:
 	# api:t1 alone on the first row (_stacked()), so it can grow where it is.
 	var office := await _live_office(_with(_stacked(fixture), "api:p4", {"agent": null}))
@@ -738,13 +742,19 @@ func test_a_plan_change_keeps_the_walks_it_does_not_touch() -> void:
 	var before := _route(office, body)
 	var segment := _segment_of(here, before)
 	var width := office.layout_plan().floor_cells.size.x
-	var capacity := office.layout_plan().desk(JSON.stringify([LOCAL, "api", "api:t1"])).capacity
-	# Four agents more: from eight desks to ten, which its row still holds.
-	_feed(office, _grown(fixture, STACKED + 4))
-	_eq(office.layout_plan().floor_cells.size.x, width, "api:t1 grew where it was: the floor is as wide as before")
-	_check(
-		office.layout_plan().desk(JSON.stringify([LOCAL, "api", "api:t1"])).capacity > capacity, "api:t1 really grew"
-	)
+	var rows := office.layout_plan().zones[0].rows.size()
+	# A new tab api:t3 of nine panes (5 columns, 6 cells): more than the 5 cells
+	# api:t2 leaves on its pod row, so it takes a new one.
+	var more := _four_tabs(fixture, 1)
+	var seed_pane: Dictionary = _list(more, "panes").back()
+	for index in 8:
+		var extra: Dictionary = seed_pane.duplicate(true)
+		extra.pane_id = "api:s0-%d" % index
+		extra.terminal_id = "term-api-s0-%d" % index
+		_list(more, "panes").append(extra)
+	_feed(office, more)
+	_eq(office.layout_plan().floor_cells.size.x, width, "the zone grew down: the map is as wide as before")
+	_check(office.layout_plan().zones[0].rows.size() > rows, "a new pod row really came")
 	var expected := PackedVector2Array([here])
 	expected.append_array(before.slice(segment + 1))
 	_eq(
@@ -764,15 +774,23 @@ func test_a_plan_change_keeps_the_walks_it_does_not_touch() -> void:
 
 ## A worker whose place the floor moves is routed again with one search, from
 ## their goal, whichever of their ways back onto the graph they take: api:t1
-## moves as it grows, and its three workers, one of them still walking in, walk
-## to their new seats on one search each; the three newcomers need none.
+## moves as it grows (into api:t2 beside it, in a zone of four tabs, two
+## lanes), and its three workers, one of them still walking in, walk to their
+## new seats on one search each; the three newcomers need none.
 func test_a_rerouted_walker_takes_one_search() -> void:
-	var office := await _wide_office()
+	var office := await _wide_office(_four_tabs(fixture))
 	var arriving := _with(fixture, "api:p3", {"agent": "codex"})
-	_feed(office, arriving)
-	_step(office, 1.0 / FPS, 12)
+	_feed(office, _four_tabs(arriving))
+	# Off the walking lane, into the zone: a walker still on the lane is routed
+	# on off the door's field (the lane route), which takes no search at all.
+	var newcomer := _station(office, _pane("api:p3")).actor()
+	for frame in 400:
+		_step(office, 1.0 / FPS)
+		if _floor_point(office, newcomer).y > 192.0:
+			break
+	_check(_walkers(office).has(newcomer), "api:p3 is still walking in, inside the zone")
 	var origin := office.layout_plan().desk(JSON.stringify([LOCAL, "api", "api:t1"])).origin
-	_feed(office, _grown(arriving, 3))
+	_feed(office, _four_tabs(_grown(arriving, 3)))
 	var plan := office.layout_plan()
 	_check(plan.desk(JSON.stringify([LOCAL, "api", "api:t1"])).origin != origin, "api:t1 moved as it grew")
 	for pane_id: String in ["api:p1", "api:p2", "api:p3"]:
@@ -890,8 +908,10 @@ func test_a_reconnect_with_a_layout_problem_keeps_walkers_frozen() -> void:
 ## another agent, is seated at the family's own pace, like any seated worker
 ## and like a rebuild.
 func test_a_stale_provider_swap_leaves_no_walk_pace() -> void:
-	# api:t2 on the second row (_stacked()): a walk long enough to be paced up.
-	var office := await _live_office(_with(_stacked(fixture), "api:p4", {"agent": null}))
+	# api:t2 on the second row (_stacked()), 880 wide: two lanes, the lift door
+	# ten cells further right than PLAN_SCREEN's one lane puts it, a walk long
+	# enough to be paced up (one lane's is not, with pod rows 6 cells deep).
+	var office := await _live_office(_with(_stacked(fixture), "api:p4", {"agent": null}), Vector2(880, 480))
 	_feed(office, _stacked(fixture))
 	var body := _station(office, _pane("api:p4")).actor()
 	_check(body.paced() > 1.0, "api:p4 walks in faster than the walk's own pace: %s" % body.paced())
@@ -1082,3 +1102,25 @@ func test_a_seat_s_worker_follows_its_pane_key() -> void:
 		seen.append(worker.look.clothes().key())
 	_check(seen[0] != seen[1], "a new pane key, a new person")
 	ground.free()
+
+
+## `snapshot` with more tabs on the api floor, one shell each (api:t3, api:t4,
+## ... `count` of them, two by default): four small tables make api a zone of
+## two lanes, two tables to a pod row, which the zone's height preference asks for.
+func _four_tabs(snapshot: Dictionary, count := 2) -> Dictionary:
+	var result: Dictionary = snapshot.duplicate(true)
+	var source: Dictionary = {}
+	for pane: Dictionary in _list(result, "panes"):
+		if pane.pane_id == "api:p4":
+			source = pane
+	for index in count:
+		var tab := "api:t%d" % (index + 3)
+		_list(result, "tabs").append({"tab_id": tab, "workspace_id": "api", "number": index + 3, "label": "more"})
+		var pane := source.duplicate(true)
+		pane.pane_id = "api:s%d" % index
+		pane.tab_id = tab
+		pane.terminal_id = "term-api-s%d" % index
+		pane.erase("agent")
+		pane.erase("agent_status")
+		_list(result, "panes").append(pane)
+	return result

@@ -1,20 +1,24 @@
 class_name FloorPlanCache
 extends RefCounted
-## Every floor's last valid plan, and what was last tried for it, for as long as
-## the floor exists. A floor is a MapModel of one zone, kept under that zone's
-## key, so each workspace keeps its own plan and history: a refresh plans a floor again only when its geometry, the
-## art pack or the clearance policy changed. Status, labels, focus and liveness
-## never invalidate a plan. Not persisted: this is the run's memory.
+## Every map's last valid plan, and what was last tried for it, for as long as
+## the map exists. A map is kept under its key (the office still hands in one
+## per workspace), with its plan and history: a refresh plans a map again only
+## when its geometry, the art pack or the clearance policy changed. Status,
+## labels, focus and liveness never invalidate a plan. Not persisted: this is
+## the run's memory.
 ##
-## The last attempted input and its failure are kept apart from the valid plan.
-## The same failing input is not planned again: its problems come back from
-## here and the floor stays drawn from its last valid plan. A floor that never
-## had one gets a bounded empty fallback, labelled by its problems.
+## Planning is atomic per map: every zone of it is laid out at once, and while
+## any zone's input cannot be planned (failing_zones()) the whole previous
+## plan and the model it was made for stay. The last attempted input and its
+## failure are kept apart from the valid plan. The same failing input is not
+## planned again: its problems come back from here and the map stays drawn
+## from its last valid plan. A map that never had one gets a bounded empty
+## fallback (no zone at all), labelled by its problems.
 ##
 ## A building's lobby is planned the same way (walls, door, windows, walkways,
-## decor; no fixtures, having no tables) but it lays out nothing herdr sent, so it has no place in the layout
-## diagnostics: layout_plan(), problems(), notes() and attempt_count() are about
-## workspaces only.
+## decor; no zone and no pantry) but it lays out nothing herdr sent, so it has
+## no place in the layout diagnostics: layout_plan(), problems(), notes(),
+## failing_zones() and attempt_count() are about workspaces only.
 
 var _plans: Dictionary[String, FloorPlan] = {}
 ## The model each valid plan was drawn from: what a floor whose current input
@@ -23,6 +27,8 @@ var _planned_models: Dictionary[String, MapModel] = {}
 var _attempt_inputs: Dictionary[String, String] = {}
 var _attempt_problems: Dictionary[String, PackedStringArray] = {}
 var _notes: Dictionary[String, PackedStringArray] = {}
+## The zones the last attempt of each map failed on; empty once it planned.
+var _failing: Dictionary[String, PackedStringArray] = {}
 var _lobbies: Dictionary[String, FloorPlan] = {}
 var _lobby_inputs: Dictionary[String, String] = {}
 ## The problems of the floor prepare() was last asked for.
@@ -37,14 +43,13 @@ var _footprint_read := false
 ## the first time. For a workspace that is its valid plan for the current input;
 ## while the input cannot be planned, its last valid plan (see problems() and
 ## planned_model()); and a bounded empty floor when it never had one. `pen`
-## measures the furniture the plan is furnished with. A map is laid out as its
-## one zone; one without exactly one zone cannot be planned.
+## measures the furniture the plan is furnished with. The whole map goes to
+## the map planner at once.
 func prepare(map: MapModel, pen: OfficeDraw, visible_width: float) -> FloorPlan:
 	var policy := FloorLayoutPolicy.new()
 	policy.width_cells = maxi(1, floori(visible_width / FloorLayoutPolicy.GRID))
 	policy.actor_draw_rect = PixelPerson.drawing_rect(pen.art.people)
 	policy.actor_footprint = _actor_footprint()
-	var floor_model: ZoneModel = map.zones[0] if map.zones.size() == 1 else null
 	if map.lobby():
 		_problems.clear()
 		return _lobby(map, pen, policy)
@@ -75,11 +80,12 @@ func prepare(map: MapModel, pen: OfficeDraw, visible_width: float) -> FloorPlan:
 		return previous
 	_attempts += 1
 	var result := OfficeFloorLayout.plan(
-		floor_model, previous, policy, OfficeDecorPlanner.new(pen), OfficeFixturePlanner.new(pen)
+		map, previous, policy, OfficeDecorPlanner.new(pen), OfficeFixturePlanner.new(pen)
 	)
 	_problems = result.problems
 	_attempt_inputs[map.key] = input if result.plan != null else attempted_input
 	_attempt_problems[map.key] = result.problems.duplicate()
+	_failing[map.key] = result.failing_zones.duplicate()
 	if result.plan != null:
 		_plans[map.key] = result.plan
 		_planned_models[map.key] = map
@@ -87,13 +93,14 @@ func prepare(map: MapModel, pen: OfficeDraw, visible_width: float) -> FloorPlan:
 		return result.plan
 	if previous != null:
 		return previous
-	# A bad first snapshot still gets a bounded, empty, explicitly labelled floor.
-	var empty := ZoneModel.new()
-	empty.key = map.key
+	# A bad first snapshot still gets a bounded, empty, explicitly labelled map:
+	# no zone at all, like a lobby's.
+	var none: Array[ZoneModel] = []
+	var empty := MapModel.of_zones(map.key, none)
 	_attempts += 1
 	var fallback := OfficeFloorLayout.plan(empty, null, policy)
 	_plans[map.key] = fallback.plan
-	_planned_models[map.key] = MapModel.of(empty)
+	_planned_models[map.key] = empty
 	return fallback.plan
 
 
@@ -112,6 +119,13 @@ func plan(key: String) -> FloorPlan:
 ## floor's current input cannot be planned.
 func planned_model(key: String) -> MapModel:
 	return _planned_models.get(key)
+
+
+## The zones (ZoneModel.key) whose input the last attempt of map `key` failed
+## on; empty while it plans. The whole map keeps its previous plan meanwhile.
+func failing_zones(key: String) -> PackedStringArray:
+	var found: PackedStringArray = _failing.get(key, PackedStringArray())
+	return found.duplicate()
 
 
 ## Non-fatal explanations, such as folding a complex terminal grid into seats.
@@ -140,21 +154,22 @@ func prune(floor_keys: Array[String]) -> void:
 			_attempt_inputs.erase(key)
 			_attempt_problems.erase(key)
 			_notes.erase(key)
+			_failing.erase(key)
 	for key: String in _lobbies.keys():
 		if not present.has(key):
 			_lobbies.erase(key)
 			_lobby_inputs.erase(key)
 
 
-## A lobby is an empty floor: planned once per pack and clearance policy, and
-## kept, like any floor's, when a new policy cannot be planned.
+## A lobby is an empty map (no zone): planned once per pack and clearance
+## policy, and kept, like any map's, when a new policy cannot be planned.
 func _lobby(map: MapModel, pen: OfficeDraw, policy: FloorLayoutPolicy) -> FloorPlan:
 	var previous: FloorPlan = _lobbies.get(map.key)
 	var input := JSON.stringify([map.geometry_signature(), pen.art.id, policy.geometry_signature()])
 	if previous != null and _lobby_inputs.get(map.key, "") == input:
 		return previous
 	var result := OfficeFloorLayout.plan(
-		map.zones[0], previous, policy, OfficeDecorPlanner.new(pen), OfficeFixturePlanner.new(pen)
+		map, previous, policy, OfficeDecorPlanner.new(pen), OfficeFixturePlanner.new(pen)
 	)
 	_lobby_inputs[map.key] = input
 	if result.plan == null:

@@ -1,14 +1,16 @@
 class_name MapModel
 extends RefCounted
 ## What one office map draws: its zones, and their rooms read as one floor.
-## The floor view, the presentation, the rests and the plan cache take a map.
+## The floor view, the presentation, the rests and the plan cache take a map,
+## and the map planner (OfficeFloorLayout) lays every zone of it out at once.
 ##
-## For now a map wraps exactly one zone (one workspace, or a lobby) and its key
-## is that zone's key, never the machine's: the plan cache, FloorPlan.floor_key,
-## the world, the pans and the cold path all stay per workspace, so switching
-## workspaces is still a cold rebuild with each workspace's own layout history.
+## The office still builds a map of exactly one zone (one workspace, or a
+## lobby) under that zone's key, never the machine's: the plan cache,
+## FloorPlan.floor_key, the world, the pans and the cold path all stay per
+## workspace. A map of several zones (of_zones()) is what the planner and its
+## tests lay out; the office moves to one map per machine later.
 
-## The wrapped zone's key (see ZoneModel.key).
+## The map's key: the wrapped zone's (see ZoneModel.key), or whatever of_zones() was given.
 var key := ""
 var zones: Array[ZoneModel] = []
 ## Every zone's rooms, in zone order, each zone's in its own order.
@@ -21,6 +23,16 @@ static func of(zone: ZoneModel) -> MapModel:
 	map.key = zone.key
 	map.zones.append(zone)
 	map.rooms.append_array(zone.rooms)
+	return map
+
+
+## The map `map_key` of the zones in `list`, in the order given (the planner orders them itself).
+static func of_zones(map_key: String, list: Array[ZoneModel]) -> MapModel:
+	var map := MapModel.new()
+	map.key = map_key
+	for zone in list:
+		map.zones.append(zone)
+		map.rooms.append_array(zone.rooms)
 	return map
 
 

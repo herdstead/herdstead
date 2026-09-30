@@ -45,16 +45,20 @@ MIN_CASES_CLIENT=52
 MIN_CASES_MACHINE=33
 MIN_CASES_INCREMENTAL=54
 MIN_CASES_OFFICE_LAYOUT=51
-MIN_CASES_OFFICE_SERVICE=14
-MIN_CASES_OFFICE_GEOMETRY=27
+MIN_CASES_OFFICE_MAP=18
+MIN_CASES_OFFICE_SERVICE=16
+# GEOMETRY 27 -> 25: its two row-wall sign and title cases went with the row
+# walls (lane B2a); MAP's test_top_run_and_lane_gap_pieces_clear_... covers
+# the furniture's clearance on the map now.
+MIN_CASES_OFFICE_GEOMETRY=25
 MIN_CASES_OFFICE_FRAMES=5
 MIN_CASES_OFFICE_QUIET=7
 MIN_CASES_DAY_LIGHT=8
-MIN_CASES_OFFICE_RECONCILE=19
+MIN_CASES_OFFICE_RECONCILE=20
 MIN_CASES_OFFICE_WALKING=31
 MIN_CASES_OFFICE_RESTS=27
 MIN_CASES_OFFICE_NAVIGATOR=20
-MIN_CASES_FLOORS=18
+MIN_CASES_FLOORS=19
 MIN_CASES_ATTENTION_STORE=28
 MIN_CASES_AGENT_LIST=35
 MIN_CASES_ATTENTION_INTEGRATION=19
@@ -345,6 +349,8 @@ run_scene_suite() {
 }
 
 run_scene_suite test_office_layout "OFFICE LAYOUT TESTS" "$MIN_CASES_OFFICE_LAYOUT"
+# The map planner: zones in lanes, the atomic plan cache, partitions, the map's furniture.
+run_scene_suite test_office_map "OFFICE MAP TESTS" "$MIN_CASES_OFFICE_MAP"
 # The entry band's fixtures and who rests where: pure, no office.
 run_scene_suite test_office_service "OFFICE SERVICE TESTS" "$MIN_CASES_OFFICE_SERVICE"
 run_scene_suite test_office_navigator "OFFICE NAVIGATOR TESTS" "$MIN_CASES_OFFICE_NAVIGATOR"

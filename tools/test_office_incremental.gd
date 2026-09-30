@@ -88,15 +88,17 @@ func test_status_change_redraws_one_desk() -> void:
 
 
 func test_same_look_keeps_the_worker() -> void:
-	# Three idle agents on api, all first seen idle (so in projection order),
-	# and the pantry of this narrow floor has room for two: api:p4 sits. 628
-	# wide: the floor is planned 488 units wide.
-	var idle := _with(_with(fixture, "api:p1", {"agent_status": "idle"}), "api:p2", {"agent_status": "idle"})
+	# Three idle agents on api and three residents, all first seen idle (so in projection order, the
+	# residents' tab first), and the pantry of this narrow map has room for five: api:p4 sits. 628 wide:
+	# the map is planned 488 units wide, one lane.
+	var idle := _with(
+		_with(_with_residents(fixture), "api:p1", {"agent_status": "idle"}), "api:p2", {"agent_status": "idle"}
+	)
 	idle = _with(idle, "api:p4", {"agent_status": "idle"})
 	var office := await _live_office(idle, Vector2(628, 480))
 	_eq(office.hud.plan_width(), 488.0, "planned 488 wide")
 	var pantry := office.layout_plan().pantry
-	_eq(pantry.spots.size() if pantry != null else -1, 2, "the pantry here holds two")
+	_eq(pantry.spots.size() if pantry != null else -1, 5, "the pantry here holds five")
 	var desk: OfficeStation = office.floor_view.seats[HerdrFleet.pane_key(LOCAL, "api:p4")].node
 	_eq([desk.rest, desk.actor().position], [OfficeRests.Rest.SEAT, Vector2.ZERO], "api:p4 finds it full and sits")
 	await _frames(12)
@@ -180,7 +182,7 @@ func test_standing_spots_are_clear() -> void:
 	root.remove_child(holder)
 	holder.free()
 	for workspace: String in ["api", "web", "infra"]:
-		var office := await _live_office()
+		var office := await _live_office(fixture, Vector2(880, 480))
 		await _visit_floor(office, HerdrFleet.pane_key(LOCAL, workspace))
 		var standing := _decor(office)
 		_check(not standing.is_empty(), "%s really has furniture to stand clear of" % workspace)
@@ -361,9 +363,9 @@ func test_a_still_click_picks_and_a_drag_does_not() -> void:
 		_check(not target.input_pickable, "a seat nobody's pane uses is not pickable at all")
 		await _click(empty.target_rect().get_center() - office.camera.position)
 		_eq(office.picked_key, first, "so a click on one picks nothing")
-	# 64 units further down the floor from where the table was framed: the
-	# framing already panned to keep it above the staff panel.
-	var panned := office.camera.pan + Vector2(0, 64)
+	# 16 units further down the map from where the table was framed: the framing already panned to keep
+	# it above the staff panel, and a one-row map of pods leaves 18 below it.
+	var panned := office.camera.pan + Vector2(0, 16)
 	office.camera.pan = panned
 	await _frames(2)
 	_eq(office.camera.position, panned, "the office really panned")
@@ -414,17 +416,15 @@ func test_only_a_still_left_release_picks() -> void:
 ## panel: a Control takes the event in the viewport's GUI pass, which runs
 ## before both _unhandled_input and physics picking.
 func test_a_click_over_a_panel_picks_nothing() -> void:
-	# A pod long enough to reach under the right column: the pan is clamped
-	# to the floor, and the fixture's own pods of 32-unit desks all stand in
-	# its left half (the long tables reached further right).
-	var long: Dictionary = fixture.duplicate(true)
-	var panes := _list(long, "panes")
-	var first: Dictionary = panes[1]
+	# api:t1 with 22 more panes spans a map wider than the small window below: a seat can go under every panel.
+	var wide: Dictionary = fixture.duplicate(true)
+	var first: Dictionary = _list(wide, "panes")[0]
 	for index in 22:
-		var extra := first.duplicate(true)
-		extra.pane_id = "api:p%d" % (20 + index)
-		panes.append(extra)
-	var office := await _live_office(long)
+		var extra: Dictionary = first.duplicate(true)
+		extra.pane_id = "api:wide-%d" % index
+		extra.terminal_id = "term-api-wide-%d" % index
+		_list(wide, "panes").append(extra)
+	var office := await _live_office(wide)
 	# Pan an actual seat beneath each panel. Floor geometry does not
 	# reflow on resize, so neither zero nor maximum pan implies an overlap.
 	office.test_screen = Vector2(480, 320)
@@ -443,7 +443,9 @@ func test_a_click_over_a_panel_picks_nothing() -> void:
 		# be brought under a panel depends on where the floor's pods stand.
 		var station: OfficeStation = null
 		for target in _seats(office):
-			for aim: Vector2 in [bounds.get_center(), bounds.position + Vector2(bounds.size.x / 4.0, 12)]:
+			# The bottom aim is for the FLOORS rail, whose rows fill its top and middle.
+			var bottom := bounds.end - Vector2(bounds.size.x / 2.0, 12)
+			for aim: Vector2 in [bounds.get_center(), bounds.position + Vector2(bounds.size.x / 4.0, 12), bottom]:
 				office.camera.pan = target.target_rect().get_center() - aim
 				await _frames(2)
 				station = _seat_under(office, bounds)
@@ -511,7 +513,8 @@ func test_picking_follows_the_window_scale() -> void:
 ## one still does what its keycode did. A held key repeats; the office does not.
 ## All of it through real input events, as the window delivers them.
 func test_office_actions_answer_their_keys() -> void:
-	var office := await _live_office()
+	# Planned 1600 wide (four lanes): the map reaches past a notch every way.
+	var office := await _live_office(fixture, Vector2(1600, 480))
 	# An [input] section of our own does not take the engine's built-ins away,
 	# and arrow-key panning is still Input.get_vector() over them.
 	for action: StringName in [&"ui_left", &"ui_right", &"ui_up", &"ui_down"]:
@@ -1246,15 +1249,14 @@ func test_the_first_plan_uses_the_window_the_refresh_is_for() -> void:
 	var web := HerdrFleet.pane_key(LOCAL, "web")
 	_check(office.layout_plan().floor_key != web, "web has not been shown yet")
 	_eq(office.hud.world_rect().size.x, 660.0, "the HUD is laid out for the 800-wide window")
-	# 720 wide leaves the world 580 units with the drawer closed, 18 cells:
-	# wider than the floor's own minimum, so the plan's width is the window's,
-	# and not the 20 cells the 800-wide window leaves.
-	office.test_screen = Vector2(720, 480)
+	# 880 wide leaves the world 740 units (drawer closed), 23 cells: two lanes,
+	# a map 23 wide, not the one lane (13 cells) the 800-wide window's 20 hold.
+	office.test_screen = Vector2(880, 480)
 	_feed(office, _focused_on(fixture, "web:p1"))
 	_eq(office.layout_plan().floor_key, web, "herdr's focus shows web, planned for the first time")
-	_eq(office.hud.world_rect().size.x, 580.0, "the HUD is laid out for the 720-wide window")
-	_eq(office.hud.plan_width(), 580.0, "which is the width a first plan asks for")
-	_eq(office.layout_plan().initial_width_cells, 18, "and the plan is made for it")
+	_eq(office.hud.world_rect().size.x, 740.0, "the HUD is laid out for the 880-wide window")
+	_eq(office.hud.plan_width(), 740.0, "which is the width a first plan asks for")
+	_eq([office.layout_plan().lanes, office.layout_plan().initial_width_cells], [2, 23], "and the plan is made for it")
 	_done(office)
 
 
@@ -1553,11 +1555,12 @@ func test_tile_atlas_is_padded() -> void:
 	_check(not runtime.get_image().has_mipmaps(), "and no mipmaps on that copy: the known cost")
 
 
-## The floor's shell lies on the ground, its standing furniture stands in the
-## sorted root, and both are furniture: the same floor draws the same shell
-## whatever herdr reports, and nothing in it moves when a status does.
+## The floor's shell lies on the ground, its standing furniture, the zone's partitions and its sign stand
+## in the sorted root, and all of it is furniture: the same map draws the same shell whatever herdr
+## reports, and nothing in it moves when a status does. Two lanes wide (880), so the top wall and the
+## free lane stand furniture.
 func test_the_shell_is_furniture() -> void:
-	var office := await _live_office()
+	var office := await _live_office(fixture, Vector2(880, 480))
 	var rooms: Node2D = office.floor_view.root
 	var ground: Node2D = rooms.get_node("Ground")
 	var sorted: Node2D = rooms.get_node("Sorted")
@@ -1589,7 +1592,13 @@ func test_the_shell_is_furniture() -> void:
 	planned.sort()
 	counters.sort()
 	_eq(counters, planned, "the sorted root draws exactly the planned counters")
-	_eq(planned.size(), 2, "a reception and a pantry")
+	_eq(planned.size(), 1, "a pantry, and no reception")
+	var zone := plan.zones[0].zone_key
+	var pieces := _partitions_drawn(office, zone)
+	_check(not pieces.is_empty(), "the zone stands its partitions")
+	var board := office.floor_view.zone_sign(zone)
+	_check(board != null and sorted.is_ancestor_of(board), "and its sign, in the sorted root")
+	var hung := board.position if board != null else Vector2.INF
 	_feed(office, _with(_with(fixture, "api:p1", {"agent_status": "blocked"}), "api:p2", {"agent_status": "done"}))
 	_set_online(office, false)
 	await _frames(2)
@@ -1601,20 +1610,19 @@ func test_the_shell_is_furniture() -> void:
 	var after := _fixtures(office).map(func(piece: OfficeDecor) -> Array: return [piece.piece, piece.position])
 	after.sort()
 	_eq(after, counters, "and the counters, whoever is blocked or done")
+	_eq(_partitions_drawn(office, zone), pieces, "and the partitions")
+	_eq(office.floor_view.zone_sign(zone).position, hung, "and the sign")
 	_done(office)
 
 
-## The wall-foot run is planned furniture like the plant and the
-## cabinet: the sorted root draws exactly the plan, each piece
-## where the plan put it, and neither the plan's pieces, their keys nor where
-## they are drawn change when an agent's status or herdr's focus does.
+## The top-wall run and the lane gaps' pieces (two lanes, 880) are planned furniture: the sorted root
+## draws exactly the plan, each piece where the plan put it, and neither the plan's pieces, their keys nor
+## where they are drawn change when an agent's status or herdr's focus does.
 func test_the_new_furniture_keeps_its_keys_through_status_and_focus() -> void:
-	var office := await _live_office()
+	var office := await _live_office(fixture, Vector2(880, 480))
 	var planned := _decor_signatures(office.layout_plan())
 	var keys := "; ".join(planned)
-	# Its tables fill the bay, so it has no spare bay's plant (see the layout
-	# and geometry suites for that one).
-	_check("/wall/" in keys, "the shown floor has a wall-foot run: " + keys)
+	_check("top/" in keys and "/gap/" in keys, "the shown map has a top-wall run and a lane gap's pieces: " + keys)
 	var drawn := _decor_places(office)
 	_eq(drawn, _planned_places(office.layout_plan()), "every planned piece is drawn where the plan put it")
 	_feed(office, _with(fixture, "api:p1", {"agent_status": "blocked"}))
@@ -1626,14 +1634,13 @@ func test_the_new_furniture_keeps_its_keys_through_status_and_focus() -> void:
 	_done(office)
 
 
-## A floor wide enough for a spare bay draws its standing pieces in the
-## plan's own order, the bay's plant included: the sorted root keeps them by
-## key, and so does the plan.
+## A map wide enough for lane gaps draws its standing pieces in the plan's own order, the gaps' pieces
+## included: the sorted root keeps them by key, and so does the plan.
 func test_a_spare_bay_is_drawn_in_the_plans_order() -> void:
 	var office := await _live_office(fixture, Vector2(1600, 800))
 	var plan := office.layout_plan()
 	var keys := plan.decorations.map(func(piece: DecorPlacement) -> String: return piece.key)
-	_check(keys.any(func(key: String) -> bool: return key.ends_with("/bay")), "a floor with a spare bay: %s" % [keys])
+	_check(keys.any(func(key: String) -> bool: return "/gap/" in key), "a map with lane gaps: %s" % [keys])
 	_eq(
 		_decor(office).map(func(piece: OfficeDecor) -> String: return "%s@%s" % [piece.piece, piece.position]),
 		plan.decorations.map(func(piece: DecorPlacement) -> String: return "%s@%s" % [piece.piece, piece.position]),
@@ -1665,9 +1672,9 @@ func _planned_places(plan: FloorPlan) -> Array:
 
 
 ## Standing furniture never stands in the way: not on a seat's click target, not
-## inside a table's footprint, and not on the walkway people cross the floor by.
+## inside a table's footprint, and not on a walkway (OfficeFloorValidation.walkways()).
 func test_standing_furniture_blocks_nothing() -> void:
-	var office := await _live_office()
+	var office := await _live_office(fixture, Vector2(880, 480))
 	var standing := _decor(office)
 	_check(not standing.is_empty(), "the shown floor really has furniture to check")
 	for piece in standing:
@@ -1680,14 +1687,9 @@ func test_standing_furniture_blocks_nothing() -> void:
 			)
 		for table: OfficeTable in office.floor_view.tables:
 			_check(not stands.intersects(_table_rect(table)), "%s is clear of %s" % [piece.piece, table.name])
-		for corridor in office.layout_plan().corridors:
+		for walk in OfficeFloorValidation.walkways(office.layout_plan()):
 			var walkway := Rect2(
-				(
-					Vector2(corridor.position * FloorLayoutPolicy.GRID)
-					+ office.world.global_position
-					+ Vector2(0, OfficeScene.PLATE_HEIGHT)
-				),
-				Vector2(corridor.size * FloorLayoutPolicy.GRID)
+				walk.position + office.world.global_position + Vector2(0, OfficeScene.PLATE_HEIGHT), walk.size
 			)
 			_check(not stands.intersects(walkway), "%s is clear of every planned walkway" % piece.piece)
 	_done(office)
@@ -1989,3 +1991,10 @@ func _subtree_ids(node: Node) -> Array:
 func _within(track: PixelPeople.Track, frame: Variant) -> bool:
 	var column: int = frame
 	return column >= track.start and column < track.start + track.frame_count()
+
+
+## Each partition sprite of `zone` on the shown map, as "texture@position".
+func _partitions_drawn(office: OfficeDouble, zone: String) -> Array:
+	return office.floor_view.partition_sprites(zone).map(
+		func(sprite: Sprite2D) -> String: return "%s@%s" % [sprite.texture.resource_path, sprite.position]
+	)

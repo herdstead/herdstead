@@ -94,14 +94,14 @@ func test_art_contract_names_every_id_a_pack_lacks() -> void:
 	var missing := {
 		"a palette colour": func(m: Dictionary) -> void: _drop(m, ["palette", "task_light"]),
 		"a tile": func(m: Dictionary) -> void: _drop(m, ["tiles", "rug.middle_center"]),
-		"a prop": func(m: Dictionary) -> void: _drop(m, ["props", "sign"]),
+		"a prop": func(m: Dictionary) -> void: _drop(m, ["props", "window"]),
 		"a UI image": func(m: Dictionary) -> void: _drop(m, ["ui", "branch"]),
 		"a state": func(m: Dictionary) -> void: _drop(m, ["states", "blocked"]),
 	}
 	var named := {
 		"a palette colour": "task_light",
 		"a tile": "rug.middle_center",
-		"a prop": "sign",
+		"a prop": "window",
 		"a UI image": "branch",
 		"a state": "blocked",
 	}
@@ -589,26 +589,31 @@ func test_art_contract_names_ids_no_scene_asks_for() -> void:
 	_eq(_sorted_names(unused), ["props", "table", "tiles", "ui"], "every category is reported")
 	_eq(
 		Array(unused[&"tiles"]),
-		["wall.front_center", "wall.front_left", "wall.front_right", "wall.threshold"],
-		"the front wall nothing lays: it would cover the near seats (docs/WORLD_MODEL.md)"
+		[
+			"wall.cap_end_right",
+			"wall.cap_t_left",
+			"wall.face_end_right",
+			"wall.face_t_left",
+			"wall.front_center",
+			"wall.front_left",
+			"wall.front_right",
+			"wall.threshold",
+		],
+		(
+			"the front wall nothing lays: it would cover the near seats (docs/WORLD_MODEL.md); nor the row walls'"
+			+ " joints: a zone stands in low partitions, not row walls (pruned in lane C)"
+		)
 	)
-	# The pods of desks draw the pod's art (lane B1); what the long table, the
-	# big paper stack and the big selection frame drew is shipped and drawn by
-	# nothing now, until lane C prunes it from the pack; the zone partitions
-	# land before lane B2 draws them: exactly these ids.
+	# The pods of desks draw the pod's art (lane B1); the long table's big paper
+	# stack is shipped and drawn by nothing now, until lane C prunes it from the
+	# pack; the open run's two ends are drawn by no zone (a zone's bottom run
+	# ends in its corners); the retired reception, row sign and cabinet the live
+	# office no longer places (the showroom's row room still stands the sign and
+	# the cabinet until lane C redoes it). Exactly these ids.
 	_eq(
 		Array(unused[&"props"]),
-		[
-			"done_stack",
-			"partition_corner_bl",
-			"partition_corner_br",
-			"partition_h",
-			"partition_h_end_l",
-			"partition_h_end_r",
-			"partition_post",
-			"partition_v",
-		],
-		"every prop but the long table's paper and the zone partitions is placed somewhere"
+		["cabinet", "done_stack", "partition_h_end_l", "partition_h_end_r", "reception", "sign"],
+		"every prop but the long table's paper, the open run's ends and the retired row pieces is in the contract"
 	)
 	_eq(Array(unused[&"ui"]), ["selection"], "every UI image but the long table's frame is drawn somewhere")
 	_eq(

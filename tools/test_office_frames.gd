@@ -1,14 +1,14 @@
 extends "res://tools/office_test_base.gd"
-## Framed pictures on the row walls: furnishing hung on a grid of the
-## wall, clear of every sign, title, table and standing piece, drawn in the
-## shell, and moved only by the floor's geometry. Pure plans and bare floor
-## views first, then the live office (office_test_base), which is why the suite
-## runs --read-only with its own --socket and --work.
+## Framed pictures on the top wall: furnishing hung in every second gap
+## between two windows, clear of the windows, the lift door and the pantry,
+## drawn in the shell, and moved only by the map's geometry. Pure plans and
+## bare map views first, then the live office (office_test_base), which is why
+## the suite runs --read-only with its own --socket and --work.
 
 ## The widths a floor is first planned at in the shipped windows, narrowest to
 ## widest (the layout suite's FURNISHED_WIDTHS).
 const WIDTHS: Array[int] = [11, 20, 32, 60]
-## Where the cream of a row wall's face starts and ends, from the row's top
+## Where the cream of the top wall's face starts and ends, from the map's top
 ## (the cap's ink, wood and plaster above it, the skirting below: the wall tiles).
 const FACE_TOP := 12.0
 const FACE_FOOT := 57.0
@@ -121,7 +121,9 @@ func _rules(width: int) -> FloorLayoutPolicy:
 ## its standing pieces, as the office plans it; `previous` is the plan it grows from.
 func _planned(floor_model: ZoneModel, width: int, previous: FloorPlan = null, furnished := true) -> FloorPlan:
 	var decor := OfficeDecorPlanner.new(pen) if furnished else null
-	var result := OfficeFloorLayout.plan(floor_model, previous, _rules(width), decor, OfficeFixturePlanner.new(pen))
+	var result := OfficeFloorLayout.plan(
+		MapModel.of(floor_model), previous, _rules(width), decor, OfficeFixturePlanner.new(pen)
+	)
 	_eq(result.problems, PackedStringArray(), "%d cells: a valid floor: %s" % [width, "; ".join(result.problems)])
 	return result.plan
 
@@ -132,113 +134,61 @@ func _drawn(foot: Vector2) -> Rect2:
 	return Rect2(foot - picture.pivot, Vector2(picture.size))
 
 
-## Whether a picture drawn over `near` (already grown by FRAME_GAP) is clear on
-## `row`'s wall: off its end cells, and away from every sign, title and table of
-## the row and every standing piece and counter of the floor.
-func _clear_at(plan: FloorPlan, row: RowPlan, near: Rect2) -> bool:
+## Every picture of `plan` hangs centred in a gap between two neighbouring
+## windows, every second gap (the second, the fourth, ...) and only those, on
+## the cream of the top wall's face, off its end cells, and grown by FRAME_GAP
+## it clears every window, the lift door and the pantry counter. Returns how
+## many hang.
+func _check_frames(plan: FloorPlan, what: String) -> int:
 	var grid := float(FloorLayoutPolicy.GRID)
-	var wall_y := float(row.wall_cells.position.y) * grid
-	if near.position.x < float(row.wall_cells.position.x + 1) * grid:
-		return false
-	if near.end.x > float(row.wall_cells.end.x - 1) * grid:
-		return false
-	for desk in row.desks:
-		var table := desk.measure.render_rect
-		table.position += desk.origin
-		if near.intersects(OfficeShell.wall_display_bounds(desk, wall_y, pen)) or near.intersects(table):
-			return false
-	for placed in plan.decorations:
-		if near.intersects(placed.draw_rect):
-			return false
-	for counter in plan.fixtures():
-		if near.intersects(counter.draw_rect):
-			return false
-	return true
-
-
-## Every picture of `plan` hangs on the wall's grid, one to a bay at most, in
-## the bay's second place only when its start is taken, at the foot of the row
-## it is on, on the cream of that row's face and off its end cells, and grown by
-## FRAME_GAP it clears every sign, title and table of the row and every standing
-## piece and counter of the floor. Returns the number hung on each row.
-func _check_frames(plan: FloorPlan, what: String) -> Array[int]:
-	var counts: Array[int] = []
-	var grid := float(FloorLayoutPolicy.GRID)
-	var first := OfficeShell.FRAME_FROM
 	var every := OfficeShell.frames(plan, pen)
-	var hung := 0
-	for row in plan.rows:
-		var xs := OfficeShell.frame_xs(plan, row, pen)
-		counts.append(xs.size())
-		var wall_y := float(row.wall_cells.position.y) * grid
-		var bays: Dictionary[float, bool] = {}
-		for x in xs:
-			var foot := Vector2(x, wall_y + OfficeShell.FRAME_FOOT)
-			_check(foot in every, "%s: frames() carries row %d's %s" % [what, row.index, foot])
-			hung += 1
-			# A bay's start or its second place, and one picture to a bay at most.
-			var bay := floorf((x - first) / OfficeShell.FRAME_PITCH)
-			var into := x - first - bay * OfficeShell.FRAME_PITCH
-			_check(
-				bay >= 0.0 and (is_zero_approx(into) or is_equal_approx(into, OfficeShell.FRAME_SECOND)),
-				"%s: %d is a place of the grid" % [what, x]
-			)
-			_check(not bays.has(bay), "%s: row %d hangs one picture in bay %d at most" % [what, row.index, bay])
-			bays[bay] = true
-			if not is_zero_approx(into):
-				var start := Vector2(x - OfficeShell.FRAME_SECOND, wall_y + OfficeShell.FRAME_FOOT)
-				_check(
-					not _clear_at(plan, row, _drawn(start).grow(OfficeShell.FRAME_GAP)),
-					"%s: %d hangs in the bay's second place only because its start is taken" % [what, x]
-				)
-			var drawn := _drawn(foot)
-			_check(
-				drawn.position.y >= wall_y + FACE_TOP and drawn.end.y <= wall_y + FACE_FOOT,
-				"%s: row %d's picture at %d hangs on the cream face: %s" % [what, row.index, x, drawn]
-			)
-			var near := drawn.grow(OfficeShell.FRAME_GAP)
-			_check(
-				near.position.x >= float(row.wall_cells.position.x + 1) * grid,
-				"%s: %d keeps off the tee at the left wall" % [what, x]
-			)
-			_check(
-				near.end.x <= float(row.wall_cells.end.x - 1) * grid, "%s: %d keeps off the row wall's end" % [what, x]
-			)
-			for desk in row.desks:
-				var shown := OfficeShell.wall_display_bounds(desk, wall_y, pen)
-				_check(
-					not near.intersects(shown), "%s: %d clears %s's sign and title %s" % [what, x, desk.tab_key, shown]
-				)
-				var table := desk.measure.render_rect
-				table.position += desk.origin
-				_check(not near.intersects(table), "%s: %d clears %s's table" % [what, x, desk.tab_key])
-			for placed in plan.decorations:
-				_check(not near.intersects(placed.draw_rect), "%s: %d clears %s" % [what, x, placed.key])
-			for counter in plan.fixtures():
-				_check(not near.intersects(counter.draw_rect), "%s: %d clears the %s" % [what, x, counter.key])
-	_eq(every.size(), hung, "%s: frames() is every row's frame_xs() and nothing else" % what)
-	return counts
+	var windows := OfficeShell.window_xs(plan, pen)
+	var covers := OfficeShell.wall_covers(plan, pen)
+	var gaps: Array[float] = []
+	for gap in range(1, windows.size() - 1, 2):
+		gaps.append((windows[gap] + windows[gap + 1]) / 2.0)
+	for foot in every:
+		_check(foot.x in gaps, "%s: %s hangs centred in a second gap between windows: %s" % [what, foot, gaps])
+		_eq(foot.y, OfficeShell.FRAME_FOOT, "%s: at the frame's foot" % what)
+		var drawn := _drawn(foot)
+		_check(
+			drawn.position.y >= FACE_TOP and drawn.end.y <= FACE_FOOT,
+			"%s: the picture at %s hangs on the cream face: %s" % [what, foot, drawn]
+		)
+		var near := drawn.grow(OfficeShell.FRAME_GAP)
+		_check(
+			near.position.x >= grid and near.end.x <= float(plan.floor_cells.size.x - 1) * grid,
+			"%s: %s keeps off the wall's ends" % [what, foot]
+		)
+		for cover in covers:
+			_check(not near.intersects(cover), "%s: %s clears %s" % [what, foot, cover])
+	for x in gaps:
+		var near := _drawn(Vector2(x, OfficeShell.FRAME_FOOT)).grow(OfficeShell.FRAME_GAP)
+		var clear := true
+		for cover in covers:
+			clear = clear and not near.intersects(cover)
+		_eq(
+			Vector2(x, OfficeShell.FRAME_FOOT) in every,
+			clear,
+			"%s: the gap at %d hangs one exactly when it is clear" % [what, x]
+		)
+	return every.size()
 
 
-## Pictures hang on every row wall that has room at every shipped width and on
-## the stress floor, each on the wall's grid, on the cream face, off the end
-## cells, and never within FRAME_GAP of a sign, a title (long ones included), a
-## table, a standing piece (the cabinet and the plants reach up the wall) or a
-## counter. 11 cells is the exception the geometry leaves: its table's sign sits
-## over the only places, so its wall stays bare, as its wall-foot run does.
-func test_frames_hang_on_the_wall_grid_clear_of_signs_and_pieces() -> void:
+## Pictures hang on the top wall at every shipped width and on the stress map,
+## each centred in a second gap between two windows, on the cream face, off the
+## end cells, and never within FRAME_GAP of a window, the lift door or the
+## pantry. 13 cells (the narrowest map) has two windows, one gap: no second
+## gap, so its wall hangs none.
+func test_frames_hang_between_the_windows_clear_of_the_door_and_the_pantry() -> void:
 	var cases: Array[Array] = []
 	for width in WIDTHS:
 		cases.append(["one table", _floor([_room("a", 2)]), width])
-	var titled: Array[RoomModel] = []
-	for index in 3:
-		titled.append(_room("tab-%d" % index, 2, index, "MMMMMMMMMMMMMMMMMMMMMMMM"))
-	for width: int in [20, 32, 60]:
-		cases.append(["three long titles", _floor(titled), width])
 	cases.append(["three tables", _floor([_room("a", 4), _room("b", 2, 1), _room("c", 6, 2)]), 32])
 	cases.append(["stress", _stress_floor(), 20])
 	cases.append(["stress", _stress_floor(), 32])
-	var stress_hung := 0
+	cases.append(["empty", _floor([]), 32])
+	var hung_wide := 0
 	for each in cases:
 		var what: String = each[0]
 		var model: ZoneModel = each[1]
@@ -246,15 +196,13 @@ func test_frames_hang_on_the_wall_grid_clear_of_signs_and_pieces() -> void:
 		var plan := _planned(model, width)
 		if plan == null:
 			continue
-		var label := "%s, %d cells" % [what, width]
-		var counts := _check_frames(plan, label)
-		print("FRAMES_PER_ROW %s: %s" % [label, counts])
-		for count in counts:
-			if what == "one table" and width > 11:
-				_check(count > 0, "%s: every row hangs a picture: %s" % [label, counts])
-			if what == "stress":
-				stress_hung += count
-	_check(stress_hung > 0, "the stress floor hangs pictures somewhere: %d" % stress_hung)
+		var label := "%s, %d cells asked, %d wide" % [what, width, plan.floor_cells.size.x]
+		var count := _check_frames(plan, label)
+		print("FRAMES %s: %d %s" % [label, count, OfficeShell.frames(plan, pen)])
+		if plan.floor_cells.size.x >= 23:
+			_check(count > 0, "%s: the top wall hangs a picture" % label)
+			hung_wide += count
+	_check(hung_wide > 0, "the wide maps hang pictures: %d" % hung_wide)
 
 
 ## The same plan hangs the same pictures however often it is asked and in
@@ -320,17 +268,13 @@ func _view(plan: FloorPlan, model: ZoneModel) -> OfficeFloorView:
 	return view
 
 
-## The floor draws exactly the planned pictures, in its shell on the ground and
-## nowhere in the sorted root, and none within FRAME_GAP of a sign or title as
-## they are drawn, the real font-sized label included: long titles, several
-## tables to a row, at the shipped widths.
-func test_the_floor_draws_the_planned_frames_clear_of_the_drawn_signs() -> void:
+## The map draws exactly the planned pictures, in its shell on the ground and
+## nowhere in the sorted root, and none within FRAME_GAP of a window or the
+## lift door as they are drawn, at the shipped widths.
+func test_the_floor_draws_the_planned_frames_clear_of_the_windows() -> void:
 	var drawn_any := 0
-	for width: int in [20, 32, 60]:
-		var titled: Array[RoomModel] = []
-		for index in 3:
-			titled.append(_room("tab-%d" % index, 2, index, "MMMMMMMMMMMMMMMMMMMMMMMM"))
-		var model := _floor(titled)
+	for width: int in [32, 60]:
+		var model := _floor([_room("a", 2), _room("b", 2, 1)])
 		var plan := _planned(model, width)
 		if plan == null:
 			continue
@@ -343,79 +287,63 @@ func test_the_floor_draws_the_planned_frames_clear_of_the_drawn_signs() -> void:
 		for node: Node in view.sorted.find_children("*", "Sprite2D", true, false):
 			_check((node as Sprite2D).texture != texture, "%d cells: no picture stands in the sorted root" % width)
 		var covers: Array[Rect2] = []
-		var floor_root := view.root
-		for tab: String in view.desks:
-			var desk := view.desks[tab]
-			var label_transform := floor_root.global_transform.affine_inverse() * desk.title.get_global_transform()
-			covers.append(label_transform * Rect2(Vector2.ZERO, desk.title.size))
-			for child in desk.background.get_children():
-				if child is Sprite2D:
-					var sign_sprite: Sprite2D = child
-					var sign_transform := floor_root.global_transform.affine_inverse() * sign_sprite.global_transform
-					covers.append(sign_transform * sign_sprite.get_rect())
-		_eq(covers.size(), 2 * view.desks.size(), "%d cells: a sign and a title for every table" % width)
+		var shell := view.ground.get_node("Shell")
+		for child in shell.get_children():
+			var sprite := child as Sprite2D
+			if sprite != null and sprite.texture != texture:
+				covers.append(sprite.transform * sprite.get_rect())
+		_check(covers.size() >= 1 + view.windows().size(), "%d cells: the door and every window are drawn" % width)
 		for foot in hung:
 			var near := _drawn(foot).grow(OfficeShell.FRAME_GAP)
 			for cover in covers:
 				_check(not near.intersects(cover), "%d cells: the picture at %s clears %s" % [width, foot, cover])
-	_check(drawn_any > 0, "the floors hang pictures: %d" % drawn_any)
+	_check(drawn_any > 0, "the maps hang pictures: %d" % drawn_any)
 
 
-## A table that grows moves its sign along the row wall, and the pictures move
-## out of its way: the floor updated in place draws the new plan's pictures, not
-## the old ones, and never one under a sign. Here nothing else of the shell moves:
-## the floor stands no furniture (the planner leaves the whole batch out when it
-## would close a path, OfficeFloorLayout.plan()), and the floor, its walls, its
-## corridors and its counters stay as they were, so only a shell keyed on the
-## pictures themselves is drawn again.
-func test_a_moved_sign_moves_the_frames_out_of_its_way() -> void:
-	var width := 20
-	var first_model := _floor([_room("a", 5)])
+## Only the map's geometry moves a picture: a zone growing down, the map as
+## wide as it was, moves none and draws no new shell pictures; the map
+## widening (the lift door moves right, the windows centre again between the
+## pantry and it) moves them, and the map updated in place draws the new
+## plan's pictures, not the old ones.
+func test_a_widened_map_moves_the_frames_with_its_door() -> void:
+	var width := 32
+	var first_model := _floor([_room("a", 2)])
 	var first := _planned(first_model, width, null, false)
-	# Twenty-eight panes: a fourteen-desk pod, 448 wide, whose sign (centred at
-	# 256) reaches the first bay's picture at 312; nine panes no longer do, now
-	# that a desk is 32 wide.
-	var grown_model := _floor([_room("a", 28)])
-	var grown := _planned(grown_model, width, first, false)
-	if first == null or grown == null:
+	# A twelve-pane pod (7 cells) cannot share a's pod row: a new row.
+	var taller_model := _floor([_room("a", 2), _room("b", 12, 1)])
+	var taller := _planned(taller_model, width, first, false)
+	var wide_model := _floor([_room("a", 2), _room("b", 12, 1), _room("c", 40, 2)])
+	var wide := _planned(wide_model, width, taller, false)
+	if first == null or taller == null or wide == null:
 		return
 	var before := OfficeShell.frames(first, pen)
-	var after := OfficeShell.frames(grown, pen)
+	_check(taller.zones[0].cells.size.y > first.zones[0].cells.size.y, "the zone grew down")
+	_eq(taller.floor_cells.size.x, first.floor_cells.size.x, "the map is as wide as it was")
+	_eq(OfficeShell.frames(taller, pen), before, "so the pictures hang where they hung")
+	var after := OfficeShell.frames(wide, pen)
 	print("FRAMES_MOVED %s -> %s" % [before, after])
-	_check(before != after, "growing table a moves the pictures: %s -> %s" % [before, after])
-	_check(first.decorations.is_empty() and grown.decorations.is_empty(), "the floor stands no furniture")
-	_eq(grown.floor_cells, first.floor_cells, "the floor is as big as it was")
-	_eq(grown.corridors, first.corridors, "its corridors are where they were")
-	_eq(grown.rows.size(), first.rows.size(), "it has the rows it had")
-	for index in first.rows.size():
-		_eq(grown.rows[index].wall_cells, first.rows[index].wall_cells, "row %d's wall is where it was" % index)
-	var counters := func(plan: FloorPlan) -> Array:
-		return plan.fixtures().map(func(each: FixturePlacement) -> String: return each.geometry_signature())
-	_eq(counters.call(grown), counters.call(first), "and so are its counters")
-	_check_frames(grown, "grown")
+	_check(wide.lanes > taller.lanes, "a wide table widened the map: %d -> %d lanes" % [taller.lanes, wide.lanes])
+	_check(before != after, "and moved the pictures: %s -> %s" % [before, after])
+	_eq(wide.pantry.position, first.pantry.position, "the pantry stays")
+	_check_frames(wide, "widened")
 	var view := _view(first, first_model)
 	await process_frame
-	_eq(_hung(view), before, "the first floor draws its pictures")
-	view.reconcile(grown, MapModel.of(grown_model))
+	_eq(_hung(view), before, "the first map draws its pictures")
+	view.reconcile(taller, MapModel.of(taller_model))
 	await process_frame
-	_eq(_hung(view), after, "updated in place, the floor draws the grown plan's pictures")
-	var grid := float(FloorLayoutPolicy.GRID)
-	for foot in _hung(view):
-		for desk in grown.desks:
-			var wall_y := float(grown.rows[desk.row].wall_cells.position.y) * grid
-			_check(
-				not _drawn(foot).intersects(OfficeShell.wall_display_bounds(desk, wall_y, pen)),
-				"the picture at %s is not under %s's sign" % [foot, desk.tab_key]
-			)
+	_eq(_hung(view), before, "a taller zone draws the same")
+	view.reconcile(wide, MapModel.of(wide_model))
+	await process_frame
+	_eq(_hung(view), after, "updated in place, the widened map draws its own pictures")
 
 
-## The framed pictures on the row walls are furniture: the shell on the
+## The framed pictures on the top wall are furniture: the shell on the
 ## ground hangs them and nothing that stands in the sorted root is one (that it
 ## draws exactly the plan's is the frames suite's), and neither a status, herdr's focus, a
 ## click that selects another desk nor a dropped machine draws the shell again
 ## or moves a picture. A dropped machine dims them with the whole floor.
 func test_the_wall_frames_are_furniture() -> void:
-	# Wide enough that the row wall has room beside its two signs.
+	# Wide enough that the top wall has room for pictures between its windows.
 	var office := await _live_office(fixture, Vector2(1600, 800))
 	var shell := office.floor_view.ground.get_node_or_null("Shell")
 	_check(shell != null, "the floor has its shell")

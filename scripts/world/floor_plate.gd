@@ -130,7 +130,7 @@ func _show_accent(group: String) -> void:
 	var accent: Control = %Accent
 	accent.visible = not group.is_empty()
 	if accent.visible:
-		accent.theme_type_variation = StringName("PlateAccent%d" % posmod(group.hash(), ArtContract.ACCENTS.size()))
+		accent.theme_type_variation = StringName("PlateAccent%d" % OfficeZoneSign.accent_of(group))
 
 
 ## Whether the plate names the machine and its state: once there is more than Local.

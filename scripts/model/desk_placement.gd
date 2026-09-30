@@ -8,7 +8,9 @@ static var signatures := 0
 var tab_key := ""
 ## ZoneModel.key of the zone the desk stands in (FloorPlan.zone()).
 var zone_key := ""
+## The pod row it stands in, counted from its zone's top (ZonePlacement.rows).
 var row := -1
+## Where it stands, in map cells, and the table's origin in map units.
 var reserved_cells := Rect2i()
 var origin := Vector2.ZERO
 var capacity := 2

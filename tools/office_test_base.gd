@@ -666,24 +666,45 @@ func _text_tick() -> void:
 		OS.delay_msec(10)
 
 
-## Every piece of standing furniture on the shown floor, in tree order: the
-## rows' plants and cabinets, not the entry band's counters (_fixtures()), which
-## stand in its walkway on purpose.
+## `snapshot` with `count` more agents, idle, in a tab of the api floor of
+## their own that is projected before the others (number 0): residents that
+## went idle first (their starts unknown, from the first snapshot they are in),
+## so they hold that many pantry spots before anyone a case watches. The
+## narrowest map's pantry holds five; three residents leave the two a case
+## fills and overfills.
+func _with_residents(snapshot: Dictionary, count := 3) -> Dictionary:
+	var result: Dictionary = snapshot.duplicate(true)
+	_list(result, "tabs").append({"tab_id": "api:t0", "workspace_id": "api", "number": 0, "label": "residents"})
+	var source: Dictionary = _list(result, "panes")[1]
+	for index in count:
+		var pane := source.duplicate(true)
+		pane.pane_id = "api:r%d" % index
+		pane.tab_id = "api:t0"
+		pane.terminal_id = "term-api-r%d" % index
+		pane.agent = "claude"
+		pane.agent_status = "idle"
+		_list(result, "panes").append(pane)
+	return result
+
+
+## Every piece of standing furniture on the shown map, in tree order: the
+## top-wall run's plants and the lane gaps' plants and side tables, not the
+## entry band's pantry counter (_fixtures()), which stands in its walkway on purpose.
 func _decor(office: OfficeDouble) -> Array[OfficeDecor]:
 	var found: Array[OfficeDecor] = []
 	for node: Node in office.world.find_children("*", "OfficeDecor", true, false):
 		var piece: OfficeDecor = node
-		if piece.piece != ArtContract.PROP_RECEPTION and piece.piece != ArtContract.PROP_PANTRY:
+		if piece.piece != ArtContract.PROP_PANTRY:
 			found.append(piece)
 	return found
 
 
-## The entry band's counters on the shown floor, in tree order.
+## The entry band's counter (the pantry) on the shown map, in tree order.
 func _fixtures(office: OfficeDouble) -> Array[OfficeDecor]:
 	var found: Array[OfficeDecor] = []
 	for node: Node in office.world.find_children("*", "OfficeDecor", true, false):
 		var piece: OfficeDecor = node
-		if piece.piece == ArtContract.PROP_RECEPTION or piece.piece == ArtContract.PROP_PANTRY:
+		if piece.piece == ArtContract.PROP_PANTRY:
 			found.append(piece)
 	return found
 

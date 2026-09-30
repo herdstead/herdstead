@@ -1,8 +1,9 @@
 class_name StrategicModel
 extends RefCounted
 ## What the strategic view (`S`, OfficeStrategic) draws for the shown floor:
-## its title, and per table of the floor's plan (its rows in `index` order,
-## empty rows left out, each row's tables left to right) the seats that have a
+## its title, and per table of the floor's plan (its zones in the plan's order,
+## each zone's pod rows in `index` order, empty rows left out, each row's
+## tables left to right) the seats that have a
 ## pane, with the look of that pane's FLOORS window (OfficeFloorRow.window_look(),
 ## the one colour scale) and, for an agent that asks on a machine that answers,
 ## how long it has waited (StateLog.wait_of() in OfficeAttention.wait_text():
@@ -23,7 +24,8 @@ class Table:
 	var label := ""
 	## Seat columns, one far and one near seat each (DeskPlacement.capacity).
 	var capacity := 0
-	## Which of the view's rows (the plan's non-empty rows, top to bottom) it is in.
+	## Which of the view's rows (the plan's non-empty pod rows, zone by zone,
+	## top to bottom) it is in.
 	var row := 0
 	var seats: Array[Seat] = []
 
@@ -101,10 +103,13 @@ static func of(
 		rooms[room.key] = room
 		for pane in room.panes:
 			panes[pane.key] = pane
-	var bands := plan.rows.duplicate()
-	bands.sort_custom(func(a: RowPlan, b: RowPlan) -> bool: return a.index < b.index)
+	var bands: Array[RowPlan] = []
+	for zone in plan.zones:
+		var rows := zone.rows.duplicate()
+		rows.sort_custom(func(a: RowPlan, b: RowPlan) -> bool: return a.index < b.index)
+		bands.append_array(rows)
 	var row := 0
-	for band: RowPlan in bands:
+	for band in bands:
 		if band.desks.is_empty():
 			continue
 		var desks := band.desks.duplicate()

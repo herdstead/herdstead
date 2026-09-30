@@ -83,7 +83,7 @@ The four scenes (office, showroom, pixel people showroom, Avatar Studio) read th
 | machine | a building (the only one when there is just Local) |
 | workspace (**space** in the UI) | a floor, ordered by herdr's `number` |
 | linked worktree | a **mezzanine** hung under its source floor, numbered `3A`, `3B` |
-| tab | an open long table; its sign shows the tab label |
+| tab | a pod of desks; its label is written small right under it |
 | pane | a seat at that table |
 | agent | the pixel person in the seat; an empty `agent` is a SHELL seat with nobody in it |
 
@@ -764,7 +764,7 @@ scenes/preview.tscn      mock showroom (no herdr)
 scenes/avatar_studio.tscn, scenes/people_showroom.tscn
 scenes/ui/               HUD scenes: hud.tscn (layout lives here), bar, floors, signpost, inspector (staff panel),
                          agent list, news, event list, overview, strategic, terminal_monitor
-scenes/world/            world prefabs: table, station, decor, bubble, floor_plate
+scenes/world/            world prefabs: table, station, decor, bubble, floor_plate, zone_sign
 scenes/people/           pixel_person.tscn and the showroom cells
 scripts/office.gd        OfficeScene, the composition root
 scripts/herdr_client.gd  read-only socket client (ping, session.snapshot, events.subscribe)
@@ -772,10 +772,11 @@ scripts/herdr_commands.gd  HerdrCommands, the write boundary; not constructed un
 scripts/herdr_fleet.gd   Local + SSH machines; the only thing the office reads data from; feeds the state log
 scripts/machine_link.gd, machine_roster.gd, child_process.gd   ssh -L forwards, herdr machine list, bounded child processes
 scripts/office_projection.gd  pure projection: typed snapshot → OfficeFrame
-scripts/office_*.gd      navigator, camera, lens, alerts, draw helpers, window (fill the screen, bar as title bar)
+scripts/office_*.gd      navigator, camera, lens, alerts, draw helpers, window (fill the screen, bar as title bar),
+                         question tips, new-pane follow
 scripts/model/           typed models: HerdrSnapshot (the only reader of raw snapshots), OfficeFrame, StateLog,
                          command context / ticket / refusal / results, layout plans
-scripts/layout/          floor planning, seat planning, walk graph, validation
+scripts/layout/          map and zone planning, seat planning, walk graph, validation
 scripts/world/           tables, stations, floor view, presentation (walking), rests, pointer
 scripts/ui/              HUD scripts: hud, theme, bar, floors, agent list, staff panel, monitor, NEWS, EVENTS,
                          OVERVIEW, strategic view

@@ -1790,7 +1790,7 @@ func test_office_arrange() -> void:
 	var floor_model := OfficeProjection.project(_view_fixture("snapshot_office"), _states())[0]
 	var policy := FloorLayoutPolicy.new()
 	policy.width_cells = 15
-	var initial := OfficeFloorLayout.plan(floor_model, null, policy)
+	var initial := OfficeFloorLayout.plan(MapModel.of(floor_model), null, policy)
 	_check(initial.problems.is_empty(), "the fixture produces a valid floor plan")
 	_check(initial.plan != null, "the public allocator returns its plan")
 	if initial.plan == null:
@@ -1800,12 +1800,12 @@ func test_office_arrange() -> void:
 		_check(initial.plan.floor_cells.encloses(placed.reserved_cells), "each tab is within the complete floor")
 	var signature := initial.plan.geometry_signature()
 	policy.width_cells = 40
-	var widened := OfficeFloorLayout.plan(floor_model, initial.plan, policy)
+	var widened := OfficeFloorLayout.plan(MapModel.of(floor_model), initial.plan, policy)
 	_check(widened.problems.is_empty(), "a wider viewport keeps a valid retained plan")
 	_eq(widened.plan.geometry_signature(), signature, "viewport width does not rearrange existing desks")
 	var empty := ZoneModel.new()
 	empty.key = "empty-workspace"
-	var empty_result := OfficeFloorLayout.plan(empty, null, policy)
+	var empty_result := OfficeFloorLayout.plan(MapModel.of(empty), null, policy)
 	_check(empty_result.plan != null, "an empty workspace still has a complete floor")
 	_check(empty_result.plan.floor_cells.size.y > 0, "empty floor height is real, not zero")
 	_eq(empty_result.plan.desks.size(), 0, "an empty workspace invents no tab")

@@ -110,6 +110,22 @@ func test_bubbles_read_blocked_panes_on_screen_one_at_a_time() -> void:
 ## read yet.
 func test_bubbles_read_nothing_while_minimized_covered_stale_or_off_screen() -> void:
 	_blocked_pair()
+	# Twelve more shells on bee's alpha:t1: a pod of eight columns (9 cells) takes
+	# two lanes, a map (23 cells) wide enough to pan its blocked seats off the
+	# 480-wide window; one lane's 13 cells leave only 76 units of pan (lane B2a).
+	var wide := _changed(
+		_changed(_raw(), "alpha:p1", {"agent_status": "blocked"}), "alpha:p3", {"agent_status": "blocked"}
+	)
+	var shell: Dictionary = {}
+	for record: Dictionary in _list(wide, "panes"):
+		if record.pane_id == "alpha:p2":
+			shell = record
+	for index in 12:
+		var extra: Dictionary = shell.duplicate(true)
+		extra.pane_id = "alpha:x%d" % index
+		extra.terminal_id = "term-alpha-x%d" % index
+		_list(wide, "panes").append(extra)
+	_ctl("control-b", "set_snapshot", {"snapshot": wide})
 	var office := await _office_with(false, true, true, Vector2(480, 320), true)
 	office.pacer.note_minimized(true)
 	await _floor_pick(office, HerdrFleet.pane_key(BEE, "alpha"))

@@ -60,36 +60,72 @@ These were tried and dropped as a whole. Do not bring them back under any name.
 | `scenes/people/pixel_person.tscn` | `CharacterBody2D` | A pixel person: six layer sprites under `Layers` (`Legs`, `Top`, `Body`, `Glasses`, `Hair`, `Headwear`, bottom to top), one `AnimationPlayer`, a `Feet` collider, no chest badge. `configure` dresses, `play_state` picks the motion, `face` turns, `sit` / `stand_up`, `pace` sets the step rate; `drawing_rect()` / `footprint()` measure the person for layout. |
 | `scenes/world/table.tscn` | `StaticBody2D` | A pod of single desks built from 32-unit modules, one desk per column: desktops, apron, the low screen between the two rows, two short legs, a bracket per desk, footprint collider; per column and side a seat `Marker2D`, a standing `Marker2D` (`Standing`, `standing()`: the near seat leg's corner, nobody stands there), laptop, grommet, lamp and done's paper stack (`Papers`, `show_papers()` / `papers()`, built with the table, only `visible` changes). `measure()` gives the planner its size; `resize()` / `relocate()` update in place; `equip()`, `light()` and `show_papers()` switch existing nodes. **All table geometry constants live only in `scripts/world/table.gd`.** |
 | `scenes/world/station.tscn` | `Node2D` (y-sort) | One seat: chair, person (seated, or standing in the pantry when idle, rule 5), `Overlay` and `Target`. `Overlay` holds the name plate, lens line, seat mark (`selection_seat`), status badge and the blocked chip (`bubble.tscn`, `OfficeBubble`: a 30×16 `panel` with the same badge node moved into its left half and the wait in `OfficeAttention.compact_duration()` in its right half; with no writable wait (start not seen, disconnected) it draws nothing, not even the frame, the badge is back in the middle and its click area stays; it never shows the question, which is in the HUD tooltip `%BubbleTip`). The rows over a seat are listed in "Rows over a seat" below. The plate shows only while the seat's or the chip's rectangle is hovered, the seat is selected or `L` is held. Seated offsets (`PLATE_AT`, `BUBBLE_AT`, ...) are relative to the seat, the `AWAY_*` ones relative to where the person rests in the pantry, where there is no plate; a move only changes their `position`. `Target` is the click `Area2D`: this side's seat rectangle (while the chip shows it is swapped for a shorter one that leaves the tag row to the chip), `Bubble` (the chip's, enabled only while it shows; a click there emits `asked`, anywhere else `picked`; pointer enter/exit emits `bubble_hovered`; the badge draws over the chip) and `Away` (enabled with the seat rectangle while the person rests in the pantry). The other side's seat rectangle is never enabled. `rest_at()`, called by the presentation, hangs overlay and click area where the person rests. Every column has a station on both sides; one without a pane is an empty chair that cannot be clicked (no laptop, lamp off). `rebind()` rebinds the seat and sets position and click area absolutely, keeping the actor. A station hands its laptop, lamp and paper stack to the table and never touches the table's nodes. While the presentation walks the person (`walking`), `furnish()` / `rebind()` leave the person's position and motion alone, only recording the seated look, and `land()` applies it on arrival. |
-| `scenes/world/decor.tscn` | `StaticBody2D` | One standing piece of furniture (plant, filing cabinet, side table, and the entry band's counters): a `Sprite2D` placed on its foot point plus a footprint on the `FURNITURE` layer, and a `%Top` holder for what a side table carries (`hold()`, `held()`, `TOP_Y`). Footprint sizes come from each piece's `item` block in the pack (`OfficeDecor.footprint_of()`, including the two counters; [ITEMS](ITEMS.md)). **Furniture binds no herdr field**; its position comes only from the floor layout. |
+| `scenes/world/decor.tscn` | `StaticBody2D` | One standing piece of furniture (plant, side table, and the entry band's pantry counter): a `Sprite2D` placed on its foot point plus a footprint on the `FURNITURE` layer, and a `%Top` holder for what a side table carries (`hold()`, `held()`, `TOP_Y`). Footprint sizes come from each piece's `item` block in the pack (`OfficeDecor.footprint_of()`, including the two counters; [ITEMS](ITEMS.md)). **Furniture binds no herdr field**; its position comes only from the floor layout. |
+| `scenes/world/zone_sign.tscn` | `Node2D` | A zone's sign (`OfficeZoneSign`): a `panel`, the workspace's number and label and an accent stripe over the aisle row, its origin the zone's top-left partition post's foot; an `Area2D` on `PICKABLE` (`Hover`) emits `hovered(zone_key, inside)`. Display only: its text is written on every reconcile. |
 
 Floor assembly:
 
 ```text
 FloorRooms              the node dimmed as a whole when its machine disconnects
-├── Ground              floor TileMapLayer, shell, the lens's washes, corridors, contact shadows, wall signs and titles,
-│                       framed pictures on the row walls (drawn first)
-└── Sorted (y-sort)     tables, stations, standing furniture, the entry band's counters, and anything else that
-                        stands on the floor and can cover or be covered by a person
+├── Ground              floor TileMapLayer, shell, the lens's washes, corridors, contact shadows, tab labels,
+│                       framed pictures on the top wall (drawn first)
+└── Sorted (y-sort)     tables, stations, standing furniture, the entry band's pantry, each zone's partitions (a
+                        y-sorted holder) and sign, and anything else that stands on the floor and can cover or be
+                        covered by a person
 ```
 
 ### Grid, measurement and stable ordering
 
-A real workspace's floor is laid out by `OfficeFloorLayout` into a `FloorPlan`; `OfficeSeatPlanner` handles one tab's
-seats. `ZoneModel` / `RoomModel` / `PaneModel` hold no render nodes; `FloorPlan` / `RowPlan` / `DeskPlacement` /
+A map (`MapModel`: one or more workspaces, each a `ZoneModel`) is laid out by `OfficeFloorLayout` into a
+`FloorPlan`; `OfficeZoneLayout` lays out one zone's pod rows and `OfficeSeatPlanner` one tab's seats. `ZoneModel` /
+`RoomModel` / `PaneModel` hold no render nodes; `FloorPlan` / `ZonePlacement` / `RowPlan` / `DeskPlacement` /
 `SeatPlacement` hold grid bounds, table origins and seat bindings; `OfficeFloorView` / `OfficeDeskView` assemble nodes
-from the plan.
+from the plan. The office still builds one map per workspace (`MapModel.of()`); a map of several zones
+(`MapModel.of_zones()`) plans the same way.
 
-A building with no workspace still has one floor: LOBBY is an empty floor with no tabs. It goes through the same
-planning, furnishing and assembly path as an empty workspace (outer walls, door, windows, walkways; no rows, so no
-standing furniture), places nothing herdr gives, and is left out of the layout diagnostics (`layout_plan()`,
-`layout_problems()`, `layout_attempt_count()`). Its notices (offline, waiting, ssh error) are on the floor plate.
+A building with no workspace still has one floor: LOBBY is an empty map, with no zone at all. It goes through the
+same planning, furnishing and assembly path as any map (outer walls, door, windows, walkways; no desk, so no pantry),
+places nothing herdr gives, and is left out of the layout diagnostics (`layout_plan()`, `layout_problems()`,
+`layout_attempt_count()`). Its notices (offline, waiting, ssh error) are on the floor plate. An empty workspace is a
+zone of one empty pod row.
 
-The grid is fixed at **32 world units**. A floor's first plan picks its initial width from the viewport width
-available at that moment, meeting the minimum table group and walkway sizes. After that, window or zoom changes only
-change how much is visible; rows never reflow. A floor's origin is fixed and it only grows right and down. A removed
-table group leaves a reusable gap; tables, rows and other groups never shrink or compact on their own. An oversized
-table takes a row of its own and widens the floor to the right if needed, extending the cross corridors and moving
-the main corridor to the new right edge.
+The grid is fixed at **32 world units**. **The map is lanes** (`FloorLayoutPolicy`): across it a side wall (1 cell),
+`lanes` lanes of `zone_width_cells` (9) with an aisle column (`lane_aisle_cells`, 1) between two of them, the main
+corridor (2) and the other side wall: **10L + 3 cells** for L lanes; lane i covers columns 1 + 10i to 9 + 10i, the
+aisle after it is column 10 + 10i, and the main corridor is columns 10L and 10L + 1. Down it: the top wall (2 cells),
+the entry band (3), then the zones from row 6. A map's first plan picks L = max(1, ⌊(width − 3) / 10⌋) from the
+viewport width available at that moment (820 units, 25 cells: two lanes, 23 cells); after that, window or zoom changes
+only change how much is visible, and nothing reflows. L is raised only when a zone needs more lanes than the map has.
+
+**A zone** (a workspace, `ZonePlacement`) stands in k adjacent lanes under an **aisle row** of its own
+(`zone_aisle_cells`, 1; the first zones' aisle row is row 5, right under the entry band): it is 10k − 1 cells wide
+(the aisle columns between its lanes are its own) and whole **pod rows** deep; its **slot** is its aisle row and its
+rectangle. Inside it a pad column (`zone_pad_left_cells`, 1) keeps its tables off its left partition; the rows are as
+deep as a table's measured reservation (`OfficeZoneLayout.pod_row_cells()`, 6 cells on the pods), with no
+walls and no cross corridors between them. **Lane span**: the fewest lanes whose 10k − 2 inner cells hold its widest
+table (for a table w cells wide, ⌈(w + 2) / 10⌉; a pod of c columns needs ⌈(c + 3) / 10⌉); on its first placement a
+zone takes more lanes, up to the map's, while it would stand taller than `zone_tall_rows` (3) pod rows.
+
+**Placement is a masonry that only grows, down or right** (`OfficeFloorLayout._place()`), zones taken in (number,
+key) order:
+
+1. every retained zone holds its slot;
+2. a retained zone that must grow (taller, or wider by any number of lanes): the map widens first when it needs more
+   lanes than the map has (lanes are appended on the right; the main corridor and the lift door move right; the pantry
+   stays); then it grows in place when the cells it grows over, down and right, aisle row included, are free of every
+   held slot (the ones grown earlier in the pass included); otherwise it alone releases its slot and moves;
+3. the zones that move and the new ones, in order, take the **top-most, then left-most** gap their whole slot fits in
+   over k adjacent lanes (from row 6); a new mezzanine first tries directly below its source's slot, in the same
+   lanes; only on its first placement (grouping is display, never in the geometry signature, so a group forming or
+   breaking later moves nothing).
+
+Inside a zone the row allocator is today's: next-fit on the zone's first layout, gap reuse afterwards, growth
+left-anchored, a table wider than the zone first was taking a row of its own (and widening the zone by lanes), rows
+never shrinking. **The map keeps its largest extents**: its width is 10L + 3, its height the larger of the last plan's
+and the lowest slot's bottom (at least `min_height_cells`, 12). Removing a zone leaves a gap a later zone may take;
+removing the last or lowest zone, or emptying a lane, never shrinks the map. The keep-outs (`FloorPlan.aisles`, drawn
+as plain floor) are every zone's aisle row and every inter-lane aisle column where no zone spans both lanes; no
+reservation, zone or furniture stands on them or on a walkway.
 
 `OfficeTable.measure(capacity) -> DeskMeasure` is the only source of table geometry. A tab is a **pod of single
 desks**: one 32-unit desk per column, a seat on each side of it, the two rows facing across a low screen.
@@ -141,26 +177,23 @@ non-finite numbers, illegal widths and illegal columns at creation and on update
 at least 64. The plate, lens and chip Labels are sized again once the display face is on: a Label is 23 units tall
 before its font applies.
 
-Each row is fixed at **320 units = back wall 64 + pod reservation 192 + cross corridor 64** (`row_height_cells` 10).
 Below the top outer wall is a **96-unit entry band** of three cell rows: the first is inside the outer wall's drawing
-clearance, the second is the fixture row (y = 112), the third the walking lane (y = 144). The first row has its own
-back wall. The main corridor on the right is 64 wide, and each side outer wall takes 32. Every row back wall ends
-before the main corridor so the vertical path is never sealed. A floor with pods is therefore 15 cells deep (one
-row); the lobby and an empty workspace are 12.
+clearance, the second is the fixture row (y = 112), the third the walking lane (y = 144). The main corridor on the
+right is 64 wide, and each side outer wall takes 32. A map of one zone of one pod row is therefore 2 + 3 + 1 + 6 = 12
+cells deep (a pod row is 6); the lobby is 12 too, the least a map is.
 
 `FloorPlan.floor_cells` is the one half-open integer rectangle. The base floor covers every cell of it, including
-under walls, at short row ends and in gaps left by deletions; walkways draw over that full floor. The total
+under walls, in lane gaps and in gaps left by deletions; walkways draw over that full floor. The total
 drawing extent comes from the plan and the floor plate together; the camera never guesses bounds with stray `ceil()`
 or margins.
 
 ### Shell and joints
 
-A workspace's walls are drawn on one `TileMapLayer` at `Ground/Shell/Walls`; every cell ends up with exactly one
-semantic ID. The top outer wall uses two courses, `wall.cap_left/center/right` and `wall.face_left/center/right`;
-side walls run from top to bottom. Where a row back wall meets the left outer wall it uses
-`wall.cap_t_left / wall.face_t_left`; before the main corridor it ends with `wall.cap_end_right / wall.face_end_right`.
-A joint replaces the straight or side wall in the same cell; two sets of end pieces are never stacked. Only this
-rectangular shell with parallel row back walls is supported; it is not a general wall-network generator.
+A map's walls are drawn on one `TileMapLayer` at `Ground/Shell/Walls`; every cell ends up with exactly one semantic
+ID. The top outer wall uses two courses, `wall.cap_left/center/right` and `wall.face_left/center/right`; side walls run
+from top to bottom. **There are no row walls**: a zone is bounded by low partitions, not walls, so the row walls'
+joints (`wall.cap_t_left / face_t_left`, `wall.cap_end_right / face_end_right`) are shipped but laid nowhere (pruned
+in lane C). Only this rectangular shell is supported; it is not a general wall-network generator.
 
 **The apron.** Past its side walls the shell carries plain wood floor (`Ground/Shell/Apron`, a `TileMapLayer` under the
 floor's own), from the screen's left edge to its right one and as deep as the floor, so the HUD's side panels float
@@ -170,91 +203,99 @@ walk graph, a seat's click or the camera's reach. Below and beyond the floor's d
 
 Cap plus face make a 64-unit drawing band, the same band the people's clearance check uses. Bricks are placed with
 `set_cell()` by semantic ID; no Terrain autotiling, and no `TileMapPattern` deciding where walls and openings go.
+Walkway tiles are laid on the corridors only (the entry band and the main corridor); lane aisles and aisle rows are
+plain wood.
 
-Only the top outer wall carries windows and the lift door. Row back walls carry tab signs, and framed pictures hang
-between the signs (`OfficeShell.frames()`): the wall is cut into bays `FRAME_PITCH` (320) wide from `FRAME_FROM`
-(312); each bay hangs at most one picture, at its start or the next gap of the wall-foot run (`FRAME_SECOND` = 160
-on), at the first of those places whose picture, grown by `FRAME_GAP` (8), clears every sign, title, table and
-standing piece. Pictures are drawn in the shell, have no footprint and are not on the walk graph; the shell's key
-includes them, so a table that moves a sign redraws the shell. The first row's back wall is an inner wall and carries
-no windows. The lift door is directly over the main corridor's left lane (`OfficeShell.door()`, its x a cell centre);
-windows keep `WINDOW_CLEARANCE` (64) from it.
+The top outer wall carries the lift door, the windows and the framed pictures. The lift door is directly over the
+main corridor's left lane (`OfficeShell.door()`, its x a cell centre), so it moves right when the map widens; windows
+keep `WINDOW_CLEARANCE` (64) from it. A picture hangs centred in every second gap between two neighbouring windows
+(`OfficeShell.frames()`: the second, the fourth, ...), foot at `FRAME_FOOT` (48), where it, grown by `FRAME_GAP` (8),
+clears every window, the door, the pantry counter and the wall's end cells: one at 23 cells, five at 53. Pictures are
+drawn in the shell, have no footprint and are not on the walk graph; the shell's key includes them, so a widening that
+moves the door and the windows redraws the shell.
+
+**Partitions.** Each zone stands inside low cream partitions, a U open at the top (`OfficeShell.partition_pieces()`):
+`partition_v` (6 × 32, foot (3, 32)) down each side at x0 + 3 and x1 − 3, one per cell row but the last;
+`partition_corner_bl / _br` (32 × 32, foot (16, 32)) at the bottom corners; `partition_h` (32 × 10, foot (16, 10)) at
+each cell centre between them along the bottom edge; and `partition_post` (6 × 12, foot (3, 12)) at each top corner,
+its foot `POST_FOOT` (6) below the zone's top, where it covers the side run's top end (the art lane's mock). They are
+Sorted sprites placed by id (`OfficeDraw.prop()`), in a y-sorted holder per zone (so each sorts by its own foot), made
+again only when the zone's rectangle changes; they have no collider and no item block: the walk graph's partitions are
+the obstacle (see "Collision and walking"). The bottom run draws at [y1 − 10, y1), right under the last pod row's tab
+labels, which end at y1 − 10: a tab label is `OfficeDraw.TAB_LABEL_HEIGHT` (8) deep (`tab_face` gives up the display
+face's lowest descent row; the labels are upper case).
+The zone's **sign** (`scenes/world/zone_sign.tscn`) hangs from the top-left post, at its foot, and draws over the aisle
+row at zone y − 18 .. − 2: a `panel`, the workspace's number (a mezzanine's `3A`), its label and a 3-unit accent stripe
+(the worktree group's, `OfficeZoneSign.accent_of()`, the floor plate's pick). The panel is as wide as what it says
+(`PAD` 4, the stripe, `GAP` 3, the number, `GAP`, the label, `PAD`), at most `MAX_WIDTH` (160) and never past the drawn
+left edge of the zone's top-right post (`OfficeShell.right_post()`), the label cut with a forced ellipsis to fit; its
+hover area is the drawn panel. Hovering it names the repository and checkout in the tooltip panel (`%BubbleTip`). Its
+text and width follow the zone's model on every reconcile; the plan only positions it.
 
 **There is no front wall**: `wall.front_*` and `wall.threshold` stay unused, because a wall at the near edge would
-cover the seats of the nearest row. The door is outer-wall furniture (it
-does not open, there is no opening); people enter and leave a floor at the door's foot (see "Collision and walking").
+cover the seats of the nearest row. The door is outer-wall furniture (it does not open, there is no opening); people
+enter and leave a map at the door's foot (see "Collision and walking").
 
-The shell, the plants and the cabinets are **furniture**: they do not change with agent state, focus, selection or
-connection. Structural changes (a tab opened or closed, a table grown) may move them; furniture has no herdr data
-behind it and does not stand for repos or agent counts. Furniture is optional: its drawing must not cover a table
-group, a wall sign or title; its footprint must not intrude on a walkway; and the floor must still pass the
-entrance-to-station path check with it placed. If it does not fit, it is left out.
+The shell, the partitions, the signs, the plants and the side tables are **furniture**: they do not change with agent
+state, focus, selection or connection. Structural changes (a tab opened or closed, a table grown, a zone moved) may
+move them; furniture has no herdr data behind it and does not stand for repos or agent counts. Standing furniture is
+optional: its drawing, grown by `WALL_RUN_GAP` (8), must not cover a pod, a zone's slot (its partitions, posts and
+sign), the door, a window, a picture or the pantry counter; its footprint must not intrude on a walkway or aisle
+(`OfficeFloorValidation.walkways()`: the entry band below its first row, which is the wall's drawing clearance where
+nobody walks, the main corridor and every aisle); and the map must still pass the entrance-to-station path check with
+it placed. If it does not fit, it is left out. Its candidates (`OfficeDecorPlanner`), keyed by grid step, never by tab,
+zone or state:
 
-Each row's candidates, in order:
+- **the top-wall run**: plants `top/%03d` at the top wall's foot (foot y `TOP_RUN_FOOT` 76, in the clearance row),
+  `TOP_RUN_PITCH` (160) apart from `TOP_RUN_FROM` (72), the plant of its step (`plant_at(step)`); a step whose plant
+  would meet the door, a window, a picture or the pantry counter stands empty (at 23 cells one stands, at 232);
+- **lane gaps**: every run of at least `LANE_GAP_MIN_CELLS` (3) free cell rows inside a lane, outside every zone's
+  slot and down to the map's bottom (`OfficeDecorPlanner.lane_gaps()`), stands a piece every `LANE_GAP_STEP_CELLS` (2)
+  rows from its second row, in the lane's middle column, foot `LANE_GAP_FOOT` (8) above its row's bottom, keyed
+  `%02d/gap/%04d` (lane, row); pieces take turns by their number j along the run: `plant_at(j)` for an even j, a
+  `side_table` for an odd one. A side table carries one piece (`DecorPlacement.item`) from the `desk` pool or, on
+  28% of keys, the `cat` pool, picked by `OfficeDecorPlanner.side_table_item()` from a stream seeded by the placement
+  key alone; `OfficeDecor.hold()` stands it in the piece's `%Top` at `OfficeDecor.TOP_Y` (−20), and the candidate's
+  drawing covers both. A zone growing elsewhere moves none of a gap's
+  pieces; one growing into a lane's gap re-keys that lane's pieces only.
 
-- the filing cabinet `%06d/cabinet` at the back wall's end and the plant `%06d/plant` at its start, each
-  `DECOR_FROM_END` (40) from the row's end;
-- between them, **the wall-foot run** of plants `%06d/wall/%03d`, on the wall's own grid: one every
-  `OfficeShell.WALL_RUN_PITCH` (160) from the first plant, keyed by grid step and never placed by tables or tabs, so
-  when tables grow or move the plants that still fit keep their keys and places. A grid place whose plant would come
-  within `WALL_RUN_GAP` (8) of a sign, title or other piece stays empty. The run stands on the same strip under the
-  wall as the cabinet (foot y = row top + 76, `PLANT_FOOT`; cabinet `CABINET_FOOT` 80; footprint only in the row's
-  second cell row, T+64..96), and the far walkway stays open;
-- last, the **spare bay** side table `%06d/bay`: when a row's last pod's reservation ends at least
-  `SPARE_BAY_CELLS` (3) cells short of the main corridor, one `side_table` stands on the cell centre in the middle of
-  that gap, its foot level with the pods' near edge (row top + `BAY_PLANT_FOOT`, 192), with at least one full free
-  cell column on each side. It carries one piece (`DecorPlacement.item`) from the `desk` pool or, on 28% of keys, the
-  `cat` pool, picked by `OfficeDecorPlanner.side_table_item()` from a stream seeded by the placement key alone;
-  `OfficeDecor.hold()` stands it in the piece's `%Top` at `OfficeDecor.TOP_Y` (−20), and the candidate's drawing
-  covers both. An empty row has no spare bay.
-
-Which plant image is used comes from `OfficeDecorPlanner.plant_at(index)` by grid step; the two plant kinds take
-turns, moving nothing.
-
-Candidates and choices live in `OfficeDecorPlanner` (`scripts/layout/`). `OfficeFloorLayout.plan()` places them
-before the one validation a candidate plan gets; if the furnished plan fails, it drops the batch and validates the
-bare floor once more (a rare second flood fill). Furniture never moves a table group. The wall-front position
-constants (door, windows, signs, titles, furniture feet) all live in `OfficeShell`, so planning and drawing read the
-same numbers. Standing furniture stays a direct child of `Sorted`; each table's lens wash, sign and contact shadow may be
-grouped under Ground, but people must never be wrapped in a table group with y-sort off.
+Which plant image stands at a place comes from `OfficeDecorPlanner.plant_at(index)` alone (the pack's plants in turn:
+with two, even places `plant`, odd `plant_b`). `OfficeFloorLayout.plan()` places the pantry, then the furniture, before
+the one validation a candidate plan gets (see "Entry-band fixtures" for what it drops when that fails). Furniture never
+moves a table group. The wall-front and floor position constants (door, windows, pictures, partitions, furniture feet)
+all live in `OfficeShell`, so planning and drawing read the same numbers. Standing furniture stays a direct child of
+`Sorted`; each table's lens wash, tab label and contact shadow may be grouped under Ground, but people must never be wrapped
+in a table group with y-sort off.
 
 ### Entry-band fixtures
 
-Two counters stand against the top wall in the entry band: the **reception** left of the lift door and the
-**pantry** at the band's left end (`FloorPlan.reception / pantry`, typed `FixturePlacement`, planned by
-`OfficeFixturePlanner` in `scripts/layout/`, both drawn by `decor.tscn` as ordinary `OfficeDecor`). They are not
-furniture candidates: for the furniture rules the entry band is a walkway, and the counters stand in it on purpose.
-**Nobody queues at the reception** (blocked agents sit at their own seats); the planner still reserves its queue
-slots, and the validator and walk graph still check them, only so that no floor is laid out differently. They are the
-empty space in front of the counter.
+One counter stands against the top wall in the entry band: the **pantry** at the band's left end (`FloorPlan.pantry`,
+typed `FixturePlacement`, planned by `OfficeFixturePlanner` in `scripts/layout/`, drawn by `decor.tscn` as an ordinary
+`OfficeDecor`). **There is no reception.** The pantry is not a furniture candidate: for the furniture rules the entry
+band is a walkway, and the counter stands in it on purpose.
 
-Only floors with tables have them. Every position is a pure function of the plan's geometry. The reception's right
-edge is `OfficeShell.DOOR_CLEARANCE` (16) left of the main corridor's left edge (the 48-wide door, centred on the left
-lane, reaches 8 into the bay, and 8 more keep the counter off its frame); counters meet the floor at y = 106
-(`COUNTER_FOOT` = 42 from the band's top), 6 short of the fixture row. The pantry's left edge touches the left outer
-wall.
+Only maps with at least one desk have it. Every position is a pure function of the plan's geometry. The counter's left
+edge touches the left outer wall; it meets the floor at y = 106 (`COUNTER_FOOT` = 42 from the band's top), 6 short of
+the fixture row.
 
-- **Queue and pantry spots** are on the fixture row (y = 112), `SPOT_PITCH` = 48 apart (a standing person's click
-  rectangle is 38 wide and a wait label 40, plus 8 between neighbours; kept so no floor is laid out differently). The
-  queue runs left from one cell left of the reception (its head next to the counter); pantry spots run right from the
-  left wall. On the walking lane right below each spot (y = 144) is its **approach point**; its leg is "cell centre of
-  the approach point → approach point → spot". Neighbouring queue slots also have a one-cell sideways **step leg**.
-- **Capacity**: a band that cannot hold the reception, the door's clearance and `MIN_QUEUE` (2) slots has neither
-  fixture. One that holds the reception but not the pantry plus one spot (with `FIXTURE_GAP` 16 between) has only the
-  reception. When both fit, the stretch between them is split by spot count: the queue takes half (rounded up, at
-  least 2, at most `MAX_QUEUE` 24), the pantry the rest (at most `MAX_PANTRY` 24). At 11 / 20 / 32 / 60 cells wide the
-  queue has 2 / 5 / 9 / 18 slots and the pantry 1 / 4 / 8 / 17. When a floor widens, the reception and its queue follow
-  the main corridor; the pantry stays.
-- **Windows** (`OfficeShell.window_xs()`, a pure function; the floor view only draws what it returns): on a floor
-  with counters, windows are `WINDOW_SPACING` (128) apart, centred on the top wall between the pantry's right drawing
-  edge and the reception's left drawing edge, as many as fit with equal margins at both ends (1 / 3 / 6 / 13 at
-  11 / 20 / 32 / 60 cells). The reception is left of the door, so that stretch is already beyond `WINDOW_CLEARANCE`.
-  Floors without counters (lobby, empty workspace) put one every 128 from x = 64, a cell off the side wall and
+- **Spots** are on the fixture row (y = 112), `SPOT_PITCH` = 48 apart (a standing person's click rectangle is 38 wide
+  and a wait label 40, plus 8 between neighbours), running right from the left wall and ending at least `FIXTURE_GAP`
+  (16) short of the main corridor, at most `MAX_PANTRY` (24): 5 at 13 cells, **12 at 23** (the shipped plan width's
+  two lanes), 24 at 53. On the walking lane right below each spot (y = 144) is its **approach point**; its leg is "cell
+  centre of the approach point → approach point → spot". A band that cannot hold the counter and one spot has no
+  pantry. When the map widens, the lift door moves with the main corridor; the pantry and its first spots stay.
+- **The fixture-row barrier.** On every map with desks, pantry or not, the fixture row from the left wall to the main
+  corridor is an obstacle (see "Collision and walking"): the threshold stays at (door x, 112) in the main corridor, and
+  every way in from the door crosses the walking lane at (door x, 144), which the walkers' lane routes rely on.
+- **Windows** (`OfficeShell.window_xs()`, a pure function; the floor view only draws what it returns): on a map with a
+  pantry, windows are `WINDOW_SPACING` (128) apart, centred on the top wall between the pantry's right drawing edge and
+  `WINDOW_CLEARANCE` short of the lift door, as many as fit with equal margins at both ends (2 / 4 / 12 at 13 / 23 / 53
+  cells). Maps without a pantry (lobby, empty workspace) put one every 128 from x = 64, a cell off the side wall and
   `WINDOW_CLEARANCE` from the door. The shell's signature includes the fixtures; a fixture change redraws the shell.
-- **Left out when validation fails**, never moving a table group: `OfficeFloorLayout.plan()` validates once with
-  furniture and fixtures. If that fails, the second try drops the furniture (with no furniture, the pantry; with no
-  pantry, the reception). If that fails too, the third and last try drops the pantry when only the pantry's problems
-  remain, otherwise both. Default widths pass on the first try (one flood fill).
+- **Left out when validation fails**, never moving a table group: `OfficeFloorLayout.plan()` validates once with the
+  furniture and the pantry. If that fails, the second try drops the furniture (the pantry kept); if that fails too
+  (or there was no furniture), the third and last drops the pantry. Default widths pass on the first try (one flood
+  fill).
 - Who rests at which spot is a pure function of the current model in `OfficeRests` (`scripts/world/`): see
   [the visual language](VISUAL_LANGUAGE.md), "Where people rest".
 
@@ -270,8 +311,8 @@ columns; explicit seat conflicts may allocate extra columns and produce a diagno
 grows in place where it can, and moves only the affected groups when it cannot; other surviving groups keep their
 place.
 
-At run time `FloorPlanCache` keeps, per floor key, the last valid plan with its display model, and the last attempt's
-input signature with its failure diagnostics; `OfficeNavigator` keeps each floor's view. None of this is saved to
+At run time `FloorPlanCache` keeps, per map key (still one per workspace in the office), the last valid plan with its
+display model, and the last attempt's input signature with its failure diagnostics and failing zones; `OfficeNavigator` keeps each floor's view. None of this is saved to
 disk. Renames, state, focus and disconnects do not invalidate the geometry cache. The same failing input reuses the old
 picture and diagnostics without running the planner and never adopts an invalid display model; only a change of
 structure, theme, clearance policy or budget tries again. Window size does not change fixed rows; only when a new
@@ -279,15 +320,23 @@ policy is incompatible with the old plan and has not yet laid out successfully d
 under that policy. Closing a workspace clears its valid plan and attempt record. Rebuilding the same plan keeps the
 gaps history made; a cold plan without that history is not an equivalent rebuild. Duplicate identities, illegal
 geometry or over-budget input never replace the last valid plan; the UI shows a layout error, and a first failure
-keeps a bounded empty floor.
+keeps a bounded empty map (no zone at all).
+
+**Planning is atomic per map.** Every zone is laid out in the same attempt, and any zone's problem fails the whole
+map: its problems carry the zone's key (`zone <key>: …`), `FloorLayoutResult.failing_zones` and
+`FloorPlanCache.failing_zones(key)` name the zones at fault (for the node budget, the zone the running total ran out
+at), and the whole previous plan and the model it was made for stay. So a pane that moves from a failing zone to a
+valid one is never seated twice, and the desk node budget is charged on the composed map, every zone's tables
+together. The price, said plainly: while one workspace's input is invalid, none of its map is re-laid out or updated.
 
 The allocation budget has three parts. Input pane / tab counts bound parsing work. Floor cell count, width and height
-bound the TileMap, the shell and each row's standing furniture (cabinet, start plant, the wall-foot run at most one
-per 160 units, and the spare bay plant). `FloorLayoutPolicy.max_desk_nodes` (default 32768) separately bounds **the
-sum of the node upper bounds of all live table groups on a floor**. `OfficeDeskView.node_budget(capacity)` charges
+bound the TileMap, the shell, the partitions and the standing furniture (the top-wall run at most one plant per 160
+units, the lane gaps at most one piece every two rows of a lane). `FloorLayoutPolicy.max_desk_nodes` (default 32768) separately bounds **the
+sum of the node upper bounds of all live table groups on a map**, every zone's together. `OfficeDeskView.node_budget(capacity)` charges
 `26 + 71 × capacity` per pod, where capacity is the retained columns per side, not the current pane count: 26 fixed
 nodes (21 of the pod: its body, 12 holders, the footprint, the overlay, the frame and its 4 bars, the 2 short legs;
-5 of the background: itself, the lens's wash, the contact holder, the sign, the title) and 71 per column (20 of the
+5 of the background: itself, the lens's wash, the contact holder, the tab label, and the row wall sign's, spare
+since the row walls went) and 71 per column (20 of the
 pod's: a desk, an apron and a screen module, a bracket, 2 laptops, 2 three-node grommets, 2 lamps, 2 papers, 2 seat
 and 2 standing markers; 1 contact shadow; two 15-node stations and two 10-node people), measured on the dressed
 prefabs at 2, 4, 18 and 250 columns (168, 310, 1304 and 17776 nodes with everybody seated). Geometry tests count the real dressed prefabs, so a scene change cannot silently break this
@@ -306,8 +355,9 @@ scene offsets and never accumulates `+=`. A seat swap finishes every binding bef
 later empty seat cannot clear an earlier station's laptop. Contact shadows are owned by the table and drawn on Ground;
 repeated `contact_shadows()`, a background group change or a move never duplicates old shadows.
 
-When the wall extent or walkways change, the shell subgroup is rebuilt; when a table group's geometry changes, its wash
-and sign are updated. There is no per-brick diff. Changing floor or theme still rebuilds the current world; what is
+When the map's extent, walkways, pantry or furniture change, the shell subgroup is rebuilt; when a zone's rectangle
+changes, its partitions are made again and its sign moves; when a table group's geometry changes, its wash and tab
+label are updated. There is no per-brick diff. Changing floor or theme still rebuilds the current world; what is
 kept is the plan and the view, not the people's nodes or animation clocks across floors.
 
 ## Collision and walking
@@ -346,7 +396,7 @@ kept is the plan and the view, not the people's nodes or animation clocks across
   per route.
 - **Obstacle entries.** A route may enter an obstacle only along the obstacle's own **entries** (`Obstacle.entries`,
   pairs of end points): a table's are the far seat legs that run into its footprint; the top wall's drawing
-  clearance's is the threshold leg. When a segment is checked (`clear()`), the part of it inside an obstacle must lie
+  clearance's is the threshold leg; the fixture row's are the pantry spots' legs; a partition has none. When a segment is checked (`clear()`), the part of it inside an obstacle must lie
   wholly on one of that obstacle's entries. Entries are the legs of this plan, at this table's current place (a
   straightened route that merges with a leg counts the same way: only the part inside the obstacle matters). Nothing
   is exempt by tab name. The validator and the people use the same check, so every segment of every live route avoids
@@ -359,19 +409,24 @@ kept is the plan and the view, not the people's nodes or animation clocks across
   equals the validator's" true by construction) and checks the threshold leg itself. Reachability is the door's
   distance field: one whole-floor BFS from the threshold per graph (the validator builds it first). A route in is read
   back from the goal along it; a ghost's route out is read from its start along it; neither searches again.
-- **The fixture row.** On a floor with fixtures, the fixture row from the left wall to the main corridor is one
-  `FIXTURE` obstacle (a band of cell centres, not inflated by the person), and the counters' footprints, inflated by
-  the feet, are `FIXTURE` too. No fixture-row centre and no edge along it is walkable, so no route runs along the
-  fixture row. Its entries are each spot's leg (straight up from the walking lane, `leg_to_fixture()`) and the
-  queue's step legs: neighbouring slots lie end to end and collinear, so the obstacle joins them into one entry from
-  tail to head, and a shift of several slots also walks along the step legs. There is no entry between queue and
-  pantry.
-- **To and from the fixtures.** Every seat reaches the entry band's walking lane through the main corridor (at
-  `(door x, 144)` on the left lane, or the cell beside the right lane). So a route to a fixture is: the person's own
-  leg back to the approach point, the door's distance field up to the lane (`OfficeWalkGraph.to_lane()`), straight
-  along the lane, then up the spot's leg. Back to a seat is the reverse (`from_lane()`); fixture to fixture is down to
-  the lane, along it, and up again. No per-spot distance field and no search: someone coming in reads the door's field
-  and passes along this lane anyway. (The queue's step legs are still in the graph; nobody walks them.)
+- **The fixture row.** On every map with desks, whether or not its pantry fits, the fixture row from the left wall to
+  the main corridor is one `FIXTURE` obstacle (a band of cell centres, not inflated by the person), and the pantry
+  counter's footprint, inflated by the feet, is `FIXTURE` too; `fixture_row` (112) and `walking_lane` (144) are set
+  for every such map (a map without desks has neither, and nobody walks there). No fixture-row centre and no edge along
+  it is walkable, so no route runs along the fixture row. Its only entries are the pantry spots' legs (straight up from
+  the walking lane, `leg_to_fixture()`); with no pantry it has none. There is no entry from spot to spot.
+- **Partitions.** Each zone's partitions (`ZonePlacement.partitions()`: bands `PARTITION_THICKNESS` (6) thick inside
+  its left, right and bottom edges) are obstacles of their own kind, `PARTITION`, inflated by the **feet only** (they
+  draw no taller than a person's legs, so the wall's drawing rule does not apply). They block the edges across them and
+  no node: the pad column inside a zone's left edge, the passage inside its right edge (beside the main corridor too)
+  and the rows just above and below its bottom edge are walked, and the edges between them and outside are not. So a
+  zone is entered from its open top, its aisle row. They have no entries.
+- **To and from the fixtures.** Every seat reaches the entry band's walking lane at `(door x, 144)` (or the cell beside
+  the main corridor's right lane): the door's distance field runs down the threshold, onto the lane and along it to
+  the lanes' aisles. So a route to the pantry is: the person's own leg back to the approach point, the door's distance
+  field up to the lane (`OfficeWalkGraph.to_lane()`), straight along the lane, then up the spot's leg. Back to a seat is
+  the reverse (`from_lane()`); spot to spot is down to the lane, along it, and up again. No per-spot distance field and
+  no search: someone coming in reads the door's field and passes along this lane anyway.
 - **The two legs.** A table gives each column and side one approach point (a cell centre); both legs start at the
   approach point's cell centre. The standing spot is dx 24, dy 26 from the approach point, and nobody walks
   diagonally. Far side: approach → seat is one straight segment into the table's footprint (rule 5), which is this
@@ -462,8 +517,10 @@ Besides the client / machine / incremental-update tests, `tools/run_tests.sh` ch
   working surface. In both themes the real opaque pixel envelopes of desk decor are read and checked for overlap with
   surface clearances and each other; a fixed-identity rebuild, growth and shrink, equipment state and theme changes
   leave existing placements unchanged.
-- Shell bricks are all under `Ground`, standing furniture all under `Sorted`; each piece's position is unchanged
-  across state changes and intersects no seat's click area, table footprint or walkway band.
+- Shell bricks are all under `Ground`, standing furniture, partition pieces and zone signs all under `Sorted` (the
+  partitions in a y-sorted holder per zone, each piece sorting by its own foot); each piece's position is unchanged
+  across state changes and intersects no seat's click area, table footprint, walkway or aisle. No row wall and no row
+  wall joint is laid; the top wall's courses are drawn once per cell.
 - In every occupied column: far chair y < far person y < table y < near person y < near chair y.
 - A person is always the pixel-people family's six layers + one `AnimationPlayer`, no chest badge; all layers show the
   same `frame` at every moment; state changes, sitting / standing and re-dressing never replace nodes. Far people face
@@ -481,11 +538,18 @@ Besides the client / machine / incremental-update tests, `tools/run_tests.sh` ch
   plate.
 - A standing person walking into a table is stopped by its footprint collider; a seated person's feet collider is
   off.
-- The entry band is three cells deep; fixtures appear only on floors with tables, at positions that are a pure
-  function of plan geometry (stable under growth and widening); a narrow band drops the pantry first, then both; the
-  validator reports blocked queue legs and unreachable approach points separately. No edge runs along the fixture row;
-  `route_between()` picks the cheaper end (compared against a reference BFS every time); an entry can only be used
-  along its own length.
+- The entry band is three cells deep; the pantry, the only fixture, appears only on maps with desks, at positions
+  that are a pure function of plan geometry (stable under growth and widening; 12 spots at 23 cells); a band too
+  narrow drops the pantry and keeps the fixture-row barrier and the walking lane; the validator reports blocked pantry
+  legs and unreachable approach points separately; the furniture is dropped before the pantry. No edge runs along the
+  fixture row, with or without a pantry; `to_lane()` reaches the walking lane from every approach; `route_between()`
+  picks the cheaper end (compared against a reference BFS every time); an entry can only be used along its own length.
+- Zones take the top-most, left-most fit in whole lanes; a removed zone leaves a gap the next fitting zone reuses; the
+  map keeps its extents; a zone grows down or right in place while the cells are free and otherwise moves alone,
+  never into a held slot; a table needing more lanes widens the map first (the main corridor and the door move, the
+  pantry stays); a new mezzanine lands below its source once, and grouping moves nothing; one invalid zone keeps the
+  whole previous map and names that zone; a pane moving between zones during a failure is never seated twice; the
+  node budget is charged on the composed map. No walk edge crosses a partition, and every approach is reached.
 - No walk-graph node is inside an obstacle and no edge enters one (including a thin obstacle between two clear
   centres); validator and people share one graph, starting from the threshold's end; on stress floors (20 and 32 cells
   wide) and after growth every approach point is reachable; each blocked leg is reported on its own, and no near leg
@@ -516,8 +580,8 @@ Besides the client / machine / incremental-update tests, `tools/run_tests.sh` ch
   footprint and all standing furniture, and the far standing spot is beyond the far edge.
 - Illegal widths (e.g. 240, or 32 under the minimum) are rejected, repeated setup adds no nodes; growth keeps seats
   and equipment, and rebinding never accumulates seat or chip click-area offsets.
-- The planner covers empty floors, empty tabs, missing and conflicting layout, stable seats, gap reuse, oversized
-  tables, budget rejection and fixed-seed incremental sequences.
+- The planner covers empty maps and workspaces, empty tabs, missing and conflicting layout, stable seats, gap reuse,
+  oversized tables, budget rejection and fixed-seed incremental sequences, on zones in lanes.
 - Geometry tests read each real Sprite / Label envelope, check that everything stationary (badges at every lift, chips,
   seat marks) stays inside the measured range (`render_rect`; the plate and lens rows are transient and pinned by the
   cross-row case), and verify moved stations through real input: a seat click emits `picked`, a chip click `asked`.

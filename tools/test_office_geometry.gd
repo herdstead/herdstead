@@ -135,12 +135,14 @@ func test_thin_front_joins_supports_without_moving_the_floor() -> void:
 			_check(point.y <= -8.0, "near light stops on the working top, not below the thin edge")
 
 
-## The desk decor's pools stand on side tables now (the pod carries none): the
-## spare bay's side table carries one piece picked by its placement key, and
-## that piece survives the pod growing (the table moving along the row, the
-## same node and the same piece), state updates at every seat, and a rebuild in
-## another theme (the same semantic piece, drawn from that pack). It replaces
-## test_desktop_decor_survives_growth_state_updates_and_theme_rebuilds.
+## The desk decor's pools stand on side tables now (the pod carries none): a
+## lane gap's side table carries one piece picked by its placement key, and
+## that piece survives growth elsewhere (the pod in the lane above it growing
+## wider, the zone in the next lane growing down and deepening the map: the
+## same node, the same piece, where it stood), state updates at every seat, and
+## a rebuild in another theme (the same semantic piece, drawn from that pack).
+## It replaces test_desktop_decor_survives_growth_state_updates_and_theme_rebuilds;
+## lane B1 stood it in a row's spare bay, lane B2a moves it into the lane gaps.
 func test_side_table_items_survive_growth_state_updates_and_theme_rebuilds() -> void:
 	world = Node2D.new()
 	root.add_child(world)
@@ -148,29 +150,33 @@ func test_side_table_items_survive_growth_state_updates_and_theme_rebuilds() -> 
 	policy.width_cells = 32
 	policy.actor_footprint = PixelPerson.footprint()
 	policy.actor_draw_rect = PixelPerson.drawing_rect(art.people)
-	var model := ZoneModel.new()
-	model.key = "side-table-floor"
-	var room := RoomModel.new()
-	room.key = "tab-a"
-	room.label = "A"
-	model.rooms.append(room)
-	for index in 2:
-		room.panes.append(_side_pane(index))
+	# Zone 1 (lane 0) is one pod row; zone 2 (lane 1) three rows of twelve-pane
+	# pods, so the map is deeper than zone 1 and lane 0 has a gap under it.
+	var room := _side_room("tab-a", 0, 0, 2)
+	var first_zone := _side_zone("side/1", 1, [room])
+	var second_zone := _side_zone(
+		"side/2", 2, [_side_room("tab-b", 0, 100, 12), _side_room("tab-c", 1, 200, 12), _side_room("tab-d", 2, 300, 12)]
+	)
+	var zones: Array[ZoneModel] = [first_zone, second_zone]
 	var decor := OfficeDecorPlanner.new(pen)
-	var first := OfficeFloorLayout.plan(model, null, policy, decor).plan
-	var bay := _bay_of(first)
-	_check(bay != null, "the row has a spare bay")
+	var first := OfficeFloorLayout.plan(MapModel.of_zones("side", zones), null, policy, decor).plan
+	_check(first != null, "the map is planned")
+	if first == null:
+		return
+	_eq(first.lanes, 2, "two lanes")
+	var bay := _gap_table_of(first)
+	_check(bay != null, "lane 0's gap stands a side table")
 	if bay == null:
 		return
-	_eq(bay.piece, ArtContract.PROP_SIDE_TABLE, "the spare bay stands a side table")
+	_eq(bay.piece, ArtContract.PROP_SIDE_TABLE, "the lane gap stands a side table")
 	_eq(bay.item, OfficeDecorPlanner.side_table_item(art, bay.key), "carrying its key's piece")
 	_check(art.prop_sprite(bay.item) != null, "a piece of the pack: " + bay.item)
 	var floor_root := Node2D.new()
 	world.add_child(floor_root)
 	var view := OfficeFloorView.new()
 	view.setup(pen, floor_root)
-	view.reconcile(first, MapModel.of(model))
-	view.update_desks(MapModel.of(model), "", false)
+	view.reconcile(first, MapModel.of_zones("side", zones))
+	view.update_desks(MapModel.of_zones("side", zones), "", false)
 	var node := _decor_node(floor_root, bay.key)
 	_check(node != null, "the side table is drawn")
 	if node == null:
@@ -181,22 +187,29 @@ func test_side_table_items_survive_growth_state_updates_and_theme_rebuilds() -> 
 	_eq((node.get_node("%Top") as Node2D).position, Vector2(0, OfficeDecor.TOP_Y), "on its top")
 	for index in range(2, 6):
 		room.panes.append(_side_pane(index))
-	var grown := OfficeFloorLayout.plan(model, first, policy, decor).plan
-	var moved := _bay_of(grown)
-	_check(moved != null and moved.key == bay.key, "the grown row keeps its spare bay")
+	second_zone.rooms.append(_side_room("tab-e", 3, 400, 12))
+	var grown := OfficeFloorLayout.plan(MapModel.of_zones("side", zones), first, policy, decor).plan
+	_check(grown != null, "the grown map is planned")
+	if grown == null:
+		return
+	var moved := _gap_table_of(grown, bay.key)
+	_check(moved != null, "the grown map keeps the side table's key")
 	if moved == null:
 		return
-	_check(grown.desk(room.key).capacity > first.desk(room.key).capacity, "the pod really grew")
-	_eq(moved.item, bay.item, "the same piece where the table stands now")
-	view.reconcile(grown, MapModel.of(model))
-	view.update_desks(MapModel.of(model), "", false)
+	_check(grown.desk(room.key).capacity > first.desk(room.key).capacity, "the pod above it really grew")
+	_check(grown.floor_cells.size.y > first.floor_cells.size.y, "and the next lane's zone deepened the map")
+	_eq([moved.item, moved.position], [bay.item, bay.position], "the same piece where it stood")
+	view.reconcile(grown, MapModel.of_zones("side", zones))
+	view.update_desks(MapModel.of_zones("side", zones), "", false)
 	_eq(_decor_node(floor_root, bay.key), node, "the same side table node")
 	_eq(node.held(), held, "holding the same sprite")
-	_eq(node.position, moved.position, "moved with the bay")
+	_eq(node.position, moved.position, "standing where the plan stands it")
 	for state: String in ["blocked", "done", "idle", "working"]:
-		for pane in room.panes:
-			pane.state = state
-		view.update_desks(MapModel.of(model), room.key, false)
+		for zone in zones:
+			for tab in zone.rooms:
+				for pane in tab.panes:
+					pane.state = state
+		view.update_desks(MapModel.of_zones("side", zones), room.key, false)
 		_eq(
 			[node.held_item, held.texture],
 			[bay.item, art.sprite_texture(art.prop_sprite(bay.item))],
@@ -208,7 +221,7 @@ func test_side_table_items_survive_growth_state_updates_and_theme_rebuilds() -> 
 	world.add_child(rebuilt_root)
 	var rebuilt := OfficeFloorView.new()
 	rebuilt.setup(themed, rebuilt_root)
-	rebuilt.reconcile(grown, MapModel.of(model))
+	rebuilt.reconcile(grown, MapModel.of_zones("side", zones))
 	var again := _decor_node(rebuilt_root, bay.key)
 	_check(again != null, "the rebuild in another theme draws it")
 	if again != null:
@@ -216,12 +229,12 @@ func test_side_table_items_survive_growth_state_updates_and_theme_rebuilds() -> 
 		_eq(again.held().texture, other.sprite_texture(other.prop_sprite(bay.item)), "from the other pack")
 
 
-## Over 64 placement keys, in both packs, the side tables' pieces vary: every
-## piece of the `desk` pool and a cat occur, cats on some tables and not most,
-## each key always the same piece. Stood on a real side table, a piece's foot is
-## on the top's solid wood (rows -23.5..-19 over the foot, OfficeDecor.TOP_Y
-## -20) and its pixels keep to the top's middle 16 units. It replaces
-## test_desktop_library_varies_without_covering_equipment_or_leaving_the_top.
+## Over 64 lane-gap placement keys, in both packs, the side tables' pieces
+## vary: every piece of the `desk` pool and a cat occur, cats on some tables
+## and not most, each key always the same piece. Stood on a real side table, a
+## piece's foot is on the top's solid wood (rows -23.5..-19 over the foot,
+## OfficeDecor.TOP_Y -20) and its pixels keep to the top's middle 16 units. It
+## replaces test_desktop_library_varies_without_covering_equipment_or_leaving_the_top.
 func test_side_table_items_vary_and_stay_on_the_top() -> void:
 	world = Node2D.new()
 	root.add_child(world)
@@ -236,7 +249,8 @@ func test_side_table_items_vary_and_stay_on_the_top() -> void:
 		for sprite in pack.items_in(OfficeDecorPlanner.CAT_GROUP):
 			cat_ids.append(sprite.id)
 		for sample in 64:
-			var key := "%06d/bay" % sample
+			# The planner's own key shape: lane, then row.
+			var key := "%02d/gap/%04d" % [sample % 4, 7 + 2 * (sample >> 2)]
 			var id := OfficeDecorPlanner.side_table_item(pack, key)
 			_eq(OfficeDecorPlanner.side_table_item(pack, key), id, "%s: the same piece every time" % key)
 			seen[id] = true
@@ -259,7 +273,7 @@ func test_side_table_items_vary_and_stay_on_the_top() -> void:
 		_check(cats > 0 and cats < 32, "%s: cats occur, on most tables not: %d of 64" % [pack.id, cats])
 
 
-## A pane of the side-table floor, working.
+## A pane of the side-table map, working.
 func _side_pane(index: int) -> PaneModel:
 	var pane := PaneModel.new()
 	pane.pane_id = "p%d" % index
@@ -270,10 +284,33 @@ func _side_pane(index: int) -> PaneModel:
 	return pane
 
 
-## The spare bay's piece of `plan`, or null.
-func _bay_of(plan: FloorPlan) -> DecorPlacement:
+## A tab `key` numbered `number` of `count` working panes, their indices from `first`.
+func _side_room(key: String, number: int, first: int, count: int) -> RoomModel:
+	var room := RoomModel.new()
+	room.key = key
+	room.number = number
+	room.label = key.to_upper()
+	for index in count:
+		room.panes.append(_side_pane(first + index))
+	return room
+
+
+## A workspace `key` numbered `number` holding `rooms`: one zone of the map.
+func _side_zone(key: String, number: int, rooms: Array[RoomModel]) -> ZoneModel:
+	var zone := ZoneModel.new()
+	zone.key = key
+	zone.number = number
+	zone.label = key
+	zone.rooms = rooms
+	return zone
+
+
+## Lane 0's first gap side table of `plan` (or the one keyed `key`), or null.
+func _gap_table_of(plan: FloorPlan, key := "") -> DecorPlacement:
 	for placed in plan.decorations:
-		if placed.key.ends_with("/bay"):
+		if key.is_empty() and placed.key.begins_with("00/gap/") and placed.piece == ArtContract.PROP_SIDE_TABLE:
+			return placed
+		if not key.is_empty() and placed.key == key:
 			return placed
 	return null
 
@@ -693,122 +730,6 @@ func test_shrink_removes_only_discarded_columns() -> void:
 	_eq(ground.find_children("*", "Polygon2D", true, false).size(), 2, "discarded shadows are released")
 
 
-func test_optional_decor_cannot_cover_wall_title_or_sign() -> void:
-	world = Node2D.new()
-	root.add_child(world)
-	for width: int in [1, 12, 20]:
-		var policy := FloorLayoutPolicy.new()
-		# Width 1 asks the planner for its measured minimum, without copying the
-		# table's dimensions. Wider floors also exercise retained decoration: at
-		# the measured minimum (7 cells since the pod of desks; it was 11) the
-		# planner retains no optional piece (measured), so the rule is only
-		# checked there, not exercised.
-		policy.width_cells = width
-		policy.actor_footprint = PixelPerson.footprint()
-		policy.actor_draw_rect = PixelPerson.drawing_rect(art.people)
-		var model := ZoneModel.new()
-		model.key = "minimum-title-floor"
-		var room := RoomModel.new()
-		room.key = "long-title-tab"
-		room.label = "MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM"
-		model.rooms.append(room)
-		var result := OfficeFloorLayout.plan(model, null, policy, OfficeDecorPlanner.new(pen))
-		_eq(result.problems, PackedStringArray(), "base floor is valid")
-		_check(result.plan != null, "base floor can be decorated")
-		if result.plan == null:
-			continue
-		_eq(OfficeFloorLayout.validate(result.plan, policy), PackedStringArray(), "decorated plan keeps clear paths")
-		if width > 1:
-			_check(not result.plan.decorations.is_empty(), "safe optional furniture is retained at %d cells" % width)
-		var floor_root := Node2D.new()
-		floor_root.position = Vector2(17, 23)
-		world.add_child(floor_root)
-		var view := OfficeFloorView.new()
-		view.setup(pen, floor_root)
-		view.reconcile(result.plan, MapModel.of(model))
-		await process_frame
-		var desk := view.desks[room.key]
-		_eq(desk.title.text, room.label, "the real label contains the long title")
-		var label_transform := floor_root.global_transform.affine_inverse() * desk.title.get_global_transform()
-		var label_bounds := label_transform * Rect2(Vector2.ZERO, desk.title.size)
-		var signs: Array[Rect2] = []
-		for child in desk.background.get_children():
-			if child is Sprite2D:
-				var sign_sprite: Sprite2D = child
-				var sign_transform := floor_root.global_transform.affine_inverse() * sign_sprite.global_transform
-				signs.append(sign_transform * sign_sprite.get_rect())
-		_eq(signs.size(), 1, "the actual wall sign is present")
-		for sign_bounds in signs:
-			_check(
-				(
-					label_bounds.position.x >= sign_bounds.position.x + 6.0
-					and label_bounds.end.x <= sign_bounds.end.x - 6.0
-				),
-				"long title stays inside the native sign with room for its frame"
-			)
-		for decoration in result.plan.decorations:
-			_check(not decoration.draw_rect.intersects(label_bounds), "decor leaves the actual font-sized label clear")
-			for sign_bounds in signs:
-				_check(not decoration.draw_rect.intersects(sign_bounds), "decor leaves the dressed sign clear")
-		floor_root.free()
-
-
-## The wall-foot run and the spare bay's plant never cover a sign or a
-## title as they are drawn, the real font-sized label included: several tabs
-## with long titles to a row, at the shipped widths, and every sign of the row.
-func test_the_wall_run_leaves_every_drawn_sign_and_title_clear() -> void:
-	world = Node2D.new()
-	root.add_child(world)
-	var runs := 0
-	var bays := 0
-	for width: int in [20, 32, 60]:
-		var policy := FloorLayoutPolicy.new()
-		policy.width_cells = width
-		policy.actor_footprint = PixelPerson.footprint()
-		policy.actor_draw_rect = PixelPerson.drawing_rect(art.people)
-		var model := ZoneModel.new()
-		model.key = "wall-run-floor-%d" % width
-		for index in 3:
-			var room := RoomModel.new()
-			room.key = "tab-%d" % index
-			room.number = index
-			room.label = "MMMMMMMMMMMMMMMMMMMMMMMM"
-			model.rooms.append(room)
-		var result := OfficeFloorLayout.plan(model, null, policy, OfficeDecorPlanner.new(pen))
-		_eq(result.problems, PackedStringArray(), "%d cells: the floor is valid" % width)
-		if result.plan == null:
-			continue
-		var floor_root := Node2D.new()
-		world.add_child(floor_root)
-		var view := OfficeFloorView.new()
-		view.setup(pen, floor_root)
-		view.reconcile(result.plan, MapModel.of(model))
-		await process_frame
-		var covers: Array[Rect2] = []
-		for tab: String in view.desks:
-			var desk := view.desks[tab]
-			var label_transform := floor_root.global_transform.affine_inverse() * desk.title.get_global_transform()
-			covers.append(label_transform * Rect2(Vector2.ZERO, desk.title.size))
-			for child in desk.background.get_children():
-				if child is Sprite2D:
-					var sign_sprite: Sprite2D = child
-					var sign_transform := floor_root.global_transform.affine_inverse() * sign_sprite.global_transform
-					covers.append(sign_transform * sign_sprite.get_rect())
-		_eq(covers.size(), 2 * view.desks.size(), "%d cells: a sign and a title for every table" % width)
-		for decoration in result.plan.decorations:
-			if "/wall/" in decoration.key:
-				runs += 1
-			elif decoration.key.ends_with("/bay"):
-				bays += 1
-			for cover in covers:
-				_check(
-					not decoration.draw_rect.intersects(cover),
-					"%d cells: %s clears %s" % [width, decoration.key, cover]
-				)
-		floor_root.free()
-	_check(runs > 0 and bays > 0, "the floors stand a wall-foot run (%d) and a spare bay's plant (%d)" % [runs, bays])
-
-
 ## A station bound again and again, then moved to another table place and
 ## seat, still answers real clicks where it is now: its seat's rectangle picks
 ## (`picked`) and its bubble's asks (`asked`), each through the viewport's own
@@ -999,7 +920,7 @@ func test_desk_node_budget_bounds_real_prefabs_and_retained_empty_slots() -> voi
 		placed.tab_key = room.key
 		placed.capacity = capacity
 		placed.measure = OfficeTable.measure(capacity)
-		view.reconcile(room, placed, 0)
+		view.reconcile(room, placed)
 		_eq(view.stations.size(), capacity * 2, "every retained column allocates two real stations")
 		_check(view.table.find_children("*", "", true, false).size() > 0, "a pod carries no decoration to count")
 		for provider: String in ["", "claude"]:

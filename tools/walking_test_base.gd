@@ -14,10 +14,12 @@ const BEE := "socket:bee"
 ## wide (OfficeHud.plan_width()). The walks, pantries and rows the
 ## cases here measure stand on that geometry.
 const PLAN_SCREEN := Vector2(628, 480)
-## How many agents api:t1 takes on in _stacked(): enough that its pod (nine
-## cells) and api:t2's no longer share a row of the suites' 15-cell floor, so
-## api:t2 is laid out on the row below, as the long tables always were.
-const STACKED := 10
+## How many agents api:t1 takes on in _stacked(): enough that its pod (twelve
+## panes, six columns, seven cells) and api:t2's (three cells) no longer share a
+## pod row of the suites' one-lane map (eight inner cells), so api:t2 is laid
+## out on the row below, as the long tables always were. (Ten made a pod of
+## nine cells, which takes two lanes and api:t2 beside it.)
+const STACKED := 9
 
 
 func _initialize() -> void:
@@ -358,19 +360,14 @@ static func _table_legs(plan: FloorPlan) -> Dictionary[String, PackedVector2Arra
 	return legs
 
 
-## Every leg up to a spot of `plan`'s fixtures and the reception's step legs
-## end to end (still in the walk graph, walked by nobody), as pairs of
-## points: the only way onto the fixture row. Read off the plan's own fixtures,
-## not the walk graph.
+## Every leg up to a spot of `plan`'s pantry, as pairs of points: the only way
+## onto the fixture row. Read off the plan's own fixtures, not the walk graph.
 static func _fixture_legs(plan: FloorPlan) -> PackedVector2Array:
 	var pairs := PackedVector2Array()
 	for counter in plan.fixtures():
 		for index in counter.spots.size():
 			pairs.append(counter.approaches[index])
 			pairs.append(counter.spots[index])
-	if plan.reception != null and plan.reception.spots.size() > 1:
-		pairs.append(plan.reception.spots[plan.reception.spots.size() - 1])
-		pairs.append(plan.reception.spots[0])
 	return pairs
 
 
@@ -398,7 +395,7 @@ static func _inside_on(a: Vector2, b: Vector2, box: Rect2, pairs: PackedVector2A
 ## the walker is on its route; what it has left to walk is straight segments;
 ## none enters an obstacle but a table along one of its far seat legs where it
 ## stands now, the top wall's drawing clearance along the door's threshold leg,
-## and the fixture row along a spot's leg or the reception's step legs (nothing
+## and the fixture row along a pantry spot's leg (nothing
 ## runs along the row otherwise); the route ends where the walker belongs (a
 ## ghost's at the door); nobody walks faster than TOP_SPEED.
 func _check_routes(view: OfficeFloorView, people: PixelPeople, when: String) -> void:

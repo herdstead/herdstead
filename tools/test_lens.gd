@@ -279,32 +279,32 @@ func test_each_rug_washes_in_its_tables_most_urgent_state_on_the_floors_scale() 
 
 
 ## Held, only the furnishing steps back: the floor, walkways, walls, door,
-## windows and framed pictures (the shell), every plant and cabinet and the
-## counters, all by LENS_DIM. The pods, their laptops, lamps and paper, the
-## people, what floats over them, the washes, the signs and titles stay as
-## bright as they were.
+## windows and framed pictures (the shell), every plant and side table (and
+## what it carries), the pantry counter, the zones' partitions and signs, all
+## by LENS_DIM. The pods, their laptops, lamps and paper, the people, what
+## floats over them, the washes and the tab labels stay as bright as they were.
 func test_only_furnishing_dims_while_held() -> void:
-	# Wide enough that the row wall hangs framed pictures beside its two signs.
+	# Wide enough that the top wall hangs framed pictures between its windows.
 	var office := await _live_office(_with(fixture, "api:p4", {"agent_status": "done"}), Vector2(1600, 800))
 	office.settle()
 	await _frames(2)
 	var furnishing := _furnishing(office)
-	_check(furnishing.size() > 3, "the shell, decor and counters are there: %d" % furnishing.size())
-	_check(not _decor(office).is_empty(), "the floor has plants or cabinets")
-	# The wall-foot run and the spare bay's plant are among them: every
+	_check(furnishing.size() > 3, "the shell, decor and partitions are there: %d" % furnishing.size())
+	_check(not _decor(office).is_empty(), "the floor has plants or side tables")
+	# The top-wall run and the lane gaps' pieces are among them: every
 	# planned piece is drawn, and every drawn one is in what dims.
 	var planned := office.layout_plan().decorations
 	var new_pieces := planned.filter(
-		func(piece: DecorPlacement) -> bool: return "/wall/" in piece.key or piece.key.ends_with("/bay")
+		func(piece: DecorPlacement) -> bool: return piece.key.begins_with("top/") or "/gap/" in piece.key
 	)
-	_check(not new_pieces.is_empty(), "the floor stands a wall-foot run or a spare bay's plant")
+	_check(not new_pieces.is_empty(), "the floor stands a top-wall run or a lane gap's pieces")
 	_eq(_decor(office).size(), planned.size(), "every planned piece is drawn")
 	var dimmed_at: Array[Vector2] = []
 	for piece in _decor(office):
 		dimmed_at.append(piece.position)
 	for piece: DecorPlacement in new_pieces:
 		_check(piece.position in dimmed_at, "%s is drawn among what dims" % piece.key)
-	# The framed pictures on the row walls hang in the shell, so they dim
+	# The framed pictures on the top wall hang in the shell, so they dim
 	# with it: each is the shell's own child and adds no tint of its own.
 	var shell := office.floor_view.ground.get_node_or_null("Shell") as CanvasItem
 	var picture := office.art.sprite_texture(office.art.prop_sprite(ArtContract.PROP_WALL_FRAME))
@@ -337,7 +337,9 @@ func test_only_furnishing_dims_while_held() -> void:
 ## keep every piece's key, kind, place and picture; and under the lens both
 ## kinds dim as every piece does.
 func test_both_plants_are_drawn_where_planned_and_ignore_herdr() -> void:
-	var office := await _live_office()
+	# Two lanes (a first plan 23 cells wide): the top wall's run and the free
+	# lane's gap stand plants; one lane has room for none.
+	var office := await _live_office(fixture, Vector2(880, 480))
 	office.settle()
 	await _frames(2)
 	var planned: Dictionary[Vector2, StringName] = {}
@@ -351,8 +353,7 @@ func test_both_plants_are_drawn_where_planned_and_ignore_herdr() -> void:
 	for at: Vector2 in drawn:
 		var piece: OfficeDecor = drawn[at]
 		_eq(piece.piece, planned.get(at, &""), "the piece drawn at %s is the planned one" % at)
-		# The spare bay's side table is furniture too, not a plant.
-		if piece.piece not in [ArtContract.PROP_CABINET, ArtContract.PROP_SIDE_TABLE]:
+		if piece.piece != ArtContract.PROP_SIDE_TABLE:
 			_check(piece.piece in [&"plant", &"plant_b"], "a plant is one of the two: %s" % piece.piece)
 			kinds[piece.piece] = (piece.get_node("Body") as Sprite2D).texture
 	_eq(kinds.size(), 2, "the floor shows both plants: %s" % [kinds.keys()])
@@ -842,11 +843,14 @@ func _furnishing(office: OfficeDouble) -> Array[CanvasItem]:
 		found.append(decor)
 	for fixture_node in _fixtures(office):
 		found.append(fixture_node)
+	for node: Node in office.floor_view.sorted.get_children():
+		if node is OfficeZoneSign or node.name.begins_with("Partitions_"):
+			found.append(node as CanvasItem)
 	return found
 
 
 ## What the lens leaves as bright as it was: pods and everything on them, the
-## seats, the people, the backgrounds (washes, shadows, signs, titles) and the
+## seats, the people, the backgrounds (washes, shadows, tab labels) and the
 ## pointer.
 func _signal_nodes(office: OfficeDouble) -> Array[CanvasItem]:
 	var found: Array[CanvasItem] = [office.floor_view.pointer]

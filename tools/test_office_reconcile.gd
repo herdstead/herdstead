@@ -335,25 +335,19 @@ func _check_floor_cells(office: OfficeScene) -> void:
 		for y in range(corridor.position.y, corridor.end.y):
 			for x in range(corridor.position.x, corridor.end.x):
 				_check(not wall_hits.has(Vector2i(x, y)), "no entrance, main or cross corridor is filled by wall tiles")
-	for row in plan.rows:
+	# No row walls: every wall tile is the top wall's two courses or a side
+	# wall, and no row wall's joint (t_left, end_right) is laid at all.
+	for at in wall_hits:
+		_check(
+			at.y < ArtContract.WALL_COURSES.size() or at.x == 0 or at.x == plan.floor_cells.size.x - 1,
+			"wall tile %s is the top wall's or a side wall's" % at
+		)
+	for cell in walls.get_used_cells():
+		var id := str(walls.get_cell_tile_data(cell).get_custom_data("semantic_id"))
+		_check(not ("t_left" in id or "end_right" in id), "no row wall's joint is laid: %s" % id)
+	for x in plan.floor_cells.size.x:
 		for course in ArtContract.WALL_COURSES.size():
-			var y := row.wall_cells.position.y + course
-			for x in range(row.wall_cells.position.x, row.wall_cells.end.x):
-				_eq(wall_hits.get(Vector2i(x, y), 0), 1, "every row wall cell is drawn once")
-			var left := walls.get_cell_tile_data(Vector2i(row.wall_cells.position.x, y))
-			var right := walls.get_cell_tile_data(Vector2i(row.wall_cells.end.x - 1, y))
-			_check(left != null and right != null, "row wall has both junction pieces")
-			if left != null and right != null:
-				_eq(
-					StringName(str(left.get_custom_data("semantic_id"))),
-					ArtContract.wall_cell(ArtContract.WALL_COURSES[course], ArtContract.WALL_T_LEFT),
-					"row joins the side through a T piece"
-				)
-				_eq(
-					StringName(str(right.get_custom_data("semantic_id"))),
-					ArtContract.wall_cell(ArtContract.WALL_COURSES[course], ArtContract.WALL_END_RIGHT),
-					"row ends before the main corridor"
-				)
+			_eq(wall_hits.get(Vector2i(x, course), 0), 1, "every top wall cell is drawn once")
 	var tile_size := Vector2(floor_layer.tile_set.tile_size)
 	var pixels := Rect2(Vector2(plan.floor_cells.position) * tile_size, Vector2(plan.floor_cells.size) * tile_size)
 	var transform_to_world := office.world.global_transform.affine_inverse() * floor_layer.global_transform
@@ -364,11 +358,11 @@ func _check_floor_cells(office: OfficeScene) -> void:
 
 
 func test_complete_floor_and_unique_wall_cells_follow_the_plan() -> void:
-	# 628 wide: the floor is planned 488 units wide; with a dozen more agents
-	# on api its pods wrap to a second row there (the fixture's own two pods
-	# of 32-unit desks fit one row).
-	var office := await _live_office(_wide_api(12), Vector2(628, 480))
-	_check(office.layout_plan().rows.size() > 1, "fixture exercises multiple wall rows")
+	# 628 wide: the floor is planned 488 units wide, one lane (8 inner cells);
+	# with nine more agents api:t1 is a pod of 7 cells, and api:t2's (3) wraps
+	# to a second pod row (the fixture's own two pods share one row).
+	var office := await _live_office(_wide_api(9), Vector2(628, 480))
+	_check(office.layout_plan().zones[0].rows.size() > 1, "fixture exercises multiple pod rows")
 	_check_floor_cells(office)
 	var signature := office.layout_plan().geometry_signature()
 	office.switch_theme(_second_pack())
@@ -394,9 +388,11 @@ func test_a_floor_planned_with_the_drawer_closed_keeps_its_plan_when_it_opens() 
 	await _frames(4)
 	var hud := office.hud
 	_check(not hud.drawer_open(), "the drawer starts closed")
+	# The map's first width is the lanes that width holds: 10L + 3 cells.
+	var policy := FloorLayoutPolicy.new()
 	_eq(
 		office.layout_plan().initial_width_cells,
-		floori(hud.plan_width() / FloorLayoutPolicy.GRID),
+		policy.map_width(policy.lanes_for(floori(hud.plan_width() / FloorLayoutPolicy.GRID))),
 		"the floor is planned for the drawer closed"
 	)
 	_eq(hud.plan_width(), 660.0, "660 wide at 800x480")
@@ -886,9 +882,12 @@ func test_render_budget_failure_keeps_old_nodes_and_first_failure_is_empty() -> 
 
 ## A floor planned for the first time is validated once, its standing furniture
 ## included: the planner furnishes the candidate before its one flood fill,
-## rather than validating the bare plan and then the furnished one again.
+## rather than validating the bare plan and then the furnished one again. In a
+## window wide enough for two lanes (a first plan 23 cells wide): the narrowest
+## map, one lane, has its top wall full of windows and no lane beside its zone,
+## so nothing to furnish.
 func test_a_new_floor_is_validated_once_decor_included() -> void:
-	var office := await _live_office()
+	var office := await _live_office(fixture, Vector2(880, 480))
 	var attempts := office.layout_attempt_count()
 	var before := OfficeFloorValidation.validations
 	await _visit_floor(office, HerdrFleet.pane_key(LOCAL, "web"))
@@ -900,8 +899,10 @@ func test_a_new_floor_is_validated_once_decor_included() -> void:
 
 
 ## Two workspaces are two floors, each planned, drawn and panned apart, as
-## before there were maps: A (one tab of 40 panes) plans (47,18); B (2 panes)
-## plans its own (23,18) rather than A's width; back on A, its own plan again,
+## before there were maps: A (one tab of 40 panes, a pod of 20 columns, 21
+## cells: three lanes, the map widened for them) plans (33,12); B (2 panes)
+## plans its own (23,12), the window's two lanes, rather than A's width; back on
+## A, its own plan again,
 ## not planned anew. Every PageUp/PageDown between them is cold: a new world,
 ## nobody walking. Each floor is back where the viewer dragged it.
 func test_each_workspace_keeps_its_own_plan_world_and_pan() -> void:
@@ -922,7 +923,7 @@ func test_each_workspace_keeps_its_own_plan_world_and_pan() -> void:
 	var a := HerdrFleet.pane_key(LOCAL, "a")
 	var b := HerdrFleet.pane_key(LOCAL, "b")
 	var plan_a := office.layout_plan()
-	_eq([plan_a.floor_key, plan_a.floor_cells.size], [a, Vector2i(25, 15)], "A is planned for its 40 panes")
+	_eq([plan_a.floor_key, plan_a.floor_cells.size], [a, Vector2i(33, 12)], "A is planned for its 40 panes")
 	var middle := office.hud.world_rect().get_center()
 	var pan := office.camera.pan
 	await _drag(middle, middle + Vector2(-160, -60))
@@ -933,7 +934,7 @@ func test_each_workspace_keeps_its_own_plan_world_and_pan() -> void:
 	await _tap_key(KEY_PAGEUP)
 	var plan_b := office.layout_plan()
 	_eq([office.navigator.shown_key, plan_b.floor_key], [b, b], "PageUp shows B")
-	_eq(plan_b.floor_cells.size, Vector2i(23, 15), "planned for its own 2 panes, not at A's width")
+	_eq(plan_b.floor_cells.size, Vector2i(23, 12), "planned for its own 2 panes, not at A's width")
 	_eq(office.layout_attempt_count(), attempts + 1, "once")
 	_check(office.world.get_instance_id() != world, "a cold switch: the world is built again")
 	_eq(office.floor_view.presentation.walkers(), [], "and nobody walks")
@@ -943,7 +944,7 @@ func test_each_workspace_keeps_its_own_plan_world_and_pan() -> void:
 	world = office.world.get_instance_id()
 	await _tap_key(KEY_PAGEDOWN)
 	_eq([office.navigator.shown_key, office.layout_plan()], [a, plan_a], "PageDown: A again, on its own plan")
-	_eq(office.layout_plan().floor_cells.size, Vector2i(25, 15), "at its own size")
+	_eq(office.layout_plan().floor_cells.size, Vector2i(33, 12), "at its own size")
 	_eq(office.layout_attempt_count(), attempts + 1, "which is not planned again")
 	_check(office.world.get_instance_id() != world, "cold again")
 	_eq(office.floor_view.presentation.walkers(), [], "nobody walks")
@@ -952,4 +953,103 @@ func test_each_workspace_keeps_its_own_plan_world_and_pan() -> void:
 	_eq([office.navigator.shown_key, office.layout_plan()], [b, plan_b], "and B on its own plan")
 	_eq(office.layout_attempt_count(), attempts + 1, "not planned again either")
 	_eq(office.camera.pan, pan_b, "where the viewer dragged it")
+	_done(office)
+
+
+## One workspace is drawn as one zone of the map: its partition pieces stand at
+## the feet OfficeShell.partition_pieces() plans, each a sprite of its own in a
+## y-sorted holder under the sorted root; no row wall's joint is laid; its sign
+## hangs at its post, over the aisle row, and names it; each tab's name is
+## small text right under its table, no wider than the table, TAB_LABEL_HEIGHT
+## deep and clear of every partition piece; and a walker
+## inside the zone, above its bottom partition, sorts before that partition.
+func test_one_workspace_is_drawn_as_a_zone() -> void:
+	var office := await _live_office()
+	var plan := office.layout_plan()
+	var view := office.floor_view
+	_eq(plan.zones.size(), 1, "one workspace, one zone")
+	var zone := plan.zones[0]
+	var sprites := view.partition_sprites(zone.zone_key)
+	var planned := OfficeShell.partition_pieces(zone)
+	_eq(sprites.size(), planned.size(), "every planned partition piece is drawn")
+	for index in mini(sprites.size(), planned.size()):
+		var sprite := sprites[index]
+		var piece := planned[index]
+		_eq(sprite.position, piece.foot, "%s stands at its planned foot" % piece.id)
+		_eq(sprite.texture, office.art.sprite_texture(office.art.prop_sprite(piece.id)), "as " + piece.id)
+		_eq(_entity_of(view.sorted, sprite), sprite, "%s sorts by its own foot" % piece.id)
+	# The post's foot is POST_FOOT (6) below the zone's top, measured on the art
+	# lane's mock: drawn 12 tall, it covers the top end of the side run below it.
+	_eq(OfficeShell.POST_FOOT, 6.0, "the post's foot is 6 below the zone's top")
+	var posts := sprites.filter(func(each: Sprite2D) -> bool: return each.position.y == zone.bounds().position.y + 6.0)
+	var sides := sprites.filter(func(each: Sprite2D) -> bool: return each.position.y == zone.bounds().position.y + 32.0)
+	_eq([posts.size(), sides.size()], [2, 2], "two posts, and the side runs' first pieces under them")
+	for index in mini(posts.size(), sides.size()):
+		var post: Sprite2D = posts[index]
+		var side: Sprite2D = sides[index]
+		var drawn := post.transform * post.get_rect()
+		var run := side.transform * side.get_rect()
+		_eq(
+			[drawn.position.y, drawn.end.y],
+			[zone.bounds().position.y - 6.0, zone.bounds().position.y + 6.0],
+			"post drawn"
+		)
+		_check(drawn.intersects(run) and drawn.position.y < run.position.y, "the post covers the side run's top end")
+	var holder := sprites[0].get_parent() as Node2D if not sprites.is_empty() else null
+	_check(holder != null and holder.y_sort_enabled and holder.get_parent() == view.sorted, "in a y-sorted holder")
+	var walls: TileMapLayer = view.ground.get_node("Shell/Walls")
+	for cell in walls.get_used_cells():
+		var id := str(walls.get_cell_tile_data(cell).get_custom_data("semantic_id"))
+		_check(not ("t_left" in id or "end_right" in id), "no row wall's joint: %s" % id)
+	var board := view.zone_sign(zone.zone_key)
+	_check(board != null, "the zone has its sign")
+	if board != null:
+		_eq(board.position, zone.sign_at, "hung at its post")
+		var aisle := Rect2(Vector2(zone.slot().position) * 32.0, Vector2(zone.cells.size.x * 32.0, 32.0))
+		_check(aisle.encloses(board.drawn_rect()), "over the aisle row: %s in %s" % [board.drawn_rect(), aisle])
+		var number: Label = board.get_node("%Number")
+		var title: Label = board.get_node("%Title")
+		_eq([number.text, title.text], ["1", "API"], "naming the workspace by its number and its label")
+	for tab: String in view.desks:
+		var desk := view.desks[tab]
+		var placed := desk.placement
+		var under := placed.origin + Vector2(0, placed.measure.render_rect.end.y)
+		_eq(desk.title.position, under, "%s's name stands right under its table" % tab)
+		_eq(desk.title.size.x, placed.measure.table_width, "no wider than the table")
+		# TAB_LABEL_HEIGHT deep, so a last pod row's name ends where the bottom
+		# run's drawing starts (46 + 8 = 54 = 64 - 10 under the pod's origin).
+		_eq(desk.title.size.y, OfficeDraw.TAB_LABEL_HEIGHT, "%s's name is TAB_LABEL_HEIGHT deep" % tab)
+		var box := Rect2(desk.title.position, desk.title.size)
+		for sprite in sprites:
+			var piece := sprite.transform * sprite.get_rect()
+			_check(not box.intersects(piece), "%s's name %s clears the partition drawn at %s" % [tab, box, piece])
+		_check(desk.title.get_parent() == desk.background, "on the ground")
+	var bottom := zone.bounds().end.y
+	var run := sprites.filter(func(each: Sprite2D) -> bool: return is_equal_approx(each.position.y, bottom))
+	_check(not run.is_empty(), "the bottom partition stands at the zone's bottom")
+	var arriving: Dictionary = fixture.duplicate(true)
+	var source: Dictionary = {}
+	for pane: Dictionary in _list(arriving, "panes"):
+		if pane.pane_id == "api:p4":
+			source = pane
+	var extra := source.duplicate(true)
+	extra.pane_id = "api:p9"
+	extra.terminal_id = "term-api-p9"
+	extra.agent = "claude"
+	extra.agent_status = "working"
+	_list(arriving, "panes").append(extra)
+	_feed(office, arriving)
+	var body := _station(office, HerdrFleet.pane_key(LOCAL, "api:p9")).actor()
+	var inside := false
+	for frame in 600:
+		view.walk(1.0 / 30.0)
+		var at := view.sorted.to_local(body.global_position)
+		if zone.bounds().has_point(at) and at.y > bottom - 64.0:
+			inside = true
+			break
+	_check(inside, "a walker comes down inside the zone, above its bottom partition")
+	if inside and not run.is_empty():
+		var piece: Sprite2D = run[0]
+		_eq(_entity_of(view.sorted, body), body, "the walker sorts by their own feet")
+		_check(body.global_position.y < piece.global_position.y, "above the partition's foot: drawn before it")
 	_done(office)

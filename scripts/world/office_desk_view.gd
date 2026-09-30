@@ -24,8 +24,9 @@ var _name := ""
 ## at 2, 4, 18 and 250 columns: 168, 310, 1304 and 17776 nodes with everybody
 ## seated): 26 fixed nodes (21 of the pod: its body, 12 holders, the footprint,
 ## the overlay, the frame and its 4 bars, and the 2 short legs; 5 of the
-## background: itself, the lens's wash, the contact holder, the sign and the
-## title) and 71 per column (20 of the pod's: a desk, an apron and a screen
+## background: itself, the lens's wash, the contact holder, the tab label, and
+## the row-wall sign's, spare since lane B2a took the sign off: the counts above
+## were taken with it) and 71 per column (20 of the pod's: a desk, an apron and a screen
 ## module, a bracket, 2 laptops, 2 three-node grommets, 2 lamps, 2 papers, 2
 ## seat and 2 standing markers; 1 contact shadow; two 15-node stations and two
 ## 10-node people). The bound decides which floors fit
@@ -48,7 +49,7 @@ func setup(drawing: OfficeDraw, ground: Node2D, sorted: Node2D, tab_key: String)
 ## placement (FloorPlanCache.prepare()), which is unchanged by definition: only
 ## a different one is compared by its geometry. The title follows the room's
 ## label either way; labels never change a plan.
-func reconcile(room: RoomModel, next: DeskPlacement, wall_y: float) -> void:
+func reconcile(room: RoomModel, next: DeskPlacement) -> void:
 	var changed := (
 		placement == null or (placement != next and placement.geometry_signature() != next.geometry_signature())
 	)
@@ -62,7 +63,7 @@ func reconcile(room: RoomModel, next: DeskPlacement, wall_y: float) -> void:
 		table.relocate(next.origin)
 	if changed:
 		_sync_stations(next)
-		_draw_background(next, wall_y)
+		_draw_background(next)
 	placement = next
 	title.text = room.label.to_upper()
 
@@ -133,7 +134,7 @@ static func _slot(column: int, side: String) -> int:
 	return column * 2 + (1 if side == "near" else 0)
 
 
-func _draw_background(next: DeskPlacement, wall_y: float) -> void:
+func _draw_background(next: DeskPlacement) -> void:
 	# The table owns SeatContacts. Move that holder to the new background before
 	# deleting the old one; reparenting a queued-for-deletion node cannot save it.
 	var previous := background
@@ -152,13 +153,10 @@ func _draw_background(next: DeskPlacement, wall_y: float) -> void:
 	wash.visible = false
 	table.contact_shadows(background)
 	previous.queue_free()
-	var middle := next.origin.x + next.measure.table_width / 2.0
-	_pen.prop(background, ArtContract.PROP_SIGN, Vector2(middle, wall_y + OfficeShell.SIGN_FOOT))
-	var bounds := OfficeShell.title_bounds(next, wall_y, _pen)
-	title = _pen.clipped(background, "", bounds.position, bounds.size, 12, ArtContract.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	# Even a narrow sign must signal truncation. Godot's ordinary ellipsis mode
-	# suppresses that mark when fewer than six characters fit.
-	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS_FORCE
+	# The tab's name, small, on the floor right under the table's drawing and
+	# no wider than the table (OfficeDraw.tab_label()).
+	var under := Vector2(next.origin.x, next.origin.y + next.measure.render_rect.end.y)
+	title = _pen.tab_label(background, under, next.measure.table_width)
 
 
 func release() -> void:

@@ -156,10 +156,8 @@ var _content_size := Vector2.ZERO
 var _inbox_left := 0.0
 ## Until the bubbles on screen are looked at again: a pan moves them without a refresh.
 var _questions_left := 0.0
-## The pane whose bubble the pointer is over, its tooltip shown; empty for none.
-var _tip_key := ""
-## Where the pointer came onto it, in viewport pixels.
-var _tip_at := Vector2.ZERO
+## The tooltip over a blocked agent's bubble, and what the question reader is told.
+var _tips: OfficeQuestionTips
 ## Machine key -> the state starts last projected while it was live, by pane key
 ## and terminal identity: what a stale machine's panes are ranked by, since its
 ## client forgets every start the moment it drops (see _stamp_starts()).
@@ -178,33 +176,14 @@ var _carried_sessionless := false
 var _overview_tick: Timer
 ## Shows the open strategic view again every STRATEGIC_TICK_SECONDS; stopped while it is closed.
 var _strategic_tick: Timer
-## The new pane a split from the card made, waited for; null for none.
-var _pending_pick: PendingPick
+## The new pane a split (or a new space) from the card made, waited for and picked.
+var _new_pane: OfficeNewPaneFollow
 ## What a HUD line under the mouse points at (_show_pointer()): a pane, or a
 ## floor (a signpost); empty for none.
 var _pointed_pane := ""
 var _pointed_floor := ""
 ## The lens was last drawn held, so letting go has something to put back.
 var _lens_shown := false
-
-
-## A pane a split made (HerdrFleet.pane_key) with its terminal, on its
-## machine's `generation`: picked when a snapshot shows it, while the viewer's
-## pick is still `from_key`, the pane split, on the floor shown then (`floor_key`),
-## out of answer mode, and until `until_msec`.
-class PendingPick:
-	var key := ""
-	var pane_id := ""
-	var terminal_id := ""
-	var from_key := ""
-	var floor_key := ""
-	## OfficeNavigator.nav_revision then: recorded, not yet checked.
-	var nav_revision := 0
-	var generation := 0
-	var until_msec := 0
-	## The pane is a new floor's shell (a space or a worktree the card made):
-	## picking it moves floors. Said for the record; the wait is the same.
-	var cross_floor := false
 
 
 ## The HUD is a child from the start: the world reads its free area, and a test
@@ -261,6 +240,7 @@ func _ready() -> void:
 	add_child(_night_light)
 	_update_light(true)
 	camera = OfficeCamera.new(hud, _screen)
+	_tips = OfficeQuestionTips.new(hud, camera, func() -> OfficeFrame: return frame, get_viewport().get_mouse_position)
 	world = Node2D.new()
 	world.position = camera.free_rect().position
 	add_child(world)
@@ -288,8 +268,6 @@ func _ready() -> void:
 	# NEXT on the staff panel is `N`; its line's `‹ ›` walk the same queue.
 	hud.next_requested.connect(_jump_to_next_human)
 	hud.step_requested.connect(_step_queue)
-	hud.pane_split.connect(_follow_new_pane_later)
-	hud.space_created.connect(_follow_new_space_later)
 	# The overview: a row picks its pane; `X  Esc` closes it; a sort or a chip redraws it.
 	hud.overview_picked.connect(_pick_from_list)
 	hud.overview_closed.connect(_on_overview_closed)
@@ -310,6 +288,9 @@ func _ready() -> void:
 	_restore_list()
 	fleet = HerdrFleet.new()
 	add_child(fleet)
+	_new_pane = OfficeNewPaneFollow.new(navigator, fleet, hud, camera, func() -> int: return pending_pick_msec)
+	hud.pane_split.connect(_new_pane.later)
+	hud.space_created.connect(_new_pane.later_space)
 	# Every stream line can change the fleet; the frame's changes are drawn once.
 	fleet.changed.connect(_queue_refresh)
 	fleet.machine_replaced.connect(attention_store.retire_machine)
@@ -347,7 +328,8 @@ func _ready() -> void:
 	# The bubbles over blocked agents say what they ask: read, never written.
 	questions = OfficeQuestionReader.new(fleet, pacer.is_minimized)
 	questions.enabled = _question_reads()
-	questions.question_changed.connect(_show_question)
+	_tips.attach(fleet, questions)
+	questions.question_changed.connect(_tips.show_question)
 	add_child(questions)
 	filled = may_fill_screen and OfficeWindow.fills_screen(args, DisplayServer.get_name() == "headless")
 	if filled:
@@ -386,6 +368,7 @@ func _ready() -> void:
 	lens.changed.connect(_on_lens)
 	lens.ticked.connect(_show_lens)
 	add_child(lens)
+	_tips.lens = lens
 	# `--point=<pane key>` points at a pane as a hovered line would (a capture's
 	# shot); a bare pane id, as a command line can spell it, is Local's.
 	if args.has("point"):
@@ -577,7 +560,7 @@ func _process(delta: float) -> void:
 	if _questions_left <= 0.0:
 		_questions_left = QUESTION_WATCH_SECONDS
 		_watch_questions()
-	_give_up_new_pane()
+	_new_pane.give_up()
 
 
 ## Everything the office answers with a key or the wheel: zoom, theme, floor,
@@ -680,7 +663,7 @@ func _strategic_key(event: InputEvent) -> bool:
 func _unhandled_input(event: InputEvent) -> void:
 	# A drag takes the tooltip away: it is about where the pointer rests.
 	if event is InputEventMouseMotion and (event as InputEventMouseMotion).button_mask & MOUSE_BUTTON_MASK_LEFT:
-		_hide_tip()
+		_tips.hide_tip()
 	if not _act_on(event):
 		camera.drag(event)
 
@@ -845,14 +828,14 @@ func _refresh() -> void:
 	_data_pending = false
 	frame = OfficeProjection.frame(_machines(), art.state_names())
 	_stamp_starts()
-	_follow_new_pane()
+	_new_pane.follow(frame)
 	plans.prune(frame.floor_order)
 	var wanted := navigator.settle(frame)
 	# A new floor is shown at once: no ride, nothing held back.
 	var changed_floor := wanted != navigator.shown_key
 	if changed_floor:
 		camera.cancel_press()
-		_hide_tip()
+		_tips.hide_tip()
 		navigator.show_floor(frame, wanted, camera.pan)
 		camera.pan = navigator.pan_of(wanted)
 	var found := frame.find_floor(wanted)
@@ -1098,7 +1081,7 @@ func _build(found: ZoneRef, map: MapModel, planned: FloorPlan, problems: PackedS
 	rooms.position = Vector2(0, PLATE_HEIGHT)
 	world.add_child(rooms)
 	floor_view = OfficeFloorView.new()
-	floor_view.setup(pen, rooms, _on_desk_picked, _on_bubble_picked, _on_bubble_hovered)
+	floor_view.setup(pen, rooms, _on_desk_picked, _on_bubble_picked, _tips.on_bubble_hovered, _tips.on_sign_hovered)
 	floor_view.set_night(night)
 	# A floor whose current input cannot be planned keeps drawing the model its
 	# last valid plan was made for.
@@ -1153,104 +1136,11 @@ func _building_state(key: String) -> MachineLiveness.State:
 	return MachineLiveness.State.OFFLINE
 
 
-## Tell the question reader which blocked agents the shown floor has, which of
-## their bubbles are on screen (in wait order, longest first) and whether their
-## machine may be read; nothing is on screen while the terminal monitor, the
-## overview or the strategic view covers the world. A refresh and a timer call this: a pan moves bubbles on and off
-## screen without a refresh. The tooltip over a bubble is written afresh from
-## the reader here, and goes with the bubble.
+## Tell the question reader what the shown floor asks and which bubbles are on
+## screen (OfficeQuestionTips.watch()): a refresh, and a timer for a pan.
 func _watch_questions() -> void:
-	if floor_view == null or questions == null:
-		return
-	var blocked: Dictionary[String, String] = {}
-	var seen: Array[PaneModel] = []
-	var found := frame.find_floor(navigator.shown_key)
-	var live := false
-	if found != null:
-		var machine := found.building.key
-		live = (
-			fleet.has(machine)
-			and fleet.snapshot_is_current(machine)
-			and not hud.monitor_open()
-			and not hud.overview_open()
-			and not hud.strategic_open()
-		)
-		var view := _visible_world()
-		for room in found.zone_model.rooms:
-			for pane in room.panes:
-				var seat := floor_view.seat(pane.key)
-				if seat == null or not _asking(pane):
-					continue
-				blocked[pane.key] = pane.identity_key()
-				var bubble := seat.node.bubble_rect()
-				if bubble.has_area() and bubble.intersects(view):
-					seen.append(pane)
-	var on_screen := PackedStringArray()
-	for pane in OfficeProjection.wait_order(seen):
-		on_screen.append(pane.key)
-	questions.watch(blocked, on_screen, live)
-	# The tooltip says what the reader keeps now, so a terminal it just dropped
-	# (another session, still blocked) is never shown; a bubble gone takes it.
-	if not _tip_key.is_empty():
-		if blocked.has(_tip_key):
-			_show_tip(_tip_key)
-		else:
-			_hide_tip()
-
-
-## A read came back for pane `key`: the tooltip over its bubble says it now.
-func _show_question(key: String) -> void:
-	if key == _tip_key:
-		_show_tip(key)
-
-
-## The pointer came onto the bubble of pane `key` (`inside`), or left it. No
-## tooltip while the monitor covers the world or a drag is under way.
-func _on_bubble_hovered(key: String, inside: bool) -> void:
-	if not inside:
-		if key == _tip_key:
-			_hide_tip()
-		return
-	if hud.monitor_open() or camera.dragging or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		return
-	# Under the lens the bubble draws nothing, and nothing comes up over it.
-	if lens != null and lens.held:
-		return
-	_tip_key = key
-	_tip_at = get_viewport().get_mouse_position()
-	_show_tip(key)
-
-
-func _show_tip(key: String) -> void:
-	var pane := frame.pane(key)
-	if pane == null:
-		_hide_tip()
-		return
-	hud.show_bubble_tip(_question_text(key, pane.identity_key()), _tip_at)
-
-
-func _hide_tip() -> void:
-	_tip_key = ""
-	hud.hide_bubble_tip()
-
-
-## What the tooltip over the bubble of pane `key` (terminal `identity`) says:
-## that this office reads nothing, the excerpt read for that terminal (an empty
-## one says so), or plainly that there is none: never a placeholder promising a
-## read, which a dropped machine would never bring.
-func _question_text(key: String, identity: String) -> String:
-	if fleet.read_only():
-		return OfficeQuestionReader.READ_ONLY_TEXT
-	var asked := questions.question(key, identity)
-	if asked == null:
-		return OfficeQuestionReader.NOT_READ_TEXT
-	return OfficeQuestionReader.EMPTY_TEXT if asked.text.is_empty() else asked.text
-
-
-## Whether `pane`'s seat shows a bubble: a blocked agent, launching or not
-## (PaneModel.asks(): blocked comes first).
-static func _asking(pane: PaneModel) -> bool:
-	return pane.asks()
+	if floor_view != null:
+		_tips.watch(floor_view, navigator.shown_key, _visible_world)
 
 
 ## The part of the world on screen, in global coordinates, from where the
@@ -1483,7 +1373,7 @@ func _open_overview() -> void:
 	if hud.monitor_open() or hud.overview_open():
 		return
 	camera.cancel_press()
-	_hide_tip()
+	_tips.hide_tip()
 	hud.open_overview()
 	world.visible = false
 	hud.signposts.visible = false
@@ -1556,7 +1446,7 @@ func _open_strategic() -> void:
 	if hud.monitor_open() or hud.strategic_open():
 		return
 	camera.cancel_press()
-	_hide_tip()
+	_tips.hide_tip()
 	hud.open_strategic()
 	world.visible = _world_shown()
 	hud.signposts.visible = false
@@ -1631,7 +1521,7 @@ func _open_monitor(key: String) -> void:
 	if hud.monitor_open() or frame.pane(key) == null:
 		return
 	camera.cancel_press()
-	_hide_tip()
+	_tips.hide_tip()
 	hud.open_monitor(fleet.context_for(key, 0))
 	_show_monitor()
 	_show_pointer()
@@ -1746,87 +1636,6 @@ func _carry_pick_to_started(pane: PaneModel) -> void:
 	navigator.pick_desk(pane.key, _carried_pick)
 
 
-## The card split pane `target_key` into a new pane `pane_id` (herdr's
-## spelling) with terminal `terminal_id` at the machine's `generation`: wait
-## for a snapshot to show it (_follow_new_pane()). A selection only, later.
-func _follow_new_pane_later(target_key: String, pane_id: String, terminal_id: String, generation: int) -> void:
-	var pending := PendingPick.new()
-	var machine := HerdrFleet.split_key(target_key)[0]
-	pending.key = HerdrFleet.pane_key(machine, pane_id)
-	pending.pane_id = pane_id
-	pending.terminal_id = terminal_id
-	pending.from_key = target_key
-	pending.floor_key = navigator.shown_key
-	pending.nav_revision = navigator.nav_revision
-	pending.generation = generation
-	pending.until_msec = Time.get_ticks_msec() + pending_pick_msec
-	_pending_pick = pending
-
-
-## The card made a new space or worktree from pane `from_key`, whose root
-## pane `pane_id` (herdr's spelling) has terminal `terminal_id`, at the
-## machine's `generation`: wait for a snapshot to show it, on its new floor
-## (_follow_new_pane() with `cross_floor`). A selection only, later.
-func _follow_new_space_later(
-	from_key: String, _workspace_id: String, pane_id: String, terminal_id: String, generation: int
-) -> void:
-	_follow_new_pane_later(from_key, pane_id, terminal_id, generation)
-	_pending_pick.cross_floor = true
-
-
-## In a refresh, before the navigator settles: the new pane a split made is in
-## this frame, with the terminal herdr named, on the same connection, and the
-## viewer is still where the split left them (the pane split picked, the same
-## floor shown, out of answer mode): pick it, as a list pick does, and stop
-## waiting. The card then shows that shell; nothing is sent to it. Another pick
-## or connection: stop waiting. Another floor, answer mode, or the pane with
-## another terminal: stop waiting, and the card says why it was not picked.
-## A new floor's shell (`cross_floor`: a space or a worktree) is picked the
-## same way: locate() takes the pick to its floor, which the navigator then
-## shows; the viewer changing floor meanwhile still counts as moving on.
-func _follow_new_pane() -> void:
-	var pending := _pending_pick
-	if pending == null or _give_up_new_pane():
-		return
-	var machine := HerdrFleet.split_key(pending.key)[0]
-	if navigator.picked_key != pending.from_key or fleet.generation(machine) != pending.generation:
-		_pending_pick = null
-		return
-	if navigator.shown_key != pending.floor_key or hud.inspector.answering():
-		_leave_new_pane(OfficePaneInspector.Unpicked.MOVED_ON)
-		return
-	var pane := frame.pane(pending.key)
-	if pane == null:
-		return
-	if pane.terminal_id != pending.terminal_id:
-		_leave_new_pane(OfficePaneInspector.Unpicked.OTHER_TERMINAL)
-		return
-	_pending_pick = null
-	camera.cancel_press()
-	hud.inspector.leave_answer()
-	navigator.locate(frame, pane)
-	# The split came from the opened panel: it stays open on the new pane, so
-	# its card offers START AGENT (a click of its own).
-	if not hud.card_compact():
-		hud.expand_card(pane.key)
-
-
-## Stop waiting for the new pane once PENDING_PICK_MSEC ran out: the card says
-## no snapshot showed it. True when it just gave up.
-func _give_up_new_pane() -> bool:
-	if _pending_pick == null or Time.get_ticks_msec() < _pending_pick.until_msec:
-		return false
-	_leave_new_pane(OfficePaneInspector.Unpicked.UNSEEN)
-	return true
-
-
-## Stop waiting for the new pane without picking it; the card says `why`.
-func _leave_new_pane(why: OfficePaneInspector.Unpicked) -> void:
-	var left := _pending_pick
-	_pending_pick = null
-	hud.inspector.new_pane_not_picked(left.from_key, left.pane_id, why)
-
-
 ## Whether the card could answer or start something in the selected pane, as
 ## far as the office knows: a pane the viewer picked, on an office that may
 ## write, with an agent in it, or a shell with a kind to start there.
@@ -1913,7 +1722,7 @@ func _may_lens() -> bool:
 ## away while it is on, and the world shows it or puts everything back.
 func _on_lens(held: bool) -> void:
 	if held:
-		_hide_tip()
+		_tips.hide_tip()
 	hud.bar.show_lens(held)
 	_show_lens()
 

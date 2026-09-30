@@ -7,6 +7,10 @@ const TABLE_SCENE := preload("res://scenes/world/table.tscn")
 const DECOR_SCENE := preload("res://scenes/world/decor.tscn")
 const STATION_SCENE := preload("res://scenes/world/station.tscn")
 const PERSON_SCENE := preload("res://scenes/people/pixel_person.tscn")
+## A tab's name on the floor under its table (tab_label()): the display face's
+## own size, and the band it stands in.
+const TAB_LABEL_PIXELS := 8
+const TAB_LABEL_HEIGHT := 8.0
 
 var art: ArtPack
 ## The bundled face keeps Latin text consistent across platforms. System CJK
@@ -17,6 +21,11 @@ var font: Font
 ## the lens line. The same system fallbacks fill glyphs it lacks (an agent's
 ## name may be anything). A pack without one uses `font`.
 var display: Font
+## `display` for the tab labels: its line cut to TAB_LABEL_HEIGHT at
+## TAB_LABEL_PIXELS by giving up descent rows below it (Tiny5 at 8 is 9 tall:
+## ascent 7, descent 2), so a label's box ends where its band says. A tab label
+## is upper case: the rows given up are empty.
+var tab_face: Font
 
 
 func _init(pack: ArtPack) -> void:
@@ -45,6 +54,10 @@ func _init(pack: ArtPack) -> void:
 		small.base_font = art.display_font
 		small.fallbacks = [system]
 		display = small
+	var cut := FontVariation.new()
+	cut.base_font = display
+	cut.spacing_bottom = mini(0, int(TAB_LABEL_HEIGHT) - ceili(display.get_height(TAB_LABEL_PIXELS)))
+	tab_face = cut
 
 
 func box(parent: Node, bounds: Rect2, color_key: StringName) -> ColorRect:
@@ -118,6 +131,21 @@ func clipped(
 	# Control.size clamps to the minimum size, which only drops to zero once
 	# clipping is on, so the requested box has to be applied again here.
 	result.size = size
+	return result
+
+
+## A tab's name under its table: the pack's display face (a pixel font) at
+## TAB_LABEL_PIXELS, its line cut to TAB_LABEL_HEIGHT (tab_face), centred in `width` from `at` (the left end of the line it
+## stands on, on the floor), TAB_LABEL_HEIGHT deep, cut with a forced ellipsis:
+## even a narrow table signals truncation (Godot's ordinary ellipsis mode
+## suppresses the mark when fewer than six characters fit).
+func tab_label(parent: Node, at: Vector2, width: float) -> Label:
+	var result := clipped(
+		parent, "", at, Vector2(width, TAB_LABEL_HEIGHT), TAB_LABEL_PIXELS, ArtContract.INK, HORIZONTAL_ALIGNMENT_CENTER
+	)
+	result.add_theme_font_override("font", tab_face)
+	result.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS_FORCE
+	result.size = Vector2(width, TAB_LABEL_HEIGHT)
 	return result
 
 
