@@ -130,6 +130,62 @@
         32,
         32
       ]
+    },
+    "desk_left": {
+      "path": "desk_left.png",
+      "size": [
+        32,
+        48
+      ]
+    },
+    "desk_mid_a": {
+      "path": "desk_mid_a.png",
+      "size": [
+        32,
+        48
+      ]
+    },
+    "desk_mid_b": {
+      "path": "desk_mid_b.png",
+      "size": [
+        32,
+        48
+      ]
+    },
+    "desk_right": {
+      "path": "desk_right.png",
+      "size": [
+        32,
+        48
+      ]
+    },
+    "screen_left": {
+      "path": "screen_left.png",
+      "size": [
+        32,
+        6
+      ]
+    },
+    "screen_mid": {
+      "path": "screen_mid.png",
+      "size": [
+        32,
+        6
+      ]
+    },
+    "screen_right": {
+      "path": "screen_right.png",
+      "size": [
+        32,
+        6
+      ]
+    },
+    "leg_short": {
+      "path": "leg_short.png",
+      "size": [
+        6,
+        22
+      ]
     }
   },
   "furniture": {

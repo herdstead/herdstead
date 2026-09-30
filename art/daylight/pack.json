@@ -412,6 +412,12 @@
       "pivot": [12, 22],
       "item": {"place": "desk", "footprint": [11, 4]}
     },
+    "done_stack_small": {
+      "path": "props/done_stack_small.png",
+      "size": [24, 24],
+      "pivot": [12, 22],
+      "item": {"place": "desk", "footprint": [6, 3]}
+    },
     "reception": {
       "path": "props/reception.png",
       "size": [48, 32],
@@ -569,6 +575,11 @@
         32,
         60
       ]
+    },
+    "selection_seat": {
+      "path": "ui/selection_seat.png",
+      "size": [32, 48],
+      "pivot": [16, 46]
     }
   },
   "states": {

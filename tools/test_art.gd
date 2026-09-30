@@ -592,9 +592,24 @@ func test_art_contract_names_ids_no_scene_asks_for() -> void:
 		["wall.front_center", "wall.front_left", "wall.front_right", "wall.threshold"],
 		"the front wall nothing lays: it would cover the near seats (docs/WORLD_MODEL.md)"
 	)
-	_eq(Array(unused[&"props"]), [], "every prop is placed somewhere")
-	_eq(Array(unused[&"ui"]), [], "every UI image is drawn somewhere")
-	_eq(Array(unused[&"table"]), [], "every shared-table module is laid or is a furniture view")
+	# The open-plan pod's art lands before the code that draws it (lane B1):
+	# exactly these ids are shipped and not drawn yet.
+	_eq(Array(unused[&"props"]), ["done_stack_small"], "every prop but the pod's paper is placed somewhere")
+	_eq(Array(unused[&"ui"]), ["selection_seat"], "every UI image but the seat mark is drawn somewhere")
+	_eq(
+		Array(unused[&"table"]),
+		[
+			"desk_left",
+			"desk_mid_a",
+			"desk_mid_b",
+			"desk_right",
+			"leg_short",
+			"screen_left",
+			"screen_mid",
+			"screen_right",
+		],
+		"every shared-table module but the pod's is laid or is a furniture view"
+	)
 	for id in ArtContract.tile_ids():
 		_check(not Array(unused[&"tiles"]).has(str(id)), "a wanted tile is never called unused: " + id)
 	for id in ArtContract.ui_ids():
