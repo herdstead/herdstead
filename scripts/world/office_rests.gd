@@ -53,7 +53,7 @@ static func rest_of(state: StringName, starting: bool) -> Rest:
 
 
 ## Where every worker of `model` on `plan` rests (see the class comment).
-static func assign(plan: FloorPlan, model: FloorModel) -> Service:
+static func assign(plan: FloorPlan, model: ZoneModel) -> Service:
 	var result := Service.new()
 	var seated: Dictionary[String, bool] = {}
 	for desk in plan.desks:

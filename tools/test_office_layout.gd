@@ -40,14 +40,14 @@ func _room(key: String, count := 0, number := 0) -> RoomModel:
 	return room
 
 
-func _floor(rooms: Array[RoomModel]) -> FloorModel:
-	var floor_model := FloorModel.new()
+func _floor(rooms: Array[RoomModel]) -> ZoneModel:
+	var floor_model := ZoneModel.new()
 	floor_model.key = "machine/workspace"
 	floor_model.rooms = rooms
 	return floor_model
 
 
-func _plan(floor_model: FloorModel, previous: FloorPlan = null, policy: FloorLayoutPolicy = null) -> FloorPlan:
+func _plan(floor_model: ZoneModel, previous: FloorPlan = null, policy: FloorLayoutPolicy = null) -> FloorPlan:
 	var rules := policy if policy != null else FloorLayoutPolicy.new()
 	rules.actor_footprint = PixelPerson.footprint()
 	rules.actor_draw_rect = PixelPerson.drawing_rect(people)
@@ -185,12 +185,12 @@ func _space(id: String, number: int, repo_key: Variant = null, linked := false) 
 
 
 ## The floors one machine's raw workspaces project to.
-func _spaces(workspaces: Array, machine := "m") -> Array[FloorModel]:
+func _spaces(workspaces: Array, machine := "m") -> Array[ZoneModel]:
 	return OfficeProjection.project(HerdrSnapshot.from_wire({"workspaces": workspaces}), PackedStringArray(), machine)
 
 
 ## [workspace id, level label, the parent's workspace id or "", index] per floor.
-func _levels(floors: Array[FloorModel], machine := "m") -> Array:
+func _levels(floors: Array[ZoneModel], machine := "m") -> Array:
 	var prefix := HerdrFleet.pane_key(machine, "")
 	var rows: Array = []
 	for floor_model in floors:
@@ -240,7 +240,7 @@ func test_linked_worktrees_are_mezzanines_of_their_source() -> void:
 	var snapshot := HerdrSnapshot.from_wire(_dict(raw, "snapshot"))
 	var building := OfficeProjection.building("m", "M", snapshot, PackedStringArray(), false)
 	_eq(
-		_levels(building.floors),
+		_levels(building.zones),
 		[
 			["hs", "1", "", -1],
 			["hud", "1A", "hs", 0],
@@ -250,10 +250,10 @@ func test_linked_worktrees_are_mezzanines_of_their_source() -> void:
 		],
 		"the fixture: two worktrees under herdstead, notes has no worktree, ops lane has no source floor open"
 	)
-	_eq(_levels(building.floor_tree), _levels(building.floors), "already in tree order")
+	_eq(_levels(building.zone_tree), _levels(building.zones), "already in tree order")
 	var lobby := OfficeProjection.building("m", "M", HerdrSnapshot.new(), PackedStringArray(), false)
-	_eq(lobby.floor_tree, lobby.floors, "a building of one lobby is its own tree")
-	_eq(lobby.floors[0].level_label, "", "a lobby has no number")
+	_eq(lobby.zone_tree, lobby.zones, "a building of one lobby is its own tree")
+	_eq(lobby.zones[0].level_label, "", "a lobby has no number")
 
 
 ## Several checkouts of one repository that are not linked worktrees: the lowest
@@ -305,13 +305,13 @@ func test_worktree_groups_are_per_machine() -> void:
 		MachineView.new("m", "M", local, false), MachineView.new("n", "N", remote, false)
 	]
 	var frame := OfficeProjection.frame(machines, PackedStringArray())
-	_eq(_levels(frame.buildings[0].floors, "m"), [["a", "1", "", -1], ["b", "1A", "a", 0]], "one group on m")
+	_eq(_levels(frame.buildings[0].zones, "m"), [["a", "1", "", -1], ["b", "1A", "a", 0]], "one group on m")
 	_eq(
-		_levels(frame.buildings[1].floors, "n"),
+		_levels(frame.buildings[1].zones, "n"),
 		[["b", "2", "", -1], ["c", "3", "", -1]],
 		"n's worktrees of the same key find no source floor on n"
 	)
-	_eq(frame.buildings[0].floors[1].mezzanine_of, HerdrFleet.pane_key("m", "a"), "the parent key is composite")
+	_eq(frame.buildings[0].zones[1].mezzanine_of, HerdrFleet.pane_key("m", "a"), "the parent key is composite")
 
 
 ## Grouping follows every refresh: a source space opening turns its worktrees
@@ -339,7 +339,7 @@ func test_mezzanine_letters() -> void:
 	var spaces: Array = [_space("a", 7, "R")]
 	for index in 28:
 		spaces.append(_space("w%02d" % index, 10 + index, "R", true))
-	var labels := _spaces(spaces).map(func(f: FloorModel) -> String: return f.level_label)
+	var labels := _spaces(spaces).map(func(f: ZoneModel) -> String: return f.level_label)
 	_eq(labels.slice(0, 3), ["7", "7A", "7B"], "the first children")
 	_eq(labels.slice(26), ["7Z", "7AA", "7AB"], "past Z")
 
@@ -391,7 +391,7 @@ func test_equivalent_terminal_resize_preserves_columns_and_gaps() -> void:
 
 
 ## One tab's floor projected from herdr's terminal rects, [pane id, x, y, width, height] each.
-func _tiled(rects: Array) -> FloorModel:
+func _tiled(rects: Array) -> ZoneModel:
 	var panes: Array = []
 	var placed: Array = []
 	for rect: Array in rects:
@@ -407,7 +407,7 @@ func _tiled(rects: Array) -> FloorModel:
 
 
 ## PaneModel.desk_signature() by pane key.
-func _desk_looks(floor_model: FloorModel) -> Dictionary[String, String]:
+func _desk_looks(floor_model: ZoneModel) -> Dictionary[String, String]:
 	var looks: Dictionary[String, String] = {}
 	for room in floor_model.rooms:
 		for pane in room.panes:
@@ -897,7 +897,7 @@ func _pen() -> OfficeDraw:
 
 
 ## A floor model under its own key.
-func _keyed(key: String, rooms: Array[RoomModel]) -> FloorModel:
+func _keyed(key: String, rooms: Array[RoomModel]) -> ZoneModel:
 	var floor_model := _floor(rooms)
 	floor_model.key = key
 	return floor_model
@@ -1015,7 +1015,7 @@ func test_furniture_that_closes_a_path_is_left_out() -> void:
 
 ## `floor_model` planned `width` cells wide as the cache plans it: furnished,
 ## with its fixtures, in one validation.
-func _furnished(floor_model: FloorModel, width: int) -> FloorPlan:
+func _furnished(floor_model: ZoneModel, width: int) -> FloorPlan:
 	var rules := _real_rules(width)
 	var before := OfficeFloorValidation.validations
 	var result := OfficeFloorLayout.plan(
@@ -1060,7 +1060,7 @@ func test_every_row_stands_more_furniture_and_still_validates_once() -> void:
 	cases.append(["stress", _stress_floor(), 32])
 	for each in cases:
 		var what: String = each[0]
-		var model: FloorModel = each[1]
+		var model: ZoneModel = each[1]
 		var width: int = each[2]
 		var plan := _furnished(model, width)
 		if plan == null:
@@ -1565,7 +1565,7 @@ func _graph_of(plan: FloorPlan, rules: FloorLayoutPolicy) -> OfficeWalkGraph:
 
 ## The floor of tools/gen_stress_fixture.py's snapshot_stress80: ten tabs of
 ## eight agents, two to a column, far and near.
-func _stress_floor() -> FloorModel:
+func _stress_floor() -> ZoneModel:
 	var rooms: Array[RoomModel] = []
 	for tab in 10:
 		var room := _room("stress-%d" % tab, 0, tab + 1)

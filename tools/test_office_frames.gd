@@ -89,8 +89,8 @@ func _room(key: String, count := 0, number := 0, label := "") -> RoomModel:
 	return room
 
 
-func _floor(rooms: Array[RoomModel]) -> FloorModel:
-	var floor_model := FloorModel.new()
+func _floor(rooms: Array[RoomModel]) -> ZoneModel:
+	var floor_model := ZoneModel.new()
 	floor_model.key = "machine/workspace"
 	floor_model.rooms = rooms
 	return floor_model
@@ -98,7 +98,7 @@ func _floor(rooms: Array[RoomModel]) -> FloorModel:
 
 ## The floor of tools/gen_stress_fixture.py's snapshot_stress80: ten tabs of
 ## eight agents, two to a column, far and near.
-func _stress_floor() -> FloorModel:
+func _stress_floor() -> ZoneModel:
 	var rooms: Array[RoomModel] = []
 	for tab in 10:
 		var room := _room("stress-%d" % tab, 0, tab + 1)
@@ -119,7 +119,7 @@ func _rules(width: int) -> FloorLayoutPolicy:
 
 ## `floor_model` planned `width` cells wide with its counters and, `furnished`,
 ## its standing pieces, as the office plans it; `previous` is the plan it grows from.
-func _planned(floor_model: FloorModel, width: int, previous: FloorPlan = null, furnished := true) -> FloorPlan:
+func _planned(floor_model: ZoneModel, width: int, previous: FloorPlan = null, furnished := true) -> FloorPlan:
 	var decor := OfficeDecorPlanner.new(pen) if furnished else null
 	var result := OfficeFloorLayout.plan(floor_model, previous, _rules(width), decor, OfficeFixturePlanner.new(pen))
 	_eq(result.problems, PackedStringArray(), "%d cells: a valid floor: %s" % [width, "; ".join(result.problems)])
@@ -241,7 +241,7 @@ func test_frames_hang_on_the_wall_grid_clear_of_signs_and_pieces() -> void:
 	var stress_hung := 0
 	for each in cases:
 		var what: String = each[0]
-		var model: FloorModel = each[1]
+		var model: ZoneModel = each[1]
 		var width: int = each[2]
 		var plan := _planned(model, width)
 		if plan == null:
@@ -308,7 +308,7 @@ func _hung(view: OfficeFloorView) -> Array[Vector2]:
 
 
 ## A floor view on its own root, for `model` planned as `plan`.
-func _view(plan: FloorPlan, model: FloorModel) -> OfficeFloorView:
+func _view(plan: FloorPlan, model: ZoneModel) -> OfficeFloorView:
 	if not is_instance_valid(world):
 		world = Node2D.new()
 		root.add_child(world)

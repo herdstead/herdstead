@@ -15,7 +15,7 @@ var pane_by_key: Dictionary[String, PaneModel] = {}
 ## is absent: its location is unknown.
 var floor_of_pane: Dictionary[String, String] = {}
 ## Floor key -> the floor and the building it stands in.
-var floor_by_key: Dictionary[String, FloorRef] = {}
+var floor_by_key: Dictionary[String, ZoneRef] = {}
 ## Every floor bottom to top, building after building: the PageUp/PageDown order.
 var floor_order: Array[String] = []
 ## Panes of every live machine, seated or not, for the attention counts. A
@@ -27,7 +27,7 @@ var herdr_focus := ""
 
 
 ## The floor with this key and the building it stands in, or null.
-func find_floor(key: String) -> FloorRef:
+func find_floor(key: String) -> ZoneRef:
 	return floor_by_key.get(key)
 
 
@@ -64,7 +64,7 @@ func choose_floor(picked_floor: String, active_key: String) -> String:
 	if not holding.is_empty():
 		return holding
 	for building_model in buildings:
-		for floor_model in building_model.floors:
+		for floor_model in building_model.zones:
 			if not floor_model.lobby:
 				return floor_model.key
-	return "" if buildings.is_empty() else buildings[0].floors[0].key
+	return "" if buildings.is_empty() else buildings[0].zones[0].key

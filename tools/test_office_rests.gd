@@ -904,7 +904,7 @@ func test_the_papers_and_the_minimap_count_unread_alike() -> void:
 	var api := HerdrFleet.pane_key(LOCAL, "api")
 	var done := _with(fixture, "api:p1", {"agent_status": "done"})
 	_feed(office, done)
-	var row := office.frame.find_floor(api).floor_model
+	var row := office.frame.find_floor(api).zone_model
 	_eq(row.done, 1, "one UNREAD on the minimap's row")
 	_eq(_shown_papers(office).size(), row.done, "and one stack of paper")
 	var malformed := _with(done, "api:p2", {"agent_status": "done"})
@@ -912,7 +912,7 @@ func test_the_papers_and_the_minimap_count_unread_alike() -> void:
 	_list(malformed, "panes").append(repeated.duplicate(true))
 	_feed(office, malformed)
 	_check(not office.layout_problems().is_empty(), "the repeated pane cannot be laid out")
-	row = office.frame.find_floor(api).floor_model
+	row = office.frame.find_floor(api).zone_model
 	_eq(row.done, 1, "the minimap's row counts the repeated pane not at all")
 	_eq(_shown_papers(office), [_pane("api:p1")], "the floor keeps its last valid paper")
 	_done(office)

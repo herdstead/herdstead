@@ -263,8 +263,8 @@ func _without_many(snapshot: Dictionary, first: int, last: int) -> Dictionary:
 
 ## The stress fixture's floor as the office models it: ten tabs of eight panes
 ## (tab 0 `extra` more), two to a column, every one an agent, or every one a shell.
-func _stress_model(agents: bool, extra := 0) -> FloorModel:
-	var floor_model := FloorModel.new()
+func _stress_model(agents: bool, extra := 0) -> ZoneModel:
+	var floor_model := ZoneModel.new()
 	floor_model.key = HerdrFleet.pane_key(LOCAL, "stress")
 	for tab in 10:
 		var room := RoomModel.new()

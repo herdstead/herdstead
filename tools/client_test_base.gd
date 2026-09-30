@@ -284,7 +284,7 @@ func _open_tabs(active: Variant) -> Array:
 
 
 ## The floor of a single workspace whose `worktree` field is this.
-func _worktree_floor(worktree: Variant) -> FloorModel:
+func _worktree_floor(worktree: Variant) -> ZoneModel:
 	var snapshot := {"workspaces": [{"workspace_id": "w", "number": 1, "worktree": worktree}]}
 	return OfficeProjection.project(_view(snapshot), _states())[0]
 
@@ -399,8 +399,8 @@ func _floor_icons(minimap: OfficeFloors) -> Array:
 
 
 ## One floor for the minimap, which draws a row per floor and nothing else.
-func _floor_row(key: String, number: int, agents: int, blocked: int, done: int) -> FloorModel:
-	var floor_model := FloorModel.new()
+func _floor_row(key: String, number: int, agents: int, blocked: int, done: int) -> ZoneModel:
+	var floor_model := ZoneModel.new()
 	floor_model.key = key
 	floor_model.number = number
 	floor_model.label = key
@@ -410,9 +410,7 @@ func _floor_row(key: String, number: int, agents: int, blocked: int, done: int) 
 	return floor_model
 
 
-func _building_rows(
-	key: String, label: String, state: MachineLiveness.State, floors: Array[FloorModel]
-) -> BuildingRows:
+func _building_rows(key: String, label: String, state: MachineLiveness.State, floors: Array[ZoneModel]) -> BuildingRows:
 	var building := BuildingRows.new()
 	building.key = key
 	building.label = label

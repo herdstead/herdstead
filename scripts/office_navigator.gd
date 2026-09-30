@@ -57,7 +57,7 @@ func settle(frame: OfficeFrame) -> String:
 ## them, top to bottom: the highest floor on top, and each floor's mezzanines
 ## hung just below it in letter order, as herdr's sidebar hangs a worktree
 ## under the space it was made from. Pure; the minimap draws this order.
-static func section(floors: Array[FloorModel]) -> Array[FloorModel]:
+static func section(floors: Array[ZoneModel]) -> Array[ZoneModel]:
 	var keys: Dictionary[String, bool] = {}
 	for floor_model in floors:
 		keys[floor_model.key] = true
@@ -68,9 +68,9 @@ static func section(floors: Array[FloorModel]) -> Array[FloorModel]:
 		if groups.is_empty() or not keys.has(floor_model.mezzanine_of):
 			groups.append([])
 		groups[-1].append(floor_model)
-	var drawn: Array[FloorModel] = []
+	var drawn: Array[ZoneModel] = []
 	for index in range(groups.size() - 1, -1, -1):
-		for floor_model: FloorModel in groups[index]:
+		for floor_model: ZoneModel in groups[index]:
 			drawn.append(floor_model)
 	return drawn
 
@@ -81,7 +81,7 @@ static func section(floors: Array[FloorModel]) -> Array[FloorModel]:
 static func shaft_order(frame: OfficeFrame) -> Array[String]:
 	var order: Array[String] = []
 	for building in frame.buildings:
-		var drawn := section(building.floors)
+		var drawn := section(building.zones)
 		for index in range(drawn.size() - 1, -1, -1):
 			order.append(drawn[index].key)
 	return order
@@ -241,7 +241,7 @@ static func _seated_in_state(frame: OfficeFrame, state: String) -> Array[PaneMod
 	for building_model in frame.buildings:
 		if building_model.stale:
 			continue
-		for floor_model in building_model.floors:
+		for floor_model in building_model.zones:
 			for room in floor_model.rooms:
 				for pane in room.panes:
 					if not pane.provider.is_empty() and not pane.launching() and pane.state == state:
@@ -281,7 +281,7 @@ func is_picked(pane: PaneModel) -> bool:
 func _resolve_wanted_floor(frame: OfficeFrame) -> void:
 	if wanted_floor < 0 or frame.buildings.is_empty():
 		return
-	for floor_model in frame.buildings[0].floors:
+	for floor_model in frame.buildings[0].zones:
 		if not floor_model.lobby and floor_model.number == wanted_floor:
 			picked_floor = floor_model.key
 			wanted_floor = -1

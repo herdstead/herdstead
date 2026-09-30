@@ -11,7 +11,7 @@ var label := ""
 var state := MachineLiveness.State.LIVE
 ## Ascending by floor number, the way the office projected them; the panel draws
 ## them the other way round, highest on top.
-var floors: Array[FloorModel] = []
+var floors: Array[ZoneModel] = []
 
 
 static func of(building: BuildingModel, live_state: MachineLiveness.State) -> BuildingRows:
@@ -19,5 +19,5 @@ static func of(building: BuildingModel, live_state: MachineLiveness.State) -> Bu
 	rows.key = building.key
 	rows.label = building.label
 	rows.state = live_state
-	rows.floors = building.floors
+	rows.floors = building.zones
 	return rows

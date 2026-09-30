@@ -74,7 +74,7 @@ FloorRooms              the node dimmed as a whole when its machine disconnects
 ### Grid, measurement and stable ordering
 
 A real workspace's floor is laid out by `OfficeFloorLayout` into a `FloorPlan`; `OfficeSeatPlanner` handles one tab's
-seats. `FloorModel` / `RoomModel` / `PaneModel` hold no render nodes; `FloorPlan` / `RowPlan` / `DeskPlacement` /
+seats. `ZoneModel` / `RoomModel` / `PaneModel` hold no render nodes; `FloorPlan` / `RowPlan` / `DeskPlacement` /
 `SeatPlacement` hold grid bounds, table origins and seat bindings; `OfficeFloorView` / `OfficeDeskView` assemble nodes
 from the plan.
 
@@ -365,7 +365,7 @@ kept is the plan and the view, not the people's nodes or animation clocks across
   reroute never walks slower than before. Once a person stops walking (seated, standing still, placed, or set down on
   disconnect), the step rate returns to 1.
 - **Presentation apart from observation (`OfficePresentation`, `scripts/world/`).** When an observation arrives (a
-  `FloorModel` laid on a `FloorPlan`), plates, status badges, wait times, selection frames and click areas jump to where
+  `ZoneModel` laid on a `FloorPlan`), plates, status badges, wait times, selection frames and click areas jump to where
   it says at once (they are signals); the body then walks there. It is one floor-level model keyed by pane key plus
   terminal identity (`PaneModel.identity_key()`). Before reconcile it compares the last presented observation with this
   one: a body that is leaving is first taken out of its seat and hung under `Sorted` as a ghost (renamed, no overlay,

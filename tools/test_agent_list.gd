@@ -149,7 +149,7 @@ func test_tree_view_nests_machine_floor_mezzanine_tab_agent() -> void:
 		if entry.key.begins_with("tree:f:"):
 			order.append(entry.key)
 	var tree := PackedStringArray()
-	for floor_model in frame.buildings[0].floor_tree:
+	for floor_model in frame.buildings[0].zone_tree:
 		tree.append("tree:f:" + floor_model.key)
 	_eq(order, tree, "floors come in the building's tree order")
 	var shells := 0
@@ -1569,7 +1569,7 @@ func _frame(machines: Array[MachineView]) -> OfficeFrame:
 ## Give the seated panes the state starts the office would stamp.
 func _stamp(frame: OfficeFrame, starts: Dictionary) -> void:
 	for building in frame.buildings:
-		for floor_model in building.floors:
+		for floor_model in building.zones:
 			for room in floor_model.rooms:
 				for pane in room.panes:
 					pane.state_since = _number(starts, pane.pane_id, 1000.0)

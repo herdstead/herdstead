@@ -18,7 +18,7 @@ class Candidate:
 ## the reception with its queue, at most three validations in all (see
 ## _validate_furnished()).
 static func plan(
-	floor_model: FloorModel,
+	floor_model: ZoneModel,
 	previous: FloorPlan = null,
 	policy: FloorLayoutPolicy = null,
 	decor: OfficeDecorPlanner = null,
@@ -180,7 +180,7 @@ static func validate(value: FloorPlan, policy: FloorLayoutPolicy = null) -> Pack
 	return OfficeFloorValidation.problems(value, rules)
 
 
-static func _input_problems(floor_model: FloorModel, rules: FloorLayoutPolicy) -> PackedStringArray:
+static func _input_problems(floor_model: ZoneModel, rules: FloorLayoutPolicy) -> PackedStringArray:
 	var found := rules.problems()
 	if floor_model == null or floor_model.key.is_empty():
 		found.append("floor has no stable identity")

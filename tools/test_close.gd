@@ -895,4 +895,4 @@ func _line(office: OfficeDouble) -> String:
 ## How many tables the frame lays on floor `floor_key`.
 func _tables_of(office: OfficeDouble, floor_key: String) -> int:
 	var found := office.frame.find_floor(floor_key)
-	return 0 if found == null else found.floor_model.rooms.size()
+	return 0 if found == null else found.zone_model.rooms.size()

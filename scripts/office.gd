@@ -861,16 +861,16 @@ func _refresh() -> void:
 	# refreshes before the camera's next frame), and a floor's first plan fixes
 	# its width for good.
 	var room := camera.free_rect()
-	var planned := plans.prepare(found.floor_model, pen, hud.plan_width())
+	var planned := plans.prepare(found.zone_model, pen, hud.plan_width())
 	var problems := plans.problems()
-	var model := JSON.stringify([found.floor_model.key, art.id])
+	var model := JSON.stringify([found.zone_model.key, art.id])
 	if model != world_model:
 		world_model = model
 		_build(found, planned, problems)
 	elif problems.is_empty():
-		floor_view.reconcile(planned, found.floor_model, _frozen())
+		floor_view.reconcile(planned, found.zone_model, _frozen())
 	if problems.is_empty():
-		floor_view.update_desks(found.floor_model, navigator.active_key, _frozen())
+		floor_view.update_desks(found.zone_model, navigator.active_key, _frozen())
 	else:
 		# Nothing on the floor followed this input: the next update that can be
 		# laid out brings all of it at once, with nobody walking.
@@ -1029,7 +1029,7 @@ func _stamp_starts() -> void:
 		var kept: Dictionary = _live_starts.get(building_model.key, {})
 		var fresh := {}
 		var panes: Array[PaneModel] = []
-		for floor_model in building_model.floors:
+		for floor_model in building_model.zones:
 			for room in floor_model.rooms:
 				panes.append_array(room.panes)
 		var seated: Dictionary[String, float] = {}
@@ -1080,7 +1080,7 @@ func _machines() -> Array[MachineView]:
 
 ## Only changing floors or packs replaces the world; everything else goes
 ## through OfficeFloorView, which retains the other desks and their animations.
-func _build(found: FloorRef, planned: FloorPlan, problems: PackedStringArray) -> void:
+func _build(found: ZoneRef, planned: FloorPlan, problems: PackedStringArray) -> void:
 	remove_child(world)
 	world.queue_free()
 	world = Node2D.new()
@@ -1096,7 +1096,7 @@ func _build(found: FloorRef, planned: FloorPlan, problems: PackedStringArray) ->
 	floor_view.set_night(night)
 	# A floor whose current input cannot be planned keeps drawing the model its
 	# last valid plan was made for.
-	var drawn := found.floor_model if problems.is_empty() else plans.planned_model(found.floor_model.key)
+	var drawn := found.zone_model if problems.is_empty() else plans.planned_model(found.zone_model.key)
 	floor_view.reconcile(planned, drawn, _frozen())
 	floor_view.update_desks(drawn, navigator.active_key, _frozen())
 	plate = PLATE_SCENE.instantiate()
@@ -1107,9 +1107,9 @@ func _build(found: FloorRef, planned: FloorPlan, problems: PackedStringArray) ->
 
 ## The plate names the shown floor over the width the world has; the pan's
 ## reach is the wider of the floor and the plate.
-func _show_plate(found: FloorRef, problems: PackedStringArray) -> void:
+func _show_plate(found: ZoneRef, problems: PackedStringArray) -> void:
 	plate.size = Vector2(camera.free_rect().size.x, plate.size.y)
-	plate.show_floor(found.building, found.floor_model, frame.several_machines(), problems)
+	plate.show_floor(found.building, found.zone_model, frame.several_machines(), problems)
 	_show_plate_state()
 	camera.world_size = Vector2(maxf(_content_size.x, plate.size.x), _content_size.y)
 	var floor_width := (
@@ -1170,7 +1170,7 @@ func _watch_questions() -> void:
 			and not hud.strategic_open()
 		)
 		var view := _visible_world()
-		for room in found.floor_model.rooms:
+		for room in found.zone_model.rooms:
 			for pane in room.panes:
 				var seat := floor_view.seat(pane.key)
 				if seat == null or not _asking(pane):
@@ -1353,7 +1353,7 @@ func _signposts() -> Array[SignpostModel]:
 	for building in frame.buildings:
 		if building.stale:
 			continue
-		for floor_model in OfficeNavigator.section(building.floors):
+		for floor_model in OfficeNavigator.section(building.zones):
 			if floor_model.key == navigator.shown_key or floor_model.blocked <= 0:
 				continue
 			var post := SignpostModel.new()
@@ -1937,7 +1937,7 @@ func _show_lens() -> void:
 	var tones: Dictionary[String, StringName] = {}
 	var found := frame.find_floor(navigator.shown_key)
 	if found != null:
-		for room in found.floor_model.rooms:
+		for room in found.zone_model.rooms:
 			tones[room.key] = OfficeLens.tone_for(room, dropped)
 	floor_view.show_lens(true, texts, tones)
 

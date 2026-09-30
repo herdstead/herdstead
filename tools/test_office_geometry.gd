@@ -599,7 +599,7 @@ func test_optional_decor_cannot_cover_wall_title_or_sign() -> void:
 		policy.width_cells = width
 		policy.actor_footprint = PixelPerson.footprint()
 		policy.actor_draw_rect = PixelPerson.drawing_rect(art.people)
-		var model := FloorModel.new()
+		var model := ZoneModel.new()
 		model.key = "minimum-title-floor"
 		var room := RoomModel.new()
 		room.key = "long-title-tab"
@@ -658,7 +658,7 @@ func test_the_wall_run_leaves_every_drawn_sign_and_title_clear() -> void:
 		policy.width_cells = width
 		policy.actor_footprint = PixelPerson.footprint()
 		policy.actor_draw_rect = PixelPerson.drawing_rect(art.people)
-		var model := FloorModel.new()
+		var model := ZoneModel.new()
 		model.key = "wall-run-floor-%d" % width
 		for index in 3:
 			var room := RoomModel.new()

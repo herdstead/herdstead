@@ -502,7 +502,7 @@ func test_next_of_walks_one_state_and_done_starts_from_the_oldest() -> void:
 ## key -> unix seconds), as the office's frame builder does from the fleet.
 func _stamp(frame: OfficeFrame, starts: Dictionary[String, float]) -> void:
 	for building_model in frame.buildings:
-		for floor_model in building_model.floors:
+		for floor_model in building_model.zones:
 			for room in floor_model.rooms:
 				for pane in room.panes:
 					pane.state_since = starts.get(pane.key, -1.0)

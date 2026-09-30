@@ -77,7 +77,7 @@ class Entry:
 	var muted := false
 	## Where the pane stands, for search(): its machine's label and its floor.
 	var building_label := ""
-	var floor_ref: FloorRef
+	var floor_ref: ZoneRef
 	## A group standing for a machine that dropped: no counts, never a state.
 	var offline := false
 	## A group's lines that build() did not make (a folded History), counted.
@@ -104,7 +104,7 @@ class Entry:
 		if pane != null:
 			words.append_array([pane.provider, pane.label, pane.tab_label, pane.workspace_label, building_label])
 			if floor_ref != null:
-				var at := floor_ref.floor_model
+				var at := floor_ref.zone_model
 				words.append_array([at.label, at.repo, at.worktree])
 		elif history != null:
 			words.append_array([history.provider, history.space, history.tab, history.machine_label])
@@ -250,7 +250,7 @@ static func _flat(
 			var panes: Array[PaneModel] = building.all_panes
 			if seated:
 				panes = []
-				for floor_model in building.floors:
+				for floor_model in building.zones:
 					for room in floor_model.rooms:
 						panes.append_array(room.panes)
 			for pane in panes:
@@ -322,7 +322,7 @@ static func _tree(frame: OfficeFrame, live_items: Dictionary[String, AttentionIt
 		machine.offline = building.stale
 		result.append(machine)
 		var floor_groups: Dictionary[String, Entry] = {}
-		for floor_model in building.floor_tree:
+		for floor_model in building.zone_tree:
 			if floor_model.lobby:
 				continue
 			var parent: Entry = floor_groups.get(floor_model.mezzanine_of, machine)

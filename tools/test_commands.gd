@@ -644,7 +644,7 @@ func test_a_switch_clears_unread_on_the_whole_table() -> void:
 		"the next snapshot shows the whole table seen"
 	)
 	_eq(bee.call("bravo:p1"), "done", "another table keeps its UNREAD")
-	_eq(office.frame.find_floor(HerdrFleet.pane_key(BEE, "alpha")).floor_model.done, 0, "the floor counts none")
+	_eq(office.frame.find_floor(HerdrFleet.pane_key(BEE, "alpha")).zone_model.done, 0, "the floor counts none")
 
 
 ## An SSH machine is a site like any other: a switch reaches its herdr through

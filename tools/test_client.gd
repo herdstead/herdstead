@@ -1187,13 +1187,13 @@ func test_office_projection() -> void:
 	var states := _states()
 	var floors := OfficeProjection.project(_view_fixture("snapshot_office"), states)
 	_eq(
-		floors.map(func(f: FloorModel) -> String: return f.label),
+		floors.map(func(f: ZoneModel) -> String: return f.label),
 		["charlie", "中文 space", "echo"],
 		"floors follow workspace number"
 	)
-	_eq(floors.map(func(f: FloorModel) -> int: return f.number), [1, 2, 3], "each floor keeps herdr's number")
+	_eq(floors.map(func(f: ZoneModel) -> int: return f.number), [1, 2, 3], "each floor keeps herdr's number")
 	_eq(
-		floors.map(func(f: FloorModel) -> String: return f.repo),
+		floors.map(func(f: ZoneModel) -> String: return f.repo),
 		["sample-repo", "", "echo-repo"],
 		"repo from worktree, empty without one"
 	)
@@ -1271,7 +1271,7 @@ func test_office_projection() -> void:
 		),
 		states
 	)
-	_eq(twice.map(func(f: FloorModel) -> String: return f.label), ["first"], "a repeated workspace id is one floor")
+	_eq(twice.map(func(f: ZoneModel) -> String: return f.label), ["first"], "a repeated workspace id is one floor")
 
 
 ## Herdr's session focus reaches the desk it belongs to, and nothing else.
@@ -1408,18 +1408,18 @@ func test_office_floor_counts() -> void:
 	var snapshot := _view_fixture("snapshot_floors")
 	var floors := OfficeProjection.project(snapshot, states)
 	_eq(
-		floors.map(func(f: FloorModel) -> String: return f.label),
+		floors.map(func(f: ZoneModel) -> String: return f.label),
 		["api", "web", "infra", "notes", "数据 pipeline"],
 		"floors by number, not listing order"
 	)
 	_eq(
-		floors.map(func(f: FloorModel) -> Array: return [f.blocked, f.done]),
+		floors.map(func(f: ZoneModel) -> Array: return [f.blocked, f.done]),
 		[[0, 0], [1, 1], [1, 1], [0, 0], [0, 0]],
 		"blocked and UNREAD per floor_model"
 	)
 	# data: a working agent plus one still launching; notes: a shell only.
 	_eq(
-		floors.map(func(f: FloorModel) -> int: return f.agents),
+		floors.map(func(f: ZoneModel) -> int: return f.agents),
 		[3, 2, 3, 0, 2],
 		"agents per floor_model, a launching one included"
 	)
@@ -1442,13 +1442,13 @@ func test_office_floor_counts() -> void:
 	)
 	var dropped := OfficeProjection.project(snapshot, states, HerdrFleet.LOCAL, true)
 	_eq(
-		dropped.map(func(f: FloorModel) -> Array: return [f.blocked, f.done]),
+		dropped.map(func(f: ZoneModel) -> Array: return [f.blocked, f.done]),
 		[[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
 		"a stale machine's floors report none"
 	)
 	_eq(
-		dropped.map(func(f: FloorModel) -> String: return f.label),
-		floors.map(func(f: FloorModel) -> String: return f.label),
+		dropped.map(func(f: ZoneModel) -> String: return f.label),
+		floors.map(func(f: ZoneModel) -> String: return f.label),
 		"but keep their rooms"
 	)
 	# The counts are not part of where desks stand: a machine that flaps must not re-plan it.
@@ -1463,18 +1463,18 @@ func test_office_floor_counts() -> void:
 func test_office_lobby() -> void:
 	var states := _states()
 	var empty := OfficeProjection.building("machine:x", "far", HerdrSnapshot.new(), states, true)
-	_eq(empty.floors.size(), 1, "one lobby")
-	var lobby := empty.floors[0]
+	_eq(empty.zones.size(), 1, "one lobby")
+	var lobby := empty.zones[0]
 	_check(lobby.lobby and lobby.rooms.is_empty(), "the lobby has no rooms")
 	_eq(HerdrFleet.split_key(lobby.key)[0], "machine:x", "the lobby belongs to its machine")
 	var blank := OfficeProjection.building(
 		"machine:x", "far", _view({"workspaces": [{"workspace_id": "", "number": 1}]}), states, false
 	)
-	_eq(blank.floors.size(), 1, "a workspace whose id reads empty is a floor, not a lobby")
-	_check(not blank.floors[0].lobby and blank.floors[0].key != lobby.key, "and never shares the lobby's key")
+	_eq(blank.zones.size(), 1, "a workspace whose id reads empty is a floor, not a lobby")
+	_check(not blank.zones[0].lobby and blank.zones[0].key != lobby.key, "and never shares the lobby's key")
 	var local := OfficeProjection.building("local", "Local", _view_fixture("snapshot_basic"), states, false)
 	_eq(
-		local.floors.map(func(f: FloorModel) -> bool: return f.lobby),
+		local.zones.map(func(f: ZoneModel) -> bool: return f.lobby),
 		[false, false],
 		"a building with floors has no lobby"
 	)
@@ -1552,7 +1552,7 @@ func test_office_floor_choice() -> void:
 		OfficeProjection.building(HerdrFleet.LOCAL, "Local", HerdrSnapshot.new(), states, true),
 		OfficeProjection.building("socket:bee", "bee", HerdrSnapshot.new(), states, true)
 	]
-	_eq(OfficeProjection.choose_floor(nothing, "", ""), nothing[0].floors[0].key, "nothing anywhere: Local's lobby")
+	_eq(OfficeProjection.choose_floor(nothing, "", ""), nothing[0].zones[0].key, "nothing anywhere: Local's lobby")
 	_eq(
 		OfficeProjection.floor_of(buildings, HerdrFleet.pane_key("socket:bee", "alpha:p1")),
 		floor_model.call("socket:bee", "alpha"),
@@ -1576,7 +1576,7 @@ func test_office_floor_order_and_queue() -> void:
 	var numbers: Array = OfficeProjection.floor_order(buildings).map(
 		func(key: String) -> String:
 			var found := OfficeProjection.find_floor(buildings, key)
-			return "%s/%s" % [found.building.label, "L" if found.floor_model.lobby else str(found.floor_model.number)]
+			return "%s/%s" % [found.building.label, "L" if found.zone_model.lobby else str(found.zone_model.number)]
 	)
 	_eq(
 		numbers,
@@ -1591,7 +1591,7 @@ func test_office_floor_order_and_queue() -> void:
 	}
 	# The office's frame builder stamps these (PaneModel.state_since).
 	for building_model in buildings:
-		for floor_model in building_model.floors:
+		for floor_model in building_model.zones:
 			for room in floor_model.rooms:
 				for pane in room.panes:
 					pane.state_since = starts.get(pane.key, -1.0)
@@ -1625,13 +1625,13 @@ func test_office_minimap() -> void:
 	var minimap: OfficeFloors = hud.floors
 	var picked: Array = []
 	hud.floor_picked.connect(func(key: String) -> void: picked.append(key))
-	var tower: Array[FloorModel] = [
+	var tower: Array[ZoneModel] = [
 		_floor_row("a1", 1, 1, 0, 0), _floor_row("a2", 2, 0, 0, 0), _floor_row("a3", 3, 2, 1, 2)
 	]
 	var lobby := _floor_row("lobby", 0, 0, 0, 0)
 	lobby.label = "LOBBY"
 	lobby.lobby = true
-	var empty: Array[FloorModel] = [lobby]
+	var empty: Array[ZoneModel] = [lobby]
 	var model: Array[BuildingRows] = [
 		_building_rows("local", "Local", MachineLiveness.State.LIVE, tower),
 		_building_rows("machine:far", "far", MachineLiveness.State.OFFLINE, empty)
@@ -1730,7 +1730,7 @@ func test_office_minimap() -> void:
 	await _frames(1)
 	# A floor that goes away loses its row; the rest keep theirs.
 	var short: Array[BuildingRows] = [
-		_building_rows("local", "Local", MachineLiveness.State.LIVE, [tower[1], tower[2]] as Array[FloorModel])
+		_building_rows("local", "Local", MachineLiveness.State.LIVE, [tower[1], tower[2]] as Array[ZoneModel])
 	]
 	minimap.show_buildings(short, "a2", false)
 	await _frames(1)
@@ -1748,7 +1748,7 @@ func test_office_minimap_scroll() -> void:
 	var hud := await _hud(Vector2(800, 312))
 	var minimap: OfficeFloors = hud.floors
 	_eq(hud.placed(minimap).size.y, 200.0, "the minimap is the 200-tall panel")
-	var high: Array[FloorModel] = []
+	var high: Array[ZoneModel] = []
 	for number in range(1, 31):
 		high.append(_floor_row("t%d" % number, number, 1, 0, 0))
 	var tall: Array[BuildingRows] = [_building_rows("local", "Local", MachineLiveness.State.LIVE, high)]
@@ -1803,7 +1803,7 @@ func test_office_arrange() -> void:
 	var widened := OfficeFloorLayout.plan(floor_model, initial.plan, policy)
 	_check(widened.problems.is_empty(), "a wider viewport keeps a valid retained plan")
 	_eq(widened.plan.geometry_signature(), signature, "viewport width does not rearrange existing desks")
-	var empty := FloorModel.new()
+	var empty := ZoneModel.new()
 	empty.key = "empty-workspace"
 	var empty_result := OfficeFloorLayout.plan(empty, null, policy)
 	_check(empty_result.plan != null, "an empty workspace still has a complete floor")

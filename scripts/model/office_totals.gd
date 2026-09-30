@@ -86,7 +86,7 @@ static func of(frame: OfficeFrame, machines: Array[MachineRow], ledger: StateLog
 		var numbers: Dictionary[String, int] = {}
 		var ordered: Array[PaneModel] = []
 		var seen: Dictionary[String, bool] = {}
-		for floor_model in building.floors:
+		for floor_model in building.zones:
 			for room in floor_model.rooms:
 				for pane in room.panes:
 					if not seen.has(pane.key):

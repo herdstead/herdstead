@@ -1309,7 +1309,7 @@ func test_other_floor_draws_nothing() -> void:
 	_eq(office.world.get_instance_id(), world_id, "no rebuild")
 	_eq(office.world_model, model, "the layout model is untouched: floor counts stay out of it")
 	_eq(_world_ids(office), nodes, "not one node of the shown floor is replaced")
-	var web := office.frame.find_floor(HerdrFleet.pane_key(LOCAL, "web")).floor_model
+	var web := office.frame.find_floor(HerdrFleet.pane_key(LOCAL, "web")).zone_model
 	_eq([web.blocked, web.done], [0, 1], "the minimap's counts moved all the same")
 	_done(office)
 

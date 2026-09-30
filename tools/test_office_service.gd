@@ -24,7 +24,7 @@ func _marker() -> String:
 
 
 ## A floor with tables planned with its fixtures, `width` cells wide.
-func _serviced(floor_model: FloorModel, width := 32, previous: FloorPlan = null) -> FloorPlan:
+func _serviced(floor_model: ZoneModel, width := 32, previous: FloorPlan = null) -> FloorPlan:
 	var rules := _real_rules(width)
 	var result := OfficeFloorLayout.plan(
 		floor_model, previous, rules, OfficeDecorPlanner.new(_pen()), OfficeFixturePlanner.new(_pen())
@@ -403,7 +403,7 @@ func test_n_follows_the_wait_order() -> void:
 	var plan := _serviced(floor_model, 20)
 	var service := OfficeRests.assign(plan, floor_model)
 	var building := BuildingModel.new()
-	building.floors.append(floor_model)
+	building.zones.append(floor_model)
 	var buildings: Array[BuildingModel] = [building]
 	var order := OfficeProjection.attention_queue(buildings)
 	var waited := OfficeProjection.wait_order(blocked).map(func(pane: PaneModel) -> String: return pane.key)
@@ -482,14 +482,14 @@ func _room(key: String, count := 0, number := 0) -> RoomModel:
 	return room
 
 
-func _floor(rooms: Array[RoomModel]) -> FloorModel:
-	var floor_model := FloorModel.new()
+func _floor(rooms: Array[RoomModel]) -> ZoneModel:
+	var floor_model := ZoneModel.new()
 	floor_model.key = "machine/workspace"
 	floor_model.rooms = rooms
 	return floor_model
 
 
-func _plan(floor_model: FloorModel) -> FloorPlan:
+func _plan(floor_model: ZoneModel) -> FloorPlan:
 	var rules := _real_rules()
 	var result := OfficeFloorLayout.plan(floor_model, null, rules)
 	_eq(result.problems, PackedStringArray(), "valid plan: " + "; ".join(result.problems))

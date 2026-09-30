@@ -18,7 +18,7 @@ extends RefCounted
 var _plans: Dictionary[String, FloorPlan] = {}
 ## The model each valid plan was drawn from: what a floor whose current input
 ## cannot be planned keeps showing.
-var _planned_models: Dictionary[String, FloorModel] = {}
+var _planned_models: Dictionary[String, ZoneModel] = {}
 var _attempt_inputs: Dictionary[String, String] = {}
 var _attempt_problems: Dictionary[String, PackedStringArray] = {}
 var _notes: Dictionary[String, PackedStringArray] = {}
@@ -37,7 +37,7 @@ var _footprint_read := false
 ## current input; while the input cannot be planned, its last valid plan (see
 ## problems() and planned_model()); and a bounded empty floor when it never had
 ## one. `pen` measures the furniture the plan is furnished with.
-func prepare(floor_model: FloorModel, pen: OfficeDraw, visible_width: float) -> FloorPlan:
+func prepare(floor_model: ZoneModel, pen: OfficeDraw, visible_width: float) -> FloorPlan:
 	var policy := FloorLayoutPolicy.new()
 	policy.width_cells = maxi(1, floori(visible_width / FloorLayoutPolicy.GRID))
 	policy.actor_draw_rect = PixelPerson.drawing_rect(pen.art.people)
@@ -85,7 +85,7 @@ func prepare(floor_model: FloorModel, pen: OfficeDraw, visible_width: float) -> 
 	if previous != null:
 		return previous
 	# A bad first snapshot still gets a bounded, empty, explicitly labelled floor.
-	var empty := FloorModel.new()
+	var empty := ZoneModel.new()
 	empty.key = floor_model.key
 	_attempts += 1
 	var fallback := OfficeFloorLayout.plan(empty, null, policy)
@@ -107,7 +107,7 @@ func plan(key: String) -> FloorPlan:
 
 ## The model the plan of `key` was made for, which is what to draw while the
 ## floor's current input cannot be planned.
-func planned_model(key: String) -> FloorModel:
+func planned_model(key: String) -> ZoneModel:
 	return _planned_models.get(key)
 
 
@@ -145,7 +145,7 @@ func prune(floor_keys: Array[String]) -> void:
 
 ## A lobby is an empty floor: planned once per pack and clearance policy, and
 ## kept, like any floor's, when a new policy cannot be planned.
-func _lobby(floor_model: FloorModel, pen: OfficeDraw, policy: FloorLayoutPolicy) -> FloorPlan:
+func _lobby(floor_model: ZoneModel, pen: OfficeDraw, policy: FloorLayoutPolicy) -> FloorPlan:
 	var previous: FloorPlan = _lobbies.get(floor_model.key)
 	var input := JSON.stringify([floor_model.geometry_signature(), pen.art.id, policy.geometry_signature()])
 	if previous != null and _lobby_inputs.get(floor_model.key, "") == input:

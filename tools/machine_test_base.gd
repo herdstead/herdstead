@@ -235,7 +235,7 @@ func _desk_point(office: OfficeDouble, key: String) -> Vector2:
 func _pane_keys(office: OfficeDouble) -> Array:
 	var keys: Array = []
 	for building: BuildingModel in office.frame.buildings:
-		for floor_model in building.floors:
+		for floor_model in building.zones:
 			for room in floor_model.rooms:
 				for pane in room.panes:
 					keys.append(pane.key)
@@ -244,7 +244,7 @@ func _pane_keys(office: OfficeDouble) -> Array:
 
 func _pane_state(office: OfficeDouble, key: String) -> String:
 	for building: BuildingModel in office.frame.buildings:
-		for floor_model in building.floors:
+		for floor_model in building.zones:
 			for room in floor_model.rooms:
 				for pane in room.panes:
 					if pane.key == key:

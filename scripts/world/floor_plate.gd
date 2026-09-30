@@ -56,7 +56,7 @@ func dress(art: ArtPack, look: Theme) -> void:
 ## What the plate says about `floor_model` of `building`. `several` is there
 ## being more than Local; `problems` are why the floor cannot be laid out, and
 ## empty while it can. The machine's live state is show_state()'s.
-func show_floor(building: BuildingModel, floor_model: FloorModel, several: bool, problems: PackedStringArray) -> void:
+func show_floor(building: BuildingModel, floor_model: ZoneModel, several: bool, problems: PackedStringArray) -> void:
 	_lobby = floor_model.lobby
 	_several = several
 	_worktree = not floor_model.worktree.is_empty()
@@ -72,7 +72,7 @@ func show_floor(building: BuildingModel, floor_model: FloorModel, several: bool,
 	var source: Label = %WorktreeOf
 	source.text = ""
 	var group := floor_model.mezzanine_of
-	for other in building.floors:
+	for other in building.zones:
 		if _mezzanine and other.key == floor_model.mezzanine_of:
 			source.text = "worktree of " + OfficeFloorRow.number_text(other)
 		elif not _mezzanine and other.mezzanine_of == floor_model.key:

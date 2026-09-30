@@ -239,7 +239,7 @@ func test_squares_wear_the_floors_window_scale() -> void:
 	var windows: Control = floor_row.get_node("%Windows")
 	var index := 0
 	var found := office.frame.find_floor(office.navigator.shown_key)
-	for room in found.floor_model.rooms:
+	for room in found.zone_model.rooms:
 		for pane in room.panes:
 			var look := OfficeFloorRow.window_look(pane, true)
 			_eq(looks.get(pane.key, &""), look, "window_look(): " + pane.key)
@@ -414,7 +414,7 @@ func test_pgdn_and_a_floors_row_redraw_it_for_that_floor() -> void:
 	var mezzanine := ""
 	for key: Variant in office.hud.floors.row_keys():
 		var ref := office.frame.find_floor(str(key))
-		if ref != null and not ref.floor_model.mezzanine_of.is_empty() and str(key) != office.navigator.shown_key:
+		if ref != null and not ref.zone_model.mezzanine_of.is_empty() and str(key) != office.navigator.shown_key:
 			mezzanine = str(key)
 			break
 	_check(not mezzanine.is_empty(), "the fixture has a mezzanine to click")
@@ -423,13 +423,13 @@ func test_pgdn_and_a_floors_row_redraw_it_for_that_floor() -> void:
 	_eq(office.navigator.shown_key, mezzanine, "the FLOORS row shows it")
 	_check(office.hud.strategic_open(), "still open")
 	var ref := office.frame.find_floor(mezzanine)
-	var source := office.frame.find_floor(ref.floor_model.mezzanine_of)
+	var source := office.frame.find_floor(ref.zone_model.mezzanine_of)
 	var wanted := (
 		"%s · %s · worktree of %s"
 		% [
-			OfficeFloorRow.number_text(ref.floor_model),
-			ref.floor_model.worktree.to_upper(),
-			OfficeFloorRow.number_text(source.floor_model)
+			OfficeFloorRow.number_text(ref.zone_model),
+			ref.zone_model.worktree.to_upper(),
+			OfficeFloorRow.number_text(source.zone_model)
 		]
 	)
 	_eq(office.hud.strategic.title_text(), wanted, "a mezzanine as its plate names it")
@@ -454,7 +454,7 @@ func test_several_machines_title_names_the_machine() -> void:
 	var rules := FloorLayoutPolicy.new()
 	rules.actor_footprint = PixelPerson.footprint()
 	rules.actor_draw_rect = PixelPerson.drawing_rect(art.people)
-	var plan := OfficeFloorLayout.plan(found.floor_model, null, rules).plan
+	var plan := OfficeFloorLayout.plan(found.zone_model, null, rules).plan
 	var live := StrategicModel.of(plan, found, true, MachineLiveness.State.LIVE, StateLog.new(), "", 0)
 	_eq(live.title, "1F  API @ bee", "the machine's label after the floor")
 	_eq(live.state_text, "", "a live machine says nothing more")
@@ -946,7 +946,7 @@ func _same_squares(office: OfficeDouble, when: String) -> void:
 ## The tab key of the room pane `key` sits in on the shown floor.
 func _room_of(office: OfficeDouble, key: String) -> String:
 	var found := office.frame.find_floor(office.navigator.shown_key)
-	for room in found.floor_model.rooms:
+	for room in found.zone_model.rooms:
 		for pane in room.panes:
 			if pane.key == key:
 				return room.key

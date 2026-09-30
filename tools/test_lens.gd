@@ -849,7 +849,7 @@ func _signal_nodes(office: OfficeDouble) -> Array[CanvasItem]:
 ## The tab key of the room pane `key` sits in on the shown floor.
 func _room_of(office: OfficeDouble, key: String) -> String:
 	var found := office.frame.find_floor(office.navigator.shown_key)
-	for room in found.floor_model.rooms:
+	for room in found.zone_model.rooms:
 		for pane in room.panes:
 			if pane.key == key:
 				return room.key

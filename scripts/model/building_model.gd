@@ -18,7 +18,7 @@ var panes := 0
 var all_panes: Array[PaneModel] = []
 ## Ascending by herdr's workspace number; a building without workspaces has one
 ## lobby floor instead.
-var floors: Array[FloorModel] = []
+var zones: Array[ZoneModel] = []
 ## The same floors in tree order (OfficeProjection.floor_tree()): each floor that
 ## is no mezzanine by number, its mezzanines right after it.
-var floor_tree: Array[FloorModel] = []
+var zone_tree: Array[ZoneModel] = []

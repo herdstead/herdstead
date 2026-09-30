@@ -505,7 +505,7 @@ func test_a_blocked_start_lights_its_window_blocked_and_posts_a_signpost() -> vo
 	var row := minimap.row_for(_floor("data"))
 	_eq(_looks(row), [&"WindowDone", &"WindowBlocked"], "its window is lit blocked, not plainly")
 	_eq(_tips(row).slice(1), ["pi · NEEDS INPUT"], "and names it so, in the pack's words")
-	_eq(office.frame.find_floor(_floor("data")).floor_model.blocked, 1, "the row counts it")
+	_eq(office.frame.find_floor(_floor("data")).zone_model.blocked, 1, "the row counts it")
 	_check(_node(row, "%BlockedIcon").visible, "beside the blocked icon")
 	var keys := office.hud.signposts.shown().map(func(post: OfficeSignpost) -> String: return post.key())
 	_check(keys.has(_floor("data")), "a signpost points at 1B: " + str(_post_texts(office)))
@@ -671,8 +671,8 @@ func _hud() -> OfficeHud:
 
 
 ## Floor `key` numbered `number`, one room of `panes` claude agents in `state`.
-func _floor_of(key: String, number: int, panes: int, state: String) -> FloorModel:
-	var floor_model := FloorModel.new()
+func _floor_of(key: String, number: int, panes: int, state: String) -> ZoneModel:
+	var floor_model := ZoneModel.new()
 	floor_model.key = key
 	floor_model.number = number
 	floor_model.label = key
@@ -688,7 +688,7 @@ func _floor_of(key: String, number: int, panes: int, state: String) -> FloorMode
 	return floor_model
 
 
-func _one_building(floors: Array[FloorModel]) -> Array[BuildingRows]:
+func _one_building(floors: Array[ZoneModel]) -> Array[BuildingRows]:
 	var building := BuildingRows.new()
 	building.key = "local"
 	building.label = "Local"

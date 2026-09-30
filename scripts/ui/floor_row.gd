@@ -44,7 +44,7 @@ var _machine := ""
 ## Whether the row says its floor's name (see set_named()).
 var _named := false
 ## What show_floor() last drew, so set_named() can draw it again.
-var _floor: FloorModel
+var _floor: ZoneModel
 var _current := false
 var _live := true
 ## A HUD line under the mouse names this floor (set_pointed()).
@@ -58,7 +58,7 @@ func _ready() -> void:
 ## The chip's text for `floor_model`: `L` for a lobby, a mezzanine's own level
 ## label (`3A`), and every other floor's number with an F (`3F`). The floor
 ## plate and the signposts write floors the same way.
-static func number_text(floor_model: FloorModel) -> String:
+static func number_text(floor_model: ZoneModel) -> String:
 	if floor_model.lobby:
 		return "L"
 	if not floor_model.mezzanine_of.is_empty() and not floor_model.level_label.is_empty():
@@ -109,7 +109,7 @@ func is_named() -> bool:
 ## Draw `floor_model` of `machine`; `current` is the floor the office shows, and
 ## `live` is whether that machine is answering. A building that is not is
 ## dimmed, with no count and no lit window: a lost connection is not activity.
-func show_floor(floor_model: FloorModel, machine: String, current: bool, live := true) -> void:
+func show_floor(floor_model: ZoneModel, machine: String, current: bool, live := true) -> void:
 	key = floor_model.key
 	_machine = machine
 	_floor = floor_model
@@ -171,7 +171,7 @@ func icon(state: StringName) -> StatusBadge:
 ## One window per pane seated on the floor, in the order the floor seats them,
 ## as many as the scene holds; the rest are counted after the last one. A
 ## window's look and tooltip are only written when they change.
-func _show_windows(floor_model: FloorModel, current: bool, live: bool) -> void:
+func _show_windows(floor_model: ZoneModel, current: bool, live: bool) -> void:
 	var windows: Control = %Windows
 	var facade: Control = %Facade
 	var more: Label = %More

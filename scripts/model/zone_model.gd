@@ -1,4 +1,4 @@
-class_name FloorModel
+class_name ZoneModel
 extends RefCounted
 ## One herdr workspace as the office draws it: a floor of rooms, or the lobby of
 ## a building that has no workspaces at all.

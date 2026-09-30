@@ -72,7 +72,7 @@ var now_msec := 0
 ## pane selected (picked or followed), `now_msec` the log's clock now.
 static func of(
 	plan: FloorPlan,
-	found: FloorRef,
+	found: ZoneRef,
 	several: bool,
 	state: MachineLiveness.State,
 	ledger: StateLog,
@@ -88,7 +88,7 @@ static func of(
 		model.state_text = "CONNECTING"
 	if found == null:
 		return model
-	var floor_model := found.floor_model
+	var floor_model := found.zone_model
 	model.lobby = floor_model.lobby
 	model.title = _title(found)
 	if several:
@@ -160,8 +160,8 @@ func row_capacities() -> Array[PackedInt32Array]:
 
 ## The floor as its plate names it (OfficeFloorPlate.show_floor()), a mezzanine
 ## with the floor its checkout belongs to.
-static func _title(found: FloorRef) -> String:
-	var floor_model := found.floor_model
+static func _title(found: ZoneRef) -> String:
+	var floor_model := found.zone_model
 	if floor_model.lobby:
 		return "LOBBY"
 	var number := OfficeFloorRow.number_text(floor_model)
@@ -169,7 +169,7 @@ static func _title(found: FloorRef) -> String:
 		return "%s  %s" % [number, floor_model.label.to_upper()]
 	var named := floor_model.worktree if not floor_model.worktree.is_empty() else floor_model.label
 	var said := "%s · %s" % [number, named.to_upper()]
-	for other in found.building.floors:
+	for other in found.building.zones:
 		if other.key == floor_model.mezzanine_of:
 			said += " · worktree of " + OfficeFloorRow.number_text(other)
 	return said

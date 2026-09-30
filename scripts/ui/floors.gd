@@ -69,7 +69,7 @@ func show_buildings(buildings: Array[BuildingRows], shown: String, with_headings
 		machines.append(building.key)
 		if with_headings:
 			wanted.append(_heading(building, index > 0))
-		for floor_model: FloorModel in OfficeNavigator.section(building.floors):
+		for floor_model: ZoneModel in OfficeNavigator.section(building.floors):
 			var row := _row(floor_model.key)
 			row.show_floor(floor_model, building.key, floor_model.key == shown, live)
 			wanted.append(row)

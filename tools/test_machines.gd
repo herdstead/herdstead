@@ -1357,7 +1357,7 @@ func test_office_two_machines() -> void:
 		"working",
 		"Local's alpha:p1 keeps its own state"
 	)
-	_eq(office.frame.find_floor(bee_alpha).floor_model.blocked, 1, "bee's floor counts it")
+	_eq(office.frame.find_floor(bee_alpha).zone_model.blocked, 1, "bee's floor counts it")
 	_check(_floor_badges(office).has([bee, "blocked"]), "and its minimap row shows it")
 	_check(
 		not office.attention.machine_stale(HerdrFleet.LOCAL) and not office.attention.machine_stale(bee),
@@ -1373,7 +1373,7 @@ func test_office_two_machines() -> void:
 	_eq(office.floor_view.root.modulate, tint, "bee's rooms dim")
 	_eq(_actors_playing(office), [false], "bee's workers freeze")
 	_check(_plate_text(office, "state").begins_with("OFFLINE"), "bee's plate says offline")
-	_eq(office.frame.find_floor(bee_alpha).floor_model.blocked, 0, "a dropped machine's floors report nobody waiting")
+	_eq(office.frame.find_floor(bee_alpha).zone_model.blocked, 0, "a dropped machine's floors report nobody waiting")
 	_check(not _floor_badges(office).has([bee, "blocked"]), "and its minimap rows lose their icons")
 	_check(
 		_bar_text(office).begins_with("1 OFFLINE / READ ONLY"), "bar counts the dropped machine: " + _bar_text(office)
@@ -1472,7 +1472,7 @@ func test_office_two_machines() -> void:
 		"a bad target never gets a client or an ssh"
 	)
 	office.refresh()
-	var lobby: FloorModel = office.frame.buildings[2].floors[0]
+	var lobby: ZoneModel = office.frame.buildings[2].zones[0]
 	_check(lobby.lobby, "a machine that never connected has a lobby")
 	await _floor_pick(office, lobby.key)
 	_eq(office.navigator.shown_key, lobby.key, "the lobby can be shown")
@@ -1679,7 +1679,7 @@ func test_office_ssh_machines() -> void:
 	_check(far_client.socket_path.is_empty(), "no client before its forward exists")
 	await _until(func() -> bool: return office.fleet.link_state(far) == MachineLink.State.WAITING, "ssh refused")
 	office.refresh()
-	await _floor_pick(office, office.frame.buildings[1].floors[0].key)
+	await _floor_pick(office, office.frame.buildings[1].zones[0].key)
 	_check(_plate_text(office, "state").contains("Permission denied"), "its lobby's plate shows ssh's reason")
 	_check(_plate_text(office, "note").contains("Permission denied"), "and so does the lobby itself")
 	_check(far_client.socket_path.is_empty(), "still no client while ssh fails")
