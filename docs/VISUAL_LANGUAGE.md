@@ -248,7 +248,7 @@ non-zero, and a row of windows; higher zones on top, mezzanines indented under t
 signpost **pan** to their zone (its aisle row at the top of the world, as little sideways as brings its width in), and switch maps only for a
 zone on another machine; PageUp / PageDown pan zone to zone in drawn row order and cross machines at either end (from a machine's lowest zone
 down into the next machine's highest), stopping at the ends; `N`, NEXT, the counters, the list, NEWS and EVENTS pan to the desk, switching
-machine if needed; herdr's focus moving, while nothing is picked, pans to it as far as it takes. A machine's map seen for the first time opens
+machine if needed; herdr's focus moving, while nothing is picked or the picked pane is gone, pans to it as far as it takes. A machine's map seen for the first time opens
 on the selection's pod, else on its first zone. Every change is instant: no transition, no lift car, no input lock. A zone that disappears is
 forgotten at once; a machine that disappears takes its map with it. The `door` on the outer wall is furniture.
 

@@ -131,9 +131,10 @@ disappears, selection returns to herdr's focus. Clicking a seat never changes th
 **Which map is shown, and where.** One machine's map at a time: the machine you went to (a FLOORS row or signpost of
 one of its zones, PageUp / PageDown, `N`, a list pick) while it exists; otherwise the selected pane's machine (your
 pick, else herdr's focus, Local first); otherwise the first machine with a workspace; otherwise Local's empty map. A
-row click pans to its zone, its sign at the top of the world. While you have picked nothing, herdr's focus moving pans
-to the new desk as far as it takes (and to another machine's map if it is there). A map seen for the first time opens
-on the selected pane's pod, else on its first zone; each map keeps where you left it panned.
+row click pans to its zone, its sign at the top of the world. While you have picked nothing, or the pane you picked is
+gone, herdr's focus moving pans to the new desk as far as it takes (and to another machine's map if it is there). A map
+seen for the first time opens on the selected pane's pod, else on its first zone; each map keeps where you left it
+panned.
 
 **Disconnected is not idle.** When a socket goes away or the event stream breaks, the office keeps the last picture,
 dims it, stops the people and shows OFFLINE (with several machines, only that machine's map), and its counts drop to

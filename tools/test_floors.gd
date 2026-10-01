@@ -513,6 +513,77 @@ func test_a_blocked_start_lights_its_window_blocked_and_posts_a_signpost() -> vo
 	_done(office)
 
 
+## The posts standing are the ones the office last worked out, through an
+## overlay too. The overview (`O`) and the strategic view (`S`) hide them, and
+## closing one over an unchanged office brings the same post back; but the last
+## blocked agent going back to work while one is open leaves no post standing
+## once it closes. Real keys, pressed and let go.
+func test_no_signpost_outlives_its_blocked_agent_under_an_overlay() -> void:
+	for code: Key in [KEY_O, KEY_S]:
+		var overlay := OS.get_keycode_string(code)
+		var office := await _live_office()
+		var posts := office.hud.signposts
+		await _frames(2)
+		_eq(_post_texts(office), ["↓ 1A hud-lane 1"], "%s: one blocked desk off screen, one post" % overlay)
+		await _office_key(office, code)
+		_check(_overlay_open(office), "%s opens its overlay" % overlay)
+		_check(not posts.visible, "%s: which hides the signposts" % overlay)
+		await _office_key(office, code)
+		await _frames(2)
+		_check(not _overlay_open(office), "%s closes it" % overlay)
+		_check(posts.visible, "%s: over an unchanged office, the signposts are back" % overlay)
+		_eq(_post_texts(office), ["↓ 1A hud-lane 1"], "%s: the same post" % overlay)
+		await _office_key(office, code)
+		_feed(office, _nobody_blocked(fixture))
+		await _frames(2)
+		_check(_overlay_open(office), "%s: the overlay stays open over the new snapshot" % overlay)
+		await _office_key(office, code)
+		await _frames(2)
+		_check(not _overlay_open(office), "%s closes it again" % overlay)
+		_eq(office.frame.find_zone(_floor("hud")).zone_model.blocked, 0, "%s: nobody is blocked any more" % overlay)
+		_check(not posts.visible, "%s: so no signposts" % overlay)
+		_eq(posts.shown().size(), 0, "%s: and no post left standing" % overlay)
+		_done(office)
+		await _frames(2)
+
+
+## The same when the map shown changes under the overlay. Nobody on Local is
+## blocked and bee's one agent is: Local's map posts bee's zone. `N`, under
+## either overlay, picks that agent and shows bee's map with its desk in view,
+## where nothing waits out of sight; closing the overlay leaves no post.
+func test_no_signpost_outlives_a_machine_switch_under_an_overlay() -> void:
+	var hive := HerdrFleet.pane_key(BEE, "hive")
+	for code: Key in [KEY_O, KEY_S]:
+		var overlay := OS.get_keycode_string(code)
+		var office := await _two_machine_office(_nobody_blocked(fixture))
+		var posts := office.hud.signposts
+		await _frames(2)
+		_eq(office.navigator.shown_key, LOCAL, "%s: Local's map is shown" % overlay)
+		_check(posts.visible, "%s: bee's blocked agent puts a signpost up" % overlay)
+		_eq(
+			posts.shown().map(func(post: OfficeSignpost) -> String: return post.key()),
+			[hive],
+			"%s: to its zone" % overlay
+		)
+		await _office_key(office, code)
+		_check(_overlay_open(office), "%s opens its overlay" % overlay)
+		await _office_key(office, KEY_N)
+		await _frames(2)
+		_eq(office.navigator.shown_key, BEE, "%s: N under it shows bee's map" % overlay)
+		_check(_overlay_open(office), "%s: and leaves the overlay open" % overlay)
+		await _office_key(office, code)
+		await _frames(2)
+		_check(not _overlay_open(office), "%s closes it" % overlay)
+		_eq(office.frame.find_zone(hive).zone_model.blocked, 1, "%s: bee's agent still waits" % overlay)
+		_check(
+			_desk_in_view(office, HerdrFleet.pane_key(BEE, "hive:p1")), "%s: at a desk in view on its own map" % overlay
+		)
+		_check(not posts.visible, "%s: so no signposts" % overlay)
+		_eq(posts.shown().size(), 0, "%s: and no post left standing" % overlay)
+		_done(office)
+		await _frames(2)
+
+
 ## The FLOORS column is a narrow rail below 1280 wide: each
 ## row keeps its number chip, its blocked badge and count, and the windows
 ## directly under the chip; its name, indent and UNREAD count step out, and the
@@ -643,6 +714,36 @@ func test_floor_gestures_count_as_navigation_and_panning_does_not() -> void:
 	_done(office)
 
 
+## A desk picked by a real click stops the follow only while its pane is there.
+## Once herdr closes that pane the selection is herdr's focus again, and every
+## move of the focus to a zone out of sight pans its desk into the world's room:
+## the map is one world, so nothing else would bring it into view.
+func test_focus_is_revealed_again_once_the_picked_pane_is_gone() -> void:
+	var zones := _six_zones()
+	var office := await _live_office(zones)
+	var picked := HerdrFleet.pane_key(LOCAL, "w0:t0:p1")
+	await _click_desk(office, picked)
+	_eq(office.picked_key, picked, "a real click picks the desk")
+	var world_id := office.world.get_instance_id()
+	var closed: Dictionary = zones.duplicate(true)
+	closed.panes = _list(closed, "panes").filter(
+		func(pane: Dictionary) -> bool: return str(pane.get("pane_id", "")) != "w0:t0:p1"
+	)
+	_feed(office, closed)
+	await _frames(3)
+	_eq(office.navigator.active_key, HerdrFleet.pane_key(LOCAL, "w0:t0:p0"), "its pane closed: herdr's focus")
+	for pane_id: String in ["w5:t0:p0", "w2:t0:p0"]:
+		var key := HerdrFleet.pane_key(LOCAL, pane_id)
+		_check(not _desk_in_view(office, key), "%s is out of sight before herdr's focus goes there" % pane_id)
+		_feed(office, _focused_on(closed, pane_id))
+		await _frames(3)
+		_eq(office.navigator.active_key, key, "herdr's focus on %s is the selection" % pane_id)
+		_check(_desk_in_view(office, key), "and %s is panned into the world's room" % pane_id)
+	_eq(office.picked_key, picked, "the pick itself is remembered")
+	_eq(office.world.get_instance_id(), world_id, "the same world throughout")
+	_done(office)
+
+
 ## A real left click at `at`, in viewport pixels.
 func _click_at(at: Vector2) -> void:
 	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, true))
@@ -743,6 +844,51 @@ func _one_building(floors: Array[ZoneModel]) -> Array[BuildingRows]:
 	building.label = "Local"
 	building.floors = floors
 	return [building]
+
+
+## Whether the overview or the strategic view covers the world.
+func _overlay_open(office: OfficeDouble) -> bool:
+	return office.hud.overview_open() or office.hud.strategic_open()
+
+
+## `snapshot` with every blocked agent back at work.
+func _nobody_blocked(snapshot: Dictionary) -> Dictionary:
+	var result: Dictionary = snapshot.duplicate(true)
+	for pane: Dictionary in _list(result, "panes"):
+		if str(pane.get("agent_status", "")) == "blocked":
+			pane.agent_status = "working"
+	return result
+
+
+## Whether the desk drawn for `key` answers a click wholly inside the world's
+## room on screen.
+func _desk_in_view(office: OfficeDouble, key: String) -> bool:
+	var target := _desk_target(office, key)
+	return office.hud.world_rect().encloses(Rect2(target.position - office.camera.position, target.size))
+
+
+## Six workspaces of four working agents each, herdr's focus on the first: a
+## map whose zones are a window apart.
+func _six_zones() -> Dictionary:
+	var raw := {"workspaces": [], "tabs": [], "panes": [], "layouts": [], "focused_pane_id": "w0:t0:p0"}
+	for zone in 6:
+		var workspace := "w%d" % zone
+		var tab := workspace + ":t0"
+		_list(raw, "workspaces").append({"workspace_id": workspace, "number": zone + 1, "label": workspace})
+		_list(raw, "tabs").append({"workspace_id": workspace, "tab_id": tab, "number": 1})
+		for index in 4:
+			var pane := "%s:p%d" % [tab, index]
+			_list(raw, "panes").append(
+				{
+					"workspace_id": workspace,
+					"tab_id": tab,
+					"pane_id": pane,
+					"terminal_id": "terminal-" + pane,
+					"agent": "claude",
+					"agent_status": "working"
+				}
+			)
+	return raw
 
 
 ## Each shown signpost's words, arrow to count, as one string.

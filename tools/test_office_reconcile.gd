@@ -44,8 +44,15 @@ static func _papers(station: OfficeStation) -> Sprite2D:
 	return station.table.papers(station.column, station.side)
 
 
-func _seat_node(office: OfficeScene, pane_id: String) -> OfficeStation:
-	var key := HerdrFleet.pane_key(LOCAL, pane_id)
+## bee's connection drops, as _set_online(office, false) drops Local's; a
+## fresh snapshot (_feed_bee()) brings it back.
+func _bee_drops(office: OfficeDouble) -> void:
+	_bee(office)._go_offline()
+	office.fleet.liveness_changed.emit()
+
+
+func _seat_node(office: OfficeScene, pane_id: String, machine := LOCAL) -> OfficeStation:
+	var key := HerdrFleet.pane_key(machine, pane_id)
 	for node: Node in office.world.find_children("*", "OfficeStation", true, false):
 		var station: OfficeStation = node
 		if station.pane_key == key:
@@ -759,6 +766,14 @@ func _wide_api(count: int) -> Dictionary:
 	return grown
 
 
+## The first failure of a map that has no plan at all: the cache builds a
+## bounded, empty fallback for it. Only a map never planned before gets there,
+## and Local's never is one: an office plans Local's map, empty, in _ready(),
+## before any snapshot, so a first snapshot that cannot be laid out keeps that
+## plan (test_render_budget_failure_keeps_old_nodes_and_first_failure_is_empty).
+## A second machine's map is first planned when it is first shown. So the first
+## failure here is bee's: fed a workspace no map can hold while Local's map is
+## shown, then shown by a real click on its row.
 func test_first_budget_failure_is_cached_until_geometry_changes_or_floor_closes() -> void:
 	var invalid := {
 		"workspaces": [{"workspace_id": "oversized", "number": 1}],
@@ -771,46 +786,76 @@ func test_first_budget_failure_is_cached_until_geometry_changes_or_floor_closes(
 	# exceeds the 512-cell production budget.
 	for index in 1014:
 		_list(invalid, "panes").append({"pane_id": "wide-%d" % index, "tab_id": "wide", "workspace_id": "oversized"})
-	var office := await _live_office(invalid)
-	_eq(office.layout_attempt_count(), 2, "first failure plans once and constructs one bounded fallback")
+	var oversized := HerdrFleet.pane_key(BEE, "oversized")
+	var office := await _two_machine_office()
+	var local := office.plans.plan(LOCAL)
+	_check(local != null and not local.desks.is_empty(), "Local's map is planned and shown")
+	_check(office.plans.plan(BEE) == null, "bee's map, never shown, has no plan")
+	_feed_bee(office, invalid)
+	await _frames(2)
+	_check(office.plans.plan(BEE) == null, "and none is made for input it is not shown for")
+	# Counted from here: what showing bee's map for the first time plans. (A
+	# refresh that shows Local keeps the model it last drew Local from.)
+	var local_model := office.plans.planned_model(LOCAL)
+	var attempts := office.layout_attempt_count()
+	await _visit_floor(office, oversized)
+	_eq(office.navigator.shown_key, BEE, "a real click on its row shows bee's map")
+	_eq(office.layout_attempt_count(), attempts + 2, "first failure plans once and constructs one bounded fallback")
 	var fallback := office.layout_plan()
 	var problems := office.layout_problems()
 	_check("; ".join(problems).contains("tab exceeds measured width budget"), "the real width budget rejects input")
 	_check(fallback != null and fallback.desks.is_empty(), "first failure has an empty floor, not invalid desks")
 	_eq(OfficeFloorLayout.validate(fallback), PackedStringArray(), "fallback obeys the real floor budget")
+	_eq([fallback.floor_key, fallback.zones.size()], [BEE, 0], "the fallback is bee's own map, with no zone at all")
+	_eq(office.plans.plan(BEE), fallback, "and is what the cache now holds for bee")
+	var kept := office.plans.planned_model(BEE)
+	_check(kept != null and kept.key == BEE and kept.zones.is_empty(), "with the empty model it was planned from")
+	_eq(office.plans.failing_zones(BEE), PackedStringArray([oversized]), "the zone that cannot be laid out is named")
+	_eq(office.plans.plan(LOCAL), local, "bee's failure leaves Local's plan alone")
+	_eq(office.plans.planned_model(LOCAL), local_model, "and the model it was planned from")
 	for repeat in 3:
-		_feed(office, invalid)
-	_eq(office.layout_attempt_count(), 2, "unchanged over-budget snapshots do not run the planner again")
+		_feed_bee(office, invalid)
+	_eq(office.layout_attempt_count(), attempts + 2, "unchanged over-budget snapshots do not run the planner again")
 	_eq(office.layout_plan(), fallback, "unchanged failure retains the fallback object")
 	_eq(office.layout_problems(), problems, "unchanged failure remains diagnosed")
 	office.test_screen = Vector2(1400, 480)
-	_feed(office, invalid, false)
+	office.refresh()
+	_bee_drops(office)
+	_feed_bee(office, invalid)
 	_set_online(office, false)
 	_set_online(office, true)
-	_eq(office.layout_attempt_count(), 2, "viewport and liveness changes do not retry fixed-row geometry")
+	_eq(office.layout_attempt_count(), attempts + 2, "viewport and liveness changes do not retry fixed-row geometry")
+	_eq(office.navigator.shown_key, BEE, "bee's map is still the one shown")
 	office.rebuild_world()
-	_eq(office.layout_attempt_count(), 2, "rebuilding an initial failure also hits its failed cache")
+	_eq(office.layout_attempt_count(), attempts + 2, "rebuilding an initial failure also hits its failed cache")
 	_eq(office.world.find_children("*", "OfficeStation", true, false).size(), 0, "fallback never adopts invalid people")
 	# A different invalid structure must be tried; it is not a sticky failure flag.
 	_list(invalid, "panes").append({"pane_id": "wide-extra", "tab_id": "wide", "workspace_id": "oversized"})
-	_feed(office, invalid)
-	_eq(office.layout_attempt_count(), 3, "changed invalid geometry is retried once")
+	_feed_bee(office, invalid)
+	_eq(office.layout_attempt_count(), attempts + 3, "changed invalid geometry is retried once")
 	_eq(office.layout_plan(), fallback, "a second failure does not replace the bounded fallback")
-	_feed(office, {})
+	_feed_bee(office, {})
 	_check(
 		office.layout_plan().zones.is_empty() and office.layout_problems().is_empty(),
 		"closing the workspace plans a clean empty map (an empty map is planned and counted like any other)"
 	)
-	_feed(office, invalid)
-	_eq(office.layout_attempt_count(), 5, "reopening forgets the failed attempt and tries again")
+	_eq(office.navigator.shown_key, BEE, "which is still bee's")
+	_feed_bee(office, invalid)
+	_eq(office.layout_attempt_count(), attempts + 5, "reopening forgets the failed attempt and tries again")
 	_check(office.layout_plan() != fallback, "the empty map's plan replaced the retained fallback")
 	_eq(office.layout_problems(), problems, "reopened invalid workspace is diagnosed again")
 	var corrected: Dictionary = invalid.duplicate(true)
 	corrected.panes = [{"pane_id": "wide-0", "tab_id": "wide", "workspace_id": "oversized"}]
-	_feed(office, corrected)
-	_eq(office.layout_attempt_count(), 6, "legal geometry retries once after the first-failure fallback")
+	_feed_bee(office, corrected)
+	_eq(office.layout_attempt_count(), attempts + 6, "legal geometry retries once after the first-failure fallback")
 	_check(office.layout_problems().is_empty(), "legal geometry clears the cached failure")
-	_check(_seat_node(office, "wide-0") != null, "the recovered floor draws the valid pane")
+	_check(_seat_node(office, "wide-0", BEE) != null, "the recovered floor draws the valid pane")
+	var recovered := office.layout_plan()
+	_eq(recovered.floor_key, BEE, "on bee's map")
+	_check(recovered.seat(HerdrFleet.pane_key(BEE, "wide-0")) != null, "whose plan seats it under bee's key")
+	_eq(recovered.seat(HerdrFleet.pane_key(LOCAL, "wide-0")), null, "and never under Local's")
+	_eq(office.plans.failing_zones(BEE), PackedStringArray(), "no zone of bee's fails any more")
+	_eq(office.plans.plan(LOCAL), local, "Local's plan is the one it had throughout")
 	_done(office)
 
 
@@ -882,11 +927,27 @@ func test_render_budget_failure_keeps_old_nodes_and_first_failure_is_empty() -> 
 	_feed(office, fixture)
 	_check(office.layout_problems().is_empty(), "valid input recovers without sacrificing the old layout")
 	_done(office)
+	# Local's first snapshot: refused, over the empty map _ready() planned.
 	var initial := await _live_office(excessive)
 	_check(initial.layout_problems().has("floor exceeds desk node budget"), "first snapshot is also refused")
-	_eq(initial.layout_plan().desks.size(), 0, "first failure uses the bounded empty fallback")
+	_eq(initial.layout_plan().desks.size(), 0, "Local keeps the empty map it started with")
 	_eq(initial.world.find_children("*", "OfficeStation", true, false).size(), 0, "first failure allocates no stations")
 	_done(initial)
+	# A map with no plan at all (bee's, never shown): the same refusal builds
+	# the fallback itself, on a real click on one of its rows.
+	var remote := await _two_machine_office()
+	_feed_bee(remote, excessive)
+	await _frames(2)
+	_check(remote.plans.plan(BEE) == null, "bee's map, never shown, has no plan")
+	var attempts := remote.layout_attempt_count()
+	await _visit_floor(remote, HerdrFleet.pane_key(BEE, "api"))
+	_eq(remote.navigator.shown_key, BEE, "a real click on its row shows bee's map")
+	_eq(remote.layout_attempt_count(), attempts + 2, "the refused input, then the bounded fallback")
+	_check(remote.layout_problems().has("floor exceeds desk node budget"), "bee's first show is refused too")
+	_eq([remote.layout_plan().floor_key, remote.layout_plan().zones.size()], [BEE, 0], "an empty fallback of its own")
+	_eq(remote.layout_plan().desks.size(), 0, "with no desk")
+	_eq(remote.world.find_children("*", "OfficeStation", true, false).size(), 0, "and no station allocated")
+	_done(remote)
 
 
 ## A map planned for the first time is validated once, its standing furniture

@@ -11,7 +11,8 @@ extends RefCounted
 ## shown and where it is panned is the viewer's state.
 
 ## Composite pane key (see HerdrFleet.pane_key) the viewer picked. Empty means
-## "follow what herdr has focused".
+## "follow what herdr has focused", and so does a pick whose pane is gone, for
+## as long as it is gone (it is remembered: see settle()).
 var picked_key := ""
 ## PaneModel.identity_key() of the pane when it was picked: which terminal the
 ## viewer chose. A pane id herdr later gives another terminal still selects its
@@ -21,7 +22,7 @@ var picked_identity := ""
 ## it, else herdr's focus.
 var active_key := ""
 ## Machine key the viewer chose (a zone picked on it, PageUp/PageDown, `N`, a
-## list pick), or the machine herdr's focus moved to while nothing is picked.
+## list pick), or the machine herdr's focus moved to while it is followed.
 ## Empty means "the machine holding the selection". Forgotten once it is gone.
 var picked_machine := ""
 ## Machine key whose map is drawn now.
@@ -40,7 +41,7 @@ var nav_revision := 0
 ## One-shot: the pane whose desk the office pans to after it next draws the
 ## shown map, framing its whole pod with `pan_whole_table`; empty for none. Set
 ## per request: on the first arrival at a map this run, for the selection seated
-## there (its whole pod); when herdr's focus moves while nothing is picked (only
+## there (its whole pod); when herdr's focus moves while it is followed (only
 ## as far as it takes, see settle()); for a new pane the office picks. The office
 ## takes it (take_pan_to()) whether or not it is drawn.
 var pan_to := ""
@@ -61,9 +62,9 @@ var _opened: Dictionary[String, bool] = {}
 ## The zone the viewer last picked (pick_zone()); empty once they navigate to a
 ## pane, pick a desk, herdr's focus moves them, or it is gone. See current_zone().
 var _picked_zone := ""
-## The selection the last settle() ended with, and whether there was one: a
-## change of herdr's focus between two settles is revealed (settle()).
-var _last_selection := ""
+## Herdr's focus at the last settle(), and whether there was one: a change of
+## it between two settles is revealed (settle()).
+var _last_focus := ""
 var _settled := false
 
 # --- a refresh ----------------------------------------------------------------
@@ -73,13 +74,20 @@ var _settled := false
 ## machine whose map the viewer wants to see. Machines that went away take
 ## their pan with them.
 ##
-## Herdr's focus moving is revealed: while nothing is picked, when the selection
-## (herdr's focus) is another desk than at the last settle, the office pans to
-## it as far as it takes (pan_to, not the whole pod; nothing moves when it is on
-## screen already), and its machine's map is shown (a switch to another machine
-## is cold, and it is revealed on arrival). It never counts as a navigation, and
-## a settle where the focus did not move sets nothing, so a pan the viewer made
-## stays. An explicit navigation waiting to be carried out wins over it.
+## Herdr's focus moving is revealed: while the frame has no picked pane (nothing
+## is picked, or the pane picked is gone), so that the selection is herdr's
+## focus, when that focus is another desk than at the last settle, the office
+## pans to it as far as it takes (pan_to, not the whole pod; nothing moves when
+## it is on screen already), and its machine's map is shown (a switch to another
+## machine is cold, and it is revealed on arrival). The map is one world:
+## nothing else would bring a focus that moved to another zone into view. It
+## never counts as a navigation, and a settle where the focus did not move sets
+## nothing, so a pan the viewer made stays; the picked pane going is not the
+## focus moving either (the selection falls back to the focus where it was, and
+## the map and the machine the viewer chose stay). An explicit navigation
+## waiting to be carried out wins over it. A pick whose pane is gone is still
+## remembered: the pane back, it is the selection again, and the focus is no
+## longer followed.
 func settle(frame: OfficeFrame) -> String:
 	for key: String in _map_pans.keys():
 		if frame.building_of(key) == null:
@@ -90,7 +98,8 @@ func settle(frame: OfficeFrame) -> String:
 	active_key = frame.effective_selection(picked_key)
 	# A pane can be valid but not yet placed in a tab/zone. Keep its inspector
 	# available instead of silently replacing it with herdr's focused desk.
-	if frame.pane(picked_key) != null:
+	var pick_alive := frame.pane(picked_key) != null
+	if pick_alive:
 		active_key = picked_key
 	_resolve_wanted_space(frame)
 	if frame.building_of(picked_machine) == null:
@@ -98,14 +107,14 @@ func settle(frame: OfficeFrame) -> String:
 		picked_machine = ""
 	if frame.find_zone(_picked_zone) == null:
 		_picked_zone = ""
-	var moved := _settled and picked_key.is_empty() and active_key != _last_selection
+	var moved := _settled and not pick_alive and frame.herdr_focus != _last_focus
 	if moved and pan_zone.is_empty() and reveal_on_arrival.is_empty():
 		var zone := frame.find_zone(frame.zone_of(active_key))
 		if zone != null:
 			_ask_pan(active_key, false)
 			picked_machine = zone.building.key
 			_picked_zone = ""
-	_last_selection = active_key
+	_last_focus = frame.herdr_focus
 	_settled = true
 	var chosen := frame.choose_machine(picked_machine, active_key)
 	if chosen == shown_key:

@@ -185,7 +185,7 @@ var _new_pane: OfficeNewPaneFollow
 var _pointed_pane := ""
 var _pointed_floor := ""
 ## The camera position and world room the signposts were last worked out for,
-## and what they said (_follow_view(), _show_signposts()).
+## and what the posts the HUD was last handed say (_follow_view(), _show_signposts()).
 var _viewed_at := Vector2.INF
 var _viewed_room := Rect2()
 var _posted := ""
@@ -1277,14 +1277,15 @@ func _show_floors() -> void:
 
 ## The signposts over the world's right edge (_signposts()), worked out for the
 ## view now; drawn again only when what they say changed. None while the
-## overview or the strategic view covers the world. A refresh and
-## _follow_view() call this.
+## overview or the strategic view covers the world: they are only hidden, and
+## `_posted` stays what the HUD still holds, so the refresh that closes the
+## overlay hands over whatever changed under it, an empty list too. A refresh
+## and _follow_view() call this.
 func _show_signposts() -> void:
 	_viewed_at = camera.position
 	_viewed_room = hud.world_rect()
 	if hud.overview_open() or hud.strategic_open():
 		hud.signposts.visible = false
-		_posted = ""
 		return
 	var posts := _signposts()
 	var said := PackedStringArray()

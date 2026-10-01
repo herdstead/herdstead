@@ -397,6 +397,79 @@ func test_herdr_focus_moving_is_revealed_only_when_it_moves() -> void:
 	_eq(navigator.pan_to, "", "and asks nothing")
 
 
+## A pick stops the follow only while its pane is on the frame. Once that pane
+## is gone the selection is herdr's focus again, where it was (the pane going
+## is not the focus moving: nothing is asked, the machine chosen stays), and
+## from then on its moves are revealed as if nothing were picked: each one, on
+## this machine or another, never counted; one that comes with the pane's going
+## too. An explicit navigation still wins over it. The pick itself is
+## remembered: the pane back, it is the selection again and the focus moves
+## nothing.
+func test_a_pick_whose_pane_is_gone_lets_the_focus_be_followed_until_it_is_back() -> void:
+	var navigator := OfficeNavigator.new()
+	_show(navigator, _frame(floors, basic))
+	navigator.pick_desk(_local("web:p1"))
+	_show(navigator, _frame(floors, basic))
+	_eq(navigator.active_key, _local("web:p1"), "the picked desk is the selection")
+	var revision := navigator.nav_revision
+	var closed: Dictionary = floors.duplicate(true)
+	closed.panes = _list(closed, "panes").filter(
+		func(pane: Dictionary) -> bool: return str(pane.get("pane_id", "")) != "web:p1"
+	)
+	var gone := _frame(closed, basic)
+	_eq(navigator.settle(gone), LOCAL, "its pane gone: the same map")
+	_eq(navigator.active_key, _local("api:p1"), "the selection is herdr's focus again")
+	_eq(navigator.picked_key, _local("web:p1"), "while the pick itself is remembered")
+	_eq([navigator.pan_to, navigator.picked_machine], ["", ""], "the focus did not move: nothing asked or chosen")
+	var moved := _frame(closed, basic)
+	moved.herdr_focus = _local("infra:p1")
+	_eq(navigator.settle(moved), LOCAL, "herdr's focus moves to another zone of the map")
+	_eq([navigator.pan_to, navigator.pan_whole_table], [_local("infra:p1"), false], "revealed as far as it takes")
+	navigator.take_pan_to()
+	navigator.settle(moved)
+	_eq(navigator.pan_to, "", "the next settle, focus unmoved, asks nothing")
+	var again := _frame(closed, basic)
+	again.herdr_focus = _local("data:p1")
+	navigator.settle(again)
+	_eq(navigator.pan_to, _local("data:p1"), "a later move is revealed too")
+	var away := _frame(closed, basic)
+	away.herdr_focus = _bee("bravo:p1")
+	_eq(navigator.settle(away), BEE, "and one onto another machine switches maps")
+	_eq(navigator.pan_to, _bee("bravo:p1"), "revealing it there")
+	_eq(navigator.nav_revision, revision, "none of them counted")
+	_show(navigator, away)
+	navigator.pick_zone(_local("notes"))
+	var asked := _frame(closed, basic)
+	asked.herdr_focus = _local("api:p2")
+	_eq(navigator.settle(asked), LOCAL, "a zone the viewer picks as the focus moves")
+	_eq([navigator.pan_zone, navigator.pan_to], [_local("notes"), ""], "wins over the focus")
+	_show(navigator, asked)
+	var back := _frame(floors, basic)
+	back.herdr_focus = _local("infra:p1")
+	_eq(navigator.settle(back), LOCAL, "the picked pane is back")
+	_eq(navigator.active_key, _local("web:p1"), "and is the selection again")
+	_eq(navigator.pan_to, "", "herdr's focus moving moves nothing")
+	# The pane goes as the focus moves, in one snapshot: that move is revealed.
+	var both := _frame(closed, basic)
+	both.herdr_focus = _local("data:p1")
+	navigator.settle(both)
+	_eq([navigator.active_key, navigator.pan_to], [_local("data:p1"), _local("data:p1")], "gone as the focus moves")
+	navigator.take_pan_to()
+	# A machine the viewer chose stays shown when the pane picked on it goes.
+	navigator.pick_zone(_bee("alpha"))
+	_show(navigator, both)
+	navigator.pick_desk(_bee("bravo:p1"))
+	_show(navigator, both)
+	var shut: Dictionary = basic.duplicate(true)
+	shut.panes = _list(shut, "panes").filter(
+		func(pane: Dictionary) -> bool: return str(pane.get("pane_id", "")) != "bravo:p1"
+	)
+	var left := _frame(closed, shut)
+	left.herdr_focus = both.herdr_focus
+	_eq(navigator.settle(left), BEE, "the pane picked on bee's map gone: the map the viewer chose stays")
+	_eq([navigator.active_key, navigator.pan_to], [_local("data:p1"), ""], "herdr's focus selected, nothing asked")
+
+
 # --- who needs a human --------------------------------------------------------
 
 
