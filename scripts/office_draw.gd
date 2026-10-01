@@ -11,15 +11,18 @@ const PERSON_SCENE := preload("res://scenes/people/pixel_person.tscn")
 ## own size, and the band it stands in.
 const TAB_LABEL_PIXELS := 8
 const TAB_LABEL_HEIGHT := 8.0
+## The size the world's small labels draw the display face at (style_display()).
+const DISPLAY_PIXELS := 8
 
 var art: ArtPack
 ## The bundled face keeps Latin text consistent across platforms. System CJK
 ## fonts fill missing glyphs without replacing the pack's Latin typography.
 var font: Font
 ## The pack's display face (ArtPack.display_font, a pixel font drawn at its
-## native 8) for the small world labels: the name plates, the chip's wait and
-## the lens line. The same system fallbacks fill glyphs it lacks (an agent's
-## name may be anything). A pack without one uses `font`.
+## native 8) for the small world labels: the name plates, the chip's wait, the
+## lens line and the zone signs. The same system fallbacks fill glyphs it lacks
+## (an agent's name may be anything), and never make a row taller than the
+## pixel face's own (no_taller()). A pack without one uses `font`.
 var display: Font
 ## `display` for the tab labels: its line cut to TAB_LABEL_HEIGHT at
 ## TAB_LABEL_PIXELS by giving up descent rows below it (Tiny5 at 8 is 9 tall:
@@ -49,15 +52,33 @@ func _init(pack: ArtPack) -> void:
 	readable.fallbacks = [system]
 	font = readable
 	display = readable
+	var chain: Font = readable
 	if art.display_font != null:
 		var small := FontVariation.new()
 		small.base_font = art.display_font
 		small.fallbacks = [system]
-		display = small
+		chain = small
+		display = no_taller(small, art.display_font, DISPLAY_PIXELS)
 	var cut := FontVariation.new()
-	cut.base_font = display
-	cut.spacing_bottom = mini(0, int(TAB_LABEL_HEIGHT) - ceili(display.get_height(TAB_LABEL_PIXELS)))
+	cut.base_font = chain
+	cut.spacing_bottom = mini(0, int(TAB_LABEL_HEIGHT) - ceili(chain.get_height(TAB_LABEL_PIXELS)))
 	tab_face = cut
+
+
+## `face` (a face and its fallbacks) at `pixels`, its row no taller than `own`'s
+## (the face without its fallbacks). Godot sizes a row by the tallest font in
+## the chain, used or not: Linux's Noto Sans CJK is 13 tall at 8 where the pixel
+## face is 9 (macOS's Hiragino is not taller, so it never shows there), and a
+## name plate or a zone sign grew out of its box. The rows given up are below
+## the baseline, so the baseline stays where the face's own puts it; a top
+## spacing would lift the text by as much.
+static func no_taller(face: FontVariation, own: Font, pixels: int) -> FontVariation:
+	var extra := ceili(face.get_height(pixels)) - ceili(own.get_height(pixels))
+	if extra <= 0:
+		return face
+	var fitted: FontVariation = face.duplicate()
+	fitted.spacing_bottom -= extra
+	return fitted
 
 
 func box(parent: Node, bounds: Rect2, color_key: StringName) -> ColorRect:
@@ -88,7 +109,7 @@ func style(
 ## The same, in the display face (`display`): the world's small labels.
 func style_display(
 	target: Label,
-	pixels: int = 8,
+	pixels: int = DISPLAY_PIXELS,
 	color_key: StringName = ArtContract.INK,
 	align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT
 ) -> void:

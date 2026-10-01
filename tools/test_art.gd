@@ -86,6 +86,40 @@ func test_a_fallback_never_makes_a_row_taller() -> void:
 		)
 
 
+## The world's small labels (name plates, the lens line, the chip's wait, zone
+## signs) wear the pack's pixel face over the same system fallbacks, and a
+## fallback taller than the pixel face must not make their rows taller either:
+## on CI (Linux, Noto Sans CJK: 13 tall at 8 where the pixel face is 9) the
+## plate and the lens row grew to 13 and a sign's words out of its board. The
+## rows given up are below the baseline, so the text stays where the pixel face
+## alone puts it (a top spacing would lift it by as much).
+func test_a_fallback_never_makes_a_world_label_taller_or_moves_its_baseline() -> void:
+	var pack := ArtPack.from_manifest(MANIFEST)
+	var own := pack.display_font
+	var pixels := OfficeDraw.DISPLAY_PIXELS
+	var pen := OfficeDraw.new(pack)
+	_check(
+		pen.display.get_height(pixels) <= own.get_height(pixels),
+		"the pen's display face: %s, no taller than the pixel face" % pen.display.get_height(pixels)
+	)
+	# A chain that is taller on every machine: the pack's text face as fallback.
+	var chain := FontVariation.new()
+	chain.base_font = own
+	chain.fallbacks = [pack.font]
+	_check(
+		chain.get_height(pixels) > own.get_height(pixels),
+		"the text face makes the chain taller: the case has a subject"
+	)
+	var fitted := OfficeDraw.no_taller(chain, own, pixels)
+	_eq(fitted.get_height(pixels), own.get_height(pixels), "cut to the pixel face's own height")
+	var alone := TextLine.new()
+	alone.add_string("DATA 12m", own, pixels)
+	var line := TextLine.new()
+	line.add_string("DATA 12m", fitted, pixels)
+	_eq(line.get_line_ascent(), alone.get_line_ascent(), "and the baseline is where the pixel face alone puts it")
+	_check(OfficeDraw.no_taller(fitted, own, pixels) == fitted, "a chain that already fits is handed back as it is")
+
+
 ## The set of semantic IDs the scenes draw with lives in GDScript, next to the
 ## code that draws, and every pack is held to it. A pack that lacks one is
 ## named, not quietly missing a texture at runtime.
