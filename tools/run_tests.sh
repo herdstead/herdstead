@@ -45,7 +45,7 @@ MIN_CASES_CLIENT=52
 MIN_CASES_MACHINE=34
 MIN_CASES_INCREMENTAL=54
 MIN_CASES_OFFICE_LAYOUT=51
-MIN_CASES_OFFICE_MAP=22
+MIN_CASES_OFFICE_MAP=23
 MIN_CASES_OFFICE_SERVICE=16
 # GEOMETRY 27 -> 25: its two row-wall sign and title cases went with the row
 # walls (lane B2a); MAP's test_top_run_and_lane_gap_pieces_clear_... covers

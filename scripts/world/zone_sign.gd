@@ -29,6 +29,8 @@ const MAX_WIDTH := 160.0
 ## The zone this sign names (ZoneModel.key).
 var zone_key := ""
 var _pen: OfficeDraw
+## Where the scene puts the top of the words' line.
+@onready var _line_top: float = (%Title as Label).position.y
 
 
 ## Which of the pack's accent colours (ArtContract.ACCENTS) a worktree group
@@ -87,11 +89,17 @@ func show_zone(zone: ZoneModel, limit := INF) -> void:
 	var title: Label = %Title
 	title.text = title_text(zone)
 	# As tall as the display face's line (9), once it applies: a Label sized
-	# before its font is set keeps the default face's height.
+	# before its font is set keeps the default face's height. A line taller
+	# than the room under the words' top (a fallback's glyphs: Linux's Noto
+	# Sans CJK makes a 13-tall line at 8) takes the rest from the padding above
+	# it, so the words stay on the board.
+	var board: NinePatchRect = %Panel
+	var bottom := board.position.y + board.size.y * board.scale.y
 	for label: Label in [number, title] as Array[Label]:
 		var tall := label.get_minimum_size().y
 		if label.size.y != tall:
 			label.size = Vector2(label.size.x, tall)
+		label.position.y = maxf(board.position.y, minf(_line_top, bottom - tall))
 	var accent: ColorRect = %Accent
 	var key := ArtContract.ACCENTS[accent_of(zone.mezzanine_of if mezzanine else zone.key)]
 	if _pen != null:

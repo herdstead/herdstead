@@ -877,6 +877,48 @@ func test_the_zone_sign_writes_a_cjk_label_in_the_pens_display_face() -> void:
 	board.free()
 
 
+## A fallback's glyphs can make the line taller than the room under the words
+## (on Linux, Noto Sans CJK's line at 8 is 13 tall where the board leaves 12,
+## and a CJK label hung a pixel below it). The line takes what it lacks from
+## the padding above it and stays on the board; a line that fits stays where
+## the scene puts it. A face five rows taller than the pixel face stands in
+## for such a line on any machine.
+func test_a_taller_line_stays_on_the_zone_signs_board() -> void:
+	var pixel := _pen().art.display_font
+	var tops: Array[float] = []
+	for extra: int in [0, 5]:
+		var own := OfficeDraw.new(_pen().art)
+		var face := FontVariation.new()
+		face.base_font = pixel
+		face.spacing_top = extra
+		own.display = face
+		var board: OfficeZoneSign = OfficeFloorView.ZONE_SIGN_SCENE.instantiate()
+		board.dress(own)
+		root.add_child(board)
+		var zone := _zoned("machine/data", 5, [])
+		zone.label = "DATA"
+		board.show_zone(zone)
+		await process_frame
+		board.show_zone(zone)
+		var panel: NinePatchRect = board.get_node("%Panel")
+		var box := Rect2(panel.position, panel.size * panel.scale)
+		var title: Label = board.get_node("%Title")
+		_eq(
+			title.size.y,
+			pixel.get_height(OfficeDraw.DISPLAY_PIXELS) + extra,
+			"+%d: the line is as tall as its face" % extra
+		)
+		_check(
+			box.encloses(Rect2(title.position, title.size)),
+			"+%d: on the board: %s in %s" % [extra, Rect2(title.position, title.size), box]
+		)
+		_eq(board.drawn_rect().size.y, 16.0, "+%d: the board is 16 tall" % extra)
+		tops.append(title.position.y)
+		board.free()
+	_eq(tops[0], -20.0, "a line that fits starts where the scene puts it")
+	_check(tops[1] < tops[0], "a taller one starts higher: %s" % [tops])
+
+
 ## The map's final width is settled before any retained zone is held, grown or
 ## moved (codex's review of ba943f9, P1): in one refresh the blocker left of A
 ## goes, A grows 2 → 20 panes (two lanes) and B under both grows 20 → 48 (three
