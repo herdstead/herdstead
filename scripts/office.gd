@@ -1787,14 +1787,23 @@ func _show_lens() -> void:
 
 
 ## A HUD line about pane `key` is under the mouse (empty: none any more).
+## "None any more" takes back only a pane: a zone an arrow has pointed at
+## since is the arrows' to take back.
 func _point_at_pane(key: String) -> void:
+	if key.is_empty() and _pointed_pane.is_empty():
+		return
 	_pointed_pane = key
 	_pointed_zone = ""
 	_show_pointer()
 
 
 ## An edge arrow for zone `key` is under the mouse (empty: none any more).
+## The arrows say "none" a frame after the mouse left one (OfficeEdgeArrows),
+## by when a HUD line entered in the same motion has pointed at its pane: that
+## late word takes back only a zone, never the line's pane.
 func _point_at_zone(key: String) -> void:
+	if key.is_empty() and _pointed_zone.is_empty():
+		return
 	_pointed_zone = key
 	_pointed_pane = ""
 	_show_pointer()

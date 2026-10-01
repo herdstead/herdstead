@@ -10,21 +10,27 @@ The procedural drawings are authoring templates, available only through
 `make pixel-sources`). Review and copy selected templates into
 art/daylight/table explicitly; normal builds never invoke the drawing code.
 
-The drawing code works in units on a density-1 canvas and each template is
-blown up by DENSITY, nearest, as it is written. A shell view is derived from its
-monitor view by shell_mark() at DENSITY, so a repainted monitor gets its shell
-the same way.
+The apron, the bracket and the chairs are drawn in units on a density-1
+canvas and blown up by DENSITY, nearest, as they are written; the desks, the
+screens, the short leg and the laptop are drawn texel by texel at DENSITY. A
+shell view is derived from its monitor view by shell_mark() at DENSITY, so a
+repainted monitor gets its shell the same way.
+
+One source module set is accepted (SOURCE_SETS), the pod: what the office
+draws and nothing else (POD_ONLY, 18 images). The pod's own 8 modules
+(POD_MODULES), the near edge every desk hangs (POD_SHARED: the apron's three
+and the bracket) and the 6 furniture views (FURNITURE), which is exactly the
+runtime's ArtContract.TABLE_MODULES plus the furniture (a test holds the two
+together). A source manifest declares exactly these names; one that declares
+fewer, more or others is refused with what is missing and what is unknown.
+The native manifest is built for the set, every image of it is required, and
+the templates draw it.
 
 What every drawing keeps, because OfficeTable and the tests stand on it (all
 numbers are world units; a probe in the PNG is the unit times DENSITY):
 
-- surface_* 32x80: opaque rows 0..74, transparent 75..79. Rows 0..71 are the
-  working top, 72..74 the lip the three-row apron continues; rows 28..51 lie
-  under the divider. The three outer columns on each side of a module are one
-  uniform column, so any module meets any other without a seam.
-- apron_* 32x3 and divider_* 32x24: fully opaque.
-- leg 20x40: last opaque row 38, so the foot stands on y 37 below its mount at
-  y -2; every row is attached; ankle and glide are narrower than the shoulder.
+- apron_* 32x3: fully opaque, the three rows that continue a desk's lip.
+- bracket 12x10: the corbel under each seat's stretch of edge.
 - chair_front / chair_back 32x48: nothing above row 22 (at most 24 units
   tall), centred on x 16 and at most 18 wide, feet on row 45 over the pivot
   [16, 46], a backrest over (16, 26), a seat over (16, 35), a gas-lift column
@@ -35,19 +41,8 @@ numbers are world units; a probe in the PNG is the unit times DENSITY):
   normal view plus a `$_` mark with the same silhouette: ink on the rear lid,
   paper on the front screen, its cursor at CURSOR_AT (texels).
 
-Three source module sets are accepted (SOURCE_SETS), told apart by the modules
-the source manifest declares (exactly one of them, nothing in between):
-`legacy`, the 18 above (the long table's 12 modules and the 6 furniture
-views); `legacy+pod`, those and the small-desk pod's 8 below (26); or `pod`,
-what the office draws today and nothing else (POD_ONLY, 18): the pod's 8, the
-apron's three, the bracket and the 6 furniture views, which is exactly the
-runtime's ArtContract.TABLE_MODULES plus the furniture (a test holds the two
-together). The long table's surface_*, divider_* and leg are in no `pod`
-source. The native manifest is built for the set declared and every image of
-that set is required. The templates draw `legacy+pod`.
-
-What every POD drawing keeps. They are drawn texel by texel at DENSITY in the
-painted table's hand (unit-thick outlines and bands, one-texel grain and
+What the pod's own drawings keep. They are drawn texel by texel at DENSITY in
+the painted table's hand (unit-thick outlines and bands, one-texel grain and
 panel lines); rows and columns below are units, pod-local y in brackets, the
 far edge at y -48:
 
@@ -56,13 +51,13 @@ far edge at y -48:
   (-8..-5) the three-row apron continues; rows 16..21 (-32..-26) lie under the
   low screen, row 22 is its shadow. The far plane is rows 2..15, the near
   plane 23..39. The three outer columns on each side are one uniform column,
-  as on a surface module, so any desk module meets any other without a seam.
+  so any desk module meets any other without a seam.
 - screen_* 32x6: fully opaque, a wooden rail over a sage panel; its panel
   lines repeat every 8 units, which divides 32, so modules in any order
   continue them.
-- leg_short 6x22: the pod's end leg, hung like the legacy leg at LEG_DROP -2
-  (its mount right under the apron). The last opaque row is 20, so the foot
-  ends at pod y 19: the near chair (chair_back, pivot at y 28) is opaque
+- leg_short 6x22: the pod's end leg, hung at LEG_DROP -2 (its mount right
+  under the apron). The last opaque row is 20, so the foot ends at pod y 19:
+  the near chair (chair_back, pivot at y 28) is opaque
   across x -5.5..+5 of its column only over y 7..19.5 (below that only its
   gas-lift column and then its base), so a leg centred under an end column's
   near chair hides behind it from y 7 down, glide included. It is 6 wide
@@ -84,21 +79,6 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKS = (ROOT / "art/daylight",)
 DENSITY = 2
 
-MODULES: dict[str, tuple[int, int]] = {
-    "surface_left": (32, 80),
-    "surface_mid_a": (32, 80),
-    "surface_mid_b": (32, 80),
-    "surface_right": (32, 80),
-    "apron_left": (32, 3),
-    "apron_mid": (32, 3),
-    "apron_right": (32, 3),
-    "divider_left": (32, 24),
-    "divider_mid": (32, 24),
-    "divider_right": (32, 24),
-    "leg": (20, 40),
-    "bracket": (12, 10),
-}
-
 FURNITURE: dict[str, tuple[int, int]] = {
     "chair_front": (32, 48),
     "chair_back": (32, 48),
@@ -108,7 +88,7 @@ FURNITURE: dict[str, tuple[int, int]] = {
     "shell_front": (32, 32),
 }
 
-## The small-desk pod's modules (see the POD contract above).
+## The small-desk pod's own modules (see the contract above).
 POD_MODULES: dict[str, tuple[int, int]] = {
     "desk_left": (32, 48),
     "desk_mid_a": (32, 48),
@@ -120,18 +100,18 @@ POD_MODULES: dict[str, tuple[int, int]] = {
     "leg_short": (6, 22),
 }
 
-## The long table's modules the pod still lays: its apron and a bracket per desk.
-POD_SHARED: tuple[str, ...] = ("apron_left", "apron_mid", "apron_right", "bracket")
+## The near edge every desk hangs: the apron's three modules and a bracket per desk.
+POD_SHARED: dict[str, tuple[int, int]] = {
+    "apron_left": (32, 3),
+    "apron_mid": (32, 3),
+    "apron_right": (32, 3),
+    "bracket": (12, 10),
+}
 
-## The source module sets a pack may declare, by name: exactly one of these.
-## POD_ONLY is what the office draws (ArtContract.TABLE_MODULES and the
-## furniture views): the pod without the long table's surface, divider and leg.
-LEGACY: dict[str, tuple[int, int]] = {**MODULES, **FURNITURE}
-LEGACY_POD: dict[str, tuple[int, int]] = {**LEGACY, **POD_MODULES}
-POD_ONLY: dict[str, tuple[int, int]] = {
-    **POD_MODULES, **{name: MODULES[name] for name in POD_SHARED}, **FURNITURE}
-SOURCE_SETS: dict[str, dict[str, tuple[int, int]]] = {
-    "legacy": LEGACY, "legacy+pod": LEGACY_POD, "pod": POD_ONLY}
+## The one source module set a pack may declare, by name. POD_ONLY is what the
+## office draws: ArtContract.TABLE_MODULES and the furniture views.
+POD_ONLY: dict[str, tuple[int, int]] = {**POD_MODULES, **POD_SHARED, **FURNITURE}
+SOURCE_SETS: dict[str, dict[str, tuple[int, int]]] = {"pod": POD_ONLY}
 
 
 def rgba(palette: dict[str, str], name: str, alpha: int = 255) -> tuple[int, int, int, int]:
@@ -170,49 +150,9 @@ def pixel_map(target: Image.Image, rows: tuple[str, ...], legend: dict[str, str]
     return target
 
 
-## Plank seams across both working planes (the divider hides rows 28..51), and
-## each grain variant's light flecks as (row, first column, length). Flecks keep
-## to columns 3..28, so the three edge columns of every module stay uniform.
-SURFACE_SEAMS = (10, 19, 58, 65)
-SURFACE_GRAIN = {
-    "a": ((5, 6, 7), (14, 17, 9), (23, 4, 6), (55, 12, 8), (62, 20, 6), (69, 5, 9)),
-    "b": ((6, 15, 9), (15, 4, 6), (24, 18, 8), (54, 5, 7), (61, 9, 10), (68, 17, 8)),
-}
-
-
-def surface(palette: dict[str, str], variant: str, cap: str | None) -> Image.Image:
-    """Oak boards along the table, seen from above and lit from the top-left.
-
-    The far edge is outlined and catches the light, seams are single dark rows
-    and the grain a few calm light flecks: a large surface, so no dithering.
-    The near edge is a highlight over the lip's two shaded rows.
-    """
-    result = image(MODULES["surface_mid_a"])
-    deep, light, wood, shadow = (rgba(palette, key) for key in ("deep", "wood_light", "wood", "wood_shadow"))
-    rect(result, (0, 0, 32, 72), wood)
-    rect(result, (0, 0, 32, 1), deep)
-    rect(result, (0, 1, 32, 1), light)
-    for y in SURFACE_SEAMS:
-        rect(result, (0, y, 32, 1), shadow)
-    # The raised divider stands on rows 28..51 and shades the row below it.
-    rect(result, (0, 52, 32, 1), shadow)
-    grain = rgba(palette, "floor")
-    for y, x, length in SURFACE_GRAIN[variant]:
-        rect(result, (x, y, length, 1), grain)
-    rect(result, (0, 72, 32, 1), light)
-    rect(result, (0, 73, 32, 2), shadow)
-    if cap == "left":
-        rect(result, (0, 0, 1, 75), deep)
-        rect(result, (1, 1, 1, 72), light)
-    elif cap == "right":
-        rect(result, (31, 0, 1, 75), deep)
-        rect(result, (30, 2, 1, 70), shadow)
-    return result
-
-
 def apron(palette: dict[str, str], cap: str | None) -> Image.Image:
-    """The rest of the table's front face under the lip, closed by an outline."""
-    result = image(MODULES["apron_mid"])
+    """The rest of the desk's front face under the lip, closed by an outline."""
+    result = image(POD_SHARED["apron_mid"])
     rect(result, (0, 0, 32, 1), rgba(palette, "wood_shadow"))
     rect(result, (0, 1, 32, 1), rgba(palette, "wood_dark"))
     rect(result, (0, 2, 32, 1), rgba(palette, "deep"))
@@ -220,58 +160,6 @@ def apron(palette: dict[str, str], cap: str | None) -> Image.Image:
         rect(result, (0, 0, 1, 3), rgba(palette, "deep"))
     elif cap == "right":
         rect(result, (31, 0, 1, 3), rgba(palette, "deep"))
-    return result
-
-
-def divider(palette: dict[str, str], cap: str | None) -> Image.Image:
-    """A raised privacy screen: a wooden rail over upholstered panels, one every eight units.
-
-    The panel rhythm repeats every 8 columns, which divides 32, so modules in
-    any order continue it; only the end posts differ.
-    """
-    result = image(MODULES["divider_mid"])
-    deep, light, wood, dark = (rgba(palette, key) for key in ("deep", "wood_light", "wood", "wood_dark"))
-    sage, sage_light, sage_dark = (rgba(palette, key) for key in ("sage", "sage_light", "sage_dark"))
-    rect(result, (0, 0, 32, 1), deep)
-    rect(result, (0, 1, 32, 1), light)
-    rect(result, (0, 2, 32, 1), wood)
-    rect(result, (0, 3, 32, 1), dark)
-    rect(result, (0, 4, 32, 16), sage)
-    rect(result, (0, 4, 32, 1), sage_dark)
-    rect(result, (0, 5, 32, 1), sage_light)
-    for x in range(7, 32, 8):
-        rect(result, (x, 5, 1, 15), sage_dark)
-    rect(result, (0, 20, 32, 2), sage_dark)
-    rect(result, (0, 22, 32, 1), dark)
-    rect(result, (0, 23, 32, 1), deep)
-    if cap == "left":
-        rect(result, (0, 0, 1, 24), deep)
-        rect(result, (1, 1, 1, 22), light)
-        rect(result, (2, 1, 1, 22), wood)
-    elif cap == "right":
-        rect(result, (31, 0, 1, 24), deep)
-        rect(result, (30, 1, 1, 22), dark)
-        rect(result, (29, 1, 1, 22), wood)
-    return result
-
-
-def leg(palette: dict[str, str]) -> Image.Image:
-    """A tapered oak leg under a dark mount, on a small glide.
-
-    OfficeTable hangs this canvas at y -2, so the last opaque row, 38, puts the
-    foot on the floor at y 37. The shaft steps in twice on its way down.
-    """
-    result = image(MODULES["leg"])
-    deep, light, wood, shadow = (rgba(palette, key) for key in ("deep", "wood_light", "wood", "wood_shadow"))
-    rect(result, (3, 0, 14, 3), deep)
-    rect(result, (4, 1, 12, 1), rgba(palette, "wood_dark"))
-    for top, bottom, left, right in ((3, 13, 6, 14), (13, 25, 7, 13), (25, 35, 8, 12)):
-        rect(result, (left, top, right - left, bottom - top), deep)
-        rect(result, (left + 1, top, 1, bottom - top), light)
-        rect(result, (left + 2, top, right - left - 4, bottom - top), wood)
-        rect(result, (right - 2, top, 1, bottom - top), shadow)
-    rect(result, (8, 35, 4, 4), deep)
-    rect(result, (9, 36, 2, 2), rgba(palette, "slate"))
     return result
 
 
@@ -291,7 +179,7 @@ BRACKET = (
 
 def bracket(palette: dict[str, str]) -> Image.Image:
     """The small corbel under each seat's stretch of edge, mostly hidden by the apron."""
-    return pixel_map(image(MODULES["bracket"]), BRACKET, {"K": "deep", "d": "wood_dark", "s": "wood_shadow"}, palette)
+    return pixel_map(image(POD_SHARED["bracket"]), BRACKET, {"K": "deep", "d": "wood_dark", "s": "wood_shadow"}, palette)
 
 
 ## The first office chair, kept as an authoring template only: the shipped
@@ -536,9 +424,8 @@ def desk(palette: dict[str, str], variant: str, cap: str | None) -> Image.Image:
 
 
 def screen(palette: dict[str, str], cap: str | None) -> Image.Image:
-    """The pod's low privacy screen, six units tall: the tall divider's wooden
-    rail over a sage panel, with its panel line (a dark and a lit texel) every
-    eight units."""
+    """The pod's low privacy screen, six units tall: a wooden rail over a sage
+    panel, with its panel line (a dark and a lit texel) every eight units."""
     result = dense(POD_MODULES["screen_mid"])
     deep, light, wood, dark = (rgba(palette, key) for key in ("deep", "wood_light", "wood", "wood_dark"))
     sage, sage_light, sage_dark = (rgba(palette, key) for key in ("sage", "sage_light", "sage_dark"))
@@ -571,7 +458,7 @@ LEG_SHORT_SHAFT = ((6, 22, 1, (2, 2, 2, 2, 2)), (22, 34, 2, (2, 2, 0, 2, 2)))
 
 
 def leg_short(palette: dict[str, str]) -> Image.Image:
-    """The pod's small end leg under a dark mount, on a small glide (see the POD contract)."""
+    """The pod's small end leg under a dark mount, on a small glide (see the contract above)."""
     result = dense(POD_MODULES["leg_short"])
     deep, dark = rgba(palette, "deep"), rgba(palette, "wood_dark")
     rect(result, (0, 0, 12, 6), deep)
@@ -594,22 +481,10 @@ def generate_templates(source: Path, output: Path) -> None:
     pack = json.loads((source / "pack.json").read_text())
     palette = pack["palette"]
 
-    surface_left = surface(palette, "a", "left")
-    surface_mid_a = surface(palette, "a", None)
-    surface_mid_b = surface(palette, "b", None)
-    surface_right = surface(palette, "b", "right")
     makers: dict[str, Image.Image] = {
-        "surface_left": surface_left,
-        "surface_mid_a": surface_mid_a,
-        "surface_mid_b": surface_mid_b,
-        "surface_right": surface_right,
         "apron_left": apron(palette, "left"),
         "apron_mid": apron(palette, None),
         "apron_right": apron(palette, "right"),
-        "divider_left": divider(palette, "left"),
-        "divider_mid": divider(palette, None),
-        "divider_right": divider(palette, "right"),
-        "leg": leg(palette),
         "bracket": bracket(palette),
         "chair_front": chair(palette, "front"),
         "chair_back": chair(palette, "back"),
@@ -622,16 +497,17 @@ def generate_templates(source: Path, output: Path) -> None:
     sprites["monitor_front"] = laptop(palette, False)
     for view in ("rear", "front"):
         sprites[f"shell_{view}"] = shell_mark(sprites[f"monitor_{view}"], view, palette, DENSITY)
-    # The pod's modules, drawn texel by texel at DENSITY already.
+    # The pod's own modules, drawn texel by texel at DENSITY already.
     for end, variant in (("left", "a"), ("mid_a", "a"), ("mid_b", "b"), ("right", "b")):
         sprites[f"desk_{end}"] = desk(palette, variant, end if end in ("left", "right") else None)
     for end in ("left", "mid", "right"):
         sprites[f"screen_{end}"] = screen(palette, None if end == "mid" else end)
     sprites["leg_short"] = leg_short(palette)
+    require(set(sprites) == set(POD_ONLY), f"the templates draw {sorted(set(sprites) ^ set(POD_ONLY))} out of the pod set")
     for name, sprite in sprites.items():
-        expected = tuple(value * DENSITY for value in LEGACY_POD[name])
+        expected = tuple(value * DENSITY for value in POD_ONLY[name])
         require(sprite.size == expected, f"template {name} is {sprite.size}, not {expected}")
-    manifest = table_manifest(pack, LEGACY_POD)
+    manifest = table_manifest(pack, POD_ONLY)
     output.mkdir(parents=True, exist_ok=True)
     for name, sprite in sprites.items():
         sprite.save(output / f"{name}.png")
@@ -640,9 +516,8 @@ def generate_templates(source: Path, output: Path) -> None:
 
 
 def table_manifest(pack: dict, sizes: dict[str, tuple[int, int]]) -> dict:
-    """The fixed native furniture contract for one accepted module set
-    (SOURCE_SETS), shared by templates and validation. The furniture and the
-    assembly numbers are the same for every set."""
+    """The fixed native furniture contract for the accepted module set
+    (SOURCE_SETS), shared by templates and validation."""
     return {
         "schema_version": 2,
         "density": DENSITY,
@@ -678,7 +553,7 @@ def table_manifest(pack: dict, sizes: dict[str, tuple[int, int]]) -> dict:
 
 
 def source_set(manifest: dict, path: Path) -> dict[str, tuple[int, int]]:
-    """The accepted module set (SOURCE_SETS) whose names the manifest declares, exactly."""
+    """The accepted module set (SOURCE_SETS) when the manifest declares its names, exactly."""
     modules = manifest.get("modules") if isinstance(manifest, dict) else None
     require(isinstance(modules, dict), f"{path}: manifest declares no modules")
     declared = set(modules)
@@ -688,8 +563,8 @@ def source_set(manifest: dict, path: Path) -> dict[str, tuple[int, int]]:
     closest = min(SOURCE_SETS, key=lambda name: len(declared ^ set(SOURCE_SETS[name])))
     missing = sorted(set(SOURCE_SETS[closest]) - declared)
     extra = sorted(declared - set(SOURCE_SETS[closest]))
-    raise ValueError(f"{path}: the modules are none of the accepted sets ({', '.join(SOURCE_SETS)}); "
-                     f"nearest {closest}, missing {missing}, unknown {extra}")
+    raise ValueError(f"{path}: the modules are not the accepted set ({closest}): "
+                     f"missing {missing}, unknown {extra}")
 
 
 def validate_source(source: Path) -> dict:

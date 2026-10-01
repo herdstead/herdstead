@@ -250,20 +250,22 @@ lists together (`test_the_pod_only_set_is_exactly_what_the_office_draws`).
   contract × `DENSITY`, and a mismatched manifest; a failed validation writes nothing. It prunes only stale
   PNGs / `.import` files in the runtime directory.
 - **Procedural drawing is authoring only**: `make table-templates` (and `make pixel-sources`, with the desk
-  library) exports into the empty directory `OUT` names; `make art` never runs it. To redo geometry, change the
-  drawing functions, export, review and copy chosen files into `art/daylight/table/`. Drawings are made in units
-  on a 1x canvas and scaled by `DENSITY` with NEAREST as written, except the laptop, which `laptop()` draws texel
-  by texel at `DENSITY`. `shell_*` is derived from the written `monitor_*` by `shell_mark()` (covers the lid mark
+  library) exports the pod set's 18 images and its manifest into the empty directory `OUT` names; `make art` never
+  runs it. To redo geometry, change the drawing functions, export, review and copy chosen files into
+  `art/daylight/table/`. The apron, the bracket and the chairs are drawn in units on a 1x canvas and scaled by
+  `DENSITY` with NEAREST as written; the desks, the screens, the short leg and the laptop are drawn texel by texel
+  at `DENSITY`. `shell_*` is derived from the written `monitor_*` by `shell_mark()` (covers the lid mark
   on the rear, clears two output rows on the front, then draws a texel `$_` with its cursor at `CURSOR_AT`);
   derive it again after redrawing a monitor, because the probe points are contract. The pixel contract of every image (the desk's rows, the screen, the leg's last row,
   chair and laptop probe points) is in the docstring of `tools/build_table_assets.py`, and
   `tools/test_table_assets.py` checks each item.
 
-The table contract is fixed (schema 2, density 2, `filter: nearest`, the modules of one accepted set, one set of
+The table contract is fixed (schema 2, density 2, `filter: nearest`, the modules of the accepted set, one set of
 size / pivot / views / assembly) and `manifest.json` must match the builder's; the build never repairs it. The
-builder accepts three module sets, told apart by the names a source manifest declares, exactly one of them:
-`pod` (the 18 above, what the office draws), and, while the long table's art is still about, `legacy` (the long
-table's 12 modules and the furniture) and `legacy+pod` (both, 26). Changing table geometry
+builder accepts one module set, `pod` (the 18 above, what the office draws): a source manifest declares exactly
+those names, and one that declares fewer, more or others (the long table's `surface_*`, `divider_*` and `leg`,
+which the builder took until the office drew the pod alone) is refused with what is missing and what is unknown,
+before anything is written. Changing table geometry
 means updating the contract and the world model together; changing pixels needs no code or manifest change. `make
 art` copies the table, then compares against the committed products.
 

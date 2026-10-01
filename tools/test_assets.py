@@ -30,7 +30,8 @@ from PIL import Image
 
 import check_build_clean
 import draw_pixel_sources
-from build_assets import ROOT, build, contract_size, packs, people_animations, save_if_pixels_moved, validate
+from build_assets import (ROOT, build, contract_size, packs, people_animations, resolve_density_filter,
+                          save_if_pixels_moved, validate)
 from build_table_assets import build_pack as build_table
 from recolour import remap_table, repaint
 from upscale_pack import upgrade
@@ -56,6 +57,27 @@ def take_source_argument():
             del sys.argv[index:index + 2]
             return Path(value)
     return None
+
+
+def as_schema_one(source: Path) -> dict:
+    """Turn the pack copied to `source` into a schema-1 source, in place, and return its manifest.
+
+    A schema-1 fixture needs actual 1x PNGs, not just a changed manifest
+    declaration: a denser pack under test (--source) is brought down to 1x.
+    """
+    pack = json.loads((source / "pack.json").read_text())
+    for category in ("tiles", "props", "ui"):
+        for info in pack[category].values():
+            path = source / info["path"]
+            with Image.open(path) as opened:
+                size = contract_size(pack, category, info)
+                if opened.size != size:
+                    opened.resize(size, Image.Resampling.NEAREST).save(path)
+    pack["schema_version"] = 1
+    pack.pop("density", None)
+    pack.pop("filter", None)
+    (source / "pack.json").write_text(json.dumps(pack, indent=2) + "\n")
+    return pack
 
 
 class ArtContractTests(unittest.TestCase):
@@ -123,7 +145,9 @@ class ArtContractTests(unittest.TestCase):
             if name not in self.pack["tiles"]:
                 self.pack["tiles"][name] = {"path": f"walls/{name}.png", "cell": free.pop(0)}
         (self.source / "pack.json").write_text(json.dumps(self.pack))
-        for path in wall_templates(self.source / "pack.json", self.root / "joints", self.pack["density"]):
+        # The builder's own resolver: a schema-1 pack declares no density and is 1x.
+        density = resolve_density_filter(self.pack)[0]
+        for path in wall_templates(self.source / "pack.json", self.root / "joints", density):
             shutil.copyfile(path, self.source / self.pack["tiles"][path.stem]["path"])
         # The synthetic family is a pack `make art` accepts before a case breaks it.
         validate(self.source, self.pack)
@@ -370,12 +394,12 @@ class ArtContractTests(unittest.TestCase):
         companion = output / "table"
         companion.mkdir()
         (companion / "manifest.json").write_text("{}")
-        (companion / "surface_left.png").write_bytes(b"not this builder's")
+        (companion / "desk_left.png").write_bytes(b"not this builder's")
         stray = output / "fonts/NOTES.txt"
         stray.write_text("not a picture")
         with contextlib.redirect_stdout(io.StringIO()):
             build(self.source, output)
-        self.assertTrue((companion / "surface_left.png").is_file(), "the shared table was pruned by the wrong builder")
+        self.assertTrue((companion / "desk_left.png").is_file(), "the shared table was pruned by the wrong builder")
         self.assertTrue(stray.is_file(), "pruning removed something that is not a picture")
 
     def test_every_editable_pack_in_the_tree_is_found_by_its_manifest(self):
@@ -447,6 +471,33 @@ class ArtContractTests(unittest.TestCase):
             validate(self.source, changed)
 
 
+class SchemaOneRowWallJointTests(unittest.TestCase):
+    """The row walls' joint cases on a schema-1 source, which declares no density.
+
+    `--source` takes any compliant pack, and a schema-1 pack may not carry the
+    `density` key at all (build_assets.resolve_density_filter()): the cases
+    that draw the synthetic joint family must reach their seam assertions on
+    one, as they do on the shipped schema-2 pack. The same case bodies as
+    ArtContractTests', on the pack under test brought down to schema 1.
+    """
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.source = self.root / "source"
+        shutil.copytree(SOURCE, self.source)
+        self.pack = as_schema_one(self.source)
+        self.assertNotIn("density", self.pack)
+        self.assertEqual(validate(self.source, self.pack).density, 1, "a pack `make art` accepts, at 1x")
+
+    paint = ArtContractTests.paint
+    with_row_wall_joints = ArtContractTests.with_row_wall_joints
+    test_t_junction_preserves_its_side_connection_above = ArtContractTests.test_t_junction_preserves_its_side_connection_above
+    test_t_junction_preserves_its_side_connection_below = ArtContractTests.test_t_junction_preserves_its_side_connection_below
+    test_open_end_keeps_its_horizontal_connection_to_the_wall = ArtContractTests.test_open_end_keeps_its_horizontal_connection_to_the_wall
+
+
 class DensityContractTests(unittest.TestCase):
     """schema v2: one density per pack, lower-density sources filled in by the build.
 
@@ -463,20 +514,7 @@ class DensityContractTests(unittest.TestCase):
         # 1x pack; the product source and runtime assets remain untouched.
         self.base_source = self.root / "base"
         shutil.copytree(SOURCE, self.base_source)
-        base_pack = json.loads((self.base_source / "pack.json").read_text())
-        # A schema-1 fixture needs actual 1x PNGs, not just a changed manifest
-        # declaration: a denser pack under test (--source) is brought down to 1x.
-        for category in ("tiles", "props", "ui"):
-            for info in base_pack[category].values():
-                path = self.base_source / info["path"]
-                with Image.open(path) as opened:
-                    size = contract_size(base_pack, category, info)
-                    if opened.size != size:
-                        opened.resize(size, Image.Resampling.NEAREST).save(path)
-        base_pack["schema_version"] = 1
-        base_pack.pop("density", None)
-        base_pack.pop("filter", None)
-        (self.base_source / "pack.json").write_text(json.dumps(base_pack, indent=2) + "\n")
+        as_schema_one(self.base_source)
 
     ## --- fixtures -------------------------------------------------------------
 
@@ -839,8 +877,8 @@ class PixelSourceTests(unittest.TestCase):
         self.assertEqual(
             len(files),
             len(draw_pixel_sources.DESK_PIECES) + len(draw_pixel_sources.FIXTURE_SIZES)
-            + len(draw_pixel_sources.DENSE_SIZES) + len(draw_pixel_sources.PARTITION_SIZES) + 27,
-            "8 desk props, 2 fixture props, 2 density-2 pieces, 7 partition pieces, 26 modules (legacy and pod), 1 manifest",
+            + len(draw_pixel_sources.DENSE_SIZES) + len(draw_pixel_sources.PARTITION_SIZES) + 19,
+            "8 desk props, 2 fixture props, 2 density-2 pieces, 7 partition pieces, the pod family's 18 images, 1 manifest",
         )
         self.assertEqual(files, sorted(path.relative_to(second) for path in second.rglob("*") if path.is_file()))
         for relative in files:

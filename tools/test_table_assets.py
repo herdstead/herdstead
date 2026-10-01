@@ -13,11 +13,18 @@ from pathlib import Path
 
 from PIL import Image
 
-from build_table_assets import (CURSOR_AT, DENSITY, FURNITURE, LEGACY, LEGACY_POD, MODULES, POD_MODULES, POD_ONLY,
-                                POD_SHARED, ROOT, SOURCE_SETS, build_pack, generate_templates)
+from build_table_assets import (CURSOR_AT, DENSITY, FURNITURE, POD_MODULES, POD_ONLY, POD_SHARED, ROOT, SOURCE_SETS,
+                                build_pack, generate_templates, table_manifest)
 
 
 THEMES = ("daylight",)
+
+## The long table's own modules, which the builder accepted until the office
+## drew the pod alone: a source that still declares them is refused.
+LONG_TABLE = {
+    "surface_left": (32, 80), "surface_mid_a": (32, 80), "surface_mid_b": (32, 80), "surface_right": (32, 80),
+    "divider_left": (32, 24), "divider_mid": (32, 24), "divider_right": (32, 24), "leg": (20, 40),
+}
 
 
 class SharedTableBuildTests(unittest.TestCase):
@@ -145,10 +152,10 @@ class SharedTableAssetTests(unittest.TestCase):
             manifest = json.loads((source / "manifest.json").read_text())
             self.assertEqual(manifest["density"], DENSITY, theme)
             self.assertEqual((manifest["density"], manifest["filter"]), (2, "nearest"), f"{theme}: the shipped table is 2x, nearest")
-            # Either accepted source set (build_table_assets.SOURCE_SETS), and
-            # every module of the set it declares is checked below.
+            # The accepted source set (build_table_assets.SOURCE_SETS), and
+            # every module of it is checked below.
             declared = next((sizes for sizes in SOURCE_SETS.values() if set(manifest["modules"]) == set(sizes)), None)
-            self.assertIsNotNone(declared, f"{theme}: modules are none of the accepted sets {sorted(SOURCE_SETS)}")
+            self.assertIsNotNone(declared, f"{theme}: modules are not the accepted set {sorted(SOURCE_SETS)}")
             self.assertEqual(manifest["assembly"], {
                 "module_width": 32,
                 "surface_depth": 80,
@@ -179,51 +186,27 @@ class SharedTableAssetTests(unittest.TestCase):
                     f"{theme}/{furniture_id} views are identical",
                 )
 
-    def test_surface_and_divider_modules_join_without_transparent_seams(self):
-        temporary, trees = legacy_tables()
-        self.addCleanup(temporary.cleanup)
-        for theme, root in trees:
-            for prefix in ("surface", "divider"):
-                mid_names = ["mid_a", "mid_b"] if prefix == "surface" else ["mid"]
-                names = [f"{prefix}_left", *(f"{prefix}_{name}" for name in mid_names), f"{prefix}_right"]
-                images = [Image.open(root / f"{name}.png") for name in names]
-                try:
-                    height = 75 * DENSITY if prefix == "surface" else images[0].height
-                    # Compose an intentionally wide strip. Every internal join
-                    # must have opaque pixels at the same rows; otherwise a
-                    # repeated native module creates a visible vertical hole.
-                    for left, right in zip(images, images[1:]):
-                        self.assertEqual(left.getchannel("A").getbbox()[3], height, "thin surface has no old fascia below its lip")
-                        self.assertEqual(left.getchannel("A").crop((left.width - 1, 0, left.width, height)).getbbox(), (0, 0, 1, height), f"{theme}/{prefix} right edge has a hole")
-                        self.assertEqual(right.getchannel("A").crop((0, 0, 1, height)).getbbox(), (0, 0, 1, height), f"{theme}/{prefix} left edge has a hole")
-                finally:
-                    for image in images:
-                        image.close()
-
     def test_wood_edges_match_in_colour_not_only_alpha(self):
-        # The long table's surface on every tree that has it (legacy_tables());
-        # the apron, which the pod lays too, on every shipped theme and on the templates.
-        temporary, legacy = legacy_tables()
+        # The apron, on the templates and on every shipped theme (the desks'
+        # own edges are PodModuleContractTests').
+        temporary, trees = table_trees(POD_SHARED)
         self.addCleanup(temporary.cleanup)
-        aprons = [legacy[0]] + [(theme, ROOT / "art" / theme / "table") for theme in THEMES]
-        for prefix, mids, trees in (("surface", ("mid_a", "mid_b"), legacy), ("apron", ("mid",), aprons)):
-            for theme, root in trees:
-                for left in ("left", *mids):
-                    for right in (*mids, "right"):
-                        with Image.open(root / f"{prefix}_{left}.png") as a, \
-                                Image.open(root / f"{prefix}_{right}.png") as b:
-                            edge = a.crop((a.width - 1, 0, a.width, a.height)).tobytes()
-                            self.assertEqual(edge, b.crop((0, 0, 1, b.height)).tobytes(),
-                                             f"{theme}/{prefix}/{left}->{right} has a colour seam")
-                            # Nearest sampling never reads past the seam, so one
-                            # column is the structural contract; the three outer
-                            # units (3 x DENSITY columns) are still one uniform
-                            # band, the templates' rule, so no board detail is
-                            # cut off at a module line wherever the planner
-                            # repeats a module.
-                            for offset in range(2, 3 * DENSITY + 1):
-                                self.assertEqual(edge, a.crop((a.width - offset, 0, a.width - offset + 1, a.height)).tobytes())
-                                self.assertEqual(edge, b.crop((offset - 1, 0, offset, b.height)).tobytes())
+        self.assertEqual([label for label, _ in trees], ["templates", *THEMES])
+        for theme, root in trees:
+            for left in ("left", "mid"):
+                for right in ("mid", "right"):
+                    with Image.open(root / f"apron_{left}.png") as a, Image.open(root / f"apron_{right}.png") as b:
+                        edge = a.crop((a.width - 1, 0, a.width, a.height)).tobytes()
+                        self.assertEqual(edge, b.crop((0, 0, 1, b.height)).tobytes(),
+                                         f"{theme}/apron/{left}->{right} has a colour seam")
+                        # Nearest sampling never reads past the seam, so one
+                        # column is the structural contract; the three outer
+                        # units (3 x DENSITY columns) are still one uniform
+                        # band, the templates' rule, so no detail is cut off at
+                        # a module line wherever the planner repeats a module.
+                        for offset in range(2, 3 * DENSITY + 1):
+                            self.assertEqual(edge, a.crop((a.width - offset, 0, a.width - offset + 1, a.height)).tobytes())
+                            self.assertEqual(edge, b.crop((offset - 1, 0, offset, b.height)).tobytes())
 
     def test_chairs_are_a_persons_scale_with_a_column_under_the_seat(self):
         for view in ("front", "back"):
@@ -282,24 +265,6 @@ class SharedTableAssetTests(unittest.TestCase):
                                          "and no wider than its six texels")
                         self.assertNotEqual(at(32, 52), silver, "keyboard is distinct from the palmrest")
 
-    def test_tapered_legs_keep_floor_contact(self):
-        temporary, trees = legacy_tables()
-        self.addCleanup(temporary.cleanup)
-        for theme, root in trees:
-            with Image.open(root / "leg.png") as leg:
-                alpha = leg.getchannel("A")
-                # Unit rows, times DENSITY. Hung at y -2, a last unit row of 38
-                # puts the foot on the floor at y 37.
-                d = DENSITY
-                self.assertEqual(alpha.getbbox()[3], 39 * d, "raised mount plus extended shaft preserves floor contact")
-                shoulder = alpha.crop((0, 5 * d, alpha.width, 5 * d + 1)).getbbox()
-                ankle = alpha.crop((0, 35 * d, alpha.width, 35 * d + 1)).getbbox()
-                glide = alpha.crop((0, 37 * d, alpha.width, 37 * d + 1)).getbbox()
-                self.assertLess(ankle[2] - ankle[0], shoulder[2] - shoulder[0], "shaft tapers towards the floor")
-                self.assertLess(glide[2] - glide[0], shoulder[2] - shoulder[0], "no broad pedestal beneath the shaft")
-                for y in range(39 * d):
-                    self.assertIsNotNone(alpha.crop((0, y, alpha.width, y + 1)).getbbox(), "joint and glide stay attached")
-
     def test_builder_reproduces_runtime_modules(self):
         for theme in THEMES:
             source = ROOT / "art" / theme
@@ -324,10 +289,9 @@ class SharedTableAssetTests(unittest.TestCase):
 
 
 class PodSourceSetTests(unittest.TestCase):
-    """The builder accepts the LEGACY module set, LEGACY plus POD, or the pod
-    alone (POD_ONLY, what the office draws), told apart by the modules the
-    manifest declares, and requires every image of that set. Built from fresh
-    templates, so the cases hold whichever set art/ ships."""
+    """The builder accepts one module set, the pod alone (POD_ONLY, what the
+    office draws): a manifest declares exactly its names, and every image of
+    it is required. Built from fresh templates, which draw that set."""
 
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -345,52 +309,51 @@ class PodSourceSetTests(unittest.TestCase):
             build_pack(self.source, self.root / name)
         return self.root / name / "table"
 
-    def as_legacy(self):
-        """Today's shape: the manifest without the pod modules and their images gone."""
-        data = json.loads(self.manifest.read_text())
-        for name in POD_MODULES:
-            del data["modules"][name]
-            (self.source / "table" / f"{name}.png").unlink()
-        self.manifest.write_text(json.dumps(data, indent=2) + "\n")
+    def declare(self, sizes):
+        """The manifest rewritten to declare `sizes`, the rest of the contract as the builder writes it."""
+        pack = json.loads((self.source / "pack.json").read_text())
+        self.manifest.write_text(json.dumps(table_manifest(pack, sizes), indent=2) + "\n")
 
-    def as_pod(self):
-        """The pod alone: the manifest without the long table's own modules and their images gone."""
-        data = json.loads(self.manifest.read_text())
-        for name in set(LEGACY_POD) - set(POD_ONLY):
-            del data["modules"][name]
-            (self.source / "table" / f"{name}.png").unlink()
-        self.manifest.write_text(json.dumps(data, indent=2) + "\n")
-
-    def test_the_sets_are_legacy_legacy_with_pod_and_the_pod_alone(self):
-        self.assertEqual(set(SOURCE_SETS), {"legacy", "legacy+pod", "pod"})
-        self.assertEqual(LEGACY, {**MODULES, **FURNITURE})
-        self.assertEqual(LEGACY_POD, {**MODULES, **FURNITURE, **POD_MODULES})
-        self.assertEqual(SOURCE_SETS["pod"], POD_ONLY)
-        self.assertEqual(POD_ONLY, {**POD_MODULES, **{name: MODULES[name] for name in POD_SHARED}, **FURNITURE})
-        self.assertEqual(set(LEGACY_POD) - set(POD_ONLY),
-                         {"surface_left", "surface_mid_a", "surface_mid_b", "surface_right",
-                          "divider_left", "divider_mid", "divider_right", "leg"},
-                         "the pod alone leaves out the long table's surface, divider and leg, and nothing else")
-        self.assertFalse(set(POD_MODULES) & set(LEGACY), "the pod adds modules, it renames none")
+    def test_the_one_set_is_the_pod_alone(self):
+        self.assertEqual(SOURCE_SETS, {"pod": POD_ONLY})
+        self.assertEqual(POD_ONLY, {**POD_MODULES, **POD_SHARED, **FURNITURE})
+        self.assertEqual(len(POD_ONLY), 18)
+        self.assertEqual(len(POD_MODULES) + len(POD_SHARED) + len(FURNITURE), 18, "the three parts share no name")
+        self.assertFalse(set(POD_ONLY) & set(LONG_TABLE),
+                         "the pod alone leaves out the long table's surface, divider and leg")
         self.assertEqual(POD_MODULES, {
             "desk_left": (32, 48), "desk_mid_a": (32, 48), "desk_mid_b": (32, 48), "desk_right": (32, 48),
             "screen_left": (32, 6), "screen_mid": (32, 6), "screen_right": (32, 6), "leg_short": (6, 22),
         })
+        self.assertEqual(POD_SHARED, {
+            "apron_left": (32, 3), "apron_mid": (32, 3), "apron_right": (32, 3), "bracket": (12, 10),
+        })
 
-    def test_templates_declare_legacy_with_pod_and_build(self):
-        self.assertEqual(set(json.loads(self.manifest.read_text())["modules"]), set(LEGACY_POD))
+    def test_templates_declare_the_pod_and_build(self):
+        self.assertEqual(set(json.loads(self.manifest.read_text())["modules"]), set(POD_ONLY))
+        self.assertEqual({path.name for path in (self.source / "table").iterdir()},
+                         {f"{name}.png" for name in POD_ONLY} | {"manifest.json"},
+                         "the templates draw the pod family's 18 images and its manifest, nothing of the long table")
         runtime = self.build()
-        for name in LEGACY_POD:
+        for name in POD_ONLY:
             self.assertEqual((runtime / f"{name}.png").read_bytes(), (self.source / "table" / f"{name}.png").read_bytes(), name)
 
-    def test_a_legacy_only_source_is_still_valid_and_builds_only_legacy(self):
-        self.as_legacy()
-        runtime = self.build()
-        self.assertEqual({path.stem for path in runtime.glob("*.png")}, set(LEGACY))
-        self.assertEqual(set(json.loads((runtime / "manifest.json").read_text())["modules"]), set(LEGACY))
+    def test_a_source_that_declares_the_long_table_is_refused_before_writing(self):
+        # Until the office drew the pod alone the builder also took `legacy`
+        # (the long table and the furniture) and `legacy+pod` (both). Either
+        # is refused now, by what it lacks of the pod and what the pod has no
+        # name for, whatever images lie beside the manifest, and nothing is written.
+        legacy = {**LONG_TABLE, **POD_SHARED, **FURNITURE}
+        unknown = re.escape(str(sorted(LONG_TABLE)))
+        for label, sizes, missing in (("legacy", legacy, sorted(POD_MODULES)), ("legacy+pod", {**legacy, **POD_MODULES}, [])):
+            with self.subTest(label=label):
+                self.declare(sizes)
+                with self.assertRaisesRegex(ValueError, "not the accepted set \\(pod\\): "
+                                            f"missing {re.escape(str(missing))}, unknown {unknown}"):
+                    self.build(f"refused-{label}")
+                self.assertFalse((self.root / f"refused-{label}").exists(), "nothing written")
 
     def test_a_pod_only_source_is_valid_and_builds_only_the_pod(self):
-        self.as_pod()
         self.assertEqual(set(json.loads(self.manifest.read_text())["modules"]), set(POD_ONLY))
         runtime = self.build()
         self.assertEqual({path.stem for path in runtime.glob("*.png")}, set(POD_ONLY))
@@ -451,17 +414,17 @@ class PodSourceSetTests(unittest.TestCase):
         del partial["modules"]["screen_mid"]
         unknown = copy.deepcopy(original)
         unknown["modules"]["desk_corner"] = {"path": "desk_corner.png", "size": [32, 48]}
-        # The pod alone with one of the long table's modules left in is no set either.
+        # The pod with one of the long table's modules left in is not the set either.
         leftover = copy.deepcopy(original)
-        for name in set(LEGACY_POD) - set(POD_ONLY) - {"leg"}:
-            del leftover["modules"][name]
-        for label, data, reason in (("partial", partial, r"nearest legacy\+pod, missing \['screen_mid'\]"),
-                                    ("unknown", unknown, r"nearest legacy\+pod, .*unknown \['desk_corner'\]"),
-                                    ("leftover", leftover, r"nearest pod, .*unknown \['leg'\]")):
+        leftover["modules"]["leg"] = {"path": "leg.png", "size": list(LONG_TABLE["leg"])}
+        for label, data, reason in (("partial", partial, r"missing \['screen_mid'\], unknown \[\]"),
+                                    ("unknown", unknown, r"missing \[\], unknown \['desk_corner'\]"),
+                                    ("leftover", leftover, r"missing \[\], unknown \['leg'\]")):
             with self.subTest(label=label):
                 self.manifest.write_text(json.dumps(data))
-                with self.assertRaisesRegex(ValueError, "none of the accepted sets \\(legacy, legacy\\+pod, pod\\).*" + reason):
+                with self.assertRaisesRegex(ValueError, "not the accepted set \\(pod\\): " + reason):
                     self.build(f"bad-{label}")
+                self.assertFalse((self.root / f"bad-{label}").exists(), "nothing written")
 
 
 def table_trees(modules):
@@ -482,16 +445,8 @@ def table_trees(modules):
 
 
 def pod_tables():
-    """Every table tree holding the pod modules: fresh templates, and each shipped
-    theme once it declares them (so the checks follow the art when it lands)."""
+    """Every table tree holding the pod's own modules: fresh templates and each shipped theme."""
     return table_trees(POD_MODULES)
-
-
-def legacy_tables():
-    """Every table tree holding the long table's own modules (its surface, divider
-    and leg): fresh templates, which draw them until the builder is pod-only, and
-    each shipped theme while it still declares them."""
-    return table_trees(set(LEGACY_POD) - set(POD_ONLY))
 
 
 class PodModuleContractTests(unittest.TestCase):
@@ -524,7 +479,7 @@ class PodModuleContractTests(unittest.TestCase):
                         edge = a.crop((a.width - 1, 0, a.width, a.height)).tobytes()
                         self.assertEqual(edge, b.crop((0, 0, 1, b.height)).tobytes(), "a colour seam")
                         # The three outer units on each side are one uniform
-                        # column, like the surface modules'.
+                        # column, so no board detail is cut off at a module line.
                         for offset in range(2, 3 * d + 1):
                             self.assertEqual(edge, a.crop((a.width - offset, 0, a.width - offset + 1, a.height)).tobytes())
                             self.assertEqual(edge, b.crop((offset - 1, 0, offset, b.height)).tobytes())
