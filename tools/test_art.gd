@@ -618,60 +618,16 @@ func test_art_contract_names_ids_no_scene_asks_for() -> void:
 	_eq(_sorted_names(unused), ["props", "table", "tiles", "ui"], "every category is reported")
 	_eq(
 		Array(unused[&"tiles"]),
-		[
-			"rug.bottom_center",
-			"rug.bottom_left",
-			"rug.bottom_right",
-			"rug.middle_center",
-			"rug.middle_left",
-			"rug.middle_right",
-			"rug.top_center",
-			"rug.top_left",
-			"rug.top_right",
-			"wall.cap_end_right",
-			"wall.cap_t_left",
-			"wall.face_end_right",
-			"wall.face_t_left",
-			"wall.front_center",
-			"wall.front_left",
-			"wall.front_right",
-			"wall.threshold",
-		],
-		(
-			"the front wall nothing lays: it would cover the near seats (docs/WORLD_MODEL.md); nor the row walls'"
-			+ " joints: a zone stands in low partitions, not row walls; nor the nine rug tiles: a pod stands on"
-			+ " the floor itself (the joints and the rug pruned in lane C2)"
-		)
+		["wall.front_center", "wall.front_left", "wall.front_right", "wall.threshold"],
+		"only the front wall, which nothing lays: it would cover the near seats (docs/WORLD_MODEL.md)"
 	)
-	# The pods of desks draw the pod's art (lane B1); the long table's big paper
-	# stack is shipped and drawn by nothing; the open run's two ends are drawn by
-	# no zone (a zone's bottom run ends in its corners); the retired reception
-	# nothing places; and the row wall's sign and the cabinet left the contract
-	# when the showroom (scripts/preview.gd) was redrawn in zones. All of them are
-	# pruned from the pack in lane C2. Exactly these ids.
-	_eq(
-		Array(unused[&"props"]),
-		["cabinet", "done_stack", "partition_h_end_l", "partition_h_end_r", "reception", "sign"],
-		(
-			"every prop but the long table's paper, the open run's ends, the retired reception and the row"
-			+ " room's sign and cabinet is in the contract"
-		)
-	)
-	_eq(Array(unused[&"ui"]), ["selection"], "every UI image but the long table's frame is drawn somewhere")
-	_eq(
-		Array(unused[&"table"]),
-		[
-			"divider_left",
-			"divider_mid",
-			"divider_right",
-			"leg",
-			"surface_left",
-			"surface_mid_a",
-			"surface_mid_b",
-			"surface_right",
-		],
-		"every shared-table module but the long table's is laid or is a furniture view"
-	)
+	# Everything else the pack ships is drawn: the long table's art, the rug, the
+	# row walls' joints, the reception, the row room's sign and cabinet, the big
+	# paper stack, the old selection frame and the open run's two ends were
+	# pruned from the pack when the office went open-plan. Exactly nothing.
+	_eq(Array(unused[&"props"]), [], "every prop is in the contract or in a pool")
+	_eq(Array(unused[&"ui"]), [], "every UI image is drawn somewhere")
+	_eq(Array(unused[&"table"]), [], "every shared-table module is laid or is a furniture view")
 	for id in ArtContract.tile_ids():
 		_check(not Array(unused[&"tiles"]).has(str(id)), "a wanted tile is never called unused: " + id)
 	for id in ArtContract.ui_ids():
