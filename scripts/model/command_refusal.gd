@@ -227,20 +227,20 @@ const _TEXTS: Dictionary[Reason, String] = {
 	Reason.DIRECTION_INVALID: "bad direction",
 	Reason.PANE_TOO_SMALL: "pane too small to split",
 	Reason.SIZE_UNKNOWN: "pane size unknown",
-	Reason.GROUP_PARENT: "the repo's own floor: close its mezzanines first",
+	Reason.GROUP_PARENT: "the repo's own space: close its mezzanines first",
 	Reason.CONFIRM_NEEDED: "click again to close",
 	Reason.SCOPE_CHANGED: "what closes changed, look again",
 	Reason.CWD_UNKNOWN: "directory unknown",
 	Reason.CWD_UNCLEAN: "directory not shown as sent",
 	Reason.CWD_CHANGED: "the directory changed",
-	Reason.MEZZANINE_SOURCE: "a mezzanine: use the repo's own floor",
+	Reason.MEZZANINE_SOURCE: "a mezzanine: use the repo's own space",
 	Reason.BRANCH_BLANK: "no branch name",
 	Reason.BRANCH_TOO_LONG: "branch over 64 bytes",
 	Reason.BRANCH_CHARS: "branch: letters, digits, . _ / - only",
 	Reason.BRANCH_SHAPE: "not a branch name git takes",
 	Reason.BRANCH_EDITED: "the branch changed",
-	Reason.FLOOR_CHANGED: "the pane's floor changed",
-	Reason.FLOOR_GONE: "floor gone",
+	Reason.FLOOR_CHANGED: "the pane's space changed",
+	Reason.FLOOR_GONE: "space gone",
 }
 ## The same in full, for the tooltips that carry what a line has no room for.
 const _DETAILS: Dictionary[Reason, String] = {
@@ -320,18 +320,18 @@ const _DETAILS: Dictionary[Reason, String] = {
 	Reason.SIZE_UNKNOWN: "herdr's layout gives this pane no size, so nothing says a split would fit.",
 	Reason.GROUP_PARENT:
 	(
-		"this is the last pane of the repo's own floor and its mezzanines are open: herdr would close them too."
+		"this is the last pane of the repo's own space and its mezzanines are open: herdr would close them too."
 		+ " Close them first, or close it in herdr."
 	),
 	Reason.CONFIRM_NEEDED: "a first click only shows what closes. Click Close again within ten seconds to close it.",
 	Reason.SCOPE_CHANGED:
-	"what closing this pane takes with it changed since your first click (its table, its floor or its state).",
+	"what closing this pane takes with it changed since your first click (its tab, its space or its state).",
 	Reason.CWD_UNKNOWN: "herdr gave no absolute directory for this pane, so there is nowhere to start the new space.",
 	Reason.CWD_UNCLEAN:
 	"herdr spells this pane's directory with characters the office does not show, so it is not sent.",
 	Reason.CWD_CHANGED: "this pane's directory changed between your press and release. Press again.",
 	Reason.MEZZANINE_SOURCE:
-	"this floor is itself a linked worktree: herdr starts a new worktree only from the repo's own floor.",
+	"this space is itself a linked worktree: herdr starts a new worktree only from the repo's own space.",
 	Reason.BRANCH_BLANK: "type a branch name first; it may hold no spaces.",
 	Reason.BRANCH_TOO_LONG: "a branch name here is at most 64 bytes of UTF-8. Nothing is cut to make it fit.",
 	Reason.BRANCH_CHARS: "a branch name here holds only letters, digits, `.`, `_`, `/` and `-`.",
@@ -342,8 +342,8 @@ const _DETAILS: Dictionary[Reason, String] = {
 	),
 	Reason.BRANCH_EDITED: "the branch box changed between your press and release. Press New worktree again.",
 	Reason.FLOOR_CHANGED:
-	"this pane moved to another floor since the press, so the worktree's source is not the one aimed at.",
-	Reason.FLOOR_GONE: "herdr no longer lists this pane's floor.",
+	"this pane moved to another space since the press, so the worktree's source is not the one aimed at.",
+	Reason.FLOOR_GONE: "herdr no longer lists this pane's space.",
 }
 
 

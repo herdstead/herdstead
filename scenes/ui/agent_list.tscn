@@ -59,7 +59,7 @@ text = "Flat"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 4
-tooltip_text = "Tree: machine, floor, worktree mezzanine, tab, agent."
+tooltip_text = "Tree: machine, space, worktree mezzanine, tab, agent."
 focus_mode = 0
 theme_type_variation = &"ListSegment"
 toggle_mode = true
@@ -71,7 +71,7 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"ListFilter"
 placeholder_text = "Filter"
-tooltip_text = "Filter by agent, tab, floor or repository name."
+tooltip_text = "Filter by agent, tab, space or repository name."
 clear_button_enabled = true
 
 [node name="Scroll" type="ScrollContainer" parent="Frame/Body"]

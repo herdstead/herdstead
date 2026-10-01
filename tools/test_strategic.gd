@@ -1,9 +1,10 @@
 extends "res://tools/office_test_base.gd"
 ## The strategic view: `S` swaps the world for a flat
-## schematic of the shown floor, one square per seated pane in the FLOORS
-## windows' colours, a blocked one saying how long it has waited where there is
+## schematic of the shown machine's map, a captioned section per zone in the
+## SPACES rail's order, one square per seated pane in the SPACES windows'
+## colours, a blocked one saying how long it has waited where there is
 ## room. A click on a square picks that pane, closes the view and pans its desk
-## into sight; `S` and Escape leave. Only the world rect is covered: FLOORS, the
+## into sight; `S` and Escape leave. Only the world rect is covered: SPACES, the
 ## drawer, the staff panel and NEWS stay usable. Keys, clicks, drags, the wheel
 ## and the pointer go through real input. Run through run_tests.sh.
 ##
@@ -83,26 +84,27 @@ func _after_case() -> void:
 
 
 ## `S` covers the world rect and nothing else: the world hides (the people keep
-## walking under it), the signposts and the bubble tooltip go, and FLOORS, the
+## walking under it), the edge arrows and the bubble tooltip go, and SPACES, the
 ## drawer's tab, the staff panel and NEWS stay where they were, shown. The top
 ## bar's theme line says the view is on.
 func test_s_opens_it_over_the_world_only() -> void:
 	var office := await _live_office(fixture, WIDE)
 	var hud := office.hud
 	var others := {}
-	for panel: Control in [hud.floors, hud.right_column, hud.staff, hud.news]:
+	for panel: Control in [hud.spaces, hud.right_column, hud.staff, hud.news]:
 		others[panel.name] = [panel.visible, hud.placed(panel)]
-	_check(hud.signposts.visible, "web and infra wait: signposts before")
+	await _frames(2)
+	_check(hud.edge_arrows.visible, "web and infra wait off screen: edge arrows before")
 	await _office_key(office, KEY_S)
 	_check(hud.strategic_open(), "S opens the strategic view")
 	_check(not office.world.visible, "the world hides")
-	_check(not hud.signposts.visible, "the signposts hide")
+	_check(not hud.edge_arrows.visible, "the edge arrows hide")
 	_check(not hud.bubble_tip_shown(), "no bubble tooltip")
 	_check(not hud.overview_open(), "the overview stays shut")
 	var view := hud.strategic
 	_eq(view.get_global_rect(), hud.world_rect(), "it covers the world rect exactly")
 	_eq(view.mouse_filter, Control.MOUSE_FILTER_STOP, "and takes the mouse there")
-	for panel: Control in [hud.floors, hud.right_column, hud.staff, hud.news]:
+	for panel: Control in [hud.spaces, hud.right_column, hud.staff, hud.news]:
 		_eq([panel.visible, hud.placed(panel)], others[panel.name], "left as it was: " + str(panel.name))
 	_eq(hud.bar.theme_line(), STRATEGIC_LINE, "the top bar says so")
 	_done(office)
@@ -220,10 +222,13 @@ func test_one_square_per_seated_pane_in_plan_order() -> void:
 	var small := await _live_office(fixture, WIDE)
 	await _office_key(small, KEY_S)
 	var keys := Array(_plan(small).seat_keys())
+	# Five zones, five sections: the squares run section by section in the
+	# rail's order (ascending), each section's pod rows in the plan's order.
+	_eq(keys, _section_order(small), "section by section, in the rail's order")
 	keys.sort()
 	var seats := small.floor_view.seats.keys()
 	seats.sort()
-	_eq(keys, seats, "the fixture's api: a square for each seated pane only")
+	_eq(keys, seats, "the fixture's map: a square for each seated pane only")
 	var alone := _plan(small).table_rect(_room_of(small, _pk("api:p4")))
 	var inside := 0
 	for key: String in keys:
@@ -234,7 +239,7 @@ func test_one_square_per_seated_pane_in_plan_order() -> void:
 
 
 ## Every square wears the FLOORS window's look for its pane
-## (OfficeFloorRow.window_look()): working, blocked, done, idle, unknown, a
+## (OfficeSpaceRow.window_look()): working, blocked, done, idle, unknown, a
 ## start (idle), a start that already asks (blocked), a shell (dark). The same
 ## look as that floor's FLOORS window, the same palette colour
 ## (HudTheme.SECTION_PANELS), and the lens's wash of a room with only that pane.
@@ -254,13 +259,13 @@ func test_squares_wear_the_floors_window_scale() -> void:
 	for pane_id: String in wanted:
 		_eq(looks.get(_pk(pane_id), &""), wanted[pane_id], "the look of " + pane_id)
 	var zone := office.navigator.current_zone(office.frame)
-	var floor_row := office.hud.floors.row_for(zone)
+	var floor_row := office.hud.spaces.row_for(zone)
 	var windows: Control = floor_row.get_node("%Windows")
 	var index := 0
 	var found := office.frame.find_zone(zone)
 	for room in found.zone_model.rooms:
 		for pane in room.panes:
-			var look := OfficeFloorRow.window_look(pane, true)
+			var look := OfficeSpaceRow.window_look(pane, true)
 			_eq(looks.get(pane.key, &""), look, "window_look(): " + pane.key)
 			var window: Control = windows.get_child(index)
 			_eq(window.theme_type_variation, look, "the FLOORS window's look: " + pane.key)
@@ -438,7 +443,7 @@ func test_pgdn_and_a_floors_row_redraw_it_for_that_floor() -> void:
 	_eq(_plan(office).seat_keys(), squares, "and the same squares")
 	_same_squares(office, "after PageDown")
 	var mezzanine := ""
-	for key: Variant in office.hud.floors.row_keys():
+	for key: Variant in office.hud.spaces.row_keys():
 		var ref := office.frame.find_zone(str(key))
 		if ref != null and not ref.zone_model.mezzanine_of.is_empty():
 			mezzanine = str(key)
@@ -478,6 +483,21 @@ func test_several_machines_title_names_the_machine() -> void:
 	var plan := OfficeFloorLayout.plan(found.map, null, rules).plan
 	var live := StrategicModel.of(plan, found, true, MachineLiveness.State.LIVE, StateLog.new(), "", 0)
 	_eq(live.title, "@ BEE", "the machine's own label, among several")
+	_eq(
+		live.sections.map(func(section: StrategicModel.Section) -> String: return section.key),
+		OfficeNavigator.section(found.zones).map(func(zone: ZoneModel) -> String: return zone.key),
+		"a section per zone of that machine, in the rail's order"
+	)
+	_eq(
+		live.sections.map(func(section: StrategicModel.Section) -> String: return section.caption),
+		found.zones.map(func(zone: ZoneModel) -> String: return OfficeZoneSign.words(zone)),
+		"captioned with the words on each zone's sign"
+	)
+	_eq(
+		Array(live.section_rows()).reduce(func(sum: int, rows: int) -> int: return sum + rows, 0),
+		live.row_capacities().size(),
+		"every row in a section"
+	)
 	_eq(live.state_text, "", "a live machine says nothing more")
 	_check(not live.stale, "and is not stale")
 	var alone := StrategicModel.of(plan, found, false, MachineLiveness.State.LIVE, StateLog.new(), "", 0)
@@ -628,8 +648,8 @@ func test_hovering_a_list_row_dashes_its_square() -> void:
 	var other := office.hud.agent_list.row_for(_pk("web:p1"))
 	await _hover(other.get_global_rect().get_center())
 	_eq(plan.pointed_key(), _pk("web:p1"), "a pane in another zone of this map dashes its own square")
-	var web := office.hud.floors.row_for(office.frame.zone_of(_pk("web:p1")))
-	_eq(web.theme_type_variation, &"FloorRow", "and marks no FLOORS row")
+	var web := office.hud.spaces.row_for(office.frame.zone_of(_pk("web:p1")))
+	_eq(web.theme_type_variation, &"SpaceRow", "and marks no FLOORS row")
 	await _hover(office.hud.world_rect().get_center())
 	_eq(plan.pointed_key(), "", "leaving takes the dash away")
 	_done(office)
@@ -697,7 +717,10 @@ func test_arrows_and_wheel_never_pan_the_hidden_world() -> void:
 ## newspaper columns; eight and a scroll when nothing fits. Pinned for the
 ## stress floors (80 and 400 panes) in the room the view has at 2x (1920x960,
 ## where the compact panel is an 80-high card) and at 4x / the minimum
-## (480x320 logical either way, its one line).
+## (480x320 logical either way, its one line). The stress map is one zone: one
+## captioned section, its caption repeated at the top of every further column.
+## The caption band is 9 units, which is what keeps every cell and column count
+## the rows had without one (two of the four rooms have exactly 9 to spare).
 func test_the_stress_fit_at_2x_4x_and_min() -> void:
 	var art := ArtPack.from_manifest(MANIFESTS[0])
 	var hud: OfficeHud = OfficeScene.HUD_SCENE.instantiate()
@@ -707,6 +730,7 @@ func test_the_stress_fit_at_2x_4x_and_min() -> void:
 	_eq(Array(plan.cells), [32, 24, 16, 12, 8], "the scene's ladder")
 	var rules := plan.rules()
 	_eq([rules.pad, rules.gap, rules.caption, rules.divider, rules.ring], [4, 8, 12, 2, 2], "the theme's measures")
+	_eq(rules.section, 9, "and its section caption band")
 	var rooms := {}
 	for screen: Vector2 in [WIDE, SMALL]:
 		hud.fit(screen)
@@ -724,9 +748,20 @@ func test_the_stress_fit_at_2x_4x_and_min() -> void:
 	for each: Array in cases:
 		var rows: Array[PackedInt32Array] = each[0]
 		var room: Vector2 = rooms[each[1]]
-		var fit := StrategicLayout.fit(rows, room, rules)
+		var fit := StrategicLayout.fit(rows, room, rules, PackedInt32Array([rows.size()]))
 		var what := "%d rows in %s" % [rows.size(), room]
 		_eq([fit.cell, fit.columns, fit.scrolls], [each[2], each[3], each[4]], what)
+		_eq(fit.headings.size(), fit.columns, what + ": the section's caption at the top of each column")
+		for index in fit.headings.size():
+			_eq(fit.headings[index].continued, index > 0, what + ": repeated, with its mark, after the first")
+			_eq(fit.headings[index].rect.position.y, 0.0, what + ": at its column's top")
+		var bare := StrategicLayout.fit(rows, room, rules)
+		_eq(
+			[bare.cell, bare.columns, bare.scrolls],
+			[fit.cell, fit.columns, fit.scrolls],
+			what + ": as without captions"
+		)
+		_eq(bare.headings.size(), 0, what + ": rows given without sections have no caption band")
 		if not fit.scrolls:
 			_check(fit.size.x <= room.x and fit.size.y <= room.y, "fits: %s in %s" % [fit.size, room])
 		else:
@@ -844,6 +879,192 @@ func test_a_desk_under_a_square_is_never_picked_through_it() -> void:
 	_done(office)
 
 
+# --- sections -------------------------------------------------------------------
+
+
+## Every zone of the map is a section: a caption with the words on its sign
+## (`2 WEB`), in the SPACES rail's order, over that zone's pods and no other's.
+## A caption is plain paper text, not the zone's accent; hovering it, by a real
+## pointer, says what the sign's tooltip says; and a real click on one picks
+## nothing and leaves the view open.
+func test_each_zone_is_a_captioned_section() -> void:
+	var office := await _live_office(fixture, WIDE)
+	await _office_key(office, KEY_S)
+	var plan := _plan(office)
+	var rail := office.hud.spaces.row_keys()
+	_eq(Array(plan.section_keys()), rail, "a section per zone, in the rail's order")
+	_eq(
+		Array(plan.captions_drawn()),
+		["1 API", "2 WEB", "3 INFRA", "4 NOTES", "5 数据 PIPELINE"],
+		"captioned with the words on each zone's sign"
+	)
+	_eq(plan.get_theme_color(&"section_caption", &"Strategic"), office.art.color(ArtContract.PAPER), "in plain paper")
+	for accent: StringName in ArtContract.ACCENTS:
+		var hue := office.art.color(accent)
+		_check(plan.get_theme_color(&"section_caption", &"Strategic") != hue, "never an accent: %s" % accent)
+	var model := office.hud.strategic.model()
+	var bands: Array[Rect2] = []
+	for section in model.sections:
+		var found := office.frame.find_zone(section.key)
+		var caption := plan.section_rects(section.key)
+		_eq(caption.size(), 1, "%s: one caption, the room holding its section whole" % section.caption)
+		var band := caption[0]
+		bands.append(band)
+		_eq(band.size.y, 9.0, "%s: the caption band" % section.caption)
+		_check(not section.tables.is_empty(), "%s: with its pods" % section.caption)
+		for table in section.tables:
+			var box := plan.table_rect(table.key)
+			_check(box.position.y >= band.end.y, "%s: %s under its caption" % [section.caption, table.label])
+			var across := box.position.x >= band.position.x and box.end.x <= band.end.x
+			_check(across, "%s: %s in its caption's column" % [section.caption, table.label])
+			for seat in table.seats:
+				_eq(office.frame.zone_of(seat.key), section.key, "%s: only its own panes" % section.caption)
+		var tip := OfficeQuestionTips.sign_text(found)
+		_eq(
+			plan.tooltip_at(band.get_center()),
+			tip,
+			"%s: hovering its caption says its sign's tooltip" % section.caption
+		)
+		_eq(plan.get_tooltip(band.get_center()), tip, "%s: the Control's own tooltip" % section.caption)
+	for index in bands.size():
+		for other in range(index + 1, bands.size()):
+			_check(not bands[index].intersects(bands[other]), "captions apart: %s, %s" % [bands[index], bands[other]])
+	var picked := office.picked_key
+	await _click(plan.get_global_rect().position + bands[1].position + Vector2(8, 4))
+	await _frames(2)
+	_check(office.hud.strategic_open(), "a click on a caption leaves the view open")
+	_eq(office.picked_key, picked, "and picks nothing")
+	_done(office)
+
+
+## Pure (StrategicLayout.fit()): a section that fits a column is kept whole, in
+## the column it starts in when what is left of that holds it, else in the next;
+## only one taller than the room is split, at a row boundary, its caption
+## repeated (`continued`) at the top of every column it runs on into. A column
+## is never narrower than a caption in it.
+func test_a_section_splits_only_when_taller_than_the_room() -> void:
+	var rules := StrategicLayout.Rules.new()
+	rules.cells = PackedInt32Array([8])
+	rules.pad = 4
+	rules.gap = 8
+	rules.caption = 12
+	rules.divider = 2
+	rules.ring = 2
+	rules.section = 9
+	# One row: a 12 caption over a 26 box. A section of n rows: 9 + 38n + 8(n - 1).
+	var two := PackedInt32Array([2, 2])
+	var whole := StrategicLayout.fit(_rows_of(4), Vector2(400, 200), rules, two)
+	_eq(
+		[whole.columns, whole.per_column, whole.scrolls],
+		[1, 4, false],
+		"two sections of two rows in a tall room: one column"
+	)
+	_eq(
+		whole.headings.map(func(h: StrategicLayout.Heading) -> Array: return [h.section, h.continued]),
+		[[0, false], [1, false]],
+		""
+	)
+	_eq(
+		[whole.headings[0].rect.position.y, whole.headings[1].rect.position.y],
+		[0.0, 101.0],
+		"the second 8 under the first"
+	)
+	_eq(whole.box(0, 0).position.y, 21.0, "a row: its caption band under the section's, then its box")
+	_eq(whole.box(2, 0).position.y, 122.0, "the second section's first row under its own caption")
+	# 150 high: a section (93) fits, both (194) do not: the second moves whole.
+	var kept := StrategicLayout.fit(_rows_of(4), Vector2(400, 150), rules, two)
+	_eq(
+		[kept.columns, kept.per_column, kept.scrolls],
+		[2, 2, false],
+		"a room for one section and a row more: two columns"
+	)
+	_eq(
+		kept.headings.map(func(h: StrategicLayout.Heading) -> Array: return [h.section, h.continued]),
+		[[0, false], [1, false]],
+		"neither split"
+	)
+	_eq(kept.box(2, 0).position, Vector2(48, 21), "the second section starts the next column, whole")
+	_eq(kept.headings[1].rect.position, Vector2(48, 0), "under its caption at that column's top")
+	_eq(
+		[kept.box(1, 0).position, kept.box(3, 0).position],
+		[Vector2(0, 67), Vector2(48, 67)],
+		"its rows down their column"
+	)
+	# One section of five rows, a room that holds two under a caption: split.
+	var split := StrategicLayout.fit(_rows_of(5), Vector2(400, 100), rules, PackedInt32Array([5]))
+	_eq([split.columns, split.per_column, split.scrolls], [3, 2, false], "five rows, two to a column")
+	_eq(
+		split.headings.map(func(h: StrategicLayout.Heading) -> Array: return [h.section, h.continued]),
+		[[0, false], [0, true], [0, true]],
+		"its caption repeated, marked, on each further column"
+	)
+	_eq(
+		[split.box(0, 0).position, split.box(2, 0).position, split.box(4, 0).position],
+		[Vector2(0, 21), Vector2(48, 21), Vector2(96, 21)],
+		"split at row boundaries"
+	)
+	# A short section after a split one shares the last column when it fits there.
+	var mixed := StrategicLayout.fit(_rows_of(4), Vector2(400, 150), rules, PackedInt32Array([3, 1]))
+	_eq(
+		mixed.headings.map(func(h: StrategicLayout.Heading) -> Array: return [h.section, h.continued]),
+		[[0, false], [1, false]],
+		"three rows fit a 150 room whole"
+	)
+	_eq(mixed.columns, 2, "and the next section, which no longer fits under it, takes the next column")
+	var tight := StrategicLayout.fit(_rows_of(4), Vector2(400, 102), rules, PackedInt32Array([3, 1]))
+	_eq(
+		tight.headings.map(func(h: StrategicLayout.Heading) -> Array: return [h.section, h.continued]),
+		[[0, false], [0, true], [1, false]],
+		"three rows in a 102 room: split, its last row and the next section share a column"
+	)
+	_eq(
+		[tight.columns, tight.box(2, 0).position, tight.box(3, 0).position],
+		[2, Vector2(48, 21), Vector2(48, 76)],
+		"the next section under the run-on row"
+	)
+	# A caption wider than its rows widens the column, and the next one starts past it.
+	var wide := StrategicLayout.fit(_rows_of(4), Vector2(400, 150), rules, two, PackedFloat32Array([90.0, 10.0]))
+	_eq(wide.headings[0].rect.size.x, 90.0, "the column is as wide as its caption")
+	_eq(wide.box(2, 0).position.x, 98.0, "and the next column starts a gap past it")
+	_eq(wide.size.x, 138.0, "the whole schematic: 90, the gap, a 40 box")
+
+
+## A SPACES row of the shown machine picked while the view is open scrolls the
+## schematic to that zone's section: its caption comes into sight, the same
+## machine's squares stay as they are, and the view stays open.
+func test_a_rail_click_while_open_scrolls_to_its_section() -> void:
+	var office := await _live_office(_many_zones(40), SMALL)
+	await _office_key(office, KEY_S)
+	await _frames(3)
+	var plan := _plan(office)
+	_check(plan.scrolls(), "forty zones in the small room: the schematic scrolls")
+	var scroll: ScrollContainer = office.hud.strategic.get_node("%Scroll")
+	var last := _pk("z39")
+	_eq(scroll.scroll_vertical, 0, "it opens at the top")
+	_check(not _caption_seen(office, last), "the last zone's caption is out of sight below")
+	var title := office.hud.strategic.title_text()
+	var squares := plan.seat_keys()
+	var draws := plan.draws
+	await _visit_floor(office, last)
+	await _frames(3)
+	_check(office.hud.strategic_open(), "a SPACES row click leaves the view open")
+	_check(scroll.scroll_vertical > 0, "and scrolls the schematic: %d" % scroll.scroll_vertical)
+	_check(_caption_seen(office, last), "that zone's caption is in sight")
+	_eq([office.hud.strategic.title_text(), plan.seat_keys()], [title, squares], "the same machine, the same squares")
+	_eq(plan.draws, draws, "nothing drawn again for it")
+	await _visit_floor(office, _pk("z0"))
+	await _frames(3)
+	_check(_caption_seen(office, _pk("z0")), "the first zone's row scrolls back to its caption")
+	_eq(scroll.scroll_vertical, 0, "at the top")
+	# PageDown, the same navigation by key, scrolls to its zone's section too.
+	for step in 39:
+		await _office_key(office, KEY_PAGEDOWN)
+	await _frames(3)
+	_eq(office.navigator.current_zone(office.frame), last, "PageDown to the last zone")
+	_check(_caption_seen(office, last), "its caption in sight")
+	_done(office)
+
+
 # --- helpers ------------------------------------------------------------------
 
 
@@ -925,6 +1146,58 @@ func _record(snapshot: Dictionary, list: String, field: String, value: String) -
 			return each
 	_fail("no %s with %s %s" % [list, field, value])
 	return {}
+
+
+## Whether the caption of zone `key`'s section is inside the schematic's
+## scrolled room.
+func _caption_seen(office: OfficeDouble, key: String) -> bool:
+	var scroll: ScrollContainer = office.hud.strategic.get_node("%Scroll")
+	var band := _plan(office).section_rects(key)[0]
+	return band.position.y >= scroll.scroll_vertical and band.end.y <= scroll.scroll_vertical + scroll.size.y
+
+
+## `count` workspaces `z0`.. of one tab of two working agents each, herdr's
+## focus in the first: a map of many small zones.
+func _many_zones(count: int) -> Dictionary:
+	var raw := {"workspaces": [], "tabs": [], "panes": [], "layouts": [], "focused_pane_id": "z0:t:p0"}
+	for zone in count:
+		var workspace := "z%d" % zone
+		var tab := workspace + ":t"
+		_list(raw, "workspaces").append({"workspace_id": workspace, "number": zone + 1, "label": workspace})
+		_list(raw, "tabs").append({"workspace_id": workspace, "tab_id": tab, "number": 1, "label": "t"})
+		for index in 2:
+			var pane := "%s:p%d" % [tab, index]
+			var record := {"workspace_id": workspace, "tab_id": tab, "pane_id": pane, "terminal_id": "terminal-" + pane}
+			record.merge({"agent": "claude", "agent_status": "working"})
+			_list(raw, "panes").append(record)
+	return raw
+
+
+## The seated panes of the shown map section by section: the rail's order of
+## zones, each zone's pod rows by index, a row's pods left to right, far seats
+## then near ones, columns left to right.
+func _section_order(office: OfficeDouble) -> Array:
+	var expected: Array = []
+	var layout := office.layout_plan()
+	for zone_key: String in office.hud.spaces.row_keys():
+		var placed := layout.zone(zone_key)
+		if placed == null:
+			continue
+		var rows := placed.rows.duplicate()
+		rows.sort_custom(func(a: RowPlan, b: RowPlan) -> bool: return a.index < b.index)
+		for band: RowPlan in rows:
+			var desks := band.desks.duplicate()
+			desks.sort_custom(func(a: DeskPlacement, b: DeskPlacement) -> bool: return a.origin.x < b.origin.x)
+			for desk: DeskPlacement in desks:
+				for side: String in OfficeTable.SIDES:
+					var seats: Array[SeatPlacement] = []
+					for seat in desk.seats:
+						if seat.side == side and office.frame.pane(seat.pane_key) != null:
+							seats.append(seat)
+					seats.sort_custom(func(a: SeatPlacement, b: SeatPlacement) -> bool: return a.column < b.column)
+					for seat in seats:
+						expected.append(seat.pane_key)
+	return expected
 
 
 ## `count` plan rows of one table of four columns, the stress floors' shape.

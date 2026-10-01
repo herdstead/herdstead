@@ -18,9 +18,10 @@ var zone_of_pane: Dictionary[String, String] = {}
 var zone_by_key: Dictionary[String, ZoneRef] = {}
 ## Machine key -> its building.
 var building_by_key: Dictionary[String, BuildingModel] = {}
-## Every zone as the FLOORS rail draws it, top to bottom, machine after machine
-## in fleet order (OfficeNavigator.section() per building): what PageUp (one
-## back) and PageDown (one on) step through, across machines.
+## Every zone as the SPACES rail draws it, top to bottom, machine after machine
+## in fleet order (OfficeNavigator.section() per machine: ascending, mezzanines
+## after their source): what PageUp (one back) and PageDown (one on) step
+## through, across machines.
 var zone_order: Array[String] = []
 ## Panes of every live machine, seated or not, for the attention counts. A
 ## dropped machine's last snapshot is not a live signal.

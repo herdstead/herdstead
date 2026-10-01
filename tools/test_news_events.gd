@@ -494,10 +494,10 @@ func test_the_smallest_screen_keeps_news_staff_and_columns_apart() -> void:
 	var hud := office.hud
 	_eq(hud.placed(hud.news), Rect2(16, 296, 448, 20), "NEWS along the bottom")
 	_eq(hud.placed(hud.staff), Rect2(16, 264, 448, 28), "the compact staff panel above it")
-	_eq(hud.placed(hud.floors).end.y, 248.0, "the minimap stops above the panel")
+	_eq(hud.placed(hud.spaces).end.y, 248.0, "the minimap stops above the panel")
 	_eq(hud.placed(hud.right_column).end.y, 248.0, "so does the drawer")
 	var panels: Array[Rect2] = [
-		hud.placed(hud.news), hud.placed(hud.staff), hud.placed(hud.floors), hud.placed(hud.right_column)
+		hud.placed(hud.news), hud.placed(hud.staff), hud.placed(hud.spaces), hud.placed(hud.right_column)
 	]
 	for i in panels.size():
 		for j in range(i + 1, panels.size()):

@@ -38,6 +38,29 @@ static func accent_of(group: String) -> int:
 	return posmod(group.hash(), ArtContract.ACCENTS.size())
 
 
+## The number a zone is known by: herdr's workspace number (`3`), a mezzanine
+## its source's number and a letter (`3A`, ZoneModel.level_label). The one place
+## it is written: the sign says it, and so do the SPACES rail's chip, the edge
+## arrows and the strategic view's captions.
+static func number_text(zone: ZoneModel) -> String:
+	if not zone.mezzanine_of.is_empty() and not zone.level_label.is_empty():
+		return zone.level_label
+	return str(zone.number)
+
+
+## The name beside it, upper case: the workspace's label, a mezzanine its
+## checkout (which says which worktree, where its label often repeats the
+## source's).
+static func title_text(zone: ZoneModel) -> String:
+	var mezzanine := not zone.mezzanine_of.is_empty()
+	return (zone.worktree if mezzanine and not zone.worktree.is_empty() else zone.label).to_upper()
+
+
+## The sign's words on one line: `3 INFRA`, a mezzanine's `3A CHECKOUT`.
+static func words(zone: ZoneModel) -> String:
+	return (number_text(zone) + " " + title_text(zone)).strip_edges()
+
+
 ## Take the pack's panel, display face and colours.
 func dress(pen: OfficeDraw) -> void:
 	var panel: NinePatchRect = %Panel
@@ -60,9 +83,9 @@ func show_zone(zone: ZoneModel, limit := INF) -> void:
 	zone_key = zone.key
 	var mezzanine := not zone.mezzanine_of.is_empty()
 	var number: Label = %Number
-	number.text = zone.level_label if mezzanine and not zone.level_label.is_empty() else str(zone.number)
+	number.text = number_text(zone)
 	var title: Label = %Title
-	title.text = (zone.worktree if mezzanine and not zone.worktree.is_empty() else zone.label).to_upper()
+	title.text = title_text(zone)
 	# As tall as the display face's line (9), once it applies: a Label sized
 	# before its font is set keeps the default face's height.
 	for label: Label in [number, title] as Array[Label]:

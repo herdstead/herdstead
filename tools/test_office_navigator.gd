@@ -115,8 +115,8 @@ func test_the_frame_indexes_one_projection() -> void:
 	_eq(frame.zone_of(_bee("bravo:p1")), _bee("bravo"), "on either machine")
 	_eq(
 		frame.zone_order,
-		[_local("data"), _local("notes"), _local("infra"), _local("web"), _local("api"), _bee("bravo"), _bee("alpha")],
-		"five Local zones and bee's two, as the rail draws them: highest on top, Local first"
+		[_local("api"), _local("web"), _local("infra"), _local("notes"), _local("data"), _bee("alpha"), _bee("bravo")],
+		"five Local zones and bee's two, as the rail draws them: ascending, Local first"
 	)
 	var map := frame.map_of(LOCAL)
 	_eq([map.key, map.zones.size()], [LOCAL, 5], "one map per machine, under the machine's key, with every zone")
@@ -262,49 +262,55 @@ func test_a_zone_on_the_shown_machine_pans_and_another_machine_switches() -> voi
 
 ## PageUp (-1) and PageDown (+1) walk every zone as the rail draws them, from
 ## the current one, from a machine's last zone into the next machine's first,
-## and stop at either end, where they pick and count nothing. (The rail draws
-## the highest zone on top, so within a machine PageUp still goes up in number;
-## across machines Local's lowest zone now leads down into bee's highest, the
-## next row of the rail, where the floors used to lead up from Local's top.)
+## and stop at either end, where they pick and count nothing. (The SPACES rail
+## is ascending, so PageUp goes to the lower number and PageDown to the higher,
+## the other way round from the FLOORS minimap, which drew the highest on top;
+## across machines Local's last zone leads down into bee's first.)
 func test_page_up_and_down_walk_the_buildings_and_stop_at_the_ends() -> void:
 	var frame := _frame(floors, basic)
-	var navigator := _showing(frame, _local("api"))
-	_eq(navigator.next_zone(frame, 1), _bee("bravo"), "Local's lowest zone leads into bee's highest")
-	_eq(navigator.next_zone(frame, -1), _local("web"), "one up")
+	var navigator := _showing(frame, _local("data"))
+	_eq(navigator.next_zone(frame, 1), _bee("alpha"), "Local's last zone leads into bee's first")
+	_eq(navigator.next_zone(frame, -1), _local("notes"), "one up, the lower number")
 	var revision := navigator.nav_revision
 	_check(navigator.step_zone(frame, 1), "PageDown crosses machines")
-	_eq([_show(navigator, frame), navigator.current_zone(frame)], [BEE, _bee("bravo")], "onto bee's map")
+	_eq([_show(navigator, frame), navigator.current_zone(frame)], [BEE, _bee("alpha")], "onto bee's map")
 	_check(navigator.step_zone(frame, 1), "and on down")
 	_eq(_show(navigator, frame), BEE, "")
 	_eq(navigator.next_zone(frame, 1), "", "nothing below the bottom")
 	_check(not navigator.step_zone(frame, 1), "PageDown at the bottom")
 	_eq(
 		[navigator.current_zone(frame), navigator.nav_revision],
-		[_bee("alpha"), revision + 2],
+		[_bee("bravo"), revision + 2],
 		"picks and counts nothing"
 	)
 	_check(navigator.step_zone(frame, -1) and navigator.step_zone(frame, -1), "back up across")
-	_eq([_show(navigator, frame), navigator.current_zone(frame)], [LOCAL, _local("api")], "onto Local's lowest")
-	navigator = _showing(frame, _local("data"))
+	_eq([_show(navigator, frame), navigator.current_zone(frame)], [LOCAL, _local("data")], "onto Local's last")
+	navigator = _showing(frame, _local("api"))
 	_eq(navigator.next_zone(frame, -1), "", "nothing above the top")
 	_check(not navigator.step_zone(frame, -1), "PageUp at the top does nothing")
 
 
-## The building section draws the highest zone on top and hangs each
-## worktree's mezzanines just below the zone they were made from, in letter
-## order; PageUp/PageDown follow that same picture.
+## A machine's section of the rail draws its zones ascending and hangs each
+## worktree's mezzanines right after the zone they were made from, in letter
+## order (OfficeNavigator.section()); PageUp/PageDown follow that same picture.
 func test_steps_follow_the_section_with_its_mezzanines() -> void:
 	var worktrees := _fixture("snapshot_worktrees")
 	var frame := _frame(worktrees, basic)
+	_eq(
+		OfficeNavigator.section(frame.building_of(LOCAL).zones).map(func(zone: ZoneModel) -> String: return zone.key),
+		[_local("hs"), _local("hud"), _local("data"), _local("notes"), _local("ops")],
+		"1, its mezzanines 1A and 1B, then 4 and the orphan worktree 5"
+	)
 	var navigator := _showing(frame, _local("hs"))
 	_eq(navigator.next_zone(frame, 1), _local("hud"), "down from a source zone into its first mezzanine")
+	_eq(navigator.next_zone(frame, -1), "", "the source is Local's first row: nothing above it")
 	navigator = _showing(frame, _local("data"))
-	_eq(navigator.next_zone(frame, 1), _bee("bravo"), "the last mezzanine of the lowest zone is Local's bottom")
+	_eq(navigator.next_zone(frame, 1), _local("notes"), "past its last mezzanine, the next zone by number")
 	_eq(navigator.next_zone(frame, -1), _local("hud"), "up the mezzanines")
 	navigator = _showing(frame, _local("hud"))
 	_eq(navigator.next_zone(frame, -1), _local("hs"), "back to their source")
-	navigator = _showing(frame, _local("hs"))
-	_eq(navigator.next_zone(frame, -1), _local("notes"), "and on to the zone above")
+	navigator = _showing(frame, _local("ops"))
+	_eq(navigator.next_zone(frame, 1), _bee("alpha"), "Local's last zone leads into bee's first")
 
 
 ## Each machine's map keeps where the viewer left it panned; a map seen for the
@@ -340,7 +346,7 @@ func test_a_first_arrival_opens_on_the_selections_pod_else_the_first_zone() -> v
 	navigator.pick_desk(_local("web:p1"))
 	navigator.settle(frame)
 	navigator.show_machine(frame, BEE, Vector2.ZERO)
-	_eq([navigator.pan_to, navigator.pan_zone], ["", _bee("bravo")], "a map without the selection: its first zone")
+	_eq([navigator.pan_to, navigator.pan_zone], ["", _bee("alpha")], "a map without the selection: its first zone")
 	navigator.take_pan_zone()
 	navigator.pick_zone(_local("infra"))
 	navigator.show_machine(frame, LOCAL, Vector2.ZERO)
@@ -752,9 +758,9 @@ func test_navigations_count_and_a_zone_is_picked_like_a_floor() -> void:
 	var frame := _frame(floors)
 	var navigator := _showing(frame, _local("api"))
 	var revision := navigator.nav_revision
-	_check(not navigator.step_zone(frame, 1), "nothing below the lowest zone")
+	_check(not navigator.step_zone(frame, -1), "nothing above the first zone")
 	_eq([navigator.pan_zone, navigator.nav_revision], ["", revision], "pans and counts nothing")
-	_check(navigator.step_zone(frame, -1), "one up")
+	_check(navigator.step_zone(frame, 1), "one down")
 	_eq([navigator.pan_zone, navigator.nav_revision], [_local("web"), revision + 1], "pans to it, one navigation")
 	_check(navigator.next_human(frame), "`N`")
 	_eq(navigator.nav_revision, revision + 2, "one more")
@@ -775,6 +781,52 @@ func test_navigations_count_and_a_zone_is_picked_like_a_floor() -> void:
 		[_local("web:p2"), _local("web:p2"), true, _local("web:p2")],
 		"which selects it and frames its pod"
 	)
+
+
+## A machine picked (pick_machine(): its SPACES heading) shows that machine's
+## map and counts one navigation; it picks no desk and no zone, drops a zone
+## pan still pending, and leaves where the map opens to the map (its first
+## arrival, or where the viewer left it); a machine that is gone is forgotten.
+## A desk asked for (pan_to_desk(): an edge arrow) is one minimal pan, one
+## navigation, and no selection.
+func test_a_machine_pick_and_a_desk_pan_count_one_and_select_nothing() -> void:
+	var frame := _frame(floors, basic)
+	var navigator := OfficeNavigator.new()
+	_eq(_show(navigator, frame), LOCAL, "Local's map, holding herdr's focus")
+	var revision := navigator.nav_revision
+	navigator.pick_zone(_local("infra"))
+	navigator.pick_machine(BEE)
+	_eq(
+		[navigator.picked_machine, navigator.pan_zone, navigator.nav_revision],
+		[BEE, "", revision + 2],
+		"the machine picked, the zone pan it replaces dropped, one navigation each"
+	)
+	_eq(navigator.settle(frame), BEE, "bee's map is the one wanted")
+	navigator.show_machine(frame, BEE, Vector2(10, 20))
+	_eq([navigator.pan_to, navigator.pan_zone], ["", _bee("alpha")], "a first arrival: bee's first zone")
+	_eq(navigator.pan_of(LOCAL), Vector2(10, 20), "Local's map remembers where it was left")
+	_eq([navigator.picked_key, navigator.active_key], ["", _local("api:p1")], "no desk is picked: herdr's focus still")
+	_eq(navigator.current_zone(frame), "", "and no zone of bee's is current")
+	navigator.take_pan_zone()
+	navigator.pick_machine(LOCAL)
+	_eq(navigator.settle(frame), LOCAL, "back to Local")
+	navigator.show_machine(frame, LOCAL, Vector2.ZERO)
+	_eq([navigator.pan_to, navigator.pan_zone], ["", ""], "a map shown before asks for no pan")
+	_eq(navigator.pan_of(LOCAL), Vector2(10, 20), "it opens where it was left")
+	_eq(navigator.nav_revision, revision + 3, "one more navigation")
+	navigator.pick_machine("nobody")
+	_eq([navigator.settle(frame), navigator.picked_machine], [LOCAL, ""], "a machine that is gone is forgotten")
+	revision = navigator.nav_revision
+	navigator.pick_zone(_local("web"))
+	navigator.pan_to_desk(_local("infra:p1"))
+	_eq(
+		[navigator.pan_to, navigator.pan_whole_table, navigator.pan_zone, navigator.reveal_on_arrival],
+		[_local("infra:p1"), false, "", ""],
+		"one pan, as far as it takes, replacing the zone pan pending"
+	)
+	_eq(navigator.nav_revision, revision + 2, "one navigation for the zone, one for the desk")
+	_eq([navigator.picked_key, navigator.active_key], ["", _local("api:p1")], "and nothing is selected")
+	_eq([navigator.take_pan_to(), navigator.take_pan_to()], [_local("infra:p1"), ""], "taken once")
 
 
 # --- the command line ---------------------------------------------------------

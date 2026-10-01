@@ -27,8 +27,8 @@ const NEW_PANE_UNPICKED: Dictionary[OfficePaneInspector.Unpicked, String] = {
 }
 ## A lost answer, by what was asked: the snapshot is the only judge.
 const CLOSE_UNKNOWN := "Close: no answer from herdr. The next snapshot shows whether %s closed."
-const SPACE_UNKNOWN := "New space: no answer from herdr; if a new floor appears, that is it."
-const WORKTREE_UNKNOWN := "New worktree: no answer from herdr; git may have run. If a new floor appears, that is it."
+const SPACE_UNKNOWN := "New space: no answer from herdr; if a new space appears, that is it."
+const WORKTREE_UNKNOWN := "New worktree: no answer from herdr; git may have run. If a new space appears, that is it."
 
 
 ## `3s`, `12m`, `2h`: as short as the caption line needs.
@@ -146,14 +146,14 @@ static func write_outcome_detail(ticket: CommandTicket) -> String:
 	match ticket.state:
 		CommandTicket.State.ACCEPTED:
 			if focus:
-				return "herdr switched its shared view to this pane, and this table's UNREAD is cleared."
+				return "herdr switched its shared view to this pane, and this tab's UNREAD is cleared."
 			if kind == CommandContext.Kind.CLOSE:
 				return (
 					(
 						"herdr closed pane %s: its terminal ended at once. The next snapshot shows it gone;"
 						% ticket.context.pane_id
 					)
-					+ " its tab or floor goes with it when it was the last pane there."
+					+ " its tab or space goes with it when it was the last pane there."
 				)
 			if ticket.space != null and kind == CommandContext.Kind.WORKTREE:
 				return (
@@ -161,12 +161,12 @@ static func write_outcome_detail(ticket: CommandTicket) -> String:
 						"herdr made worktree %s as workspace %s; herdr's view stayed where it was."
 						% [ticket.context.branch, ticket.space.workspace_id]
 					)
-					+ " The office picks the new floor's shell once a snapshot shows it."
+					+ " The office picks the new space's shell once a snapshot shows it."
 				)
 			if ticket.space != null:
 				return (
 					(
-						"herdr made workspace %s, a floor with one shell; herdr's view stayed where it was."
+						"herdr made workspace %s, a space with one shell; herdr's view stayed where it was."
 						% ticket.space.workspace_id
 					)
 					+ " The office picks its shell once a snapshot shows it."
@@ -229,7 +229,7 @@ static func unpicked_detail(why: OfficePaneInspector.Unpicked, pane_id: String) 
 		OfficePaneInspector.Unpicked.MOVED_ON:
 			detail = (
 				(
-					"You had moved on (another floor, or answer mode) before pane %s showed, so the office left you"
+					"You had moved on (another space, or answer mode) before pane %s showed, so the office left you"
 					% pane_id
 				)
 				+ " where you were and did not pick it."

@@ -430,7 +430,7 @@ func test_new_worktree_sends_four_fields_and_the_mezzanine_hangs_under_its_paren
 	await _type("v1-a")
 	_eq(_branch_box(office).text, "v1-a", "typed as it is")
 	await _until(func() -> bool: return not trees.disabled, "a good branch: on")
-	_eq(_manage_note(office), "New worktree: branch v1-a from this floor", "the note names it")
+	_eq(_manage_note(office), "New worktree: branch v1-a from this space", "the note names it")
 	_check(
 		"git hooks on Local" in trees.tooltip_text and "checks it out if it exists" in trees.tooltip_text,
 		"the tooltip: " + trees.tooltip_text
@@ -603,7 +603,7 @@ func test_a_mezzanine_source_is_off_and_herdrs_git_refusals_show_one_line() -> v
 	)
 	var footers := PackedStringArray(
 		[
-			"herdr refused: start from the repo's own floor",
+			"herdr refused: start from the repo's own space",
 			"herdr refused: not a git repo",
 			"herdr refused: git: fatal: 'v1-a' is already used by worktree at '/home/tester/.herdr/worktrees/herdstead/v1-a'",
 			"",
@@ -650,7 +650,7 @@ func test_a_lost_space_or_worktree_answer_is_unknown_and_never_resent() -> void:
 	await _click_control(spacer)
 	await _until(
 		func() -> bool:
-			return card.outcome_text() == "New space: no answer from herdr; if a new floor appears, that is it.",
+			return card.outcome_text() == "New space: no answer from herdr; if a new space appears, that is it.",
 		"the footer: no answer"
 	)
 	var w6 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "w6")
@@ -668,7 +668,7 @@ func test_a_lost_space_or_worktree_answer_is_unknown_and_never_resent() -> void:
 		func() -> bool:
 			return (
 				card.outcome_text()
-				== "New worktree: no answer from herdr; git may have run. If a new floor appears, that is it."
+				== "New worktree: no answer from herdr; git may have run. If a new space appears, that is it."
 			),
 		"the footer: git may have run"
 	)
@@ -681,8 +681,8 @@ func test_a_lost_space_or_worktree_answer_is_unknown_and_never_resent() -> void:
 
 
 ## The viewer navigating while a new space is on its way is moving on (codex
-## #5), even back to where they were: New space, then a real PageUp (a pan to
-## bravo on the same map) and PageDown (alpha again) before a snapshot shows the
+## #5), even back to where they were: New space, then a real PageDown (a pan to
+## bravo on the same map) and PageUp (alpha again) before a snapshot shows the
 ## new zone: its shell is not picked, the footer says so, and one space was made.
 func test_a_new_space_is_not_picked_after_the_viewer_paged_away() -> void:
 	var office := await _shell_local()
@@ -695,10 +695,11 @@ func test_a_new_space_is_not_picked_after_the_viewer_paged_away() -> void:
 	_ctl("control-a", "next", {"action": "delay", "method": "session.snapshot", "seconds": 2.5})
 	await _click_control(spacer)
 	await _until(func() -> bool: return card.outcome_text() == "New space w3", "herdr made w3")
-	await _navigate_key(office, KEY_PAGEUP)
-	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(HerdrFleet.LOCAL, "bravo"), "PageUp: bravo")
+	# The rail is ascending: bravo (2) is the row after alpha (1).
 	await _navigate_key(office, KEY_PAGEDOWN)
-	_eq(office.navigator.current_zone(office.frame), alpha, "PageDown: alpha again")
+	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(HerdrFleet.LOCAL, "bravo"), "PageDown: bravo")
+	await _navigate_key(office, KEY_PAGEUP)
+	_eq(office.navigator.current_zone(office.frame), alpha, "PageUp: alpha again")
 	var w3 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "w3")
 	_check(office.frame.find_zone(w3) == null, "before any snapshot showed the new zone")
 	await _until(func() -> bool: return office.frame.find_zone(w3) != null, "a snapshot shows it")
@@ -826,7 +827,7 @@ func _manage_note(office: OfficeDouble) -> String:
 
 ## The FLOORS column's chips, top to bottom (`5F`, `1A` …).
 func _chips(office: OfficeDouble) -> Array:
-	var minimap := office.hud.floors
+	var minimap := office.hud.spaces
 	return minimap.row_keys().map(
 		func(key: String) -> String: return (minimap.row_for(key).get_node("%Number") as Label).text
 	)

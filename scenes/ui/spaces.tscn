@@ -1,10 +1,10 @@
 [gd_scene load_steps=4 format=3]
 
-[ext_resource type="Script" path="res://scripts/ui/floors.gd" id="1"]
-[ext_resource type="PackedScene" path="res://scenes/ui/floor_row.tscn" id="2"]
+[ext_resource type="Script" path="res://scripts/ui/spaces.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/ui/space_row.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/ui/building_heading.tscn" id="3"]
 
-[node name="Floors" type="PanelContainer"]
+[node name="Spaces" type="PanelContainer"]
 anchor_bottom = 1.0
 offset_left = 16.0
 offset_top = 40.0
@@ -35,7 +35,7 @@ offset_bottom = 17.0
 grow_horizontal = 2
 mouse_filter = 2
 theme_type_variation = &"DisplayHeading"
-text = "FLOORS"
+text = "SPACES"
 
 [node name="Scroll" type="ScrollContainer" parent="Body"]
 unique_name_in_owner = true

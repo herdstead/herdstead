@@ -1,15 +1,18 @@
 class_name OfficeStrategic
 extends HdPanel
 ## The strategic view (scenes/ui/strategic.tscn): press
-## `S` and the world rect shows a flat schematic of the shown floor instead of
-## the world: every table a box with its tab's name, every seated pane a square
-## in its FLOORS window's colour, a blocked one saying how long it has waited
+## `S` and the world rect shows a flat schematic of the shown machine's map
+## instead of the world: a captioned section per zone, in the SPACES rail's
+## order, every pod a box with its tab's name, every seated pane a square
+## in its SPACES window's colour, a blocked one saying how long it has waited
 ## (OfficeStrategicPlan). A click on a square picks that pane, and the office
 ## closes the view and pans its desk into sight; `S` and Escape close it too.
+## A SPACES row picked while it is open scrolls it to that zone's section
+## (reveal_section()), or draws it again for that row's machine.
 ##
 ## It covers only the world rect (OfficeHud.show_strategic() places it there),
 ## over the hidden world and under the OVERVIEW, the bubble tooltip and the
-## monitor: FLOORS, the drawer, the staff panel and NEWS stay usable beside it.
+## monitor: SPACES, the drawer, the staff panel and NEWS stay usable beside it.
 ## On the pack's panel, like the OVERVIEW, so its ink reads in every pack (the
 ## bare backdrop was near ink in the retired dusk pack). A view mode, not a layer: while it is
 ## open the world's nameplates, badges and bubbles are hidden with the world,
@@ -95,6 +98,24 @@ func title_text() -> String:
 ## Dash pane `key`'s square; empty for none.
 func point(key: String) -> void:
 	plan().point(key)
+
+
+## Scroll the schematic so that the caption of zone `key`'s section is in
+## sight, at the top of the room when it was out of it; nothing for a zone with
+## no section, or a schematic that does not scroll. After the layout settles:
+## the scroll's range is only right once the schematic has its new size.
+func reveal_section(key: String) -> void:
+	_reveal_section.call_deferred(key)
+
+
+func _reveal_section(key: String) -> void:
+	var bands := plan().section_rects(key)
+	if bands.is_empty():
+		return
+	var scroll: ScrollContainer = %Scroll
+	var top := bands[0].position.y
+	if top < scroll.scroll_vertical or bands[0].end.y > scroll.scroll_vertical + scroll.size.y:
+		scroll.scroll_vertical = int(top)
 
 
 ## The room the schematic has in a view `outer` units big: the panel's frame,

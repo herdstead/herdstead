@@ -62,11 +62,11 @@ const CLOSE_KILL_DETAILS: Dictionary[String, String] = {
 const CLOSE_LINE_ROWS := 3
 const CLOSE_LINE_SHELL := "Closes %s (shell)."
 const CLOSE_LINE_AGENT := "Closes %s's pane %s."
-const CLOSE_LINE_TAB := " and its table %s (last pane of the tab)."
-const CLOSE_LINE_SPACE := ' and floor %s "%s" (last pane of the space).'
+const CLOSE_LINE_TAB := " and its tab %s (last pane of the tab)."
+const CLOSE_LINE_SPACE := ' and space %s "%s" (last pane of the space).'
 const CLOSE_LINE_MEZZANINE := ' and mezzanine %s "%s". The checkout stays on disk.'
-const SPACE_NOTE := "New space: a floor with one shell in %s"
-const WORKTREE_NOTE := "New worktree: branch %s from this floor"
+const SPACE_NOTE := "New space: a space with one shell in %s"
+const WORKTREE_NOTE := "New worktree: branch %s from this space"
 const BRANCH_NOTE := "Branch: %s"
 
 
@@ -217,13 +217,13 @@ func hide_manage() -> void:
 
 ## The confirm line for closing pane `pane_id` with `scope` (CloseScope):
 ## `Closes w2:p3 (shell).` / `Closes CODEX's pane w2:p3.`, and what goes with
-## it: its table, its floor, or its mezzanine.
+## it: its tab, its space, or its mezzanine.
 static func close_line(scope: CloseScope, pane_id: String) -> String:
 	var who := scope.who()
 	var line := CLOSE_LINE_SHELL % pane_id if who.is_empty() else CLOSE_LINE_AGENT % [who, pane_id]
 	if scope.last_of_space:
-		var floor_words := CLOSE_LINE_MEZZANINE if scope.mezzanine else CLOSE_LINE_SPACE
-		line = line.trim_suffix(".") + floor_words % [scope.level_label, scope.space_label]
+		var space_words := CLOSE_LINE_MEZZANINE if scope.mezzanine else CLOSE_LINE_SPACE
+		line = line.trim_suffix(".") + space_words % [scope.level_label, scope.space_label]
 	elif scope.last_of_tab:
 		line = line.trim_suffix(".") + CLOSE_LINE_TAB % scope.tab_id
 	return line

@@ -1,10 +1,19 @@
 class_name OfficeBuildingHeading
 extends VBoxContainer
-## One building's heading in the FLOORS minimap: the pack's icon for how its machine
-## is answering, and its label. Kept and updated in place like the rows below
-## it, and re-dressed rather than rebuilt when the theme changes.
+## One machine's heading in the SPACES rail: the pack's icon for how its machine
+## is answering, and its label, on a button (`%Press`). A click on it shows that
+## machine's map (the office decides; a machine that never connected opens as
+## an empty map), and the heading of the machine whose map is shown is the
+## highlighted one (SpaceHeadingCurrent). Kept and updated in place like the
+## rows below it, and re-dressed rather than rebuilt when the theme changes.
+##
+## A container, not the button itself: every heading but the first keeps a gap
+## above it (`%Gap`), which the button must not grow into.
 
-## Building state -> the pack's UI image for it. These are display overlays,
+## The heading was pressed; `key` is its machine's key.
+signal picked(key: String)
+
+## Machine state -> the pack's UI image for it. These are display overlays,
 ## not herdr states: a machine is answering, still opening its forward, or gone.
 const MARKS: Dictionary[MachineLiveness.State, StringName] = {
 	MachineLiveness.State.LIVE: ArtContract.UI_CONNECTED,
@@ -12,9 +21,16 @@ const MARKS: Dictionary[MachineLiveness.State, StringName] = {
 	MachineLiveness.State.OFFLINE: ArtContract.UI_OFFLINE,
 }
 
+## The machine this heading stands for; empty until show_machine().
+var key := ""
+
 var _art: ArtPack
 ## The state drawn now, so a theme switch can redraw the same mark.
 var _state := MachineLiveness.State.CONNECTING
+
+
+func _ready() -> void:
+	button().pressed.connect(func() -> void: picked.emit(key))
 
 
 ## Take the pack's icon art. Called again on a theme switch, which re-dresses
@@ -24,23 +40,41 @@ func dress(art: ArtPack) -> void:
 	_draw_mark()
 
 
-## `gap` adds the breathing room every heading but the first gets.
-func show_building(label: String, state: MachineLiveness.State, gap: bool) -> void:
+## Machine `machine`, named `label`, answering as `state` says. `gap` adds the
+## breathing room every heading but the first gets; `current` is its map being
+## the one shown.
+func show_machine(machine: String, label: String, state: MachineLiveness.State, gap: bool, current: bool) -> void:
+	key = machine
 	_state = state
-	var building_label: Label = %BuildingLabel
+	var machine_label: Label = %BuildingLabel
 	var gap_row: Control = %Gap
-	building_label.text = label.to_upper()
-	# The label clips, most of all in the FLOORS rail: its tooltip names the machine whole.
-	if building_label.tooltip_text != label:
-		building_label.tooltip_text = label
+	var press := button()
+	machine_label.text = label.to_upper()
+	# The label clips, most of all in the narrow rail: the tooltip names the machine whole.
+	if press.tooltip_text != label:
+		press.tooltip_text = label
 	gap_row.visible = gap
-	# The name dims with the building's floors; the mark keeps saying why.
+	var look := &"SpaceHeadingCurrent" if current else &"SpaceHeading"
+	if press.theme_type_variation != look:
+		press.theme_type_variation = look
+	machine_label.theme_type_variation = &"LabelPaper" if current else &"LabelWoodDark"
+	# The name dims with the machine's zones; the mark keeps saying why.
 	var live := state == MachineLiveness.State.LIVE
-	building_label.modulate = Color.WHITE if live or _art == null else _art.stale_tint
+	machine_label.modulate = Color.WHITE if live or _art == null else _art.stale_tint
 	_draw_mark()
 
 
-## The sprite showing how this building's machine is answering.
+## The button a click lands on: the heading without its gap.
+func button() -> Button:
+	return %Press
+
+
+## Whether this heading is the highlighted one: its machine's map is shown.
+func is_current() -> bool:
+	return button().theme_type_variation == &"SpaceHeadingCurrent"
+
+
+## The sprite showing how this machine is answering.
 func mark_icon() -> Sprite2D:
 	var mark: Control = %Mark
 	return mark.get_node("Icon")

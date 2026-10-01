@@ -399,9 +399,9 @@ func test_a_new_workspace_is_a_zone_its_people_walk_into() -> void:
 	_done(office)
 
 
-## PageUp pans to another zone of the same map: the world is not built again,
+## PageDown pans to another zone of the same map: the world is not built again,
 ## so it is no cold pass: whoever was walking walks on, along the same route.
-func test_a_pageup_pans_without_rebuilding() -> void:
+func test_a_pagedown_pans_without_rebuilding() -> void:
 	var office := await _live_office()
 	_feed(office, _with(fixture, "api:p1", {"agent_status": "idle"}))
 	var body := _station(office, _pane("api:p1")).actor()
@@ -410,8 +410,8 @@ func test_a_pageup_pans_without_rebuilding() -> void:
 	var route := _route(office, body)
 	var world := office.world.get_instance_id()
 	var pan := office.camera.pan
-	await _office_key(office, KEY_PAGEUP)
-	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "web"), "PageUp pans to web")
+	await _office_key(office, KEY_PAGEDOWN)
+	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "web"), "PageDown pans to web")
 	_check(office.camera.pan != pan, "the camera moved")
 	_eq(office.world.get_instance_id(), world, "the world is not built again")
 	_check(_walkers(office).has(body), "api:p1 still walks: no cold pass")
@@ -421,7 +421,7 @@ func test_a_pageup_pans_without_rebuilding() -> void:
 
 ## A map drawn afresh (another theme, or another machine's map and back) shows
 ## everyone where they belong, walks nobody and has no ghosts. (Another zone of
-## the same map is no longer drawn afresh: test_a_pageup_pans_without_rebuilding.)
+## the same map is no longer drawn afresh: test_a_pagedown_pans_without_rebuilding.)
 func test_a_new_theme_or_floor_walks_nobody() -> void:
 	var office := await _two_machine_office(fixture, PLAN_SCREEN)
 	_feed(office, _without(_with(fixture, "api:p1", {"agent_status": "idle"}), "api:p2"))

@@ -76,24 +76,24 @@ func test_a_takes_and_gives_back_the_keyboard() -> void:
 	_done(office)
 
 
-## PageUp pans zone to zone on the same map, with the list holding the
-## keyboard or not: the list keeps the keyboard and its cursor, and the FLOORS
-## rows stay enabled.
+## PageDown pans zone to zone on the same map (the rail is ascending: on to
+## the higher number), with the list holding the keyboard or not: the list
+## keeps the keyboard and its cursor, and the SPACES rows stay enabled.
 func test_list_keeps_the_keyboard_across_a_floor_switch() -> void:
 	var office := await _listed_office()
 	var zone := func() -> String: return office.navigator.current_zone(office.frame)
-	await _key_cycle(KEY_PAGEUP)
-	_eq(zone.call(), HerdrFleet.pane_key(LOCAL, "web"), "PageUp pans to the next zone at once")
+	await _key_cycle(KEY_PAGEDOWN)
+	_eq(zone.call(), HerdrFleet.pane_key(LOCAL, "web"), "PageDown pans to the next zone at once")
 	await _key_cycle(KEY_A)
 	var list := office.hud.agent_list
 	_check(list.has_keyboard(), "A reaches the list there")
 	var cursor := list.cursor()
-	await _key_cycle(KEY_PAGEUP)
-	_eq(zone.call(), HerdrFleet.pane_key(LOCAL, "infra"), "PageUp pans again, list or not")
+	await _key_cycle(KEY_PAGEDOWN)
+	_eq(zone.call(), HerdrFleet.pane_key(LOCAL, "infra"), "PageDown pans again, list or not")
 	_eq(office.navigator.shown_key, LOCAL, "on the same map")
 	_check(list.has_keyboard(), "the pan and its refresh keep the list's keyboard")
 	_eq(list.cursor(), cursor, "and its cursor")
-	var row := office.hud.floors.row_for(HerdrFleet.pane_key(LOCAL, "infra"))
+	var row := office.hud.spaces.row_for(HerdrFleet.pane_key(LOCAL, "infra"))
 	_check(not row.disabled, "the zone rows stay enabled")
 	_done(office)
 

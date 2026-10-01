@@ -340,7 +340,7 @@ func test_the_line_names_the_table_floor_or_mezzanine_and_they_go() -> void:
 	await _until(func() -> bool: return closer.is_visible_in_tree() and not closer.disabled, "hs:p4: Close offered")
 	await _click_control(closer)
 	await _frames(2)
-	_eq(_line(office), "Closes hs:p4 (shell) and its table hs:t2 (last pane of the tab).", "the last pane of a tab")
+	_eq(_line(office), "Closes hs:p4 (shell) and its tab hs:t2 (last pane of the tab).", "the last pane of a tab")
 	await _click_control(closer)
 	await _until(func() -> bool: return office.frame.pane(p4) == null, "closed")
 	await _until(
@@ -357,7 +357,7 @@ func test_the_line_names_the_table_floor_or_mezzanine_and_they_go() -> void:
 	await _frames(2)
 	_eq(
 		_line(office),
-		'Closes notes:p1 (shell) and floor 4 "notes" (last pane of the space).',
+		'Closes notes:p1 (shell) and space 4 "notes" (last pane of the space).',
 		"the last pane of a floor"
 	)
 	await _click_control(closer)
@@ -410,7 +410,7 @@ func test_the_repos_own_floor_with_mezzanines_open_never_closes() -> void:
 	await _frames(3)
 	_check(closer.disabled, "Close is off")
 	_check(
-		"mezzanines" in closer.tooltip_text and "floor 1" in closer.tooltip_text,
+		"mezzanines" in closer.tooltip_text and "space 1" in closer.tooltip_text,
 		"the tooltip says why: " + closer.tooltip_text
 	)
 	await _click_control(closer)
@@ -455,7 +455,7 @@ func test_a_working_or_blocked_agent_is_said_to_be_killed() -> void:
 	_eq(_note(office), "Kills PI mid-question.", "a blocked agent")
 	_eq(
 		_line(office),
-		'Closes PI\'s pane bravo:p1 and floor 2 "bravo desk" (last pane of the space).',
+		'Closes PI\'s pane bravo:p1 and space 2 "bravo desk" (last pane of the space).',
 		"alone on its floor"
 	)
 	await _click_control(closer)

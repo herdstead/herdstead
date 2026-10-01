@@ -1229,7 +1229,7 @@ func _show_action() -> void:
 	button.text = "Switch herdr here" if _machine.is_empty() else "Switch herdr on " + _machine
 	button.tooltip_text = (
 		"Switches the shared view of %s to this pane: every terminal attached to it follows." % where
-		+ "\nIt also clears UNREAD for every pane on this table, not just this one."
+		+ "\nIt also clears UNREAD for every pane on this tab, not just this one."
 	)
 
 

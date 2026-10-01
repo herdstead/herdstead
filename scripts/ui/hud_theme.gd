@@ -67,7 +67,7 @@ const LABEL_HEADINGS: Dictionary[StringName, StringName] = {
 	&"CounterValuePaper": ArtContract.PAPER,
 }
 ## The pack's display face (ArtPack.display_font, a pixel font on an 8-pixel
-## grid) for the fixed ASCII headings: the wordmark, and FLOORS, NEWS and
+## grid) for the fixed ASCII headings: the wordmark, and SPACES, NEWS and
 ## NEXT. Sizes are multiples of 4 units, so every even content scale lands its
 ## glyphs on whole screen pixels (at 2x a 4-unit step is 8 pixels). Without a
 ## display face these fall back to the main font at the same size.
@@ -82,14 +82,16 @@ const DISPLAY_COLORS: Dictionary[StringName, StringName] = {
 	&"DisplayHeadingMuted": ArtContract.MUTED,
 }
 ## Panel variations that are a flat fill of one palette colour: the bar's
-## ground and the minimap's floor chips. A building's heading wears the pack's
-## own icon rather than a coloured square, so it needs none of these.
+## ground, the SPACES rail's number chips and the slim bar a row whose zone is
+## in view wears at its left edge. A machine's heading wears the pack's own
+## icon rather than a coloured square, so it needs none of these.
 const FLAT_PANELS: Dictionary[StringName, StringName] = {
 	&"BarBackground": ArtContract.DEEP,
 	&"RowChip": ArtContract.SLATE,
 	&"RowChipCurrent": ArtContract.PAPER,
+	&"SpaceRowInView": ArtContract.PAPER,
 }
-## The minimap's window looks (scenes/ui/floor_row.tscn picks one
+## The SPACES rail's window looks (scenes/ui/space_row.tscn picks one
 ## per pane): a state's own colour, idle lit plainly, and dark for a shell or a
 ## machine that is not answering.
 const SECTION_PANELS: Dictionary[StringName, StringName] = {
@@ -184,32 +186,37 @@ static func build(art: ArtPack, font: Font) -> Theme:
 	_chime_switch(theme, art)
 	_tooltips(theme, art)
 	_agent_list(theme, art)
-	_signpost(theme, art)
+	_edge_arrows(theme, art)
 	_plate(theme, art)
 	_card(theme, art, font)
 	_section(theme, art)
 	_monitor(theme, art, font)
 	_news(theme, art)
 	_overview(theme, art)
-	_strategic(theme, art, heading)
+	_strategic(theme, art, heading, font)
 	return theme
 
 
 ## The strategic view (`S`, scenes/ui/strategic.tscn), drawn by
-## OfficeStrategicPlan._draw() on the pack's (dark) panel: one colour per FLOORS
+## OfficeStrategicPlan._draw() on the pack's (dark) panel: one colour per SPACES
 ## window look (SECTION_PANELS, the one scale), the tables' `frame` in muted with
 ## a slate `divider` between their far and near seats, the tab's `caption` in
 ## paper and a blocked square's `wait` in ink on it, the selection's `corner`s in
 ## the blocked colour (the world's selection, as vector corners) and the
 ## pointer's dash in ink and paper (`pointer_a`, `pointer_b`, OfficePointer's).
+## A zone's section caption (`section_caption`) is plain text too: paper, the
+## panel's own text colour, in the face and size of the zone's sign in the
+## world (the pack's display face at `section_size`), never the zone's accent,
+## with a slate rule (`divider`) on from it to its column's edge.
 ## The measures, in units: `pad` inside a table's box, `gap` between boxes,
-## `caption_height` above one, `divider` between its two rows of seats, `ring`
+## `caption_height` above one, `section_caption` the band above a section's
+## first row, `divider` between its two rows of seats, `ring`
 ## round a square (the square is its cell less the ring on both sides), `rule`
 ## the width of every line, `dash` a pointer stroke, `corner_part` the share of
 ## a cell a corner's arm takes (a cell / corner_part), and `wait_from` the
 ## smallest cell that writes a wait in its square. The cell ladder is the
 ## scene's (%Plan).
-static func _strategic(theme: Theme, art: ArtPack, heading: Font) -> void:
+static func _strategic(theme: Theme, art: ArtPack, heading: Font, font: Font) -> void:
 	theme.add_type("Strategic")
 	for name: StringName in SECTION_PANELS:
 		theme.set_color(name, "Strategic", art.color(SECTION_PANELS[name]))
@@ -217,6 +224,7 @@ static func _strategic(theme: Theme, art: ArtPack, heading: Font) -> void:
 		&"frame": ArtContract.MUTED,
 		&"divider": ArtContract.SLATE,
 		&"caption": ArtContract.PAPER,
+		&"section_caption": ArtContract.PAPER,
 		&"wait": ArtContract.INK,
 		&"corner": ArtContract.BLOCKED,
 		&"pointer_a": ArtContract.INK,
@@ -228,6 +236,8 @@ static func _strategic(theme: Theme, art: ArtPack, heading: Font) -> void:
 		&"pad": 4,
 		&"gap": 8,
 		&"caption_height": 12,
+		&"section_caption": 9,
+		&"section_size": 8,
 		&"divider": 2,
 		&"ring": 2,
 		&"rule": 1,
@@ -240,6 +250,15 @@ static func _strategic(theme: Theme, art: ArtPack, heading: Font) -> void:
 	for name: StringName in measures:
 		theme.set_constant(name, "Strategic", measures[name])
 	theme.set_font("caption_font", "Strategic", heading)
+	# The sign's face, with the HUD font's own fallbacks for the glyphs it lacks
+	# (a workspace's label may be anything).
+	var section := heading
+	if art.display_font != null:
+		var small := FontVariation.new()
+		small.base_font = art.display_font
+		small.fallbacks = font.fallbacks
+		section = small
+	theme.set_font("section_font", "Strategic", section)
 	theme.set_font("wait_font", "Strategic", heading)
 
 
@@ -475,8 +494,10 @@ static func _answer(theme: Theme, art: ArtPack) -> void:
 
 
 ## The floor plate in the world (scenes/world/floor_plate.tscn): a band of the
-## pack's panel whose text keeps clear of its frame, and a title in the world's
-## own 13-unit lettering rather than a HUD heading's heavier cut.
+## pack's panel whose text keeps clear of its frame, a title in the world's
+## own 13-unit lettering rather than a HUD heading's heavier cut, and the line
+## that says why the map cannot be laid out (`PlateProblem`), in the blocked
+## colour, which reads on the band's dark panel.
 static func _plate(theme: Theme, art: ArtPack) -> void:
 	theme.set_type_variation("PlateBand", "PanelContainer")
 	var band := StyleBoxEmpty.new()
@@ -486,24 +507,28 @@ static func _plate(theme: Theme, art: ArtPack) -> void:
 	band.content_margin_bottom = 1
 	theme.set_stylebox("panel", "PlateBand", band)
 	_label(theme, &"PlateTitle", 13, art.color(ArtContract.PAPER))
+	_label(theme, &"PlateProblem", 10, art.color(ArtContract.BLOCKED))
 
 
-## The signposts over the world's right edge (scenes/ui/signpost.tscn): a
-## small dark button, the same unmistakable disabled look for the `+N floors`
-## post, which is a note, not a way there, and the spacing of a post's line in
-## its full and its compact form.
-static func _signpost(theme: Theme, art: ArtPack) -> void:
-	theme.set_type_variation("Signpost", "Button")
+## The arrows on the world's edges (scenes/ui/edge_arrow.tscn): a small dark
+## button, the same unmistakable disabled look for the `+N` note, which is a
+## count, not a way there, and the spacing of an arrow's line. The `EdgeArrows`
+## type is what OfficeEdgeArrows places them by, in units: `inset` from the
+## world's edge, `gap` between two arrows on one edge.
+static func _edge_arrows(theme: Theme, art: ArtPack) -> void:
+	theme.set_type_variation("EdgeArrow", "Button")
 	for state: String in BUTTON_STATES:
 		var box := _dark_button(art, state)
-		box.content_margin_left = 2
-		box.content_margin_right = 2
+		box.content_margin_left = 3
+		box.content_margin_right = 3
 		box.content_margin_top = 1
 		box.content_margin_bottom = 1
-		theme.set_stylebox(state, "Signpost", box)
-	# A post's line: its words spaced as a card's.
-	theme.set_type_variation(&"SignpostLine", "HBoxContainer")
-	theme.set_constant("separation", &"SignpostLine", 3)
+		theme.set_stylebox(state, "EdgeArrow", box)
+	theme.set_type_variation(&"EdgeArrowLine", "HBoxContainer")
+	theme.set_constant("separation", &"EdgeArrowLine", 3)
+	theme.add_type("EdgeArrows")
+	theme.set_constant("inset", "EdgeArrows", 4)
+	theme.set_constant("gap", "EdgeArrows", 4)
 
 
 ## The panel type HdPanel draws itself: the stylebox is empty on purpose and
@@ -522,30 +547,36 @@ static func _panel(theme: Theme, art: ArtPack) -> void:
 	theme.set_stylebox("panel", "HdPanelBare", StyleBoxEmpty.new())
 
 
-## The minimap's rows. Godot's default Button draws grey chrome and a focus
-## ring; every button here is drawn by this theme instead.
+## The SPACES rail's rows and headings. Godot's default Button draws grey
+## chrome and a focus ring; every button here is drawn by this theme instead.
 static func _buttons(theme: Theme, art: ArtPack) -> void:
 	for state: String in BUTTON_STATES:
 		theme.set_stylebox(state, "Button", StyleBoxEmpty.new())
 	theme.set_color("font_color", "Button", art.color(ArtContract.PAPER))
-	for name: String in ["FloorRow", "FloorRowCurrent", "FloorRowPointed"]:
+	var plain: Array[String] = ["SpaceRow", "SpaceRowPointed", "SpaceHeading", "SpaceHeadingCurrent"]
+	for name in plain:
 		theme.set_type_variation(name, "Button")
 		theme.set_constant("outline_size", name, 0)
-	# The shown floor is the only broad highlight in the minimap: `slate`.
+	# A row and a heading light `deep` under the pointer and `slate` while
+	# pressed. The heading of the machine whose map is shown is the only broad
+	# highlight in the rail: `slate`. (Which zones are in view is the slim bar
+	# at a row's left edge, `SpaceRowInView`.)
 	for state: String in BUTTON_STATES:
-		theme.set_stylebox(state, "FloorRow", StyleBoxEmpty.new())
-		theme.set_stylebox(state, "FloorRowCurrent", _flat(art.color(ArtContract.SLATE)))
-	theme.set_stylebox("hover", "FloorRow", _flat(art.color(ArtContract.DEEP)))
-	theme.set_stylebox("pressed", "FloorRow", _flat(art.color(ArtContract.SLATE)))
-	# A floor a hovered HUD line names: a 1-unit paper edge and no fill, in
-	# every state, beside the current floor's filled row.
+		theme.set_stylebox(state, "SpaceRow", StyleBoxEmpty.new())
+		theme.set_stylebox(state, "SpaceHeading", StyleBoxEmpty.new())
+		theme.set_stylebox(state, "SpaceHeadingCurrent", _flat(art.color(ArtContract.SLATE)))
+	for name: String in ["SpaceRow", "SpaceHeading"]:
+		theme.set_stylebox("hover", name, _flat(art.color(ArtContract.DEEP)))
+		theme.set_stylebox("pressed", name, _flat(art.color(ArtContract.SLATE)))
+	# A zone a hovered HUD line names: a 1-unit paper edge and no fill, in
+	# every state.
 	for state: String in BUTTON_STATES:
 		var edge := _flat(Color.TRANSPARENT)
 		edge.draw_center = false
 		edge.set_border_width_all(1)
 		edge.border_color = art.color(ArtContract.PAPER)
-		theme.set_stylebox(state, "FloorRowPointed", edge)
-	for name: String in ["FloorRow", "FloorRowCurrent", "FloorRowPointed"]:
+		theme.set_stylebox(state, "SpaceRowPointed", edge)
+	for name in plain:
 		for role: String in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 			theme.set_color(role, name, art.color(ArtContract.PAPER))
 
@@ -678,7 +709,7 @@ static func _tooltips(theme: Theme, art: ArtPack) -> void:
 
 
 ## The agent list (scenes/ui/agent_list*.tscn): rows that light `deep` under
-## the pointer, the selected row `slate` like the minimap's shown floor, group
+## the pointer, the selected row `slate` like the SPACES rail's shown machine, group
 ## headers on a `deep` band with a slate rule under it, the Flat / Tree switch,
 ## the rows' `⋯` and the filter box, a dark field like the card's reply box.
 ## The drawer's two pages (this list and EVENTS) scroll with a thin bar
@@ -692,7 +723,7 @@ static func _agent_list(theme: Theme, art: ArtPack) -> void:
 	theme.set_type_variation("ListGroup", "Button")
 	theme.set_type_variation("ListMore", "Button")
 	# A row lights `deep` under the pointer; the selected row is `slate`, like
-	# the minimap's shown floor.
+	# the SPACES rail's shown machine.
 	for state: String in BUTTON_STATES:
 		var hover := state == "hover" or state == "pressed"
 		var lit: StyleBox = _flat(art.color(ArtContract.DEEP)) if hover else StyleBoxEmpty.new()
@@ -825,7 +856,7 @@ static func _dark_scroll(theme: Theme, art: ArtPack, name: String, wide: int) ->
 		theme.set_stylebox(state, name, grabber)
 
 
-## The minimap's windows (scenes/ui/floor_row.tscn): one flat palette colour
+## The SPACES rail's windows (scenes/ui/space_row.tscn): one flat palette colour
 ## per state a window can show, on a dark facade; the `+N` after the eighth
 ## window; and the plate's worktree-group accents, which follow structure and
 ## never state.

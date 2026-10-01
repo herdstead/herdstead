@@ -345,7 +345,7 @@ static func _tree(frame: OfficeFrame, live_items: Dictionary[String, AttentionIt
 					entry.parent = tab.key
 					entry.depth = mini(tab.depth + 1, MAX_DEPTH)
 					result.append(entry)
-		var loose := _group("tree:u:" + building.key, "Not on a floor", machine.key, 1)
+		var loose := _group("tree:u:" + building.key, "Not in a space", machine.key, 1)
 		loose.offline = building.stale
 		result.append(loose)
 		for pane in building.all_panes:

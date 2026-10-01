@@ -401,11 +401,11 @@ func test_hovering_a_bubble_shows_a_tooltip() -> void:
 	await _parsed(_motion(at + Vector2(0, 70)))
 	await _parsed(_motion(at))
 	_check(office.hud.bubble_tip_shown(), "back on the bubble: the tooltip again")
-	# PageUp, the pointer staying where it is: the camera pans to web's zone,
+	# PageDown, the pointer staying where it is: the camera pans to web's zone,
 	# and the bubble it pointed at moves away from under it.
-	await _office_key(office, KEY_PAGEUP)
+	await _office_key(office, KEY_PAGEDOWN)
 	await _physics_frames(2)
-	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "web"), "PageUp pans to web")
+	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "web"), "PageDown pans to web")
 	_check(not office.hud.bubble_tip_shown(), "another zone in view: no tooltip")
 	_done(office)
 

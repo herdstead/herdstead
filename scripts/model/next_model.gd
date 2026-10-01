@@ -1,7 +1,7 @@
 class_name NextModel
 extends RefCounted
 ## Whom `N` would pick next (OfficeNavigator.peek_next()), as the staff panel's
-## NEXT button says it: what a press does to them, provider, floor and herdr's
+## NEXT button says it: what a press does to them, provider, space and herdr's
 ## word for the state. How long they have waited is not here: OfficeAttention
 ## ticks it (attention.gd).
 

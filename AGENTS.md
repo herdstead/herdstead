@@ -51,10 +51,11 @@ herdr machine list ─ Roster ┘        │      commands: CommandContext in, C
                           │                         │
                           ▼                         ▼
         OfficeFloorView + machine plate (scenes/world):   OfficeHud (scenes/ui):
-        Ground + Sorted (y-sort), zones, pod / station / person   top bar counters (OfficeTotals) / left FLOORS minimap (a narrow rail under 1280; a row pans to its zone) + interim signposts at the world's right edge /
+        Ground + Sorted (y-sort), zones, pod / station / person   top bar counters (OfficeTotals) / left SPACES rail (OfficeSpaces, SpaceRows in: a heading shows its machine's map, a row pans to its zone; a narrow rail under 1280) + edge arrows on the world's edges toward blocked desks off screen (OfficeEdgeArrows, EdgeArrowModel in) /
                                                              right drawer (closed at start): the AGENTS tab's agent list (AgentListModel; its History group comes from StateLog via AgentHistory) and the EVENTS tab /
                                                              bottom staff panel (agent card, `inspector`; compact by default: a card on tall screens, one row below) + NEXT (NextModel's verbs) / bottom row NEWS (NewsItem) /
                                                              OVERVIEW, opened by PANES or O (OverviewModel; the timeline is a Control drawn in _draw())
+        OfficeViewMarks: follows the view without a refresh: which SPACES rows are in view, and the edge arrows (handed to the HUD only when they change)
         OfficeLens: the lens while L is held (one duration row per station, carpet tint, furniture dimmed); OfficePointer: a dashed frame off the station while a HUD row is hovered
         OfficeStrategic: the strategic view on `S` (a schematic of the shown machine's map over the world area; StrategicModel in, StrategicLayout lays out, %Plan's _draw() draws)
         OfficePresentation: people walk in and out of the lift doors, change seats, go to the pantry and back to their seats;
@@ -191,7 +192,7 @@ herdr machine list ─ Roster ┘        │      commands: CommandContext in, C
   "pressing selects the station" slip in, because the test bypassed the input path. Run a new case once against the implementation before your change, to confirm it fails.
 - Never weaken an assertion to make a test pass. When behaviour has to change, say why first, then change the assertion.
 - Tests that need herdr use `tools/fake_herdr.py`, tests that need ssh use `tools/fake_ssh.py`; tests and CI never connect to a real herdr.
-- The fake herdr answers only the read-only three by default, refuses everything else and records it as a violation. Suites that build an office but open no writes run with `--read-only` (`tools/run_tests.sh`);
+- The fake herdr answers only the read-only three by default, refuses everything else and records it as a violation. Suites that build an office but open no writes run with `--read-only` (`tools/run_tests.sh`); the SPACES rail, the edge arrows and the plate's problem line are `tools/test_space_rail.gd` (never `tools/test_spaces.gd`, which is a write suite);
   write-boundary cases live only in `tools/test_commands.gd`, `tools/test_raw_input.gd` (the monitor's pass-through input), `tools/test_answers.gd` (answer mode: keys and the one-line reply), `tools/test_bubbles.gd` (bubble reads, NEXT, counter clicks), `tools/test_monitor.gd`
   (terminal monitor: the grid and real input), `tools/test_overview.gd` (the staff panel answers as usual while the overview is open; the only deliberate write in that suite),
   `tools/test_launch.gd` (the boundary's `agent.prompt`, `agent.start` and `pane.split`, and the staff panel's START AGENT block), `tools/test_prompt.gd` (the card's one-line reply through `agent.prompt`),

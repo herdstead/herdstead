@@ -131,8 +131,9 @@ func on_sign_hovered(zone_key: String, inside: bool) -> void:
 	_hud.show_bubble_tip(sign_text(found), _tip_at)
 
 
-## What a zone's sign tooltip says: `repo · checkout · worktree of 3F`, each
-## part only when it has one; a zone with none of them says so.
+## What a zone's sign tooltip says: `repo · checkout · worktree of 3`, each
+## part only when it has one; a zone with none of them says so. The SPACES
+## rail's row and the strategic view's caption say it too.
 static func sign_text(found: ZoneRef) -> String:
 	var zone := found.zone_model
 	var parts := PackedStringArray()
@@ -143,7 +144,7 @@ static func sign_text(found: ZoneRef) -> String:
 	if not zone.mezzanine_of.is_empty():
 		for other in found.building.zones:
 			if other.key == zone.mezzanine_of:
-				parts.append("worktree of " + OfficeFloorRow.number_text(other))
+				parts.append("worktree of " + OfficeZoneSign.number_text(other))
 	return "No repository" if parts.is_empty() else " · ".join(parts)
 
 

@@ -69,7 +69,7 @@ static func text_for(pane: PaneModel, track: StateLog.Track, stale: bool, now: i
 
 
 ## The palette key `room`'s pod floor is washed in: its most urgent pane's, on the
-## FLOORS windows' own scale (OfficeFloorRow.window_look(), HudTheme.SECTION_PANELS):
+## SPACES windows' own scale (OfficeSpaceRow.window_look(), HudTheme.SECTION_PANELS):
 ## an agent that asks (blocked, even while starting), then done, working, idle
 ## or starting, unknown; a table of shells only, and every table of a machine
 ## that dropped (`stale`), dark.
@@ -79,7 +79,7 @@ static func tone_for(room: RoomModel, stale: bool) -> StringName:
 	if not stale:
 		for pane in room.panes:
 			# The FLOORS window's own look: a shell's is dark, and never wins.
-			var pane_look := OfficeFloorRow.window_look(pane, true)
+			var pane_look := OfficeSpaceRow.window_look(pane, true)
 			if pane_look == &"WindowDark":
 				continue
 			var rank: int = RANKS.get(pane_look, 4)

@@ -58,10 +58,10 @@ text_overrun_behavior = 3
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 4
-tooltip_text = "herdr's focus is shared, and it marks the whole tab seen: switching here clears UNREAD for every pane on this table."
+tooltip_text = "herdr's focus is shared, and it marks the whole tab seen: switching here clears UNREAD for every pane on this tab."
 mouse_filter = 1
 theme_type_variation = &"LabelSlate"
-text = "Clears table's UNREAD"
+text = "Clears tab's UNREAD"
 
 [node name="SwitchButton" type="Button" parent="Bezel/Frame/Column/TitleBar"]
 unique_name_in_owner = true

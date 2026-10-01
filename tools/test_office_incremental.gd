@@ -435,7 +435,7 @@ func test_a_click_over_a_panel_picks_nothing() -> void:
 	await _frames(2)
 	_check(office.hud.drawer_open(), "the tab opens the drawer")
 	# The right column is the agent list's drawer; the card is the staff panel along the bottom.
-	for panel: Control in [office.hud.right_column, office.hud.floors, office.hud.inspector, office.hud.news]:
+	for panel: Control in [office.hud.right_column, office.hud.spaces, office.hud.inspector, office.hud.news]:
 		var bounds := office.hud.placed(panel)
 		# The seat goes under a spot of the panel with no button on it: a click
 		# on a minimap row or a list row is that panel's own gesture, not a desk's.
@@ -536,10 +536,11 @@ func test_office_actions_answer_their_keys() -> void:
 	await _office_key(office, KEY_T)
 	_check(office.night != night, "`T` turns the light over")
 	var shown := office.navigator.current_zone(office.frame)
-	await _office_key(office, KEY_PAGEUP)
-	_check(office.navigator.current_zone(office.frame) != shown, "PageUp pans to another zone")
+	# The rail is ascending and herdr's focus is in its first zone: PageDown goes on.
 	await _office_key(office, KEY_PAGEDOWN)
-	_eq(office.navigator.current_zone(office.frame), shown, "and PageDown comes back")
+	_check(office.navigator.current_zone(office.frame) != shown, "PageDown pans to another zone")
+	await _office_key(office, KEY_PAGEUP)
+	_eq(office.navigator.current_zone(office.frame), shown, "and PageUp comes back")
 	office.picked_key = ""
 	await _office_key(office, KEY_N)
 	_check(not office.picked_key.is_empty(), "`N` jumps to somebody who needs a human")
@@ -766,16 +767,15 @@ func test_the_plate_pans_like_the_floor() -> void:
 	await _frames(2)
 	_check(office.world_bounds().size.x - office.camera.free_rect().size.x >= 48.0, "the floor is wider than the view")
 	var plate: Control = office.world.get_node("FloorPlate")
-	# The signposts stand over the world's top-right corner and take a click
-	# there; on a narrow world they are compact and leave this point clear.
+	# An edge arrow stands over the world along its edge and takes a click
+	# there; none stands on this point.
 	var on_plate := plate.get_global_rect().position + Vector2(100, 12) - office.camera.position
 	var along := on_plate - Vector2(48, 0)
 	_check(office.hud.world_rect().has_point(on_plate), "the plate is on screen")
 	_check(plate.get_global_rect().has_point(along + office.camera.position), "and the drag stays on it")
-	var posts := office.hud.signposts.get_global_rect()
 	_check(
-		not office.hud.signposts.visible or not (posts.has_point(on_plate) or posts.has_point(along)),
-		"clear of the signposts: %s, %s, %s" % [posts, on_plate, along]
+		not _under_arrow(office, on_plate) and not _under_arrow(office, along),
+		"clear of the edge arrows: %s, %s" % [on_plate, along]
 	)
 	await _drag(on_plate, along)
 	_eq(office.camera.pan, Vector2(48, 0), "a drag that starts on the plate pans the office")
@@ -1074,23 +1074,21 @@ func test_repeated_pane_id_retains_valid_plan() -> void:
 	_done(office)
 
 
-## A real click on a zone's row in the minimap pans to that zone at once: by
+## A real click on a zone's row in the SPACES rail pans to that zone at once: by
 ## the time the button is up the camera has its sign (in its aisle row) at the
 ## top of the world, the world is the same one (a zone is part of the machine's map), the
-## plate still names the machine and that row is the one highlighted, alone.
-## There is no transition over the world at all. PageDown, a real key, comes
-## back as fast.
+## plate still names the machine and that row is marked as in view.
+## There is no transition over the world at all. PageUp, a real key (the rail
+## is ascending: web is 2, api 1), comes back as fast.
 func test_a_floor_call_switches_at_once() -> void:
 	var office := await _live_office()
 	var origin := office.navigator.current_zone(office.frame)
 	var destination := HerdrFleet.pane_key(LOCAL, "web")
-	var minimap := office.hud.floors
+	var minimap := office.hud.spaces
 	var title := func() -> String: return office.plate.title_text()
-	var highlighted := func() -> Array:
-		return minimap.row_keys().filter(
-			func(key: String) -> bool: return minimap.row_for(key).theme_type_variation == &"FloorRowCurrent"
-		)
-	_eq(highlighted.call(), [origin], "the current zone's row is highlighted")
+	# The rail marks the rows whose zone is in view (it highlighted one "current"
+	# row before): a pan shows in those marks the moment it happens.
+	_check(Array(minimap.in_view()).has(origin), "the zone herdr's focus is in is in view: its row is marked")
 	var world_id := office.world.get_instance_id()
 	var row := minimap.row_for(destination)
 	var at := row.get_global_rect().get_center()
@@ -1105,15 +1103,15 @@ func test_a_floor_call_switches_at_once() -> void:
 	_check(drawn.y > aisle and drawn.y < aisle + 32.0, "the sign's top inside its aisle row")
 	_eq(office.world.get_instance_id(), world_id, "the same world: nothing rebuilt")
 	_eq(str(title.call()), "LOCAL", "the plate names the machine, not the zone")
-	_eq(highlighted.call(), [destination], "that row is highlighted alone")
+	_check(Array(minimap.in_view()).has(destination), "that row is marked as in view")
 	_check(office.hud.find_child("Transit", true, false) == null, "nothing covers the world on the way")
-	var key := _key(KEY_PAGEDOWN)
+	var key := _key(KEY_PAGEUP)
 	await _parsed(key)
 	key.pressed = false
 	await _parsed(key)
-	_eq(office.navigator.current_zone(office.frame), origin, "PageDown is back on the original zone at once")
+	_eq(office.navigator.current_zone(office.frame), origin, "PageUp is back on the original zone at once")
 	_eq(office.world.get_instance_id(), world_id, "still the same world")
-	_eq(highlighted.call(), [origin], "and the highlight follows")
+	_check(Array(minimap.in_view()).has(origin), "and the marks follow")
 	_done(office)
 
 
@@ -1123,12 +1121,12 @@ func test_a_floor_call_switches_at_once() -> void:
 func test_rapid_floor_calls_each_switch_and_the_world_stays_clickable() -> void:
 	var office := await _live_office()
 	for wanted: String in ["web", "infra"]:
-		var key := _key(KEY_PAGEUP)
+		var key := _key(KEY_PAGEDOWN)
 		await _parsed(key)
 		key.pressed = false
 		await _parsed(key)
-		_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, wanted), "PageUp: %s" % wanted)
-	var row := office.hud.floors.row_for(HerdrFleet.pane_key(LOCAL, "web"))
+		_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, wanted), "PageDown: %s" % wanted)
+	var row := office.hud.spaces.row_for(HerdrFleet.pane_key(LOCAL, "web"))
 	_check(not row.disabled, "the floor buttons stay enabled")
 	var desk := HerdrFleet.pane_key(LOCAL, "infra:p1")
 	await _click_desk(office, desk)
@@ -1139,7 +1137,7 @@ func test_rapid_floor_calls_each_switch_and_the_world_stays_clickable() -> void:
 	_eq(_badge(_station(office, desk)).state, &"working", "with its live data")
 	office.test_screen = Vector2(640, 320)
 	office.switch_theme(_second_pack())
-	_eq(office.hud.floors.row_for(row.key), row, "theme and resize keep the floor buttons")
+	_eq(office.hud.spaces.row_for(row.key), row, "theme and resize keep the floor buttons")
 	_check(not row.disabled, "still enabled")
 	_done(office)
 
@@ -1151,11 +1149,11 @@ func test_rapid_floor_calls_each_switch_and_the_world_stays_clickable() -> void:
 func test_a_picked_floor_that_disappears_falls_back_at_once() -> void:
 	for removed: String in ["web", "api"]:
 		var office := await _live_office()
-		var key := _key(KEY_PAGEUP)
+		var key := _key(KEY_PAGEDOWN)
 		await _parsed(key)
 		key.pressed = false
 		await _parsed(key)
-		_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "web"), removed + ": PageUp: web")
+		_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "web"), removed + ": PageDown: web")
 		var world_id := office.world.get_instance_id()
 		var changed := fixture.duplicate(true)
 		changed.workspaces = _list(changed, "workspaces").filter(
@@ -1177,14 +1175,14 @@ func test_a_picked_floor_that_disappears_falls_back_at_once() -> void:
 func test_switching_to_an_offline_floor_invents_no_activity() -> void:
 	var office := await _live_office()
 	_set_online(office, false)
-	var key := _key(KEY_PAGEUP)
+	var key := _key(KEY_PAGEDOWN)
 	await _parsed(key)
 	key.pressed = false
 	await _parsed(key)
 	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "web"), "an offline zone is reachable")
 	_check(office.stale, "switching does not turn a disconnected machine live")
 	_eq(_playing(office), [false], "all its workers remain frozen")
-	var row := office.hud.floors.row_for(HerdrFleet.pane_key(LOCAL, "web"))
+	var row := office.hud.spaces.row_for(HerdrFleet.pane_key(LOCAL, "web"))
 	var blocked: Control = row.get_node("%BlockedIcon")
 	_check(not blocked.visible, "an offline floor has no live blocked count")
 	_done(office)
@@ -1221,7 +1219,7 @@ func test_a_room_change_moves_the_world_at_once() -> void:
 	_done(office)
 
 
-## A window resize that crosses the FLOORS rail's line (`floors_named_from`,
+## A window resize that crosses the FLOORS rail's line (`spaces_named_from`,
 ## 1280) moves the column's edge inside the refresh the resize causes
 ## (camera.free_rect() fits the HUD, and the HUD says room_changed). That
 ## refresh lays the new room out itself: one refresh per resize, never one
@@ -1241,7 +1239,7 @@ func test_a_resize_across_the_rail_line_refreshes_once() -> void:
 		_check(rooms.size() > said, "%s: the column moved inside the refresh" % screen)
 		_eq(office.refreshes, 1, "%s: one refresh" % screen)
 		_eq(office.deepest_refresh, 1, "%s: never nested" % screen)
-		_eq(office.hud.floors_named(), step[1], "%s: the floors named or the rail" % screen)
+		_eq(office.hud.spaces_named(), step[1], "%s: the floors named or the rail" % screen)
 		_eq(office.camera.free_rect().position.x, step[2], "%s: the world's room right of it" % screen)
 		_check(office.hud.card_compact(), "%s: the staff panel one line throughout" % screen)
 		_eq(office.world.position, office.camera.free_rect().position, "%s: the world stands in it" % screen)
@@ -1273,21 +1271,21 @@ func test_the_first_plan_uses_the_window_the_refresh_is_for() -> void:
 	_done(office)
 
 
-## Calling the zone already current, or PageDown on the last zone, changes
-## nothing: the world is not rebuilt.
+## Calling the zone already current, or PageUp on the rail's first zone,
+## changes nothing: the world is not rebuilt.
 func test_the_current_floor_and_the_bottom_rebuild_nothing() -> void:
 	var office := await _live_office()
 	var before := office.world.get_instance_id()
 	await _visit_floor(office, HerdrFleet.pane_key(LOCAL, "api"))
 	_eq(office.world.get_instance_id(), before, "the current zone's call does not rebuild the office")
-	await _office_key(office, KEY_PAGEDOWN)
-	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "api"), "the last zone stays")
-	_eq(office.world.get_instance_id(), before, "and PageDown there does not rebuild it either")
+	await _office_key(office, KEY_PAGEUP)
+	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "api"), "the first zone stays")
+	_eq(office.world.get_instance_id(), before, "and PageUp there does not rebuild it either")
 	_done(office)
 
 
 ## Another zone is the same world (every zone is on its machine's map): the
-## minimap, PageUp and herdr's focus moving zones all pan and rebuild nothing,
+## SPACES rail, PageDown and herdr's focus moving zones all pan and rebuild nothing,
 ## and what shows matches a rebuild from scratch. (Before one map per machine,
 ## each of these was a floor switch that rebuilt the world.)
 func test_floor_change_rebuilds() -> void:
@@ -1306,8 +1304,8 @@ func test_floor_change_rebuilds() -> void:
 	)
 	await _same_as_rebuild(office, "after the minimap")
 	world_id = office.world.get_instance_id()
-	await _office_key(office, KEY_PAGEUP)
-	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "infra"), "PageUp pans one zone on")
+	await _office_key(office, KEY_PAGEDOWN)
+	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "infra"), "PageDown pans one zone on")
 	_eq(office.world.get_instance_id(), world_id, "and rebuilds nothing")
 	var focused: Dictionary = fixture.duplicate(true)
 	focused.focused_pane_id = "notes:p1"
@@ -1541,7 +1539,7 @@ func test_theme_switch_keeps_the_hud() -> void:
 	)
 	_eq(_hud_nodes(office), nodes, "and keeps every HUD node")
 	_check(office.art.sprite_texture(office.art.panel()) != panel, "the panels are dressed from the new pack")
-	_eq(hud.floors.art, office.art, "and so is the minimap")
+	_eq(hud.spaces.art, office.art, "and so is the minimap")
 	_done(office)
 
 

@@ -3,10 +3,12 @@ extends Control
 ## The machine plate over the map's zones (scenes/world/floor_plate.tscn): the
 ## machine's name (`@ NAME` once there is more than Local), and then its live
 ## state; a machine with no workspace says why it has none (its note); the
-## machine's counts on the right; and under the band, why its map cannot be
-## laid out, naming the zones at fault (`3 INFRA: invalid explicit seat hint`),
-## for as long as it cannot. Each zone's number, name, repository and checkout
-## are on its own sign (OfficeZoneSign), not here.
+## machine's counts on the right; and before them, inside the band, why its map
+## cannot be laid out, naming the zones at fault (`3 INFRA: invalid explicit
+## seat hint`), for as long as it cannot: one line in the blocked colour,
+## right-aligned, cut with an ellipsis where the band runs short, whole in its
+## tooltip. Nothing of the plate is drawn below its band. Each zone's number,
+## name, repository and checkout are on its own sign (OfficeZoneSign), not here.
 ##
 ## World furniture that reads like the HUD: Labels in containers, styled by
 ## HudTheme's type variations, so this script places nothing. All it decides is
@@ -24,6 +26,9 @@ extends Control
 @export var note_width := 0.0
 @export var source_width := 0.0
 @export var machine_width := 0.0
+## How much of the room after the machine's name the problem line keeps for
+## itself while there is one: the note and the state share the rest.
+@export var problem_share := 0.0
 
 ## The machine has no zone: its note says why.
 var _empty := false
@@ -72,10 +77,11 @@ func show_map(
 	var counts: Label = %Counts
 	counts.text = "%d SPACES / %d PANES" % [building.spaces, building.panes]
 	var problem: Label = %Problem
-	problem.visible = not problems.is_empty()
-	problem.text = (
-		"" if problems.is_empty() else "Layout unavailable: " + problem_line(building, problems, failing_zones)
-	)
+	var said := "" if problems.is_empty() else "Layout unavailable: " + problem_line(building, problems, failing_zones)
+	problem.visible = not said.is_empty()
+	problem.text = said
+	# The band cuts a long line short: its tooltip says all of it.
+	problem.tooltip_text = said
 	_fit()
 
 
@@ -90,7 +96,7 @@ static func problem_line(
 	var said := problems[0]
 	var names: Dictionary[String, String] = {}
 	for zone in building.zones:
-		names[zone.key] = "%s %s" % [zone.level_label, zone.label.to_upper()]
+		names[zone.key] = OfficeZoneSign.words(zone)
 	for key: String in names:
 		var prefix := "zone %s: " % key
 		if said.begins_with(prefix):
@@ -156,7 +162,8 @@ func title_text() -> String:
 	return title.text
 
 
-## The problem line under the band; empty while the map can be laid out.
+## The problem line in the band, in full whatever the band has room to show;
+## empty while the map can be laid out.
 func problem_text() -> String:
 	var problem: Label = %Problem
 	return problem.text if problem.visible else ""
@@ -164,8 +171,9 @@ func problem_text() -> String:
 
 ## Share the band's width out the way the plate is read when it runs short: the
 ## counts keep their whole width on the right; the machine's name comes first,
-## up to `title_share` of the room left of them; then an empty map's note, up to
-## its width; then the
+## up to `title_share` of the room left of them; a problem line then keeps
+## `problem_share` of what is left for itself, and takes whatever the others
+## leave; then an empty map's note, up to its width; then the
 ## machine; the state gets what is left. A label left with no room is hidden,
 ## so the containers never lay out more than the band holds.
 func _fit() -> void:
@@ -196,6 +204,9 @@ func _fit() -> void:
 		accent_room + _allot(title, room * title_share - accent_room, room - frame.get_margin(SIDE_LEFT) - accent_room)
 	)
 	var left := room - frame.get_margin(SIDE_LEFT) - title_width - line.get_theme_constant("separation")
+	var problem: Label = %Problem
+	if problem.visible:
+		left = maxf(0.0, (left - gap) * (1.0 - problem_share))
 	repo.visible = not repo_label.text.is_empty()
 	if repo.visible:
 		var mark := branch.custom_minimum_size.x + repo.get_theme_constant("separation")

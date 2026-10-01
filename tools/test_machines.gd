@@ -1255,9 +1255,9 @@ func test_office_two_machines() -> void:
 		"one building per machine, Local first"
 	)
 	_eq(
-		office.hud.floors.row_keys(),
-		[HerdrFleet.pane_key(HerdrFleet.LOCAL, "bravo"), local_alpha, HerdrFleet.pane_key(bee, "bravo"), bee_alpha],
-		"the minimap lists every floor, highest first, Local's building first"
+		office.hud.spaces.row_keys(),
+		[local_alpha, HerdrFleet.pane_key(HerdrFleet.LOCAL, "bravo"), bee_alpha, HerdrFleet.pane_key(bee, "bravo")],
+		"the SPACES rail lists every zone, ascending, Local's section first"
 	)
 	_check(_floors_text(office).contains("BEE"), "a heading per building once a machine exists")
 	_check(office.plate.shows_state(), "the plate names the machine once a machine exists")
@@ -1370,13 +1370,15 @@ func test_office_two_machines() -> void:
 		office.attention.machine_stale(bee) and not office.attention.machine_stale(HerdrFleet.LOCAL),
 		"attention freezes only bee's badges"
 	)
-	# PageUp walks the rail up: bee's bravo (the same map, a pan), then Local's
-	# lowest zone, across machines (bee's map is left dimmed and frozen).
-	await _navigate_key(office, KEY_PAGEUP)
-	_eq(office.navigator.shown_key, bee, "PageUp from bee's lowest zone pans to bee's next one")
+	# The rail is ascending: PageDown walks it down to bee's bravo (the same map,
+	# a pan), PageUp back up past bee's first zone into Local's last, across
+	# machines (bee's map is left dimmed and frozen).
+	await _navigate_key(office, KEY_PAGEDOWN)
+	_eq(office.navigator.shown_key, bee, "PageDown from bee's first zone pans to bee's next one")
 	_eq(office.floor_view.root.modulate, tint, "on bee's map, still dim")
 	await _navigate_key(office, KEY_PAGEUP)
-	_eq(office.navigator.shown_key, HerdrFleet.LOCAL, "PageUp from bee's highest zone reaches Local's lowest")
+	await _navigate_key(office, KEY_PAGEUP)
+	_eq(office.navigator.shown_key, HerdrFleet.LOCAL, "PageUp from bee's first zone reaches Local's last")
 	_eq(office.floor_view.root.modulate, Color.WHITE, "Local's rooms do not dim")
 	_eq(_actors_playing(office), [true], "Local's workers carry on")
 	_eq(office.plate.state_text(), "LIVE", "Local's plate stays live")
@@ -1427,14 +1429,14 @@ func test_office_two_machines() -> void:
 	var picked: String = office.picked_key
 	var other: String = _second_pack() if office.manifest_path == MANIFESTS[0] else MANIFESTS[0]
 	var old_world: Node2D = office.world
-	var old_rows: Array = office.hud.floors.row_keys()
+	var old_rows: Array = office.hud.spaces.row_keys()
 	office.switch_theme(other)
 	_check(office.world != old_world, "theme switch rebuilds the world")
 	_eq(_clients(office), clients, "same clients after the switch")
 	_eq(office.fleet.live_count(), office.fleet.size(), "still online after the switch")
 	_eq(office.picked_key, picked, "selection survives the switch")
 	_eq(office.navigator.shown_key, bee, "and so does the shown map")
-	_eq(office.hud.floors.row_keys(), old_rows, "the minimap is redrawn with the same zones")
+	_eq(office.hud.spaces.row_keys(), old_rows, "the minimap is redrawn with the same zones")
 	office.test_screen = Vector2(1600, 960)
 	office.refresh()
 	_eq(
@@ -1461,10 +1463,8 @@ func test_office_two_machines() -> void:
 	office.refresh()
 	_eq(office.frame.buildings[2].zones.size(), 0, "a machine that never connected has no zone")
 	_eq(office.frame.map_of("machine:p9").zones.size(), 0, "its map is empty")
-	# No gesture in this step reaches a machine without zones (a heading click
-	# is the SPACES rail's, B3): the navigator is asked for it, as a heading will.
-	office.navigator.picked_machine = "machine:p9"
-	office.refresh()
+	# A machine without zones has no row: a real click on its heading shows its map.
+	await _heading_pick(office, "machine:p9")
 	_eq(office.navigator.shown_key, "machine:p9", "the empty map can be shown")
 	_check(_plate_text(office, "state").contains("must not start with '-'"), "its plate says why")
 	_check(_plate_text(office, "note").contains("must not start with '-'"), "and so does its note, in full")
@@ -1567,21 +1567,28 @@ func test_office_floor_keys() -> void:
 		return seen
 	var at_local := func(id: String) -> Array: return [HerdrFleet.LOCAL, local.call(id)]
 	var at_bee := func(id: String) -> Array: return [bee, HerdrFleet.pane_key(bee, id)]
+	# The rail is ascending (PLAN_R2 §7): PageDown goes to the higher number.
 	_eq(
 		await order.call(5, KEY_PAGEDOWN),
-		[at_local.call("web"), at_local.call("api"), at_bee.call("bravo"), at_bee.call("alpha"), at_bee.call("alpha")],
-		"PageDown walks down the rail, into bee's map after Local's lowest zone, and stops at the bottom"
+		[
+			at_local.call("notes"),
+			at_local.call("data"),
+			at_bee.call("alpha"),
+			at_bee.call("bravo"),
+			at_bee.call("bravo")
+		],
+		"PageDown walks down the rail, into bee's map after Local's last zone, and stops at the bottom"
 	)
 	_eq(
 		await order.call(7, KEY_PAGEUP),
 		[
-			at_bee.call("bravo"),
-			at_local.call("api"),
-			at_local.call("web"),
-			at_local.call("infra"),
+			at_bee.call("alpha"),
+			at_local.call("data"),
 			at_local.call("notes"),
-			at_local.call("data"),
-			at_local.call("data"),
+			at_local.call("infra"),
+			at_local.call("web"),
+			at_local.call("api"),
+			at_local.call("api"),
 		],
 		"PageUp walks back up, across machines, and stops at the top"
 	)
@@ -1675,9 +1682,8 @@ func test_office_ssh_machines() -> void:
 	_check(far_client.socket_path.is_empty(), "no client before its forward exists")
 	await _until(func() -> bool: return office.fleet.link_state(far) == MachineLink.State.WAITING, "ssh refused")
 	office.refresh()
-	# An empty map has no row to click in this step (see test_office_two_machines).
-	office.navigator.picked_machine = far
-	office.refresh()
+	# An empty map has no row to click: a real click on its heading shows it.
+	await _heading_pick(office, far)
 	_check(_plate_text(office, "state").contains("Permission denied"), "its empty map's plate shows ssh's reason")
 	_check(_plate_text(office, "note").contains("Permission denied"), "and so does its note")
 	_check(far_client.socket_path.is_empty(), "still no client while ssh fails")
@@ -1957,40 +1963,37 @@ func test_each_machine_keeps_its_own_map_world_and_pan() -> void:
 	OS.unset_environment("HERDR_BIN_PATH")
 
 
-## A signpost names the machine only for another machine's zone (`@ bee`); one
-## for a zone of the shown map stands only while its blocked desk is off
-## screen. Both machines serve snapshot_basic: bravo (2F) has a blocked agent.
-func test_signposts_name_the_machine_only_for_another_building() -> void:
+## Another machine's blocked agents show only as its SPACES rows' counts: an edge arrow is for a zone
+## of the shown map with a blocked desk off screen. Both serve snapshot_basic: bravo (2) has one blocked.
+func test_another_machines_blocked_agents_show_only_as_rail_counts() -> void:
 	var office: OfficeDouble = await _two_machine_office()
 	var bee := "socket:bee"
 	var local_bravo := HerdrFleet.pane_key(HerdrFleet.LOCAL, "bravo")
-	var bee_post := "%s 2F bravo desk @ %s" % [HerdrFleet.pane_key(bee, "bravo"), office.fleet.label(bee)]
-	var words := func() -> Array:
-		return office.hud.signposts.shown().map(
-			func(post: OfficeSignpost) -> String:
-				var floor_label: Label = post.get_node("%Floor")
-				return "%s %s" % [post.key(), floor_label.text]
-		)
+	var bee_bravo := HerdrFleet.pane_key(bee, "bravo")
+	var zones := func() -> Array:
+		return office.hud.edge_arrows.shown().map(func(arrow: OfficeEdgeArrow) -> String: return arrow.zone_key())
+	var counted := func(key: String) -> String:
+		var count: Label = office.hud.spaces.row_for(key).get_node("%BlockedCount")
+		return count.text if count.visible else ""
 	await process_frame
 	await process_frame
 	_eq(office.navigator.shown_key, HerdrFleet.LOCAL, "Local's map is shown")
 	var off := not _bubble_on_screen(office, HerdrFleet.pane_key(HerdrFleet.LOCAL, "bravo:p1"))
-	_check(off, "opening on its 1F, the blocked desk of its 2F is off screen")
-	_eq(words.call(), ["%s 2F bravo desk" % local_bravo, bee_post], "Local's 2F by number and name, bee's @ bee")
-	await _navigate_key(office, KEY_PAGEUP)
+	_check(off, "opening on its 1, the blocked desk of its 2 is off screen")
+	_eq(zones.call(), [local_bravo], "an arrow for Local's 2, none for bee's")
+	_eq([counted.call(local_bravo), counted.call(bee_bravo)], ["1", "1"], "both rows count their blocked agent")
+	await _navigate_key(office, KEY_PAGEDOWN)
 	await process_frame
 	await process_frame
-	_eq(office.navigator.shown_key, HerdrFleet.LOCAL, "PageUp pans to Local's 2F, on the same map")
+	_eq(office.navigator.shown_key, HerdrFleet.LOCAL, "PageDown pans to Local's 2, on the same map")
 	_check(_bubble_on_screen(office, HerdrFleet.pane_key(HerdrFleet.LOCAL, "bravo:p1")), "its blocked desk in view")
-	_eq(words.call(), [bee_post], "so its post goes; bee's stays")
-	await _floor_pick(office, HerdrFleet.pane_key(bee, "alpha"))
-	await process_frame
-	await process_frame
-	var said: Array = words.call()
-	_eq(said[0], "%s 2F bravo desk @ Local" % local_bravo, "from bee's map it is Local's zone that carries its machine")
-	_check(said.slice(1).all(func(word: String) -> bool: return not word.contains("@")), "bee's own need none")
-	var up: Label = office.hud.signposts.shown()[0].get_node("%Arrow")
-	_eq(up.text, "↑", "and Local comes before bee in the rail")
+	_eq(zones.call(), [], "so its arrow goes, and bee's zone never had one")
+	_eq(counted.call(bee_bravo), "1", "bee's row still counts it")
+	await _heading_pick(office, bee)
+	_eq(office.navigator.shown_key, bee, "a click on bee's heading shows bee's map")
+	var on_bee: Array = zones.call()
+	_check(on_bee.all(func(key: String) -> bool: return key == bee_bravo), "only bee's own zone can have an arrow")
+	_eq(counted.call(local_bravo), "1", "and Local's blocked agent is its row's count")
 	root.remove_child(office)
 	office.free()
 	OS.unset_environment("HERDR_BIN_PATH")

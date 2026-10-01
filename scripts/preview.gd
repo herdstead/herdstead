@@ -316,7 +316,7 @@ func _hud() -> OfficeHud:
 	# before fit(), so the staff panel is laid out without it.
 	hud.news_wanted = false
 	hud.fit(HUD_SCREEN)
-	hud.floors.visible = false
+	hud.spaces.visible = false
 	hud.right_column.visible = false
 	hud.show_bar(art.display_name.to_upper(), "PREVIEW / MOCK DATA", false)
 	var pane := PaneModel.new()

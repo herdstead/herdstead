@@ -17,6 +17,7 @@ worktree_width = 80.0
 note_width = 240.0
 source_width = 96.0
 machine_width = 96.0
+problem_share = 0.5
 
 [node name="Band" type="PanelContainer" parent="."]
 unique_name_in_owner = true
@@ -141,24 +142,20 @@ theme_type_variation = &"LabelWorking"
 clip_text = true
 text_overrun_behavior = 3
 
+[node name="Problem" type="Label" parent="Band/Line/Meta/Row/Items"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 1
+theme_type_variation = &"PlateProblem"
+horizontal_alignment = 2
+clip_text = true
+text_overrun_behavior = 5
+
 [node name="Counts" type="Label" parent="Band/Line/Meta/Row"]
 unique_name_in_owner = true
 layout_mode = 2
 mouse_filter = 2
 theme_type_variation = &"LabelSlate"
 horizontal_alignment = 2
-
-[node name="Problem" type="Label" parent="."]
-unique_name_in_owner = true
-visible = false
-layout_mode = 1
-anchors_preset = 10
-anchor_right = 1.0
-offset_left = 8.0
-offset_top = 36.0
-offset_right = -8.0
-offset_bottom = 56.0
-mouse_filter = 2
-theme_type_variation = &"LabelBlocked"
-clip_text = true
-text_overrun_behavior = 3

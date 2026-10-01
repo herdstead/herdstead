@@ -373,7 +373,7 @@ func _frames(count: int) -> void:
 
 
 ## The number chips of every minimap row, top to bottom.
-func _row_numbers(minimap: OfficeFloors) -> Array:
+func _row_numbers(minimap: OfficeSpaces) -> Array:
 	return minimap.row_keys().map(func(key: String) -> String: return _label_text(minimap.row_for(key), "%Number"))
 
 
@@ -384,13 +384,13 @@ func _label_text(holder: Node, unique_name: String) -> String:
 
 
 ## A floor row's name label, which carries the variation that dims a quiet floor.
-func _row_label(minimap: OfficeFloors, key: String) -> Label:
-	return minimap.row_for(key).get_node("%FloorLabel")
+func _row_label(minimap: OfficeSpaces, key: String) -> Label:
+	return minimap.row_for(key).get_node("%SpaceLabel")
 
 
 ## Every icon the minimap shows now, in row order. A floor without a count
 ## keeps its icon node hidden and out of the badge group.
-func _floor_icons(minimap: OfficeFloors) -> Array:
+func _floor_icons(minimap: OfficeSpaces) -> Array:
 	# A building heading's mark is a plain sprite, not a badge: it stands for a
 	# machine answering, which nobody is waiting on, so it never pulses.
 	return minimap.find_children("*", "StatusBadge", true, false).filter(
@@ -410,10 +410,10 @@ func _floor_row(key: String, number: int, agents: int, blocked: int, done: int) 
 	return floor_model
 
 
-func _building_rows(key: String, label: String, state: MachineLiveness.State, floors: Array[ZoneModel]) -> BuildingRows:
-	var building := BuildingRows.new()
+func _building_rows(key: String, label: String, state: MachineLiveness.State, floors: Array[ZoneModel]) -> SpaceRows:
+	var building := SpaceRows.new()
 	building.key = key
 	building.label = label
 	building.state = state
-	building.floors = floors
+	building.zones = floors
 	return building

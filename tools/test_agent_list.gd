@@ -894,7 +894,7 @@ func test_a_hidden_slot_takes_no_room_and_a_shown_one_does() -> void:
 	hud.room_changed.connect(func() -> void: changes.append(true))
 	var shown := Rect2(96, 48, 536, 308)
 	_eq(hud.world_rect(), shown, "shown, the world stops above the staff panel's card")
-	_eq(hud.floors.offset_bottom, -124.0, "and so does the left column")
+	_eq(hud.spaces.offset_bottom, -124.0, "and so does the left column")
 	_eq(hud.right_column.offset_bottom, -124.0, "and the right one")
 	_eq(hud.right_column.get_global_rect().end.y, 356.0, "the column really ends there")
 	var staff: Control = hud.get_node("%Staff")
@@ -902,7 +902,7 @@ func test_a_hidden_slot_takes_no_room_and_a_shown_one_does() -> void:
 	hud.fit(Vector2(800, 480))
 	# 456 - 16: the NEWS strip still stands along the bottom.
 	_eq(hud.world_rect(), Rect2(96, 48, 536, 392), "hidden, the room comes back")
-	_eq(hud.floors.offset_bottom, -40.0, "to the left column")
+	_eq(hud.spaces.offset_bottom, -40.0, "to the left column")
 	_eq(hud.right_column.offset_bottom, -40.0, "and the right one")
 	_eq(changes.size(), 1, "said once")
 	hud.fit(Vector2(800, 480))

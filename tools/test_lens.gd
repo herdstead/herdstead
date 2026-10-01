@@ -5,8 +5,8 @@ extends "res://tools/office_test_base.gd"
 ## plate, hides the blocked chip's parts, washes every pod's floor in its most
 ## urgent state on the FLOORS windows' scale and dims the furnishing; letting
 ## go puts everything back. Hovering a NEWS item, a list
-## row, an EVENTS row or a signpost points at the desk it names (a dashed frame
-## of its own) or, on another floor, at that floor's FLOORS row, and never
+## row, an EVENTS row or an edge arrow points at the desk it names (a dashed frame
+## of its own) or, on another machine or for an arrow, at that zone's SPACES row, and never
 ## selects, pans, reads or writes. Keys and the pointer go through real input.
 ## Run through run_tests.sh.
 ##
@@ -210,7 +210,7 @@ func test_shells_have_no_wait_line_and_unknown_tracks_say_question_mark() -> voi
 
 ## Held, each pod's floor is washed in its most urgent pane's state, on the
 ## FLOORS windows' own scale (HudTheme.SECTION_PANELS through
-## OfficeFloorRow.WINDOW_LOOKS): blocked, then done (UNREAD), working, idle or
+## OfficeSpaceRow.WINDOW_LOOKS): blocked, then done (UNREAD), working, idle or
 ## starting (cream), unknown (muted); a table of shells only is slate. The wash
 ## covers the cells under the pod's drawing and lies first in its background,
 ## under the shadows, the sign and the title. (It used to lie over a rug; the
@@ -596,10 +596,11 @@ func test_hovering_a_news_item_points_at_its_desk_without_selecting() -> void:
 	_done(office)
 
 
-## A list row for a pane on another machine marks its zone's FLOORS row (a
-## 1-unit ink border, FloorRowPointed), never the current one, and draws
-## nothing in the world; leaving puts the row back. A row for a pane in another
-## zone of the shown map points at its desk, as for any desk of the map.
+## A list row for a pane on another machine outlines its zone's SPACES row (a
+## 1-unit paper edge, SpaceRowPointed) and draws nothing in the world; the rows
+## marked as in view keep their marks, and leaving puts the row back. A row for
+## a pane in another zone of the shown map points at its desk, as for any desk
+## of the map.
 func test_hovering_a_row_for_another_floor_marks_its_floors_row() -> void:
 	var office := await _two_machine_office()
 	var key := HerdrFleet.pane_key(BEE, "hive:p1")
@@ -613,39 +614,41 @@ func test_hovering_a_row_for_another_floor_marks_its_floors_row() -> void:
 		return
 	var hive := office.frame.zone_of(key)
 	_check(office.frame.find_zone(hive).building.key != office.navigator.shown_key, "hive is on another machine")
-	var floor_row := office.hud.floors.row_for(hive)
-	var shown_row := office.hud.floors.row_for(office.navigator.current_zone(office.frame))
-	_eq(floor_row.theme_type_variation, &"FloorRow", "hive's row as usual")
+	var floor_row := office.hud.spaces.row_for(hive)
+	var in_view := Array(office.hud.spaces.in_view())
+	_check(not in_view.is_empty() and not in_view.has(hive), "Local's zones in view are marked, hive is not")
+	_eq(floor_row.theme_type_variation, &"SpaceRow", "hive's row as usual")
 	await _hover(row.get_global_rect().get_center())
-	_eq(floor_row.theme_type_variation, &"FloorRowPointed", "hive's FLOORS row is marked")
-	_eq(shown_row.theme_type_variation, &"FloorRowCurrent", "the current zone's row keeps its look")
+	_eq(floor_row.theme_type_variation, &"SpaceRowPointed", "hive's SPACES row is outlined")
+	_eq(Array(office.hud.spaces.in_view()), in_view, "the rows in view keep their marks")
 	_check(not office.floor_view.pointer.visible, "nothing is pointed at in the world")
 	_eq(office.navigator.shown_key, LOCAL, "no map change")
 	await _hover(office.hud.world_rect().position + Vector2(4, 4))
-	_eq(floor_row.theme_type_variation, &"FloorRow", "leaving restores it")
+	_eq(floor_row.theme_type_variation, &"SpaceRow", "leaving restores it")
 	var web := office.hud.agent_list.row_for(_pk("web:p1"))
-	var web_row := office.hud.floors.row_for(office.frame.zone_of(_pk("web:p1")))
+	var web_row := office.hud.spaces.row_for(office.frame.zone_of(_pk("web:p1")))
 	await _hover(web.get_global_rect().get_center())
 	_check(office.floor_view.pointer.visible, "a row for web:p1, another zone of this map: its desk is pointed at")
 	_eq(office.floor_view.pointer.key, _pk("web:p1"), "that desk")
-	_eq(web_row.theme_type_variation, &"FloorRow", "and web's FLOORS row is not marked")
+	_eq(web_row.theme_type_variation, &"SpaceRow", "and web's SPACES row is not outlined")
 	_done(office)
 
 
-## An EVENTS row points like a NEWS item, and a signpost marks its floor's
-## FLOORS row.
+## An EVENTS row points like a NEWS item, and an edge arrow outlines its
+## zone's SPACES row.
 func test_events_rows_and_signposts_point_too() -> void:
 	var office := await _live_office()
-	var posts := office.hud.signposts.shown()
-	_check(not posts.is_empty(), "web and infra wait: signposts")
-	if not posts.is_empty():
-		var post := posts[0]
-		var floor_row := office.hud.floors.row_for(post.key())
-		await _hover(post.get_global_rect().get_center())
-		_eq(floor_row.theme_type_variation, &"FloorRowPointed", "the signpost marks its floor's row")
+	await _frames(2)
+	var arrows := office.hud.edge_arrows.shown()
+	_check(not arrows.is_empty(), "web and infra wait off screen: edge arrows")
+	if not arrows.is_empty():
+		var arrow := arrows[0]
+		var floor_row := office.hud.spaces.row_for(arrow.zone_key())
+		await _hover(arrow.get_global_rect().get_center())
+		_eq(floor_row.theme_type_variation, &"SpaceRowPointed", "the arrow outlines its zone's row")
 		_check(not office.floor_view.pointer.visible, "and nothing in the world")
 		await _hover(office.hud.world_rect().get_center())
-		_eq(floor_row.theme_type_variation, &"FloorRow", "leaving restores it")
+		_eq(floor_row.theme_type_variation, &"SpaceRow", "leaving restores it")
 	var key := _pk("api:p4")
 	_feed(office, _with(fixture, "api:p4", {"agent_status": "done"}))
 	await _press_tab(office, OfficeHud.DrawerTab.EVENTS)
@@ -705,9 +708,9 @@ func test_a_pointed_pane_that_goes_drops_the_mark() -> void:
 	_feed(office, _without(done, "api:p4"))
 	await _frames(2)
 	_check(not office.floor_view.pointer.visible, "the pane went, and the mark with it")
-	for key: Variant in office.hud.floors.row_keys():
-		var row := office.hud.floors.row_for(str(key))
-		_check(row.theme_type_variation != &"FloorRowPointed", "no FLOORS row marked: " + str(key))
+	for key: Variant in office.hud.spaces.row_keys():
+		var row := office.hud.spaces.row_for(str(key))
+		_check(row.theme_type_variation != &"SpaceRowPointed", "no SPACES row outlined: " + str(key))
 	await _hover(office.hud.world_rect().get_center())
 	for index in OfficeNews.ITEMS:
 		var gone := office.hud.news.item(index)

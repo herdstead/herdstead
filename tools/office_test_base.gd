@@ -645,9 +645,20 @@ func _physics_frames(count: int) -> void:
 		await physics_frame
 
 
+## Whether an edge arrow stands over viewport point `at`, where it would take a click.
+func _under_arrow(office: OfficeScene, at: Vector2) -> bool:
+	if not office.hud.edge_arrows.is_visible_in_tree():
+		return false
+	for arrow in office.hud.edge_arrows.shown():
+		if arrow.get_global_rect().has_point(at):
+			return true
+	return false
+
+
+## A real click on the SPACES row of zone `key`, scrolled into the rail first.
 func _visit_floor(office: OfficeScene, key: String) -> void:
-	var row := office.hud.floors.row_for(key)
-	var scroll: ScrollContainer = office.hud.floors.get_node("%Scroll")
+	var row := office.hud.spaces.row_for(key)
+	var scroll: ScrollContainer = office.hud.spaces.get_node("%Scroll")
 	scroll.ensure_control_visible(row)
 	await _frames(2)
 	var at := row.get_global_rect().get_center()

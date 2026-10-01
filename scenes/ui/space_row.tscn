@@ -1,15 +1,27 @@
 [gd_scene load_steps=3 format=3]
 
-[ext_resource type="Script" path="res://scripts/ui/floor_row.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/space_row.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/status_badge.gd" id="2_badge"]
 
-[node name="FloorRow" type="Button"]
+[node name="SpaceRow" type="Button"]
 custom_minimum_size = Vector2(0, 26)
 offset_right = 112.0
 offset_bottom = 26.0
 focus_mode = 0
-theme_type_variation = &"FloorRow"
+theme_type_variation = &"SpaceRow"
 script = ExtResource("1")
+
+[node name="InView" type="Panel" parent="."]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(2, 0)
+layout_mode = 1
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_right = 2.0
+grow_vertical = 2
+mouse_filter = 2
+theme_type_variation = &"SpaceRowInView"
 
 [node name="Body" type="HBoxContainer" parent="."]
 anchor_right = 1.0
@@ -69,7 +81,7 @@ custom_minimum_size = Vector2(5, 0)
 layout_mode = 2
 mouse_filter = 2
 
-[node name="FloorLabel" type="Label" parent="Body/Stack/Line"]
+[node name="SpaceLabel" type="Label" parent="Body/Stack/Line"]
 unique_name_in_owner = true
 visible = false
 custom_minimum_size = Vector2(0, 12)

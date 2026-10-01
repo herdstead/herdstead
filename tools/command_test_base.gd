@@ -713,15 +713,18 @@ func _panels_apart(office: OfficeDouble, what: String) -> void:
 	var shown: Array[Control] = []
 	for panel: Control in [
 		hud.bar,
-		hud.floors,
+		hud.spaces,
 		hud.get_node("%ListHolder"),
 		hud.get_node("%DrawerTab"),
 		hud.staff,
 		hud.news,
-		hud.signposts,
 	]:
 		if panel.is_visible_in_tree():
 			shown.append(panel)
+	# The edge arrows stand over the world: each is a panel of its own here.
+	if hud.edge_arrows.is_visible_in_tree():
+		for arrow in hud.edge_arrows.shown():
+			shown.append(arrow)
 	_check(shown.size() >= 4, "%s: the bar, the minimap, the list and the staff panel are shown" % what)
 	for i in shown.size():
 		var rect := shown[i].get_global_rect()

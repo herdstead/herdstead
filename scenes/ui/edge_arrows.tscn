@@ -1,0 +1,44 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/edge_arrows.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/ui/edge_arrow.tscn" id="2"]
+
+[node name="EdgeArrows" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 320.0
+offset_bottom = 200.0
+mouse_filter = 2
+script = ExtResource("1")
+
+[node name="Arrow0" parent="." instance=ExtResource("2")]
+visible = false
+layout_mode = 0
+
+[node name="Arrow1" parent="." instance=ExtResource("2")]
+visible = false
+layout_mode = 0
+
+[node name="Arrow2" parent="." instance=ExtResource("2")]
+visible = false
+layout_mode = 0
+
+[node name="Arrow3" parent="." instance=ExtResource("2")]
+visible = false
+layout_mode = 0
+
+[node name="Arrow4" parent="." instance=ExtResource("2")]
+visible = false
+layout_mode = 0
+
+[node name="Arrow5" parent="." instance=ExtResource("2")]
+visible = false
+layout_mode = 0
+
+[node name="Arrow6" parent="." instance=ExtResource("2")]
+visible = false
+layout_mode = 0
+
+[node name="Arrow7" parent="." instance=ExtResource("2")]
+visible = false
+layout_mode = 0

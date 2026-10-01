@@ -432,7 +432,7 @@ static func choose_machine(buildings: Array[BuildingModel], picked_machine: Stri
 	return frame_of(buildings).choose_machine(picked_machine, active_key)
 
 
-## Every zone as the FLOORS rail draws it, machine after machine: the
+## Every zone as the SPACES rail draws it, machine after machine: the
 ## PageUp/PageDown order (see OfficeFrame.zone_order).
 static func zone_order(buildings: Array[BuildingModel]) -> Array[String]:
 	return frame_of(buildings).zone_order

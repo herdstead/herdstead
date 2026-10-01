@@ -365,7 +365,7 @@ func test_the_new_pane_is_not_picked_after_the_viewer_moved_floor_or_into_answer
 ## is on its way is moving on (codex #5): a real click on bravo's FLOORS row,
 ## which only pans (the same map, the same world), and the new pane is not
 ## picked when a snapshot shows it; the footer says so; one split was sent.
-## And moving away and back before it shows (PageUp then PageDown, alpha
+## And moving away and back before it shows (PageDown then PageUp, alpha
 ## current again) is moving on too: the navigations count, not where the view
 ## ends up (before one map per machine, coming back to the same floor picked it).
 func test_the_new_pane_is_not_picked_after_the_viewer_moved_to_another_zone() -> void:
@@ -395,8 +395,11 @@ func test_the_new_pane_is_not_picked_after_the_viewer_moved_to_another_zone() ->
 	await _click_control(split)
 	await _until(func() -> bool: return card.outcome_text() == "New pane alpha:p5", "herdr made alpha:p5")
 	var alpha: String = zone.call()
-	await _navigate_key(office, KEY_PAGEUP)
+	# The rail is ascending: PageDown leaves alpha (1) for bravo, PageUp comes back.
 	await _navigate_key(office, KEY_PAGEDOWN)
+	var away: String = zone.call()
+	_check(away != alpha, "PageDown: away from alpha")
+	await _navigate_key(office, KEY_PAGEUP)
 	_eq(zone.call(), alpha, "away and back: alpha current again")
 	var p5 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "alpha:p5")
 	await _until(func() -> bool: return office.frame.pane(p5) != null, "a snapshot shows alpha:p5")

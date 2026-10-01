@@ -18,13 +18,13 @@
 # clipped, not sent, unknown result, a refused line; START AGENT on a shell and
 # NEW PANE BESIDE on an agent; Close armed on a working agent and a branch typed
 # for a worktree) at 2x and 4x
-# and at the 480x320 minimum; and the left column's FLOORS minimap with the signposts on the
+# and at the 480x320 minimum; and the left column's SPACES rail with the edge arrows on the
 # worktrees fixture (mezzanines shown), beside a machine that drops mid-run and
-# one that never answers, at 2x, 4x and the minimum; and the
+# one that never answers, at 2x, 4x and the minimum (spaces-*, spaces-arrows-*); and the
 # OVERVIEW (`--overview=open`): the showroom's two-hour mock, and
 # the live office's while a run of state changes lands, at 2x, 4x and the minimum.
 # The lens held (`--lens=held`, office-lens-*: 2x, 4x and the minimum) and the
-# hover mark on a desk and on another floor's FLOORS row (`--point=`, office-point-*).
+# hover mark on a desk and on another machine's SPACES row (`--point=`, office-point-*).
 # The strategic view (`--strategic=open`, office-strategic-*): the 80-pane stress
 # floor at 2x, 4x and the minimum, and the lens's stage at 2x.
 #
@@ -296,11 +296,11 @@ for tag in $CARD_TAGS; do
 		SHOTS="$SHOTS monitor-$state-$tag.png"
 	done
 done
-# The minimap on the mezzanine 1A, and on 1F with the signpost down to 1A:
-# per pack, 2x, 4x and the 480x320 minimum.
+# The SPACES rail panned to the mezzanine 1A, and to 1 with the edge arrow down
+# to 1A: per pack, 2x, 4x and the 480x320 minimum.
 for pack in daylight; do
 	for scale in zoom2 zoom4 min; do
-		SHOTS="$SHOTS floors-$pack-$scale.png floors-signposts-$pack-$scale.png"
+		SHOTS="$SHOTS spaces-$pack-$scale.png spaces-arrows-$pack-$scale.png"
 	done
 done
 # The pixel people showroom at 2x and 4x. Listed here so an old picture is
@@ -829,13 +829,13 @@ for pack in daylight; do
 		--pack=res://assets/$pack/manifest.json --zoom=2 --out="$OUT" --tag="$pack-min"
 done
 
-echo "== the minimap and the signposts: mezzanines, a machine that drops and one that never answers"
-# Local serves the worktrees fixture. floors-* show floor 2, the mezzanine 1A
-# (its plate names the checkout and its source); floors-signposts-* show floor
-# 1, herdstead, with 1A and 1B hung below it, and since 1A has a blocked agent
-# a signpost points down to it. bee serves the floors fixture and vanishes a few seconds in, while the office
+echo "== the SPACES rail and the edge arrows: mezzanines, a machine that drops and one that never answers"
+# Local serves the worktrees fixture. spaces-* pan to space 2, the mezzanine 1A
+# (its sign names the checkout); spaces-arrows-* pan to space 1, herdstead, with
+# 1A and 1B after it in the rail, and where 1A's blocked desk is out of view an
+# edge arrow points to it. bee serves the floors fixture and vanishes a few seconds in, while the office
 # still waits for gone (a socket nobody listens on, so it waits its whole
-# READY_TIMEOUT): the picture shows bee's last floors dimmed and frozen.
+# READY_TIMEOUT): the picture shows bee's section of the rail dimmed and frozen.
 ctl reset '{"fixture": "snapshot_worktrees"}'
 "$PYTHON" "$ROOT/tools/fake_herdr.py" \
 	--socket="$WORK/bee.sock" --control="$WORK/bee-ctl.sock" \
@@ -869,7 +869,7 @@ floors() {
 	DROPPER=""
 }
 for pack in daylight; do
-	for view in "floors 2" "floors-signposts 1"; do
+	for view in "spaces 2" "spaces-arrows 1"; do
 		read -r shot floor <<<"$view"
 		floors "$shot" "$floor" "$pack" zoom2
 		floors "$shot" "$floor" "$pack" zoom4 --resolution 1920x1280

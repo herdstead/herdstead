@@ -729,11 +729,11 @@ func test_invalid_input_keeps_last_valid_people_across_theme_and_floor_changes()
 	# to it pans and neither replans nor clears the diagnostic, which used to
 	# be api's floor's alone.
 	attempts = office.layout_attempt_count()
-	await _tap_key(KEY_PAGEUP)
+	await _tap_key(KEY_PAGEDOWN)
 	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "web"), "real key input pans to web")
 	_eq(office.layout_problems(), problems, "on the same map, which keeps its diagnostic")
 	_check_last_valid_people(office, signature)
-	await _tap_key(KEY_PAGEDOWN)
+	await _tap_key(KEY_PAGEUP)
 	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "api"), "and back to api")
 	_eq(office.layout_attempt_count(), attempts, "paging between zones of a failed map does not replan")
 	_eq(office.layout_problems(), problems, "and the diagnostic stays the map's")
@@ -1000,7 +1000,9 @@ func test_zones_on_one_map_keep_their_rectangles_and_the_world_when_paged() -> v
 	await _drag(middle, middle + Vector2(-160, -60))
 	var attempts := office.layout_attempt_count()
 	var world := office.world.get_instance_id()
-	for step: Array in [[KEY_PAGEUP, b], [KEY_PAGEDOWN, a], [KEY_PAGEUP, b]]:
+	# The rail is ascending. Nothing is selected or picked, so the first key
+	# picks the map's first zone, A (1); PageDown then goes on to B (2), PageUp back.
+	for step: Array in [[KEY_PAGEDOWN, a], [KEY_PAGEDOWN, b], [KEY_PAGEUP, a]]:
 		var key: Key = step[0]
 		await _tap_key(key)
 		var zone: String = step[1]

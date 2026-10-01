@@ -335,8 +335,8 @@ func manage_words(view: View, on: String, machine: String) -> LaunchBlock.Manage
 		+ " herdr's own view may move to another pane. Only by click."
 	)
 	if manage.close_reason == CommandRefusal.Reason.GROUP_PARENT:
-		# The block adds the reason's detail after; this names the floor.
-		manage.close_tip += "\nLast pane of the repo's own floor %s." % scope.level_label
+		# The block adds the reason's detail after; this names the space.
+		manage.close_tip += "\nLast pane of the repo's own space %s." % scope.level_label
 	if armed:
 		manage.confirm_note = LaunchBlock.close_note(scope)
 		manage.confirm_tip = (
@@ -352,7 +352,7 @@ func manage_words(view: View, on: String, machine: String) -> LaunchBlock.Manage
 	var directory := view.fleet.pane_cwd(view.pane.key)
 	manage.space_tip = (
 		(
-			"Makes a new space%s: a floor with one shell in %s."
+			"Makes a new space%s: a space with one shell in %s."
 			% [on, directory if not directory.is_empty() else "this pane's directory"]
 		)
 		+ " herdr's view stays where it is (except on an empty herdr). Only by click."
@@ -360,11 +360,11 @@ func manage_words(view: View, on: String, machine: String) -> LaunchBlock.Manage
 	manage.worktree_reason = worktree_refusal(view)
 	manage.worktree_tip = (
 		(
-			"Creates branch %s from this floor's HEAD (or checks it out if it exists) in herdr's worktree directory;"
+			"Creates branch %s from this space's HEAD (or checks it out if it exists) in herdr's worktree directory;"
 			% (view.branch if not view.branch.is_empty() else "<branch>")
 		)
 		+ (
-			" runs the repo's git hooks on %s. A new floor opens on the checkout; herdr's view stays. Only by click."
+			" runs the repo's git hooks on %s. A new space opens on the checkout; herdr's view stays. Only by click."
 			% machine
 		)
 	)

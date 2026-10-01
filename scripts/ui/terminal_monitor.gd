@@ -739,8 +739,7 @@ func _on_switch_finished(ticket: CommandTicket) -> void:
 	match ticket.state:
 		CommandTicket.State.ACCEPTED:
 			_say(
-				"herdr switched here",
-				"herdr switched its shared view to this pane, and this table's UNREAD is cleared."
+				"herdr switched here", "herdr switched its shared view to this pane, and this tab's UNREAD is cleared."
 			)
 		CommandTicket.State.REJECTED:
 			_say("herdr refused (%s)" % ticket.error_code, "herdr refused the switch: " + ticket.error_message)
@@ -766,7 +765,7 @@ func _show_switch() -> void:
 	button.text = "Switch herdr here" if _machine_label.is_empty() else "Switch herdr on " + _machine_label
 	button.tooltip_text = (
 		"Switches the shared view of herdr to this pane: every terminal attached to it follows."
-		+ "\nIt also clears UNREAD for every pane on this table, not just this one."
+		+ "\nIt also clears UNREAD for every pane on this tab, not just this one."
 		+ ("" if reason == CommandRefusal.Reason.NONE else "\nOff now: " + CommandRefusal.detail(reason))
 	)
 

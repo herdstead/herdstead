@@ -1572,8 +1572,8 @@ func test_office_floor_order_and_queue() -> void:
 	)
 	_eq(
 		numbers,
-		["Local/5", "Local/4", "Local/3", "Local/2", "Local/1", "bee/2", "bee/1"],
-		"zone order across buildings, as the rail draws them; the empty machine has none"
+		["Local/1", "Local/2", "Local/3", "Local/4", "Local/5", "bee/1", "bee/2"],
+		"zone order across machines, as the rail draws them: ascending; the empty machine has none"
 	)
 	_check(OfficeProjection.find_zone(buildings, "no such zone") == null, "a zone key nobody has is nobody's zone")
 	var starts := {
@@ -1608,47 +1608,51 @@ func test_office_floor_order_and_queue() -> void:
 	)
 
 
-## The minimap: buildings top to bottom, highest floor on top, the shown floor
-## highlighted, a row press names the floor, counts as pulsing icons. The rows
-## are scene nodes now, so the panel has to be in the tree and laid out.
+## The SPACES rail: machines top to bottom, each one's zones ascending, the
+## shown machine's heading highlighted, the rows of the zones in view marked, a
+## row press names its zone and a heading press its machine, counts as pulsing
+## icons. The rows are scene nodes, so the panel has to be in the tree and laid
+## out. (It was the FLOORS minimap: highest floor on top, the shown floor's row
+## highlighted, headings that took no mouse.)
 func test_office_minimap() -> void:
-	# 1280 wide: the column says the floors' names (below it, the rail; tools/test_floors.gd).
+	# 1280 wide: the column says the zones' names (below it, the rail; tools/test_space_rail.gd).
 	var hud := await _hud(Vector2(1280, 480))
-	var minimap: OfficeFloors = hud.floors
+	var minimap: OfficeSpaces = hud.spaces
 	var picked: Array = []
-	hud.floor_picked.connect(func(key: String) -> void: picked.append(key))
+	hud.zone_picked.connect(func(key: String) -> void: picked.append(key))
+	var machines: Array = []
+	hud.machine_picked.connect(func(key: String) -> void: machines.append(key))
 	var tower: Array[ZoneModel] = [
 		_floor_row("a1", 1, 1, 0, 0), _floor_row("a2", 2, 0, 0, 0), _floor_row("a3", 3, 2, 1, 2)
 	]
 	var empty: Array[ZoneModel] = []
-	var model: Array[BuildingRows] = [
+	var model: Array[SpaceRows] = [
 		_building_rows("local", "Local", MachineLiveness.State.LIVE, tower),
 		_building_rows("machine:far", "far", MachineLiveness.State.OFFLINE, empty)
 	]
-	minimap.show_buildings(model, "a2", true)
+	minimap.show_machines(model, "local", true)
 	await _frames(2)
-	_eq(minimap.row_keys(), ["a3", "a2", "a1"], "highest zone on top, buildings in order; an empty map has no row")
+	_eq(minimap.row_keys(), ["a1", "a2", "a3"], "zones ascending, machines in order; an empty map has no row")
 	_eq(
 		minimap.headings().map(func(h: OfficeBuildingHeading) -> String: return _label_text(h, "%BuildingLabel")),
 		["LOCAL", "FAR"],
 		"a heading per building with more than Local"
 	)
-	_eq(_row_numbers(minimap), ["3F", "2F", "1F"], "zone numbers")
-	var highlighted := minimap.row_keys().filter(
-		func(key: String) -> bool:
-			var row := minimap.row_for(key)
-			return row.theme_type_variation == &"FloorRowCurrent"
+	_eq(_row_numbers(minimap), ["1", "2", "3"], "zone numbers, as their signs write them")
+	var highlighted := (
+		minimap
+		. headings()
+		. filter(func(h: OfficeBuildingHeading) -> bool: return h.is_current())
+		. map(func(h: OfficeBuildingHeading) -> String: return h.key)
 	)
-	_eq(highlighted, ["a2"], "the shown floor is the only highlighted row")
-	_eq(_row_label(minimap, "a3").theme_type_variation, &"", "a floor with agents reads in ink")
-	_eq(_row_label(minimap, "a1").theme_type_variation, &"", "so does a floor with one")
-	# A quiet zone steps back unless it is the current one (a2 here): the far
-	# machine's lobby was the quiet row before; an empty machine has no row now.
-	minimap.show_buildings(model, "a3", true)
-	await _frames(1)
+	_eq(highlighted, ["local"], "the shown machine's heading is the only highlighted one")
+	_eq(Array(minimap.in_view()), [], "no row is marked before the office says which zones are in view")
+	minimap.set_in_view(PackedStringArray(["a2"]))
+	_eq(Array(minimap.in_view()), ["a2"], "the row of a zone in view is marked, alone")
+	_eq(_row_label(minimap, "a3").theme_type_variation, &"", "a zone with agents reads in ink")
+	_eq(_row_label(minimap, "a1").theme_type_variation, &"", "so does a zone with one")
+	# A quiet zone steps back, in view or not (a2 here): an empty machine has no row.
 	_eq(_row_label(minimap, "a2").theme_type_variation, &"LabelMuted", "a quiet zone steps back")
-	minimap.show_buildings(model, "a2", true)
-	await _frames(1)
 	var badges := _floor_icons(minimap)
 	_eq(
 		badges.map(func(b: StatusBadge) -> Array: return [b.machine, str(b.state), b.pane_id]),
@@ -1670,11 +1674,11 @@ func test_office_minimap() -> void:
 		),
 		"a live machine is connected, a dropped one is offline"
 	)
-	var connecting: Array[BuildingRows] = [
+	var connecting: Array[SpaceRows] = [
 		_building_rows("local", "Local", MachineLiveness.State.LIVE, tower),
 		_building_rows("machine:far", "far", MachineLiveness.State.CONNECTING, empty)
 	]
-	minimap.show_buildings(connecting, "a2", true)
+	minimap.show_machines(connecting, "local", true)
 	await _frames(1)
 	_eq(
 		minimap.headings()[1].mark_icon().texture,
@@ -1687,32 +1691,31 @@ func test_office_minimap() -> void:
 		),
 		"each icon stands at its own pivot, so the picture lands in the same square"
 	)
-	minimap.show_buildings(model, "a2", true)
+	minimap.show_machines(model, "local", true)
 	await _frames(1)
 	minimap.row_for("a1").pressed.emit()
-	_eq(picked, ["a1"], "pressing a row names that floor")
-	_check(
-		minimap.headings()[0].mouse_filter == Control.MOUSE_FILTER_IGNORE,
-		"a heading takes no mouse, so it picks nothing"
-	)
+	_eq(picked, ["a1"], "pressing a row names that zone")
+	minimap.headings()[1].button().pressed.emit()
+	_eq([machines, picked], [["machine:far"], ["a1"]], "pressing a heading names its machine, and no zone")
 	var rows := minimap.row_keys().map(func(key: String) -> int: return minimap.row_for(key).get_instance_id())
-	minimap.show_buildings(model, "a2", true)
+	minimap.show_machines(model, "local", true)
 	await _frames(1)
+	_eq(Array(minimap.in_view()), ["a2"], "the same model keeps the marks")
 	_eq(
 		minimap.row_keys().map(func(key: String) -> int: return minimap.row_for(key).get_instance_id()),
 		rows,
 		"the same model keeps every row node"
 	)
-	minimap.show_buildings(model, "a2", false)
+	minimap.show_machines(model, "local", false)
 	await _frames(1)
-	_eq(minimap.row_keys(), ["a3", "a2", "a1"], "without headings the rows stay")
-	_eq(minimap.headings(), [], "but no building heading")
-	# A building that goes away loses its heading, while the others keep theirs.
-	minimap.show_buildings(model, "a2", true)
+	_eq(minimap.row_keys(), ["a1", "a2", "a3"], "without headings the rows stay")
+	_eq(minimap.headings(), [], "but no machine heading")
+	# A machine that goes away loses its heading, while the others keep theirs.
+	minimap.show_machines(model, "local", true)
 	await _frames(1)
 	var kept := minimap.headings()[0]
-	var alone: Array[BuildingRows] = [_building_rows("local", "Local", MachineLiveness.State.LIVE, tower)]
-	minimap.show_buildings(alone, "a2", true)
+	var alone: Array[SpaceRows] = [_building_rows("local", "Local", MachineLiveness.State.LIVE, tower)]
+	minimap.show_machines(alone, "local", true)
 	await _frames(1)
 	_eq(
 		minimap.headings().map(func(h: OfficeBuildingHeading) -> String: return _label_text(h, "%BuildingLabel")),
@@ -1720,44 +1723,46 @@ func test_office_minimap() -> void:
 		"a machine that went away loses its heading"
 	)
 	_eq(minimap.headings()[0], kept, "and the one that stayed keeps its node")
-	_eq(minimap.row_keys(), ["a3", "a2", "a1"], "with only its own floors left")
-	minimap.show_buildings(model, "a2", false)
+	_eq(minimap.row_keys(), ["a1", "a2", "a3"], "with only its own zones left")
+	minimap.show_machines(model, "local", false)
 	await _frames(1)
 	# A floor that goes away loses its row; the rest keep theirs.
-	var short: Array[BuildingRows] = [
+	var short: Array[SpaceRows] = [
 		_building_rows("local", "Local", MachineLiveness.State.LIVE, [tower[1], tower[2]] as Array[ZoneModel])
 	]
-	minimap.show_buildings(short, "a2", false)
+	minimap.show_machines(short, "local", false)
 	await _frames(1)
-	_eq(minimap.row_keys(), ["a3", "a2"], "a closed floor loses its row")
+	_eq(minimap.row_keys(), ["a2", "a3"], "a closed zone loses its row")
 	_check(minimap.row_for("a1") == null, "and nothing keeps it alive")
 	_eq(minimap.row_for("a2").get_instance_id(), rows[1], "the floors that stayed keep their row node")
 	hud.free()
 
 
-## A tall building in a short panel: the shown floor stays in view and the
-## wheel scrolls the list in place.
+## A machine of many zones in a short panel: the list follows the first row in
+## view into sight, and the wheel scrolls the list in place.
 func test_office_minimap_scroll() -> void:
 	# 312 - 40 - 72 leaves a 200-tall panel: the staff panel's
 	# compact line over the NEWS strip, and its gap (72 in all), stand under the column.
 	var hud := await _hud(Vector2(800, 312))
-	var minimap: OfficeFloors = hud.floors
+	var minimap: OfficeSpaces = hud.spaces
 	_eq(hud.placed(minimap).size.y, 200.0, "the minimap is the 200-tall panel")
 	var high: Array[ZoneModel] = []
 	for number in range(1, 31):
 		high.append(_floor_row("t%d" % number, number, 1, 0, 0))
-	var tall: Array[BuildingRows] = [_building_rows("local", "Local", MachineLiveness.State.LIVE, high)]
-	minimap.show_buildings(tall, "t1", false)
+	var tall: Array[SpaceRows] = [_building_rows("local", "Local", MachineLiveness.State.LIVE, high)]
+	minimap.show_machines(tall, "local", false)
+	# The zone in view is the last of the ascending list, below the panel's fold.
+	minimap.set_in_view(PackedStringArray(["t30"]))
 	await _frames(2)
 	var list_height: float = minimap.list_height()
 	# The panel's heading is all it keeps above the list now: the lift's
 	# portal (108) and its footer (24) are gone, and the rows have that room.
 	_eq(list_height, 168.0, "the short panel keeps only its heading and gives the rest to the rows")
-	var bottom: Control = minimap.row_for("t1")
+	var bottom: Control = minimap.row_for("t30")
 	var offset := minimap.scroll_offset()
 	_check(
 		bottom.position.y >= offset and bottom.position.y + bottom.size.y <= offset + list_height,
-		"the shown floor at the bottom is scrolled into view"
+		"the row in view, at the bottom, is scrolled into sight"
 	)
 	var holder: Control = minimap.get_node("%Rows")
 	minimap.scroll_by(-10000)
@@ -1766,15 +1771,16 @@ func test_office_minimap_scroll() -> void:
 	_check(minimap.get_node("%Rows") == holder, "scrolling is not a rebuild")
 	minimap.scroll_by(10000)
 	await _frames(1)
-	_eq(minimap.scroll_offset(), 30.0 * OfficeFloors.ROW - list_height, "and at the bottom")
+	_eq(minimap.scroll_offset(), 30.0 * OfficeSpaces.ROW - list_height, "and at the bottom")
 	minimap.scroll_by(-100)
 	await _frames(1)
-	minimap.show_buildings(tall, "t1", false)
+	minimap.show_machines(tall, "local", false)
+	minimap.set_in_view(PackedStringArray(["t30"]))
 	await _frames(2)
 	_eq(
 		minimap.scroll_offset(),
-		30.0 * OfficeFloors.ROW - list_height - 100,
-		"an unchanged model keeps the viewer's scroll"
+		30.0 * OfficeSpaces.ROW - list_height - 100,
+		"an unchanged model and view keep the viewer's scroll"
 	)
 	hud.free()
 
@@ -1813,10 +1819,10 @@ func test_hud_free_area() -> void:
 	_eq(
 		hud.world_rect(),
 		Rect2(96, 48, 660, 308),
-		"right of the FLOORS rail, left of the drawer's tab, below the bar, above the staff panel's card"
+		"right of the SPACES rail, left of the drawer's tab, below the bar, above the staff panel's card"
 	)
 	_eq(hud.placed(hud.bar), Rect2(0, 0, 800, 32), "the bar spans the top")
-	_eq(hud.placed(hud.floors), Rect2(16, 40, 72, 316), "the minimap is a 72-wide rail, 16 in from the left")
+	_eq(hud.placed(hud.spaces), Rect2(16, 40, 72, 316), "the minimap is a 72-wide rail, 16 in from the left")
 	_eq(
 		hud.placed(hud.right_column),
 		Rect2(764, 40, 20, 316),
@@ -1826,7 +1832,7 @@ func test_hud_free_area() -> void:
 	_eq(hud.placed(hud.staff), Rect2(16, 372, 768, 80), "the staff panel's card slot spans the bottom, 16 in")
 	_eq(hud.placed(hud.news), Rect2(16, 456, 768, 20), "the NEWS strip under it, along the bottom")
 	hud.fit(Vector2(1600, 960))
-	_eq(hud.placed(hud.floors).size.x, 120.0, "from 1280 wide the minimap names its floors")
+	_eq(hud.placed(hud.spaces).size.x, 120.0, "from 1280 wide the minimap names its floors")
 	_eq(hud.world_rect(), Rect2(144, 48, 1412, 788), "a bigger window is more office, not a bigger HUD")
 	await _frames(2)
 	var lines: Control = hud.bar.get_node("%Lines")
@@ -1853,7 +1859,7 @@ func test_hud_free_area() -> void:
 		"the wider bar gives the counters the room, up to the switch"
 	)
 	# Every panel swallows the mouse, so nothing over one reaches the office.
-	for panel: Control in [hud.bar, hud.floors, hud.inspector, hud.agent_list]:
+	for panel: Control in [hud.bar, hud.spaces, hud.inspector, hud.agent_list]:
 		_eq(panel.mouse_filter, Control.MOUSE_FILTER_STOP, "%s stops the mouse" % panel.name)
 	hud.free()
 

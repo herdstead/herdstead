@@ -57,8 +57,11 @@ MIN_CASES_DAY_LIGHT=8
 MIN_CASES_OFFICE_RECONCILE=22
 MIN_CASES_OFFICE_WALKING=33
 MIN_CASES_OFFICE_RESTS=28
-MIN_CASES_OFFICE_NAVIGATOR=23
-MIN_CASES_FLOORS=22
+MIN_CASES_OFFICE_NAVIGATOR=24
+# FLOORS (22 cases, tools/test_floors.gd) was retired with the FLOORS minimap and
+# its signposts (lane B3): SPACE RAIL covers every one of its cases on the
+# SPACES rail and the edge arrows, and adds ten.
+MIN_CASES_SPACE_RAIL=32
 MIN_CASES_ATTENTION_STORE=28
 MIN_CASES_AGENT_LIST=35
 MIN_CASES_ATTENTION_INTEGRATION=19
@@ -75,7 +78,7 @@ MIN_CASES_TOP_BAR=26
 MIN_CASES_STATE_LOG=21
 MIN_CASES_NEWS_EVENTS=15
 MIN_CASES_LENS=17
-MIN_CASES_STRATEGIC=22
+MIN_CASES_STRATEGIC=25
 MIN_CASES_ALERTS=19
 MIN_CASES_OVERVIEW=21
 MIN_CASES_LAUNCH=40
@@ -375,9 +378,10 @@ run_scene_suite test_office_walking "WALKING TESTS" "$MIN_CASES_OFFICE_WALKING" 
 # Who rests where: the seat with its bubble and its paper, the pantry.
 run_scene_suite test_office_rests "RESTS TESTS" "$MIN_CASES_OFFICE_RESTS" -- --read-only \
 	--socket="$WORK/rests-nowhere.sock" --work="$WORK"
-# The left column's minimap and the signposts, and a mezzanine's plate, by real input.
-run_scene_suite test_floors "FLOORS TESTS" "$MIN_CASES_FLOORS" -- --read-only \
-	--socket="$WORK/floors-nowhere.sock" --work="$WORK"
+# The left column's SPACES rail (rows, headings, in-view marks), the edge arrows,
+# the zone signs and the plate's problem line, by real input.
+run_scene_suite test_space_rail "SPACE RAIL TESTS" "$MIN_CASES_SPACE_RAIL" -- --read-only \
+	--socket="$WORK/space-rail-nowhere.sock" --work="$WORK"
 
 run_scene_suite test_attention_store "ATTENTION STORE TESTS" "$MIN_CASES_ATTENTION_STORE"
 run_scene_suite test_agent_list "AGENT LIST TESTS" "$MIN_CASES_AGENT_LIST" -- --work="$WORK"

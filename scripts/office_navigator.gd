@@ -21,8 +21,9 @@ var picked_identity := ""
 ## The desk selected by the last settle(): the picked one while herdr still has
 ## it, else herdr's focus.
 var active_key := ""
-## Machine key the viewer chose (a zone picked on it, PageUp/PageDown, `N`, a
-## list pick), or the machine herdr's focus moved to while it is followed.
+## Machine key the viewer chose (its SPACES heading, a zone picked on it,
+## PageUp/PageDown, `N`, a list pick), or the machine herdr's focus moved to
+## while it is followed.
 ## Empty means "the machine holding the selection". Forgotten once it is gone.
 var picked_machine := ""
 ## Machine key whose map is drawn now.
@@ -30,7 +31,8 @@ var shown_key := ""
 ## Explicit attention navigation reveals this pane after its map is drawn.
 var reveal_on_arrival := ""
 ## Counts the navigations the viewer asked for: a zone picked (pick_zone(): a
-## FLOORS row, a signpost), PageUp/PageDown (step_zone()), and every locate:
+## SPACES row), a machine picked (pick_machine(): its SPACES heading), an edge
+## arrow (pan_to_desk()), PageUp/PageDown (step_zone()), and every locate:
 ## `N`, `‹ ›`, a top-bar counter, the agent list, NEWS, EVENTS, the overview and
 ## the strategic view (next_human(), step(), next_of(), locate()). Never panning
 ## (a drag, the wheel, the arrow keys), never a desk click, never herdr's focus
@@ -42,8 +44,9 @@ var nav_revision := 0
 ## shown map, framing its whole pod with `pan_whole_table`; empty for none. Set
 ## per request: on the first arrival at a map this run, for the selection seated
 ## there (its whole pod); when herdr's focus moves while it is followed (only
-## as far as it takes, see settle()); for a new pane the office picks. The office
-## takes it (take_pan_to()) whether or not it is drawn.
+## as far as it takes, see settle()); for an edge arrow's desk (pan_to_desk(),
+## as far as it takes too); for a new pane the office picks. The office takes
+## it (take_pan_to()) whether or not it is drawn.
 var pan_to := ""
 var pan_whole_table := false
 ## One-shot: the zone the office pans to after it next draws the shown map,
@@ -122,26 +125,15 @@ func settle(frame: OfficeFrame) -> String:
 	return chosen
 
 
-## `zones` (one building's, ascending by number) as the building section draws
-## them, top to bottom: the highest zone on top, and each zone's mezzanines
-## hung just below it in letter order, as herdr's sidebar hangs a worktree
-## under the space it was made from. Pure; the minimap draws this order.
+## `zones` (one machine's, ascending by number) as its section of the SPACES
+## rail draws them, top to bottom: ascending, and each zone's mezzanines right
+## after it in letter order, as herdr's sidebar hangs a worktree under the
+## space it was made from (OfficeProjection.floor_tree()). A mezzanine whose
+## source is not open stands by its own number. Pure; the rail draws this
+## order, PageUp and PageDown step through it (OfficeFrame.zone_order), and the
+## strategic view's sections follow it.
 static func section(zones: Array[ZoneModel]) -> Array[ZoneModel]:
-	var keys: Dictionary[String, bool] = {}
-	for zone in zones:
-		keys[zone.key] = true
-	# The tree (OfficeProjection.floor_tree()) puts every mezzanine right after
-	# its source: cut it into groups there, and stack the groups highest first.
-	var groups: Array[Array] = []
-	for zone in OfficeProjection.floor_tree(zones):
-		if groups.is_empty() or not keys.has(zone.mezzanine_of):
-			groups.append([])
-		groups[-1].append(zone)
-	var drawn: Array[ZoneModel] = []
-	for index in range(groups.size() - 1, -1, -1):
-		for zone: ZoneModel in groups[index]:
-			drawn.append(zone)
-	return drawn
+	return OfficeProjection.floor_tree(zones)
 
 
 ## Show machine `key`'s map instead of the one shown now, remembering where that
@@ -202,8 +194,9 @@ func revealed() -> void:
 	reveal_on_arrival = ""
 
 
-## The zone the FLOORS rail highlights: the one the viewer last picked, else
-## the zone of the selection; empty when neither is on the shown map.
+## The zone PageUp and PageDown step from: the one the viewer last picked, else
+## the zone of the selection; empty when neither is on the shown map. (The
+## rail marks the zones in view, not this one.)
 func current_zone(frame: OfficeFrame) -> String:
 	var picked := frame.find_zone(_picked_zone)
 	if picked != null and picked.building.key == shown_key:
@@ -217,9 +210,9 @@ func current_zone(frame: OfficeFrame) -> String:
 # --- what the viewer asks for -------------------------------------------------
 
 
-## The viewer picks zone `key` (a FLOORS row, a signpost): the office pans to
-## it, its aisle row at the top of the world (pan_zone), and shows its machine's
-## map first only when that is another machine's. It counts as a navigation
+## The viewer picks zone `key` (a SPACES row): the office pans to it, its aisle
+## row at the top of the world (pan_zone), and shows its machine's map first
+## only when that is another machine's. It counts as a navigation
 ## (nav_revision). A pan or reveal still pending belongs to the navigation this
 ## one replaces.
 func pick_zone(key: String) -> void:
@@ -227,9 +220,35 @@ func pick_zone(key: String) -> void:
 	nav_revision += 1
 
 
+## The viewer picks machine `key` (its SPACES heading): its map is shown, a
+## machine without a zone as an empty map. Where it opens is the map's own: its
+## first arrival (_open()) or where the viewer left it (pan_of()); no zone is
+## picked, and a pan or reveal still pending belongs to the navigation this
+## one replaces. It counts as a navigation (nav_revision).
+func pick_machine(key: String) -> void:
+	picked_machine = key
+	_picked_zone = ""
+	pan_zone = ""
+	pan_to = ""
+	reveal_on_arrival = ""
+	nav_revision += 1
+
+
+## The viewer asks to see the desk of pane `key` on the shown map (an edge
+## arrow): the office pans as far as it takes for that desk to be on screen
+## (pan_to, not its whole pod). Nothing is selected and no zone is picked; a
+## pan or reveal still pending belongs to the navigation this one replaces. It
+## counts as a navigation (nav_revision).
+func pan_to_desk(key: String) -> void:
+	_ask_pan(key, false)
+	reveal_on_arrival = ""
+	nav_revision += 1
+
+
 ## PageUp (-1) / PageDown (+1): pick the zone one row up or down the rail from
 ## the current one (next_zone()), as pick_zone() does, crossing machines; false
-## at either end, where nothing is picked or counted.
+## at either end, where nothing is picked or counted. The rail is ascending, so
+## PageUp goes to the lower-numbered zone and PageDown to the higher.
 func step_zone(frame: OfficeFrame, direction: int) -> bool:
 	var next := next_zone(frame, direction)
 	if next.is_empty():
@@ -401,7 +420,7 @@ func is_picked(pane: PaneModel) -> bool:
 
 
 ## `--space=<number>` names a Local zone by herdr's number, which only means
-## something once Local has sent its workspaces: then it is picked as a FLOORS
+## something once Local has sent its workspaces: then it is picked as a SPACES
 ## row picks it, without counting (the command line is not the viewer moving).
 func _resolve_wanted_space(frame: OfficeFrame) -> void:
 	if wanted_space < 0 or frame.buildings.is_empty():

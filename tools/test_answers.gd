@@ -1326,7 +1326,7 @@ func test_answer_mode_fits_the_smallest_screen() -> void:
 	_eq(office.hud.world_rect().size, Vector2(216, 112), "the world above it keeps a desk's room, the drawer open")
 	_fits(card, "answer mode")
 	# The minimap keeps to the room between the bar and the panel, and scrolls.
-	var floors := office.hud.floors
+	var floors := office.hud.spaces
 	_eq(floors.get_global_rect(), Rect2(16, 40, 72, 120), "the rail stands left 40..160, grown neither way")
 	var rows: ScrollContainer = floors.get_node("%Scroll")
 	_check(rows.get_v_scroll_bar().max_value > rows.size.y, "and scrolls the rows it has no room for")

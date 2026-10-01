@@ -44,8 +44,9 @@ pane IDs are unique only within one server (two machines can both have `w1:p1`).
   objects are dropped, fields are read as their expected type and a wrong type counts as missing, control characters
   are stripped from id / label), so one machine returning odd data cannot break the display of the others.
 
-On screen: each machine is one open-plan map, every workspace a zone on it. The FLOORS minimap lists Local first,
-then each machine under a heading with a mark for how it is answering; a row pans to its zone, and a zone on another
+On screen: each machine is one open-plan map, every workspace a zone on it. The SPACES rail lists Local first,
+then each machine under a heading with a mark for how it is answering; a heading click shows that machine's map (a
+machine that never connected opens as an empty map that says why), a row pans to its zone, and a zone on another
 machine shows that machine's map first. The machine plate names the machine (`@ name` once there is more than Local),
 LIVE / OFFLINE / CONNECTING, the ssh error, and any zone its map cannot be laid out for. A disconnected machine only
 greys out and freezes its own map (the plate stays readable); in the minimap its building is dimmed, with no counts
