@@ -159,7 +159,7 @@ atlas is `atlas_size × d` with `32·d` cells. From schema 2 on, `manifest.json`
 | Pixel colours | each opaque pixel exactly a palette colour | free |
 | Palette keys | each value 6-digit lowercase hex | identical (the pack decides which keys exist; scenes' needs are step 9 of "Replace and iterate protocol") |
 | `floor.wood_*` outer band | after scaling to the pack density, all four 3 px (×d) edges pixel-identical | identical: interchangeable variants' edges are structural |
-| Wall connecting edges | cap/face boundary and straight-wall horizontal edges pixel-identical; a family with a T joint also checks the 6-unit side section and the joint's ports | identical; only meeting ports are compared |
+| Wall connecting edges | cap/face boundary and straight-wall horizontal edges pixel-identical; a family with side walls also checks their 6-unit section (the corner's port, the repeat down the map, nothing outside the strip); one that still declares a row wall's T joint, the joint's ports too | identical; only meeting ports are compared |
 | Everything else | RGBA, size rules, not empty, no holes in `floor.*` and `wall.cap_*` / `wall.face_*`, pivot inside the canvas, `nine_patch` leaves a middle, atlas cells unique and in range, font files | identical |
 
 Per-pixel checks multiply by each image's own `k`, not the pack's `d`, so a half-repainted pack is checked at the

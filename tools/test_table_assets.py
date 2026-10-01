@@ -40,9 +40,9 @@ class SharedTableBuildTests(unittest.TestCase):
         # Asymmetric interior pixels distinguish copying from procedural redraws,
         # including the chair and laptop paths, not only wood modules. The
         # points are units of the 32-unit canvases, times DENSITY: the wood
-        # under the divider, the chair's seat, the laptop's palmrest.
+        # under the low screen, the chair's seat, the laptop's palmrest.
         ink = tuple(bytes.fromhex(json.loads((self.source / "pack.json").read_text())["palette"]["ink"])) + (255,)
-        for name, (x, y) in (("surface_mid_a", (9, 41)), ("chair_front", (13, 35)), ("shell_front", (11, 28))):
+        for name, (x, y) in (("desk_mid_a", (9, 18)), ("chair_front", (13, 35)), ("shell_front", (11, 28))):
             point = (x * DENSITY, y * DENSITY)
             path = self.source / "table" / f"{name}.png"
             with Image.open(path) as original:
@@ -57,7 +57,7 @@ class SharedTableBuildTests(unittest.TestCase):
         before = self.tree_state(self.source)
         build_pack(self.source, self.output)
         self.assertEqual(self.tree_state(self.source), before, "normal builds must never write or prune source files")
-        for name in ("surface_mid_a", "chair_front", "shell_front", "manifest"):
+        for name in ("desk_mid_a", "chair_front", "shell_front", "manifest"):
             filename = f"{name}.json" if name == "manifest" else f"{name}.png"
             self.assertEqual((self.output / "table" / filename).read_bytes(), before[Path("table") / filename][0])
         self.assertFalse((self.output / "table/artist-draft.png").exists())
@@ -180,8 +180,9 @@ class SharedTableAssetTests(unittest.TestCase):
                 )
 
     def test_surface_and_divider_modules_join_without_transparent_seams(self):
-        for theme in THEMES:
-            root = ROOT / "art" / theme / "table"
+        temporary, trees = legacy_tables()
+        self.addCleanup(temporary.cleanup)
+        for theme, root in trees:
             for prefix in ("surface", "divider"):
                 mid_names = ["mid_a", "mid_b"] if prefix == "surface" else ["mid"]
                 names = [f"{prefix}_left", *(f"{prefix}_{name}" for name in mid_names), f"{prefix}_right"]
@@ -200,9 +201,13 @@ class SharedTableAssetTests(unittest.TestCase):
                         image.close()
 
     def test_wood_edges_match_in_colour_not_only_alpha(self):
-        for prefix, mids in (("surface", ("mid_a", "mid_b")), ("apron", ("mid",))):
-            for theme in THEMES:
-                root = ROOT / "art" / theme / "table"
+        # The long table's surface on every tree that has it (legacy_tables());
+        # the apron, which the pod lays too, on every shipped theme and on the templates.
+        temporary, legacy = legacy_tables()
+        self.addCleanup(temporary.cleanup)
+        aprons = [legacy[0]] + [(theme, ROOT / "art" / theme / "table") for theme in THEMES]
+        for prefix, mids, trees in (("surface", ("mid_a", "mid_b"), legacy), ("apron", ("mid",), aprons)):
+            for theme, root in trees:
                 for left in ("left", *mids):
                     for right in (*mids, "right"):
                         with Image.open(root / f"{prefix}_{left}.png") as a, \
@@ -278,8 +283,10 @@ class SharedTableAssetTests(unittest.TestCase):
                         self.assertNotEqual(at(32, 52), silver, "keyboard is distinct from the palmrest")
 
     def test_tapered_legs_keep_floor_contact(self):
-        for theme in THEMES:
-            with Image.open(ROOT / f"art/{theme}/table/leg.png") as leg:
+        temporary, trees = legacy_tables()
+        self.addCleanup(temporary.cleanup)
+        for theme, root in trees:
+            with Image.open(root / "leg.png") as leg:
                 alpha = leg.getchannel("A")
                 # Unit rows, times DENSITY. Hung at y -2, a last unit row of 38
                 # puts the foot on the floor at y 37.
@@ -457,9 +464,10 @@ class PodSourceSetTests(unittest.TestCase):
                     self.build(f"bad-{label}")
 
 
-def pod_tables():
-    """Every table tree holding the pod modules: fresh templates, and each shipped
-    theme once it declares them (so the checks follow the art when it lands)."""
+def table_trees(modules):
+    """Every table tree holding `modules`: fresh templates (first, as "templates"), and
+    each shipped theme whose manifest declares them all. The temporary directory
+    is the caller's to clean up."""
     temporary = tempfile.TemporaryDirectory()
     root = Path(temporary.name)
     shutil.copyfile(ROOT / "art/daylight/pack.json", root / "pack.json")
@@ -468,9 +476,22 @@ def pod_tables():
     trees = [("templates", root / "table")]
     for theme in THEMES:
         table = ROOT / "art" / theme / "table"
-        if set(POD_MODULES) <= set(json.loads((table / "manifest.json").read_text())["modules"]):
+        if set(modules) <= set(json.loads((table / "manifest.json").read_text())["modules"]):
             trees.append((theme, table))
     return temporary, trees
+
+
+def pod_tables():
+    """Every table tree holding the pod modules: fresh templates, and each shipped
+    theme once it declares them (so the checks follow the art when it lands)."""
+    return table_trees(POD_MODULES)
+
+
+def legacy_tables():
+    """Every table tree holding the long table's own modules (its surface, divider
+    and leg): fresh templates, which draw them until the builder is pod-only, and
+    each shipped theme while it still declares them."""
+    return table_trees(set(LEGACY_POD) - set(POD_ONLY))
 
 
 class PodModuleContractTests(unittest.TestCase):

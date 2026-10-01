@@ -193,7 +193,7 @@ func test_an_item_block_reads_into_typed_fields() -> void:
 		"a floor item blocks"
 	)
 	_eq(art.prop_sprite(&"wall_frame").item.place, &"wall", "a wall item needs no footprint")
-	_eq(art.prop_sprite(&"done_stack").item.group, &"", "a signal is in no pool")
+	_eq(art.prop_sprite(&"done_stack_small").item.group, &"", "a signal is in no pool")
 	_check(art.prop_sprite(&"door").item == null, "the door is placed by code, by its id")
 	var desk: Array[StringName] = []
 	for member in art.items_in(&"desk"):
@@ -295,7 +295,7 @@ func test_a_broken_item_block_refuses_the_pack() -> void:
 		"blocks on a desk item": func(m: Dictionary) -> void: m.props.desk_mug.item.blocks = true,
 		"a floor item that does not block": func(m: Dictionary) -> void: m.props.plant.item.blocks = false,
 		"a group that is not an id": func(m: Dictionary) -> void: m.props.desk_mug.item.group = "Desk!",
-		"a weight with no group": func(m: Dictionary) -> void: m.props.done_stack.item.weight = 2,
+		"a weight with no group": func(m: Dictionary) -> void: m.props.done_stack_small.item.weight = 2,
 		"a negative weight": func(m: Dictionary) -> void: m.props.desk_mug.item.weight = -1,
 		"an item on a UI image": func(m: Dictionary) -> void: m.ui.panel.item = {"place": "wall"},
 	}
@@ -350,13 +350,13 @@ func test_art_pack_rejects_invalid_geometry_before_drawing() -> void:
 		"far outside atlas": func(m: Dictionary) -> void: m.tiles["floor.walkway"].cell = [999, 999],
 		"wrapping cell": func(m: Dictionary) -> void: m.tiles["floor.walkway"].cell = [4294967299, 0],
 		"negative cell y": func(m: Dictionary) -> void: m.tiles["floor.walkway"].cell = [3, -1],
-		"empty width": func(m: Dictionary) -> void: m.props.sign.size = [0, 24],
-		"negative height": func(m: Dictionary) -> void: m.props.sign.size = [64, -1],
-		"fractional size": func(m: Dictionary) -> void: m.props.sign.size = [64, 24.5],
-		"negative pivot y": func(m: Dictionary) -> void: m.props.sign.pivot = [32, -1],
-		"past pivot x": func(m: Dictionary) -> void: m.props.sign.pivot = [65, 22],
-		"past pivot y": func(m: Dictionary) -> void: m.props.sign.pivot = [32, 25],
-		"fractional pivot": func(m: Dictionary) -> void: m.props.sign.pivot = [32, 22.5],
+		"empty width": func(m: Dictionary) -> void: m.props.window.size = [0, 48],
+		"negative height": func(m: Dictionary) -> void: m.props.window.size = [64, -1],
+		"fractional size": func(m: Dictionary) -> void: m.props.window.size = [64, 48.5],
+		"negative pivot y": func(m: Dictionary) -> void: m.props.window.pivot = [32, -1],
+		"past pivot x": func(m: Dictionary) -> void: m.props.window.pivot = [65, 44],
+		"past pivot y": func(m: Dictionary) -> void: m.props.window.pivot = [32, 49],
+		"fractional pivot": func(m: Dictionary) -> void: m.props.window.pivot = [32, 44.5],
 		"patch object": func(m: Dictionary) -> void: m.ui.panel.nine_patch = {},
 		"patch wrong length": func(m: Dictionary) -> void: m.ui.panel.nine_patch = [4, 4, 4],
 		"patch negative": func(m: Dictionary) -> void: m.ui.panel.nine_patch = [4, -1, 4, 4],
@@ -369,13 +369,13 @@ func test_art_pack_rejects_invalid_geometry_before_drawing() -> void:
 		_check(ArtPack.from_manifest(_mutated_pack(what, change)) == null, "rejects " + what + " at the JSON boundary")
 	var edges := func(m: Dictionary) -> void:
 		m.tiles["floor.walkway"].cell = [7, 3]
-		m.props.sign.pivot = [64, 24]
+		m.props.window.pivot = [64, 48]
 		m.ui.panel.nine_patch = [3, 5, 28, 26]
 	var valid := ArtPack.from_manifest(_mutated_pack("geometry-edges", edges))
 	_check(valid != null, "last atlas cell, inclusive foot pivot and one-unit patch middle remain legal")
 	if valid == null:
 		return
-	_eq(valid.prop_sprite(&"sign").pivot, Vector2(64, 24), "both pivot edges survive parsing")
+	_eq(valid.prop_sprite(&"window").pivot, Vector2(64, 48), "both pivot edges survive parsing")
 	_eq([valid.panel().patch_right, valid.panel().patch_bottom], [28, 26], "asymmetric margins are preserved")
 	var built := valid.tileset()
 	_check(built != null, "accepted edge geometry really builds a TileSet")
@@ -393,10 +393,10 @@ func test_art_pack_requires_decodable_images_at_declared_density() -> void:
 	var broken := {
 		"atlas missing": func(m: Dictionary) -> void: m.atlas = "missing.png",
 		"atlas path type": func(m: Dictionary) -> void: m.atlas = [],
-		"prop missing": func(m: Dictionary) -> void: m.props.sign.path = "missing.png",
+		"prop missing": func(m: Dictionary) -> void: m.props.window.path = "missing.png",
 		"UI path type": func(m: Dictionary) -> void: m.ui.panel.path = 42,
 		"atlas width mismatch": func(m: Dictionary) -> void: m.atlas_size = [288, 128],
-		"prop height mismatch": func(m: Dictionary) -> void: m.props.sign.size = [64, 25],
+		"prop height mismatch": func(m: Dictionary) -> void: m.props.window.size = [64, 49],
 		"UI width mismatch": func(m: Dictionary) -> void: m.ui.panel.size = [33, 32],
 		"wrong image density": other_density,
 		"no density": func(m: Dictionary) -> void: m.erase("density"),
@@ -697,7 +697,7 @@ func test_art_textures_as_built() -> void:
 	var art := ArtPack.from_manifest(MANIFEST)
 	var base := MANIFEST.get_base_dir()
 	_check(
-		art.sprite_texture(art.prop_sprite(&"cabinet")) == load(base.path_join(art.props[&"cabinet"].path)),
+		art.sprite_texture(art.prop_sprite(&"window")) == load(base.path_join(art.props[&"window"].path)),
 		"a prop is the imported resource itself"
 	)
 	var shipped_atlas: TileSetAtlasSource = art.tileset().get_source(0)
@@ -874,8 +874,8 @@ func test_art_nodes() -> void:
 		var density: int = art.density
 		var pen := OfficeDraw.new(art)
 		var parent := Control.new()
-		var desk := pen.prop(parent, &"cabinet", Vector2(100, 200))
-		var spec := art.prop_sprite(&"cabinet")
+		var desk := pen.prop(parent, &"window", Vector2(100, 200))
+		var spec := art.prop_sprite(&"window")
 		var size := Vector2(spec.size)
 		var pivot := spec.pivot
 		_eq(desk.texture.get_size(), size * density, name + ": desk texture")
@@ -1043,8 +1043,8 @@ func test_avatar_layers_and_tracks() -> void:
 	)
 	_check(not body is ImageTexture, "handed out as imported, not resampled into a new one")
 	_eq(
-		art.table.module_texture(&"surface_left").get_size(),
-		Vector2(32, 80) * art.table.density,
+		art.table.module_texture(&"desk_left").get_size(),
+		Vector2(32, 48) * art.table.density,
 		"a table module is its size in units at the table's density"
 	)
 	_check(art.table.module_texture(&"no_such_module") == null, "an unknown module is null, not a crash")

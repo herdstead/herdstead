@@ -288,7 +288,8 @@ it never counts as a look and never turns writes back on.
 
 **Clicks that only navigate.** A click on a SPACES heading (show that machine's map), on a SPACES row (pan to its
 zone) and on an edge arrow (pan to its desk, selecting nothing) are navigation, like the clicks in NEWS, EVENTS and
-OVERVIEW that only select a pane: none of them is a write gesture, and none sends anything.
+OVERVIEW that only select a pane: none of them is a write gesture, and none sends a write. (A click that selects a
+pane while the card is expanded still schedules the card's preview read of it, a read, as a list click does.)
 
 ## 3. Raw mode
 

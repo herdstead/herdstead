@@ -40,6 +40,9 @@ var _compact := false
 ## The zone said last (zone_pointed): what stands under the mouse is said
 ## again only when it is another.
 var _said := ""
+## The viewport is being asked what the mouse is on (_on_an_arrow()): its
+## answer may arrange the arrows again, and is not asked for twice at once.
+var _asking := false
 
 
 func _ready() -> void:
@@ -209,21 +212,44 @@ static func _across(edge: EdgeArrowModel.Edge) -> bool:
 ## By where the mouse is and where the arrows shown stand, never by a node's
 ## hover flag: the pool's nodes are moved and handed other zones under a
 ## resting mouse, and the flag stays with the node that had it until the mouse
-## moves. Nothing while the arrows are hidden (an overlay covers the world).
+## moves. Nothing while the arrows are hidden (an overlay covers the world), and
+## nothing where something over the arrow takes the mouse (_on_an_arrow()).
 func _pointed() -> String:
 	if not is_visible_in_tree():
 		return ""
 	var at := get_global_mouse_position()
 	for arrow in _nodes():
 		if arrow.visible and arrow.get_global_rect().has_point(at):
-			return arrow.zone_key()
+			return arrow.zone_key() if _on_an_arrow() else ""
 	return ""
 
 
+## Whether what the mouse is really on is one of these arrows, and not a
+## control that covers the arrow there and takes the mouse itself (the staff
+## panel floating in answer mode, the drawer, any other part of the HUD). The
+## viewport is asked afresh (Viewport.update_mouse_cursor_state(): the engine's
+## own look at what is under the mouse, where everything stands now), and only
+## this is asked of it: which arrow it is comes from the rectangles.
+func _on_an_arrow() -> bool:
+	if _asking:
+		return false
+	_asking = true
+	var viewport := get_viewport()
+	viewport.update_mouse_cursor_state()
+	var over := viewport.gui_get_hovered_control()
+	_asking = false
+	return over is OfficeEdgeArrow and over.get_parent() == self
+
+
 ## Say the zone under the mouse when it is not the one said last: after the
-## arrows were arranged, and when they come back or go as a whole.
+## arrows were arranged, when they come back or go as a whole, and once the
+## mouse has left an arrow.
 func _say_pointed() -> void:
-	var zone := _pointed()
+	_say(_pointed())
+
+
+## Say `zone` is the one pointed at, unless it was the one said last.
+func _say(zone: String) -> void:
 	if zone != _said:
 		_said = zone
 		zone_pointed.emit(zone)
@@ -234,13 +260,14 @@ func _on_picked(pane_key: String) -> void:
 
 
 func _on_entered(arrow: OfficeEdgeArrow) -> void:
-	_said = arrow.zone_key()
-	zone_pointed.emit(_said)
+	_say(arrow.zone_key())
 
 
+## The mouse left an arrow's node. What it is on now is said once the viewport
+## has finished with this motion: another node of the pool may be entered at
+## once (the same zone still under the mouse says nothing twice).
 func _on_exited() -> void:
-	_said = ""
-	zone_pointed.emit("")
+	_say_pointed.call_deferred()
 
 
 func _nodes() -> Array[OfficeEdgeArrow]:

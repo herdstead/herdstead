@@ -17,6 +17,8 @@ extends "res://tools/office_test_base.gd"
 ## to it directly, as the NEWS / EVENTS suite does.
 
 const BUBBLE_PARTS: Array[String] = ["%Frame", "%Wait"]
+## The HUD on its own, for the cases about the edge arrows' pointing.
+const HUD_SCENE := preload("res://scenes/ui/hud.tscn")
 
 
 func _initialize() -> void:
@@ -721,7 +723,113 @@ func test_a_pointed_pane_that_goes_drops_the_mark() -> void:
 	_done(office)
 
 
+## A HUD's staff panel that says it is in answer mode: OfficeHud.fit() then
+## floats it over the world, as the office's does.
+class AnsweringInspector:
+	extends OfficePaneInspector
+
+	func answering() -> bool:
+		return true
+
+
+## An edge arrow under the staff panel is not pointed at. In answer mode the
+## panel floats over the world, here over the bottom edge's arrow, and the
+## pointer rests on the panel where it covers that arrow: no zone is said when
+## the pointer comes there, and none when a refresh hands the arrow under it
+## another zone (the arrows are arranged again, the pointer has not moved). At
+## the 480x320 minimum and at 800x480.
+func test_an_arrow_under_the_answer_panel_is_not_pointed_at() -> void:
+	# The case before's office is gone before the window changes size.
+	await _frames(2)
+	for screen: Vector2 in [Vector2(480, 320), Vector2(800, 480)]:
+		var size := "%dx%d" % [screen.x, screen.y]
+		root.size = Vector2i(screen)
+		await _hover(Vector2(4, 4))
+		var art := ArtPack.from_manifest(MANIFESTS[0])
+		var hud: OfficeHud = HUD_SCENE.instantiate()
+		var staff: Control = hud.get_node("%Staff")
+		staff.set_script(AnsweringInspector)
+		root.add_child(hud)
+		hud.dress(art, OfficeDraw.new(art).font)
+		hud.fit(screen)
+		await _frames(3)
+		hud.show_edge_arrows([_arrow_below("z0")] as Array[EdgeArrowModel])
+		await _frames(3)
+		_check(
+			hud.inspector.answering() and hud.edge_arrows.is_visible_in_tree(), size + ": answer mode, an arrow shown"
+		)
+		var arrow := hud.edge_arrows.shown()[0]
+		var at := arrow.get_global_rect().get_center()
+		_check(staff.get_global_rect().has_point(at), size + ": the floating panel covers the arrow's middle")
+		var said: Array[String] = []
+		hud.zone_pointed.connect(func(key: String) -> void: said.append(key))
+		await _hover(at)
+		var over := root.gui_get_hovered_control()
+		_check(over == staff or staff.is_ancestor_of(over), size + ": the pointer is on the panel: %s" % over)
+		_eq(said, [] as Array[String], size + ": coming onto the panel over the arrow points at no zone")
+		hud.show_edge_arrows([_arrow_below("z1")] as Array[EdgeArrowModel])
+		await _frames(3)
+		_eq(hud.edge_arrows.shown()[0].zone_key(), "z1", size + ": the arrow was handed another zone")
+		_check(
+			hud.edge_arrows.shown()[0].get_global_rect().has_point(at), size + ": still under the pointer and the panel"
+		)
+		_eq(said, [] as Array[String], size + ": and no zone is pointed at through the panel")
+		hud.free()
+		await _frames(2)
+	root.size = SCREEN
+
+
+## The zone under a resting pointer is said once. Two arrows change places in
+## the pool without moving on screen: nothing is said (the same zone is still
+## under the pointer); and when the pointer then moves a pixel within that
+## arrow, the viewport's exit from the node that was hovered and its enter of
+## the node that stands there now say nothing again.
+func test_arrows_changing_pool_places_say_the_zone_under_the_pointer_once() -> void:
+	await _frames(2)
+	await _hover(Vector2(4, 4))
+	var art := ArtPack.from_manifest(MANIFESTS[0])
+	var hud: OfficeHud = HUD_SCENE.instantiate()
+	root.add_child(hud)
+	hud.dress(art, OfficeDraw.new(art).font)
+	hud.fit(Vector2(SCREEN))
+	var below := _arrow_below("z0")
+	var above := _arrow_below("z1")
+	above.edge = EdgeArrowModel.Edge.TOP
+	hud.show_edge_arrows([below, above] as Array[EdgeArrowModel])
+	await _frames(2)
+	var at := hud.edge_arrows.shown()[0].get_global_rect().get_center()
+	var said: Array[String] = []
+	hud.zone_pointed.connect(func(key: String) -> void: said.append(key))
+	await _hover(at)
+	_eq(said, ["z0"] as Array[String], "the pointer on the bottom arrow points at its zone")
+	hud.show_edge_arrows([above, below] as Array[EdgeArrowModel])
+	await _frames(2)
+	var shown := hud.edge_arrows.shown()
+	_eq([shown[0].zone_key(), shown[1].zone_key()], ["z1", "z0"], "the two changed pool places")
+	_check(shown[1].get_global_rect().has_point(at), "z0's arrow is where it was, under the pointer")
+	_eq(said, ["z0"] as Array[String], "nothing more is said: the same zone is under the pointer")
+	await _hover(at + Vector2(1, 0))
+	_eq(said, ["z0"] as Array[String], "nor when the pointer moves a pixel within that arrow")
+	await _hover(Vector2(4, 4))
+	_eq(said, ["z0", ""] as Array[String], "off the arrows: no zone, said once")
+	hud.free()
+	await _frames(2)
+
+
 # --- helpers ------------------------------------------------------------------
+
+
+## An edge arrow for zone `zone`, one blocked desk below the view's middle.
+func _arrow_below(zone: String) -> EdgeArrowModel:
+	var arrow := EdgeArrowModel.new()
+	arrow.zone_key = zone
+	arrow.pane_key = zone + ":p0"
+	arrow.machine = LOCAL
+	arrow.number = "3"
+	arrow.blocked = 1
+	arrow.edge = EdgeArrowModel.Edge.BOTTOM
+	arrow.along = 0.5
+	return arrow
 
 
 func _pk(pane_id: String) -> String:

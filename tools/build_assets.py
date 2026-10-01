@@ -401,25 +401,29 @@ def check_tile_connections(images: dict, density: int) -> None:
                 joins(name, (31, 0, 32, 32), center, (0, 0, 1, 32), "Wall horizontal seam")
             if end in ("right", "end_right", "center"):
                 joins(center, (31, 0, 32, 32), name, (0, 0, 1, 32), "Wall horizontal seam")
-    # Declaring the new topology opts the wall family into the six-unit side
-    # profile. Legacy rectangular families are not silently reinterpreted.
-    if "wall.cap_t_left" in tiles:
-        for end in ("left", "right"):
-            side = f"wall.side_{end}"
-            x0, x1 = (0, 6) if end == "left" else (26, 32)
-            joins(f"wall.face_{end}", (x0, 31, x1, 32), side,
-                  (x0, 0, x1, 1), "Wall side port seam")
-            joins(side, (0, 31, 32, 32), side, (0, 0, 32, 1), "Wall side repeat seam")
-            if side in tiles:
-                alpha = tiles[side].getchannel("A")
-                port = tuple(value * density for value in (x0, 0, x1, 32))
-                outside = (6, 0, 32, 32) if end == "left" else (0, 0, 26, 32)
-                outside = tuple(value * density for value in outside)
-                require(alpha.crop(port).getextrema() == (255, 255)
-                        and alpha.crop(outside).getextrema() == (0, 0),
-                        f"Wall side must occupy its six-unit profile: {side}")
-        joins("wall.cap_t_left", (0, 0, 6, 1), "wall.side_left", (0, 31, 6, 32), "Wall T top port seam")
-        joins("wall.face_t_left", (0, 31, 6, 32), "wall.side_left", (0, 0, 6, 1), "Wall T bottom port seam")
+    # A wall family with side walls keeps the six-unit side profile: the strip
+    # joins its corner above, repeats down the map and stays inside its six
+    # units. (It used to be opted into by declaring the row walls' T joint; the
+    # shipped pack has no row walls any more, and its side walls are still held
+    # to their profile.)
+    for end in ("left", "right"):
+        side = f"wall.side_{end}"
+        x0, x1 = (0, 6) if end == "left" else (26, 32)
+        joins(f"wall.face_{end}", (x0, 31, x1, 32), side,
+              (x0, 0, x1, 1), "Wall side port seam")
+        joins(side, (0, 31, 32, 32), side, (0, 0, 32, 1), "Wall side repeat seam")
+        if side in tiles:
+            alpha = tiles[side].getchannel("A")
+            port = tuple(value * density for value in (x0, 0, x1, 32))
+            outside = (6, 0, 32, 32) if end == "left" else (0, 0, 26, 32)
+            outside = tuple(value * density for value in outside)
+            require(alpha.crop(port).getextrema() == (255, 255)
+                    and alpha.crop(outside).getextrema() == (0, 0),
+                    f"Wall side must occupy its six-unit profile: {side}")
+    # A pack that still declares a row wall's T joint: its ports join the
+    # through side wall (joins() skips a module the pack does not have).
+    joins("wall.cap_t_left", (0, 0, 6, 1), "wall.side_left", (0, 31, 6, 32), "Wall T top port seam")
+    joins("wall.face_t_left", (0, 31, 6, 32), "wall.side_left", (0, 0, 6, 1), "Wall T bottom port seam")
 
 
 def build(source: Path, output: Path):
