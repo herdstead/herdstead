@@ -7,7 +7,7 @@ open-plan office. Each herdr machine is one office map, each workspace a zone of
 coding agent the person sitting in it. Blocked agents raise their hands, finished ones leave a stack of paper on the desk,
 idle ones walk over to the pantry. You can see who needs you at a glance, and answer them from the office.
 
-![Answering a blocked agent from the staff panel](docs/preview.png)
+![A blocked agent in the staff panel: its question on screen, Answer one key away](docs/preview.png)
 
 ## Requirements
 
