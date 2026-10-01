@@ -15,19 +15,19 @@ var repo := ""
 ## worktree of that repository; empty for every other workspace. The plate shows
 ## it after the repo name.
 var worktree := ""
-## The floor's number as the minimap and the plate write it: herdr's number
-## ("3"), or, for a mezzanine, its source floor's number and a letter ("3A").
+## The zone's number as its sign and the SPACES rail write it: herdr's number
+## ("3"), or, for a mezzanine, its source zone's number and a letter ("3A").
 ## See OfficeProjection.group_worktrees().
 var level_label := ""
-## Key of the floor this one is a mezzanine of: the workspace herdr made this
+## Key of the zone this one is a mezzanine of: the workspace herdr made this
 ## linked worktree from, when it is open on the same machine. Empty for every
-## floor that is not a mezzanine. Display, not geometry: never in
+## zone that is not a mezzanine. Display, not geometry: never in
 ## geometry_signature(), so a group forming or breaking up re-plans nothing.
 var mezzanine_of := ""
-## 0-based among its source floor's mezzanines, in herdr's workspace order; -1
+## 0-based among its source zone's mezzanines, in herdr's workspace order; -1
 ## when this is no mezzanine.
 var mezzanine_index := -1
-## Agents seated on this floor, one still launching included.
+## Agents seated in this zone, one still launching included.
 var agents := 0
 ## Panes whose agent needs a human (see OfficeAttention.count). A stale machine
 ## reports none: a lost connection is not a live signal.
@@ -45,7 +45,7 @@ func geometry_signature() -> String:
 	return JSON.stringify([key, groups])
 
 
-## Panes seated on this floor, for the plate's counts.
+## Panes seated in this zone, for the plate's counts.
 func pane_count() -> int:
 	var total := 0
 	for room in rooms:
@@ -53,7 +53,7 @@ func pane_count() -> int:
 	return total
 
 
-## Pane keys this floor carries more than once, as a set. A remote snapshot may
+## Pane keys this zone carries more than once, as a set. A remote snapshot may
 ## repeat a pane id, and two desks under one key cannot be told apart in place.
 func repeated_keys() -> Dictionary:
 	var seen := {}

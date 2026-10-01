@@ -1,7 +1,7 @@
 extends "res://tools/command_test_base.gd"
 ## Answer mode: the approval keys and the one-line reply the agent
 ## card sends through the write boundary, against two fake herdrs of this
-## suite's own whose pane ids collide. The bubbles' reads and the clicks that
+## suite's own whose pane ids collide. The chips' reads and the clicks that
 ## open answer mode from the world are tools/test_bubbles.gd's. Run through
 ## tools/run_tests.sh.
 ##

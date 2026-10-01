@@ -1,6 +1,6 @@
-class_name OfficeFloorPlate
+class_name OfficeMachinePlate
 extends Control
-## The machine plate over the map's zones (scenes/world/floor_plate.tscn): the
+## The machine plate over the map's zones (scenes/world/machine_plate.tscn): the
 ## machine's name (`@ NAME` once there is more than Local), and then its live
 ## state; a machine with no workspace says why it has none (its note); the
 ## machine's counts on the right; and before them, inside the band, why its map
@@ -108,7 +108,7 @@ static func problem_line(
 	return said if named.is_empty() else ", ".join(named) + ": " + said
 
 
-## The machine's live state as the minimap shows it, and `reason`, its SSH
+## The machine's live state as the SPACES rail shows it, and `reason`, its SSH
 ## forward's last complaint. Only text changes: a flapping machine relabels.
 func show_state(state: MachineLiveness.State, reason: String) -> void:
 	var text := "LIVE"

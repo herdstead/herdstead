@@ -88,9 +88,9 @@ var _shell_signature := ""
 var _rooms_signature := ""
 ## Connected to every station's `picked`: a click released over a desk.
 var _picked: Callable
-## Connected to every station's `asked`: a click released over a bubble.
+## Connected to every station's `asked`: a click released over a chip.
 var _asked: Callable
-## Connected to every station's `bubble_hovered`: the pointer on or off a bubble.
+## Connected to every station's `chip_hovered`: the pointer on or off a chip.
 var _hovered: Callable
 ## Connected to every zone sign's `hovered`: the pointer on or off a sign.
 var _sign_hovered: Callable
@@ -235,16 +235,16 @@ func furnishing() -> Array[CanvasItem]:
 
 
 ## Point at pane `key`'s desk (OfficePointer): its click area and, while it
-## shows, its bubble. Empty, or a pane with no seat here, points at nothing.
+## shows, its chip. Empty, or a pane with no seat here, points at nothing.
 func point(key: String) -> void:
 	var desk: Seat = null if key.is_empty() else seats.get(key)
 	if desk == null:
 		pointer.clear()
 		return
 	var bounds := desk.node.target_rect()
-	var bubble := desk.node.bubble_rect()
-	if bubble.has_area():
-		bounds = bounds.merge(bubble)
+	var chip := desk.node.chip_rect()
+	if chip.has_area():
+		bounds = bounds.merge(chip)
 	pointer.point_at(key, root.get_global_transform().affine_inverse() * bounds)
 
 
@@ -370,8 +370,8 @@ func _index(model: MapModel) -> void:
 				station.picked.connect(_picked)
 			if _asked.is_valid() and not station.asked.is_connected(_asked):
 				station.asked.connect(_asked)
-			if _hovered.is_valid() and not station.bubble_hovered.is_connected(_hovered):
-				station.bubble_hovered.connect(_hovered)
+			if _hovered.is_valid() and not station.chip_hovered.is_connected(_hovered):
+				station.chip_hovered.connect(_hovered)
 	seats = indexed
 
 

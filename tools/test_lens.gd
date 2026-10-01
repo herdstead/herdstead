@@ -128,29 +128,29 @@ func test_holding_l_adds_the_wait_line_and_letting_go_restores_everything() -> v
 
 
 ## Under the lens the wait is the lens line's: the blocked seat keeps its
-## bubble (its click and hover rectangle, and the question reader's
+## chip (its click and hover rectangle, and the question reader's
 ## `visible`), but nothing of it is drawn, and no question tooltip comes up
 ## over it. An agent blocked in the first snapshot began before this office
-## watched: the bubble has no wait to tell, but its line says `Ns+`.
+## watched: the chip has no wait to tell, but its line says `Ns+`.
 func test_the_lens_hides_the_bubble_parts_but_not_the_blocked_seat() -> void:
 	var first := _with(fixture, "api:p1", {"agent_status": "blocked"})
 	var office := await _live_office(first)
-	# api:p4 is seen going blocked, so its bubble has a wait to draw.
+	# api:p4 is seen going blocked, so its chip has a wait to draw.
 	_feed(office, _with(first, "api:p4", {"agent_status": "blocked"}))
 	var key := _pk("api:p4")
 	office.settle()
 	await _text_tick()
 	var station := _station(office, key)
-	var bubble := station.bubble()
+	var bubble := station.chip()
 	for part in BUBBLE_PARTS:
 		_check(_part(bubble, part).is_visible_in_tree(), "without the lens the bubble draws " + part)
 	var at := await _bubble_at(office, key)
 	await _hover(at)
-	_check(office.hud.bubble_tip_shown(), "without the lens its tooltip comes up")
+	_check(office.hud.world_tip_shown(), "without the lens its tooltip comes up")
 	await _hold()
-	_check(not office.hud.bubble_tip_shown(), "the lens takes the tooltip down")
+	_check(not office.hud.world_tip_shown(), "the lens takes the tooltip down")
 	_check(bubble.visible, "the seat is still a blocked one")
-	_check(station.bubble_rect().has_area(), "and its bubble rectangle is where it was")
+	_check(station.chip_rect().has_area(), "and its bubble rectangle is where it was")
 	for part in BUBBLE_PARTS:
 		_check(not _part(bubble, part).is_visible_in_tree(), "under the lens the bubble draws no " + part)
 	var line := _lens(station)
@@ -162,7 +162,7 @@ func test_the_lens_hides_the_bubble_parts_but_not_the_blocked_seat() -> void:
 	_check(plus.search(early.text) != null, "blocked since before this office watched: " + early.text)
 	await _hover(office.hud.world_rect().position + Vector2(4, 4))
 	await _hover(at)
-	_check(not office.hud.bubble_tip_shown(), "no tooltip over the bubble while L is held")
+	_check(not office.hud.world_tip_shown(), "no tooltip over the bubble while L is held")
 	await _let_go()
 	await _text_tick()
 	for part in BUBBLE_PARTS:
@@ -786,7 +786,7 @@ func _wait_seconds(seconds: float) -> void:
 		await process_frame
 
 
-func _part(bubble: OfficeBubble, part: String) -> CanvasItem:
+func _part(bubble: OfficeChip, part: String) -> CanvasItem:
 	return bubble.get_node(part)
 
 
@@ -914,11 +914,11 @@ func _in_floor(office: OfficeDouble, rect: Rect2) -> Rect2:
 	return office.floor_view.root.get_global_transform().affine_inverse() * rect
 
 
-## The bubble over pane `key` on screen, its middle, once revealed.
+## The chip over pane `key` on screen, its middle, once revealed.
 func _bubble_at(office: OfficeDouble, key: String) -> Vector2:
 	office.reveal(key)
 	await _frames(2)
-	return _station(office, key).bubble_rect().get_center() - office.camera.position
+	return _station(office, key).chip_rect().get_center() - office.camera.position
 
 
 ## `snapshot` without pane `pane_id`, in its panes, agents and layouts.

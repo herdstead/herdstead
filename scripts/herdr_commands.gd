@@ -1455,7 +1455,7 @@ func _record(ticket: CommandTicket, entry: CommandAuditEntry, queued := true) ->
 		snapshot_wanted.emit(context.machine)
 	var floors := [CommandContext.Kind.CLOSE, CommandContext.Kind.SPACE, CommandContext.Kind.WORKTREE]
 	if context != null and context.kind in floors and ticket.state == CommandTicket.State.ACCEPTED:
-		# The pane is gone, or a floor is new: the next snapshot shows it.
+		# The pane is gone, or a space is new: the next snapshot shows it.
 		snapshot_wanted.emit(context.machine)
 
 

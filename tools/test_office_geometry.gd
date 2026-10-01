@@ -64,15 +64,15 @@ func test_repeated_station_setup_does_not_drift_the_click_targets() -> void:
 	var station := pen.station(sorted, table, 0, "far")
 	station.furnish("claude", ArtContract.STATE_BLOCKED)
 	var target := station.target_rect()
-	var bubble := station.bubble_rect()
-	var bubble_shape: CollisionShape2D = station.get_node(OfficeStation.BUBBLE_TARGET)
+	var bubble := station.chip_rect()
+	var bubble_shape: CollisionShape2D = station.get_node(OfficeStation.CHIP_TARGET)
 	var shape_at := bubble_shape.global_position
 	var worker := station.actor()
 	_check(bubble.has_area(), "a blocked seat has a bubble")
 	station.setup(pen, table, 0, "far")
 	station.furnish("claude", ArtContract.STATE_BLOCKED)
 	_eq(station.target_rect(), target, "same setup keeps the seat's click target")
-	_eq(station.bubble_rect(), bubble, "and the bubble")
+	_eq(station.chip_rect(), bubble, "and the bubble")
 	_eq(bubble_shape.global_position, shape_at, "and the bubble's click target")
 	_eq(station.actor(), worker, "same setup keeps worker node")
 
@@ -434,11 +434,11 @@ func test_relocation_rebind_keeps_actor_clock_and_pose() -> void:
 	_eq(station.chair_view, ArtContract.CHAIR_FRONT, "chair follows new side")
 	station.furnish("claude", ArtContract.STATE_BLOCKED)
 	var blocked_target := station.target_rect().position - station.global_position
-	var bubble := station.bubble_rect().position - station.global_position
+	var bubble := station.chip_rect().position - station.global_position
 	for step in 12:
 		_check(station.rebind(table, 2, "far"), "repeat blocked binding")
 		_eq(station.target_rect().position - station.global_position, blocked_target, "the seat's target stays put")
-		_eq(station.bubble_rect().position - station.global_position, bubble, "and so does the bubble")
+		_eq(station.chip_rect().position - station.global_position, bubble, "and so does the bubble")
 		_eq(worker.global_position, table.seat(2, "far").global_position, "the blocked worker stays on the seat")
 		_eq(worker.track, &"desk_blocked", "hand up at the desk")
 
@@ -524,7 +524,7 @@ func _check_inside_measure(table: OfficeTable, station: OfficeStation, held: boo
 		station.furnish("claude", state, true)
 		if state == ArtContract.STATE_BLOCKED:
 			# A wait to tell draws the whole chip: frame and number.
-			station.bubble().show_wait(5999.0)
+			station.chip().show_wait(5999.0)
 		station.show_lens(held, "99m+")
 		var line: Label = station.get_node("Overlay/Lens")
 		_eq(line.is_visible_in_tree(), held, "%s %s: the lens line shows only while held" % [side, state])
@@ -581,7 +581,7 @@ func test_labels_clear_the_heads_they_hang_on() -> void:
 		]:
 			station.furnish("claude", state, true)
 			if state == ArtContract.STATE_BLOCKED:
-				station.bubble().show_wait(5999.0)
+				station.chip().show_wait(5999.0)
 			var where := "%s %s" % [side, state]
 			var figure := _drawn_figure(station)
 			var text := _plate_text(station)
@@ -623,7 +623,7 @@ func test_labels_clear_the_heads_they_hang_on() -> void:
 					"%s: badge over lens over plate" % where
 				)
 			if state == ArtContract.STATE_BLOCKED:
-				var bubble := Rect2(station.bubble().position, OfficeStation.BUBBLE_SIZE)
+				var bubble := Rect2(station.chip().position, OfficeStation.CHIP_SIZE)
 				_check(not bubble.intersects(figure), "%s: the chip %s clears the figure %s" % [where, bubble, figure])
 				_check(not bubble.intersects(text), "%s: and the plate's text %s" % [where, text])
 				# One unit over the chip's left edge, so the wait has daylight on both sides.
@@ -632,15 +632,15 @@ func test_labels_clear_the_heads_they_hang_on() -> void:
 					bubble.grow_side(SIDE_LEFT, 1.0).encloses(badge),
 					"%s: the badge %s on the chip %s" % [where, badge, bubble]
 				)
-				_check(badge.end.x <= bubble.position.x + OfficeBubble.BADGE_SLOT, "%s: in its left half" % where)
+				_check(badge.end.x <= bubble.position.x + OfficeChip.BADGE_SLOT, "%s: in its left half" % where)
 				var overlay := station.get_node("Overlay")
 				_check(
-					badge_node.get_index() > station.bubble().get_index() and badge_node.get_parent() == overlay,
+					badge_node.get_index() > station.chip().get_index() and badge_node.get_parent() == overlay,
 					"%s: the badge is drawn over the chip" % where
 				)
-				var wait: Label = station.bubble().get_node("%Wait")
+				var wait: Label = station.chip().get_node("%Wait")
 				_eq(wait.text, "99m", "%s: the chip says the wait, compactly" % where)
-				var inside := Rect2(Vector2.ZERO, OfficeBubble.SIZE).encloses(Rect2(wait.position, wait.size))
+				var inside := Rect2(Vector2.ZERO, OfficeChip.SIZE).encloses(Rect2(wait.position, wait.size))
 				_check(inside, "%s: the chip's wait stays inside its frame" % where)
 				var drawn := _in_station(station, wait, Rect2(Vector2.ZERO, wait.size))
 				_check(not drawn.intersects(badge), "%s: the wait %s clears the badge %s" % [where, drawn, badge])
@@ -661,7 +661,7 @@ func test_the_lens_line_stays_inside_the_desk_and_off_the_badge() -> void:
 	for side: String in OfficeTable.SIDES:
 		var station := pen.station(sorted, table, 0, side)
 		station.furnish("claude", ArtContract.STATE_BLOCKED, false)
-		station.bubble().show_wait(240.0)
+		station.chip().show_wait(240.0)
 		var badge_node: StatusBadge = station.get_node("Overlay/Badge")
 		var chipped := badge_node.position
 		station.show_lens(true, "99m+")
@@ -680,7 +680,7 @@ func test_the_lens_line_stays_inside_the_desk_and_off_the_badge() -> void:
 		station.select(true)
 		_check(not lens.intersects(_plate_text(station)), "%s: and the plate's text" % side)
 		for part: String in ["%Frame", "%Wait"]:
-			var drawn_part: CanvasItem = station.bubble().get_node(part)
+			var drawn_part: CanvasItem = station.chip().get_node(part)
 			_check(not drawn_part.is_visible_in_tree(), "%s: the chip draws no %s meanwhile" % [side, part])
 		station.show_lens(false, "")
 		_check(not line.visible, "%s: let go, no line" % side)
@@ -732,7 +732,7 @@ func test_shrink_removes_only_discarded_columns() -> void:
 
 ## A station bound again and again, then moved to another table place and
 ## seat, still answers real clicks where it is now: its seat's rectangle picks
-## (`picked`) and its bubble's asks (`asked`), each through the viewport's own
+## (`picked`) and its chip's asks (`asked`), each through the viewport's own
 ## physics picking, and only on the release.
 func test_a_rebound_station_picks_by_seat_and_bubble_through_real_input() -> void:
 	var table := _table()
@@ -750,7 +750,7 @@ func test_a_rebound_station_picks_by_seat_and_bubble_through_real_input() -> voi
 	await physics_frame
 	for target: String in ["seat", "bubble"]:
 		heard.clear()
-		var at := station.target_rect().get_center() if target == "seat" else station.bubble_rect().get_center()
+		var at := station.target_rect().get_center() if target == "seat" else station.chip_rect().get_center()
 		var motion := InputEventMouseMotion.new()
 		motion.position = at
 		motion.global_position = at
@@ -793,10 +793,10 @@ func test_the_bubble_clears_every_click_target_and_its_neighbours() -> void:
 			for side: String in OfficeTable.SIDES:
 				var station := pen.station(sorted, table, column, side)
 				station.furnish("claude", ArtContract.STATE_BLOCKED)
-				station.bubble().show_wait(60.0 * column)
+				station.chip().show_wait(60.0 * column)
 				stations.append(station)
-				bubbles.append(station.bubble_rect())
-				chips.append(_shape_rect(station.get_node(OfficeStation.BUBBLE_TARGET)))
+				bubbles.append(station.chip_rect())
+				chips.append(_shape_rect(station.get_node(OfficeStation.CHIP_TARGET)))
 				seats.append(station.target_rect())
 				names.append("%d columns, column %d %s" % [capacity, column, side])
 		for index in bubbles.size():
@@ -812,9 +812,9 @@ func test_the_bubble_clears_every_click_target_and_its_neighbours() -> void:
 					stations[index].target_rect().has_point(badge_at),
 					names[index] + ": working, the seat covers the badge"
 				)
-				_eq(stations[index].bubble_rect(), Rect2(), names[index] + ": with no chip")
+				_eq(stations[index].chip_rect(), Rect2(), names[index] + ": with no chip")
 				stations[index].furnish("claude", ArtContract.STATE_BLOCKED)
-				stations[index].bubble().show_wait(60.0)
+				stations[index].chip().show_wait(60.0)
 			for other in seats.size():
 				_check(
 					not bubbles[index].intersects(seats[other]),
@@ -1000,7 +1000,7 @@ func test_rows_at_the_pod_pitch_never_meet() -> void:
 				var names: Array[String] = []
 				for station in stations:
 					station.furnish("claude", ArtContract.STATE_BLOCKED, true)
-					station.bubble().show_wait(5999.0 if known else -1.0)
+					station.chip().show_wait(5999.0 if known else -1.0)
 					station.show_lens(held, "99m+")
 					var badge: StatusBadge = station.get_node("Overlay/Badge")
 					badge.lift(lift)
@@ -1088,7 +1088,7 @@ func _seat_rows(station: OfficeStation) -> Dictionary[String, Rect2]:
 	var badge: Sprite2D = station.get_node("Overlay/Badge")
 	if badge.visible:
 		rows["badge"] = badge.get_global_transform() * _opaque_local(badge)
-	var frame: NinePatchRect = station.bubble().get_node("%Frame")
+	var frame: NinePatchRect = station.chip().get_node("%Frame")
 	if frame.is_visible_in_tree():
 		rows["chip"] = frame.get_global_transform() * Rect2(Vector2.ZERO, frame.size)
 	for label: String in ["Lens", "Plate"]:
@@ -1099,7 +1099,7 @@ func _seat_rows(station: OfficeStation) -> Dictionary[String, Rect2]:
 	if mark.is_visible_in_tree():
 		rows["mark"] = mark.get_global_transform() * _opaque_local(mark)
 	rows["seat"] = station.target_rect()
-	var chip: CollisionShape2D = station.get_node(OfficeStation.BUBBLE_TARGET)
+	var chip: CollisionShape2D = station.get_node(OfficeStation.CHIP_TARGET)
 	if not chip.disabled:
 		rows["chip rect"] = _shape_rect(chip)
 	return rows
@@ -1170,7 +1170,7 @@ func test_the_near_chair_clears_the_badge_at_its_highest_lift() -> void:
 				"near: right under the chair %s" % under
 			)
 		for known: bool in [true, false]:
-			station.bubble().show_wait(60.0 if known else -1.0)
+			station.chip().show_wait(60.0 if known else -1.0)
 			for lift: int in [0, -1, -2]:
 				badge.lift(lift)
 				var badge_texels := _texels(badge)
@@ -1244,10 +1244,10 @@ func test_the_compact_duration_is_bounded_and_fits_its_rows() -> void:
 	_eq(OfficeAttention.compact_duration(-1.0, true), "", "even unobserved")
 	var table := _table()
 	var station := pen.station(sorted, table, 0, "far")
-	var wait: Label = station.bubble().get_node("%Wait")
+	var wait: Label = station.chip().get_node("%Wait")
 	var lens: Label = station.get_node("Overlay/Lens")
 	var probe := Label.new()
-	pen.style_display(probe, OfficeBubble.WAIT_PIXELS)
+	pen.style_display(probe, OfficeChip.WAIT_PIXELS)
 	root.add_child(probe)
 	await process_frame
 	var chip_widest := 0.0
@@ -1291,7 +1291,7 @@ func test_hovering_a_seat_shows_only_its_plate() -> void:
 			stations.append(station)
 	var blocked := stations[2]
 	blocked.furnish("codex", ArtContract.STATE_BLOCKED)
-	blocked.bubble().show_wait(60.0)
+	blocked.chip().show_wait(60.0)
 	await physics_frame
 	for station in stations:
 		_check(not _plate_of(station).visible, "%d %s: no plate at rest" % [station.column, station.side])
@@ -1304,7 +1304,7 @@ func test_hovering_a_seat_shows_only_its_plate() -> void:
 				station == target,
 				"over %d %s: %d %s's plate" % [target.column, target.side, station.column, station.side]
 			)
-	await _point(blocked.bubble_rect().get_center())
+	await _point(blocked.chip_rect().get_center())
 	_check(_plate_of(blocked).visible, "over the chip, its seat's plate shows")
 	await _point(Vector2(20, 20))
 	for station in stations:

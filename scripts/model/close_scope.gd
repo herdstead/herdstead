@@ -29,7 +29,7 @@ var tabs_in_space := 0
 var space_number := 0
 var space_label := ""
 ## The mezzanine's level label (`3A`) when the workspace is a linked worktree
-## hung under an open parent, as the FLOORS column names it; the workspace's
+## hung under an open parent, as the SPACES rail names it; the workspace's
 ## own number as text otherwise.
 var level_label := ""
 ## Closing this pane closes its tab; closing it closes its workspace.

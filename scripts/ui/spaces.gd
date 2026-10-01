@@ -34,7 +34,7 @@ const ROW := 26
 ## Zone key -> its row, for as long as that zone exists.
 var _rows: Dictionary[String, OfficeSpaceRow] = {}
 ## Machine key -> its heading.
-var _headings: Dictionary[String, OfficeBuildingHeading] = {}
+var _headings: Dictionary[String, OfficeMachineHeading] = {}
 ## Row order as drawn, top to bottom.
 var _order: PackedStringArray = PackedStringArray()
 ## The zones in view (set_in_view()), as a set.
@@ -138,17 +138,17 @@ func row_for(key: String) -> OfficeSpaceRow:
 
 
 ## Every machine heading drawn now, top to bottom.
-func headings() -> Array[OfficeBuildingHeading]:
-	var found: Array[OfficeBuildingHeading] = []
+func headings() -> Array[OfficeMachineHeading]:
+	var found: Array[OfficeMachineHeading] = []
 	for child in _row_box().get_children():
-		if child is OfficeBuildingHeading:
+		if child is OfficeMachineHeading:
 			found.append(child)
 	return found
 
 
 ## The heading drawn for machine `key`, or null while headings are off or no
 ## machine has it.
-func heading_for(key: String) -> OfficeBuildingHeading:
+func heading_for(key: String) -> OfficeMachineHeading:
 	return _headings.get(key)
 
 
@@ -205,8 +205,8 @@ func _row(key: String) -> OfficeSpaceRow:
 	return row
 
 
-func _heading(machine: SpaceRows, gap: bool, current: bool) -> OfficeBuildingHeading:
-	var heading: OfficeBuildingHeading = _headings.get(machine.key)
+func _heading(machine: SpaceRows, gap: bool, current: bool) -> OfficeMachineHeading:
+	var heading: OfficeMachineHeading = _headings.get(machine.key)
 	if heading == null:
 		heading = heading_scene.instantiate()
 		heading.name = "Heading" + str(_headings.size())

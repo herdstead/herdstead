@@ -93,20 +93,20 @@ func test_art_contract_names_every_id_a_pack_lacks() -> void:
 	_check(ArtContract.problems(ArtPack.from_manifest(MANIFEST)).is_empty(), "the shipped pack dresses the scenes")
 	var missing := {
 		"a palette colour": func(m: Dictionary) -> void: _drop(m, ["palette", "task_light"]),
-		"a tile": func(m: Dictionary) -> void: _drop(m, ["tiles", "rug.middle_center"]),
+		"a tile": func(m: Dictionary) -> void: _drop(m, ["tiles", "floor.walkway"]),
 		"a prop": func(m: Dictionary) -> void: _drop(m, ["props", "window"]),
-		# The showroom's row room (scripts/preview.gd) still stands both.
-		"the showroom's sign": func(m: Dictionary) -> void: _drop(m, ["props", "sign"]),
-		"the showroom's cabinet": func(m: Dictionary) -> void: _drop(m, ["props", "cabinet"]),
+		# The office and the showroom (scripts/preview.gd) both stand these.
+		"the lift door": func(m: Dictionary) -> void: _drop(m, ["props", "door"]),
+		"the side table": func(m: Dictionary) -> void: _drop(m, ["props", "side_table"]),
 		"a UI image": func(m: Dictionary) -> void: _drop(m, ["ui", "branch"]),
 		"a state": func(m: Dictionary) -> void: _drop(m, ["states", "blocked"]),
 	}
 	var named := {
 		"a palette colour": "task_light",
-		"a tile": "rug.middle_center",
+		"a tile": "floor.walkway",
 		"a prop": "window",
-		"the showroom's sign": "sign",
-		"the showroom's cabinet": "cabinet",
+		"the lift door": "door",
+		"the side table": "side_table",
 		"a UI image": "branch",
 		"a state": "blocked",
 	}
@@ -159,7 +159,7 @@ func test_art_pack_refuses_a_manifest_it_cannot_draw() -> void:
 		"no atlas": func(m: Dictionary) -> void: m.erase("atlas"),
 		"a palette colour that is not hex": func(m: Dictionary) -> void: m.palette.ink = "not-a-colour",
 		"a tile with no cell": func(m: Dictionary) -> void: m.tiles["floor.walkway"] = {},
-		"a prop with no pivot": func(m: Dictionary) -> void: _drop(m, ["props", "sign", "pivot"]),
+		"a prop with no pivot": func(m: Dictionary) -> void: _drop(m, ["props", "window", "pivot"]),
 		"a UI image with no path": func(m: Dictionary) -> void: _drop(m, ["ui", "panel", "path"]),
 		"a state with no badge": func(m: Dictionary) -> void: _drop(m, ["states", "idle", "badge"]),
 		"no font": func(m: Dictionary) -> void: m.erase("font"),
@@ -256,6 +256,30 @@ func test_the_display_font_is_optional_and_drawn_hard() -> void:
 		null,
 		"a display face it does not ship is refused"
 	)
+
+
+## The `+N` note on the world's edge is a disabled EdgeArrow button, and it
+## stands on the floor like the arrows do: its box is the filled dark one they
+## wear, not the hollow frame other switched-off dark buttons take, so its
+## count reads like a zone's number on an arrow.
+func test_the_edge_arrows_note_wears_the_filled_box() -> void:
+	var pack := ArtPack.from_manifest(MANIFEST)
+	var theme := HudTheme.build(pack, OfficeDraw.new(pack).font)
+	var arrow := theme.get_stylebox("normal", "EdgeArrow") as StyleBoxFlat
+	var note := theme.get_stylebox("disabled", "EdgeArrow") as StyleBoxFlat
+	_check(arrow != null and note != null, "both are flat boxes of the theme")
+	if arrow == null or note == null:
+		return
+	_eq(arrow.bg_color, pack.color(ArtContract.DEEP), "an arrow is filled deep")
+	_eq(note.bg_color, arrow.bg_color, "the note has the arrow's fill")
+	_eq(note.bg_color.a, 1.0, "opaque: the floor does not show through it")
+	_eq(note.border_color, arrow.border_color, "and the arrow's edge")
+	_eq(note.get_border_width(SIDE_LEFT), arrow.get_border_width(SIDE_LEFT), "as thick")
+	for side: Side in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM]:
+		_eq(note.get_margin(side), arrow.get_margin(side), "the same room inside (side %d)" % side)
+	# Other dark buttons keep the hollow look when switched off: it is the note's alone.
+	var off := theme.get_stylebox("disabled", "CardAction") as StyleBoxFlat
+	_check(off != null and off.bg_color.a == 0.0, "a switched-off card action stays hollow")
 
 
 ## A broken item block refuses the whole pack, like any other contract error:
@@ -381,7 +405,7 @@ func test_art_pack_requires_decodable_images_at_declared_density() -> void:
 	for what: String in broken:
 		var change: Callable = broken[what]
 		_check(ArtPack.from_manifest(_mutated_pack(what, change)) == null, "rejects " + what)
-	for image_path: String in ["terrain.png", "props/sign.png", "ui/panel.png"]:
+	for image_path: String in ["terrain.png", "props/window.png", "ui/panel.png"]:
 		var path := _mutated_pack("corrupt-" + image_path.replace("/", "-"), func(_m: Dictionary) -> void: pass)
 		_check(ArtPack.from_manifest(path) != null, "the copied pack is valid before corrupting " + image_path)
 		var file := FileAccess.open(path.get_base_dir().path_join(image_path), FileAccess.WRITE)
@@ -595,6 +619,15 @@ func test_art_contract_names_ids_no_scene_asks_for() -> void:
 	_eq(
 		Array(unused[&"tiles"]),
 		[
+			"rug.bottom_center",
+			"rug.bottom_left",
+			"rug.bottom_right",
+			"rug.middle_center",
+			"rug.middle_left",
+			"rug.middle_right",
+			"rug.top_center",
+			"rug.top_left",
+			"rug.top_right",
 			"wall.cap_end_right",
 			"wall.cap_t_left",
 			"wall.face_end_right",
@@ -606,19 +639,23 @@ func test_art_contract_names_ids_no_scene_asks_for() -> void:
 		],
 		(
 			"the front wall nothing lays: it would cover the near seats (docs/WORLD_MODEL.md); nor the row walls'"
-			+ " joints: a zone stands in low partitions, not row walls (pruned in lane C)"
+			+ " joints: a zone stands in low partitions, not row walls; nor the nine rug tiles: a pod stands on"
+			+ " the floor itself (the joints and the rug pruned in lane C2)"
 		)
 	)
 	# The pods of desks draw the pod's art (lane B1); the long table's big paper
-	# stack is shipped and drawn by nothing now, until lane C prunes it from the
-	# pack; the open run's two ends are drawn by no zone (a zone's bottom run
-	# ends in its corners); the retired reception nothing places. The row sign
-	# and the cabinet stay in the contract while the showroom's row room
-	# (scripts/preview.gd) stands them, until lane C redoes it. Exactly these ids.
+	# stack is shipped and drawn by nothing; the open run's two ends are drawn by
+	# no zone (a zone's bottom run ends in its corners); the retired reception
+	# nothing places; and the row wall's sign and the cabinet left the contract
+	# when the showroom (scripts/preview.gd) was redrawn in zones. All of them are
+	# pruned from the pack in lane C2. Exactly these ids.
 	_eq(
 		Array(unused[&"props"]),
-		["done_stack", "partition_h_end_l", "partition_h_end_r", "reception"],
-		"every prop but the long table's paper, the open run's ends and the retired reception is in the contract"
+		["cabinet", "done_stack", "partition_h_end_l", "partition_h_end_r", "reception", "sign"],
+		(
+			"every prop but the long table's paper, the open run's ends, the retired reception and the row"
+			+ " room's sign and cabinet is in the contract"
+		)
 	)
 	_eq(Array(unused[&"ui"]), ["selection"], "every UI image but the long table's frame is drawn somewhere")
 	_eq(

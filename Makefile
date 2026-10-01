@@ -113,7 +113,7 @@ pixel-sources: OUT = build/pixel-sources
 pixel-sources:  ## Draw the density-1 desk props, cats and table family into OUT= (an empty directory; never run by art)
 	$(PYTHON) tools/draw_pixel_sources.py --source art/daylight --output "$(abspath $(OUT))"
 
-capture:  ## Screenshot the showroom, office, agent list, building section and agent card (OUT= to change)
+capture:  ## Screenshot the showroom, office, agent list, SPACES rail and agent card (OUT= to change)
 	GODOT=$(GODOT) PYTHON=$(PYTHON) bash tools/capture.sh $(OUT)
 
 # Windowed, like capture: the office is fed snapshots, `--read-only`, with no

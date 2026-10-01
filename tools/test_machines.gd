@@ -1266,7 +1266,7 @@ func test_office_two_machines() -> void:
 	_eq(_counter(office, &"panes"), "8", "and adds both machines' panes up")
 
 	# The minimap reaches the other building; picking there hits the right machine.
-	await _floor_pick(office, bee_alpha)
+	await _zone_pick(office, bee_alpha)
 	_eq(office.navigator.shown_key, bee, "a click on bee's row shows bee's map")
 	var bee_p1 := HerdrFleet.pane_key(bee, "alpha:p1")
 	await _click_visible_pane(office, bee_p1)
@@ -1330,7 +1330,7 @@ func test_office_two_machines() -> void:
 	_check(_inspector_text(office).contains("@ Local"), "inspector names Local")
 	await _card_key(KEY_ESCAPE)
 	await _until(office.hud.card_compact, "Escape folds it again")
-	await _floor_pick(office, bee_alpha)
+	await _zone_pick(office, bee_alpha)
 	await _click_visible_pane(office, bee_p1)
 	_eq(office.picked_key, bee_p1, "bee is selected before its status and liveness change")
 
@@ -1420,7 +1420,7 @@ func test_office_two_machines() -> void:
 	_client(office, 1)._want_snapshot = true
 	await _until(func() -> bool: return office.fleet.snapshot(bee).panes.size() == 4, "bee back to normal")
 	office.refresh()
-	await _floor_pick(office, bee_alpha)
+	await _zone_pick(office, bee_alpha)
 	await _click_visible_pane(office, bee_p1)
 	_eq(office.picked_key, bee_p1, "bee is selected again after its snapshot returns")
 
@@ -1476,7 +1476,7 @@ func test_office_two_machines() -> void:
 	await _until(func() -> bool: return office.fleet.label("machine:p9") == "renamed", "a rename arrives")
 	_check(_client(office, 2) == far_client and _site_link_of(office, 2) == far_link, "a rename keeps the connection")
 	office.refresh()
-	_check(_floor_plate_text(office).contains("@ RENAMED"), "and relabels the plate")
+	_check(_machine_plate_text(office).contains("@ RENAMED"), "and relabels the plate")
 	_check(_floors_text(office).contains("RENAMED"), "and the minimap heading")
 	_write(
 		machines_json,
@@ -1692,7 +1692,7 @@ func test_office_ssh_machines() -> void:
 	await _until(func() -> bool: return _has_panes(office, far, 4), "far live through its forward")
 	_eq(office.fleet.link_error(far), "", "a client got through, so the old complaint is gone")
 	office.refresh()
-	await _floor_pick(office, HerdrFleet.pane_key(far, "alpha"))
+	await _zone_pick(office, HerdrFleet.pane_key(far, "alpha"))
 	_eq(office.plate.state_text(), "LIVE", "plate live on its map")
 
 	var gone := func(link: MachineLink) -> Array: return [link.ssh_pid(), link.local_socket, link._sidecar_path()]
@@ -1939,7 +1939,7 @@ func test_each_machine_keeps_its_own_map_world_and_pan() -> void:
 	_check(pan_a != Vector2.ZERO, "a real drag pans Local's map: %s" % pan_a)
 	var attempts: int = office.layout_attempt_count()
 	var world: Node2D = office.world
-	await _floor_pick(office, HerdrFleet.pane_key(bee, "alpha"))
+	await _zone_pick(office, HerdrFleet.pane_key(bee, "alpha"))
 	var plan_b: FloorPlan = office.layout_plan()
 	_eq([office.navigator.shown_key, plan_b.floor_key], [bee, bee], "a click on bee's row shows bee's map")
 	_check(plan_b.floor_cells.size != plan_a.floor_cells.size, "planned apart, at its own size")
@@ -1951,7 +1951,7 @@ func test_each_machine_keeps_its_own_map_world_and_pan() -> void:
 	await _drag_world(middle, Vector2(0, 30))
 	var pan_b: Vector2 = office.camera.pan
 	world = office.world
-	await _floor_pick(office, HerdrFleet.pane_key(HerdrFleet.LOCAL, "a"))
+	await _zone_pick(office, HerdrFleet.pane_key(HerdrFleet.LOCAL, "a"))
 	_eq(office.navigator.shown_key, HerdrFleet.LOCAL, "back on Local")
 	_check(office.layout_plan() == plan_a, "on its same plan object")
 	_eq(office.layout_attempt_count(), attempts + 1, "not planned again")

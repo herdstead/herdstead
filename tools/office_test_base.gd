@@ -656,7 +656,7 @@ func _under_arrow(office: OfficeScene, at: Vector2) -> bool:
 
 
 ## A real click on the SPACES row of zone `key`, scrolled into the rail first.
-func _visit_floor(office: OfficeScene, key: String) -> void:
+func _visit_zone(office: OfficeScene, key: String) -> void:
 	var row := office.hud.spaces.row_for(key)
 	var scroll: ScrollContainer = office.hud.spaces.get_node("%Scroll")
 	scroll.ensure_control_visible(row)
@@ -746,15 +746,15 @@ func _table_rect(table: OfficeTable) -> Rect2:
 ## and sits above its rooms.
 func _plate_lines(office: OfficeDouble) -> Array:
 	var found: Array = []
-	for label: Label in office.world.get_node("FloorPlate").find_children("*", "Label", true, false):
+	for label: Label in office.world.get_node("MachinePlate").find_children("*", "Label", true, false):
 		found.append(label.text)
 	return found
 
 
-## What the bubble over the seat drawn for `key` says about how long its agent
+## What the chip over the seat drawn for `key` says about how long its agent
 ## has waited.
 func _wait_text(office: OfficeDouble, key: String) -> String:
-	return _label(office.floor_view.seats[key].node.bubble(), "%Wait").text
+	return _label(office.floor_view.seats[key].node.chip(), "%Wait").text
 
 
 ## --- typed node lookups -------------------------------------------------------

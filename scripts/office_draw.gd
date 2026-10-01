@@ -176,7 +176,7 @@ func panel(parent: Node, bounds: Rect2) -> void:
 
 
 ## Dress `target` as the pack's panel, `size` units big, the same way panel()
-## draws a new one: for a panel a scene already has (the bubble's frame).
+## draws a new one: for a panel a scene already has (the chip's frame).
 func dress_panel(target: NinePatchRect, size: Vector2) -> void:
 	var spec := art.panel()
 	target.texture = art.sprite_texture(spec)

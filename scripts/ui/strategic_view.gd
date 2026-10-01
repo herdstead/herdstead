@@ -11,11 +11,11 @@ extends HdPanel
 ## (reveal_section()), or draws it again for that row's machine.
 ##
 ## It covers only the world rect (OfficeHud.show_strategic() places it there),
-## over the hidden world and under the OVERVIEW, the bubble tooltip and the
+## over the hidden world and under the OVERVIEW, the world tooltip and the
 ## monitor: SPACES, the drawer, the staff panel and NEWS stay usable beside it.
 ## On the pack's panel, like the OVERVIEW, so its ink reads in every pack (the
 ## bare backdrop was near ink in the retired dusk pack). A view mode, not a layer: while it is
-## open the world's nameplates, badges and bubbles are hidden with the world,
+## open the world's nameplates, badges and chips are hidden with the world,
 ## so every field is still drawn once. It draws a StrategicModel and nothing
 ## else; every node is the scene's and is kept.
 

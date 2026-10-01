@@ -1,8 +1,8 @@
 [gd_scene load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://scripts/ui/building_heading.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/machine_heading.gd" id="1"]
 
-[node name="BuildingHeading" type="VBoxContainer"]
+[node name="MachineHeading" type="VBoxContainer"]
 offset_right = 112.0
 offset_bottom = 18.0
 mouse_filter = 2
@@ -32,7 +32,7 @@ mouse_filter = 2
 
 [node name="Icon" type="Sprite2D" parent="Press/Mark"]
 
-[node name="BuildingLabel" type="Label" parent="Press"]
+[node name="MachineLabel" type="Label" parent="Press"]
 unique_name_in_owner = true
 layout_mode = 1
 anchors_preset = 10

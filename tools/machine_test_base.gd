@@ -158,7 +158,7 @@ func _floor_badges(office: OfficeDouble) -> Array:
 
 
 ## Click through real GUI input, including scrolling tall panels into view.
-func _floor_pick(office: OfficeDouble, key: String) -> void:
+func _zone_pick(office: OfficeDouble, key: String) -> void:
 	var row: OfficeSpaceRow = office.hud.spaces.row_for(key)
 	if row == null:
 		_fail("no minimap row for " + key)
@@ -573,8 +573,8 @@ func _wheel_point(office: OfficeDouble, visible: Rect2) -> Vector2:
 
 
 ## Read the actual rendered plate, not an internal world rebuild signature.
-func _floor_plate_text(office: OfficeDouble) -> String:
-	var plate := office.world.get_node("FloorPlate")
+func _machine_plate_text(office: OfficeDouble) -> String:
+	var plate := office.world.get_node("MachinePlate")
 	var texts := PackedStringArray()
 	for label: Label in plate.find_children("*", "Label", true, false):
 		if label.is_visible_in_tree():
@@ -736,12 +736,12 @@ func _machine_attention(office: OfficeDouble, machine: String) -> Array[Attentio
 	return items
 
 
-## Whether the bubble over pane `key`'s desk is inside the world on screen.
+## Whether the chip over pane `key`'s desk is inside the world on screen.
 func _bubble_on_screen(office: OfficeDouble, key: String) -> bool:
 	var seat := office.floor_view.seat(key)
 	if seat == null:
 		return false
-	var screen := office.get_viewport().get_canvas_transform() * seat.node.bubble_rect()
+	var screen := office.get_viewport().get_canvas_transform() * seat.node.chip_rect()
 	return screen.has_area() and office.hud.world_rect().intersects(screen)
 
 

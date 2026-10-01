@@ -84,7 +84,7 @@ func _after_case() -> void:
 
 
 ## `S` covers the world rect and nothing else: the world hides (the people keep
-## walking under it), the edge arrows and the bubble tooltip go, and SPACES, the
+## walking under it), the edge arrows and the world tooltip go, and SPACES, the
 ## drawer's tab, the staff panel and NEWS stay where they were, shown. The top
 ## bar's theme line says the view is on.
 func test_s_opens_it_over_the_world_only() -> void:
@@ -99,7 +99,7 @@ func test_s_opens_it_over_the_world_only() -> void:
 	_check(hud.strategic_open(), "S opens the strategic view")
 	_check(not office.world.visible, "the world hides")
 	_check(not hud.edge_arrows.visible, "the edge arrows hide")
-	_check(not hud.bubble_tip_shown(), "no bubble tooltip")
+	_check(not hud.world_tip_shown(), "no bubble tooltip")
 	_check(not hud.overview_open(), "the overview stays shut")
 	var view := hud.strategic
 	_eq(view.get_global_rect(), hud.world_rect(), "it covers the world rect exactly")
@@ -449,13 +449,13 @@ func test_pgdn_and_a_floors_row_redraw_it_for_that_floor() -> void:
 			mezzanine = str(key)
 			break
 	_check(not mezzanine.is_empty(), "the fixture has a mezzanine to click")
-	await _visit_floor(office, mezzanine)
+	await _visit_zone(office, mezzanine)
 	await _frames(2)
 	_eq(office.navigator.current_zone(office.frame), mezzanine, "its FLOORS row pans to it")
 	_check(office.hud.strategic_open(), "still open")
 	_eq(office.hud.strategic.title_text(), title, "a row of this machine keeps the title")
 	_same_squares(office, "on the mezzanine")
-	await _visit_floor(office, HerdrFleet.pane_key(BEE, "hive"))
+	await _visit_zone(office, HerdrFleet.pane_key(BEE, "hive"))
 	await _frames(2)
 	_eq(office.navigator.shown_key, BEE, "a row of bee's shows bee's map")
 	_check(office.hud.strategic_open(), "still open")
@@ -1045,14 +1045,14 @@ func test_a_rail_click_while_open_scrolls_to_its_section() -> void:
 	var title := office.hud.strategic.title_text()
 	var squares := plan.seat_keys()
 	var draws := plan.draws
-	await _visit_floor(office, last)
+	await _visit_zone(office, last)
 	await _frames(3)
 	_check(office.hud.strategic_open(), "a SPACES row click leaves the view open")
 	_check(scroll.scroll_vertical > 0, "and scrolls the schematic: %d" % scroll.scroll_vertical)
 	_check(_caption_seen(office, last), "that zone's caption is in sight")
 	_eq([office.hud.strategic.title_text(), plan.seat_keys()], [title, squares], "the same machine, the same squares")
 	_eq(plan.draws, draws, "nothing drawn again for it")
-	await _visit_floor(office, _pk("z0"))
+	await _visit_zone(office, _pk("z0"))
 	await _frames(3)
 	_check(_caption_seen(office, _pk("z0")), "the first zone's row scrolls back to its caption")
 	_eq(scroll.scroll_vertical, 0, "at the top")
@@ -1102,12 +1102,12 @@ func test_a_machine_with_the_same_map_has_its_own_sections() -> void:
 	_eq(plan.tooltip_at(band.get_center()), tip, "hovering the caption says bee's zone's sign")
 	_eq(scroll.scroll_vertical, 0, "the schematic is at the top")
 	_check(not _caption_seen(office, bee_last), "bee's last caption out of sight below")
-	await _visit_floor(office, bee_last)
+	await _visit_zone(office, bee_last)
 	await _frames(3)
 	_check(scroll.scroll_vertical > 0, "a real click on bee's last rail row scrolls the schematic")
 	_check(_caption_seen(office, bee_last), "to that zone's caption")
 	# PageDown from bee's first zone to the first one whose caption is out of sight.
-	await _visit_floor(office, HerdrFleet.pane_key(BEE, "z0"))
+	await _visit_zone(office, HerdrFleet.pane_key(BEE, "z0"))
 	await _frames(3)
 	_eq(scroll.scroll_vertical, 0, "bee's first row scrolls back to the top")
 	var steps := 1
@@ -1156,7 +1156,7 @@ func test_a_workspace_replaced_under_the_same_caption_is_a_new_section() -> void
 	_eq(plan.tooltip_at(band.get_center()), tip, "hovering the caption says the new zone's sign")
 	_eq(plan.get_tooltip(band.get_center()), tip, "the Control's own tooltip")
 	_eq(scroll.scroll_vertical, 0, "the schematic is at the top")
-	await _visit_floor(office, fresh)
+	await _visit_zone(office, fresh)
 	await _frames(3)
 	_check(scroll.scroll_vertical > 0, "a real click on its rail row scrolls the schematic")
 	_check(_caption_seen(office, fresh), "to its caption")

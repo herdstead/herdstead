@@ -1,6 +1,6 @@
 # Herdstead manual
 
-Herdstead draws a [herdr](https://herdr.dev) session as a pixel office building. This manual covers everything
+Herdstead draws a [herdr](https://herdr.dev) session as a pixel open-plan office. This manual covers everything
 a user sees and every switch they can flip; the [README](../README.md) is the short version.
 The rules for writing to herdr are in [the write boundary](WRITE_BOUNDARY.md); what each thing on screen stands for
 is in [the visual language](VISUAL_LANGUAGE.md).
@@ -80,22 +80,27 @@ The four scenes (office, showroom, pixel people showroom, Avatar Studio) read th
 
 | herdr | Office |
 |---|---|
-| machine | a building (the only one when there is just Local) |
-| workspace (**space** in the UI) | a floor, ordered by herdr's `number` |
-| linked worktree | a **mezzanine** hung under its source floor, numbered `3A`, `3B` |
+| machine | one open-plan map (the only one when there is just Local); one machine's map is shown at a time |
+| workspace (**space** in the UI) | a **zone** on that map: its pods inside low partitions, under a sign with herdr's `number` and its label |
+| linked worktree | a **mezzanine**: a zone of its own, placed right under its source zone the first time, numbered `3A`, `3B` |
 | tab | a pod of desks; its label is written small right under it |
-| pane | a seat at that table |
+| pane | a seat at that pod |
 | agent | the pixel person in the seat; an empty `agent` is a SHELL seat with nobody in it |
 
-**One floor at a time.** Each floor has a full rectangular floor, an outer wall on top, an entry band under it (reception,
-the empty queue spot in front of it, the pantry), row back walls, and a main aisle down the right. Windows and the lift
-door hang only on the outer wall. Plants and filing cabinets are y-sorted with everything else.
+**One map per machine.** A map is one rectangular floor: an outer wall on top, an entry band under it with the pantry,
+side walls, and a main aisle down the right. Windows, pictures and the lift door hang only on the outer wall. Below the
+entry band the zones stand in lanes, each inside low partitions open at the top, its sign hanging from the top-left
+post. Plants and side tables (each carrying a mug, a notebook, now and then a white cat) are y-sorted with everything
+else.
 
-**Stable layout.** A 32-unit grid. Each row is a 64-unit back wall, a 288-unit table band and a 64-unit cross aisle
-(pitch 416); the entry band is 96 units, the main aisle 64. A floor's width is fixed the first time it is planned; a
-wider window only shows more floor. New tabs fill gaps first, tables grow in place, an over-wide table gets its own row.
-Nothing is compacted when things go away. Renames, state, focus and window changes never re-lay out tables. The plan and
-camera position are kept per floor for the run.
+**Stable layout.** A 32-unit grid. The map is lanes nine cells wide with a one-cell aisle between two; the entry band is
+96 units, the main aisle 64. A zone takes whole lanes under an aisle row of its own, and its pods stand in rows 192
+units deep (a pod is one 32-unit desk per column, a seat on each side). A map's lanes are fixed the first time it is
+planned; a wider window only shows more of it. New tabs fill gaps first, pods grow in place, an over-wide pod gets its
+own row (its zone taking more lanes, the map widening if it must). New zones take the top-most, left-most gap; a zone
+that must grow does so in place or moves alone. Nothing is compacted when things go away, and a map never shrinks.
+Renames, state, focus and window changes never re-lay out pods. The plan and camera position are kept per machine for
+the run.
 
 **Machine plate.** Above the map: the machine's name (`@ NAME` once there is more than Local, then LIVE / OFFLINE /
 CONNECTING with any ssh error), and on the right the machine's space and pane counts. While the map cannot be laid out,
@@ -106,18 +111,18 @@ no zone, and the plate's note says why.
 
 **State on the seats.**
 
-- **blocked**: seated, hand raised, a bubble overhead with how long it has waited (short form, `12m`, the card's clock) and
-  a patience bar that empties in 10 minutes. Hover the bubble for an excerpt of the question; click it to select the
-  agent and enter answer mode once the question shows. When the machine is offline or the start was not observed, no
-  time, no bar and no bubble frame are drawn (the raised hand and badge stay; pointing and clicking there still count).
+- **blocked**: seated, hand raised, a chip on the badge's row holding the badge and how long it has waited (short form,
+  `12m`, the card's clock). Hover the chip for an excerpt of the question; click it to select the agent and enter answer
+  mode once the question shows. When the machine is offline or the start was not observed, no time and no chip frame
+  are drawn (the raised hand and badge stay; pointing and clicking there still count).
 - **done** (UNREAD: finished, not yet looked at): seated, a stack of paper next to the laptop. Done means "unread",
   never "task passed".
 - **idle**: walks to the pantry in the entry band (sits there when it is full) and back.
 - **working**: seated at the desk. `launch_pending` shows the starting badge. Unknown states fall back to `unknown`.
-- Reception is furniture only.
+- The pantry counter, plants, side tables and partitions are furniture only.
 
 **People walk.** When a pane gets an agent, a person walks in from the lift door to the seat; when a pane goes, they
-walk out as a ghost you cannot click. Name plate, badge, bubble, papers and click area change the moment herdr says so;
+walk out as a ghost you cannot click. Name plate, badge, chip, papers and click area change the moment herdr says so;
 the body follows within at most 6 seconds. A new workspace is a new zone its people walk into; closing one, its people
 walk out (not every departure animates). An offline machine freezes in place; reconnecting, changing machine or
 changing theme places everyone directly. Panning between zones and switching machines are instant, with no transition.
@@ -143,7 +148,8 @@ zero. It reconnects with exponential backoff from 0.5 s to 5 s.
 
 **People and looks.** Everyone in the office is a pixel person: six layers (legs < top < body < glasses < hair <
 headwear), density 2, nearest-neighbour. Clothes follow the provider; face, hair and glasses vary per pane, so several
-panes of one agent are not twins. The provider shows on the name plate. The Avatar Studio
+panes of one agent are not twins. The provider shows on the seat's name plate, which appears while the seat is hovered or
+selected, or while `L` is held. The Avatar Studio
 (`scenes/avatar_studio.tscn`) pins each part per agent for all 23 agents in `data/agent_catalog.json` (or leaves it
 VARIES), saved to `user://herdstead_avatars.json` (schema 2). A save rereads what it will write, checks the file on disk
 was not changed by someone else, refuses any save that would lose data and says why, and keeps anything it cannot read
@@ -201,8 +207,8 @@ rows' counts**, and NEXT and the top bar reach them.
 
 The right column is a drawer that **starts closed on every run**: a vertical tab `◀ AGENTS · n` on the right edge
 (n = agents that need you). Click it to open the drawer (without keyboard focus), or press `A` to open it and give the
-list the keyboard; `▶` in the tab row closes it and the world widens again. Floors are planned for the closed drawer, so
-opening it never moves tables; pan to see the ones it covers. The drawer's open state is not remembered. Expanding the
+list the keyboard; `▶` in the tab row closes it and the world widens again. Maps are planned for the closed drawer, so
+opening it never moves pods; pan to see the ones it covers. The drawer's open state is not remembered. Expanding the
 staff panel does not close the list.
 
 The drawer has two tabs: **AGENTS** and **EVENTS** (see [NEWS, EVENTS and OVERVIEW](#news-events-and-overview)).
@@ -210,12 +216,12 @@ The drawer has two tabs: **AGENTS** and **EVENTS** (see [NEWS, EVENTS and OVERVI
 The AGENTS list has one row per pane on every machine, in two views:
 
 - **Flat**: grouped by urgency: Waiting, Unread, Working, Idle, Snoozed / hidden, Offline, Shells, History.
-- **Tree**: machine → floor → worktree mezzanine → tab → agent.
+- **Tree**: machine → space → worktree mezzanine → tab → agent.
 
 Groups fold and show a count; Shells and History start folded. The flat view's folds and the chosen view are saved in
-`user://herdstead.cfg`. The filter box matches agent, tab, floor and repo names.
+`user://herdstead.cfg`. The filter box matches agent, tab, space and repo names.
 
-- Click a row: select that pane (same as clicking its seat: go to its floor, move the camera, show it on the card).
+- Click a row: select that pane (same as clicking its seat: show its machine's map, pan to it, show it on the card).
 - Double-click (or `Enter`): open it in the terminal monitor (read-only monitor under `--read-only`).
 - `⋯` or right-click: Snooze 5 min / Resume, Hide / Restore (local records only, never herdr's UNREAD); History rows have
   View.
@@ -262,8 +268,8 @@ provider and space. Compact, the panel reads no preview: to see a working agent'
 - `‹ ›` step through NEXT's queue: select only, never expand or answer.
 
 **Switch herdr here** (on a remote machine: Switch herdr on <machine>) is enabled only for a seat you picked yourself,
-and only while it is still the terminal you picked. It switches herdr's shared view, and **clears UNREAD for every pane at
-that table**.
+and only while it is still the terminal you picked. It switches herdr's shared view, and **clears UNREAD for every pane of
+that tab** (the note beside it says `Clears tab's UNREAD`).
 
 **NEXT** at the right end says what pressing it would do and to whom (`Answer CLAUDE web` / `Read CODEX api`) and how
 long they have waited. Clicking it equals pressing `N`: select that agent and expand its panel; a blocked one enters
@@ -274,13 +280,13 @@ out.
 ## Answer mode
 
 Only for an agent seat you picked yourself. `Enter` or **Answer ⏎** in the card header opens it; opening sends nothing.
-A click on a blocked agent's bubble, NEXT or `N` opens it too, once the question shows; nothing opens it by itself.
+A click on a blocked agent's chip, NEXT or `N` opens it too, once the question shows; nothing opens it by itself.
 
 Answer mode is a modal: the staff panel, at most 640×272 units, stands in the middle of the room under the bar over
 the dimmed office, laid out top to bottom: who and where, the terminal across the whole panel, the answer keys in one
 row, the reply box, and along the foot Monitor, Close and what became of the last answer. NEXT stays at its right end on
 a wide enough screen. The world keeps the room the opened panel left it. The dim only darkens: clicks go
-through it, so another agent's bubble, desk or row picks them (and leaves answer mode) wherever the panel does not cover
+through it, so another agent's chip, desk or row picks them (and leaves answer mode) wherever the panel does not cover
 it. A desk under the panel takes no click; leave with `Esc` or move on with `N`. Leaving drops the panel back along
 the bottom.
 
@@ -339,8 +345,8 @@ start an agent there, click a kind). No undo.
 in the note and the terminal strip:
 
 - `Closes w2:p3 (shell).` or `Closes CLAUDE's pane w2:p3.`
-- last pane of a tab: `… and its table w2:t1 (last pane of the tab).`
-- last pane of a space: `… and floor 6 "~" (last pane of the space).`
+- last pane of a tab: `… and its tab w2:t1 (last pane of the tab).`
+- last pane of a space: `… and space 6 "~" (last pane of the space).`
 - last pane of a mezzanine: `… and mezzanine 3A "api-v2". The checkout stays on disk.`
 - an agent that is working, blocked or starting: the note becomes `Kills CLAUDE, still working.` /
   `Kills CLAUDE mid-question.` / `Kills CLAUDE's launch.` (the full sentence is in the tooltip) and the button reads
@@ -348,13 +354,13 @@ in the note and the terminal strip:
 
 A second click within 10 seconds sends `pane.close`: no confirmation from herdr, immediate SIGHUP, and herdr's own view
 may move to another pane. Changing the selection, the state or the scope, or timing out, cancels. The last pane of a
-repository's own floor while its mezzanines are open (as far as the snapshot shows) has the button disabled with the
+repository's own space while its mezzanines are open (as far as the snapshot shows) has the button disabled with the
 reason, because herdr would close the whole group; when the snapshot cannot yet show it is a parent, herdr refuses
 (`needs herdr's own confirm`) and the card says so.
 
 **New space** sends `workspace.create {cwd, focus:false}` with this pane's directory exactly as the snapshot gives it.
 It is refused when the directory is not absolute or contains invisible characters, since herdr would silently fall back
-to `$HOME`. When the new floor appears the office selects its shell across floors. On an empty herdr the first space is
+to `$HOME`. When the new zone appears the office selects its shell (on another machine's map too). On an empty herdr the first space is
 focused by herdr regardless.
 
 **Worktree**: type a branch name in the box beside it (at most 64 bytes, only `A-Za-z0-9._/-`, no shape git rejects;
@@ -414,13 +420,13 @@ answer mode `Esc` leaves answer mode first. `M` does nothing while it is open.
 
 Hold `L`. The world becomes a data view until you let go: every agent's seat (or its pantry spot) gets one line of how
 long it has been in this state (the same number as OVERVIEW's FOR, `+` = at least; shells and offline machines show none,
-no track shows `?`), bubbles are hidden, each table's rug is tinted with its most urgent state (the SPACES window colours),
-furniture dims, and the theme cell in the top bar reads `LENS · hold L`. It does not light while the monitor, OVERVIEW or
+no track shows `?`), chips are hidden, every seat's name plate shows, the floor under each pod is washed with its most
+urgent state (the SPACES window colours), furniture dims, and the theme cell in the top bar reads `LENS · hold L`. It does not light while the monitor, OVERVIEW or
 the strategic view is open or a text box has the keyboard; a press that started there has to be released first.
 
 **Pointing.** Hovering a HUD line about a pane (a NEWS entry, an agent list row, an EVENTS row) draws a still dashed frame
 in `ink` / `paper` around that seat; for a pane on another machine, SPACES outlines its zone's row instead. Hovering an edge
-arrow outlines its zone's row. Pointing never selects, reads, writes, pans or changes floor.
+arrow outlines its zone's row. Pointing never selects, reads, writes, pans or changes map.
 
 ## Strategic view
 
@@ -433,7 +439,7 @@ is cut, never shrinking the cells, and its tip starts with the whole name). Clic
 close the view and pan its seat into view. `S` or `Esc` closes it. SPACES, the drawer, the staff panel, NEWS, `N` and
 PageUp / PageDown keep working (a SPACES row or a page key scrolls the diagram to that space's section; another
 machine's row or heading redraws it for that machine); arrows and the wheel do not pan the world. The top bar's theme cell reads
-`STRATEGIC · S`, the panel title shows `S · Esc`, and a machine whose map has no tables shows `No desks on this machine`. `S` does
+`STRATEGIC · S`, the panel title shows `S · Esc`, and a machine whose map has no pods shows `No desks on this machine`. `S` does
 nothing while the monitor or OVERVIEW is open or a text box has the keyboard.
 
 ## Keyboard
@@ -442,7 +448,7 @@ nothing while the monitor or OVERVIEW is open or a text box has the keyboard.
 |---|---|
 | Drag, arrows, wheel (outside panels) | Pan |
 | `PageUp` / `PageDown` | Pan to the previous / next row in SPACES order (a zone of the map; the map of another machine only past its ends). The rail is ascending, so **PageUp goes to the lower-numbered space and PageDown to the higher** (the reverse of the FLOORS minimap, which listed the highest first): from a source zone down into its mezzanines, from a mezzanine up to its source; PageDown from a machine's last zone into the next machine's first, PageUp the other way; stops at the ends |
-| `N` | Next agent that needs you, across every online machine and floor: only blocked ones while any are blocked, otherwise UNREAD (longest wait first; unknown start counts as longest). Selects it, goes to its floor, pans to it and expands the panel per NEXT's verb. Never sends. To see done agents while some are blocked, click DONE |
+| `N` | Next agent that needs you, across every online machine and zone: only blocked ones while any are blocked, otherwise UNREAD (longest wait first; unknown start counts as longest). Selects it, shows its machine's map, pans to it and expands the panel per NEXT's verb. Never sends. To see done agents while some are blocked, click DONE |
 | `Enter` (or keypad Enter) | Expand the staff panel; on an answerable picked agent whose question shows, press again for answer mode |
 | `1`–`9`, `y` | In answer mode: send that key |
 | `Esc` | Leave answer mode; outside it, collapse the panel; close OVERVIEW / strategic view |
@@ -455,7 +461,7 @@ nothing while the monitor or OVERVIEW is open or a text box has the keyboard.
 | `-` / `=` | Pixel scale down / up |
 | `Ctrl+]` | Close the terminal monitor |
 
-Digit keys never change floor (`1`–`9` are answer keys). Outside answer mode, and while the reply box has no focus, the
+Digit keys never change zone or map (`1`–`9` are answer keys). Outside answer mode, and while the reply box has no focus, the
 card takes no office keys. While the terminal monitor is open it is the reverse: every key goes to the terminal. The top
 bar, SPACES, edge arrows, drawer and staff panel stay fixed on screen; only the world pans.
 
@@ -469,7 +475,7 @@ ground drags the window and a double click zooms it, as the title bar's would. `
 The plain desktop window is 1920×960. The pixel scale is fixed (default 2×); `-` / `=` step through 2×, 4×, 6×, 8×.
 A bigger window shows more floor, never bigger pixels; a window too small for the scale drops to the largest even scale
 that fits. The scale is the whole window's content scale (the HUD scales too), and changing it never re-lays out or
-rebuilds tables or people. Scales are even so that every texel of the density-2 art lands on whole screen pixels. So the
+rebuilds pods or people. Scales are even so that every texel of the density-2 art lands on whole screen pixels. So the
 default window has only 2× (`=` does nothing), 4× needs at least 1920×1280, and 4K (3840×2160) has 2×, 4× and 6×. Below
 960×640 (which cannot hold 2×'s 480×320) the office falls to 1×: the world is drawn at one screen pixel per unit, texels
 are halved and outlines break into dots. That is a degraded fallback below the supported size, not a scale. The mock
@@ -503,8 +509,8 @@ There are no system banners and no catch-up notifications. Alerts are not herdr 
 ## herdr machines
 
 Every SSH machine herdr has saved is its own herdr server. Every 10 seconds Herdstead runs `herdr machine list --json`
-and keeps one `ssh -L` forward to each enabled machine. Each machine is its own building, online or offline on its own;
-a disconnect dims and freezes only its floors. It needs passwordless SSH, a host key you have already accepted by hand,
+and keeps one `ssh -L` forward to each enabled machine. Each machine is its own map, online or offline on its own;
+a disconnect dims and freezes only its map. It needs passwordless SSH, a host key you have already accepted by hand,
 and herdr running on the remote. For debugging, `--machine-socket=<name>=/absolute/path/herdr.sock` attaches a local
 socket as a machine. Forwarding, cleanup, target validation, the debug hook and what has been verified are in
 [MACHINES](MACHINES.md).
@@ -512,11 +518,12 @@ socket as a machine. Forwarding, cleanup, target validation, the debug hook and 
 ## Themes and art
 
 **Packs.** One theme ships: Studio (`daylight`). Dusk Shift, a palette derived from it by a recipe, was
-retired on 2026-09-29: night is to be a light over the one pack, not a second pack. Each runtime pack has 29 logical 32×32 tiles (wood floor, open corridor, nine-slice rug, walls,
-thresholds) at density 2 (64×64 texels per tile, nearest-neighbour; the build doubles 1× sources into 2×2 blocks),
-5 standalone props (code cabinet, window, door, plant, blank sign), a desk-item library of 5 everyday objects and 3 white
-cats, the shared long-table family (table, chair, monitor), 11 state and UI icons (herdr's five states, starting, lost
-and connected), a native TileSet, four single-image SpriteFrames (for export only), a semantic manifest and the fonts.
+retired on 2026-09-29: night is to be a light over the one pack, not a second pack. Each runtime pack has logical 32×32 tiles (wood floor, open corridor, walls)
+at density 2 (64×64 texels per tile, nearest-neighbour; the build doubles 1× sources into 2×2 blocks),
+standalone props (window, door, plants, a framed picture, the pantry counter, the zones' partition kit, a side table, the
+small paper stack), a desk-item library of 5 everyday objects and 3 white
+cats, the shared pod family (desks, low screen, apron, chair, laptop), state and UI icons (herdr's five states, starting, lost
+and connected, the seat mark, the panels), a native TileSet, four single-image SpriteFrames (for export only), a semantic manifest and the fonts.
 The full spec is [ASSET_SPEC](ASSET_SPEC.md), the painter's brief is [ARTIST_BRIEF](ARTIST_BRIEF.md), and depth and
 collision rules are in [WORLD_MODEL](WORLD_MODEL.md).
 
@@ -603,7 +610,7 @@ the clock's own day or night turns. `--light=day|night` holds it (and T then swa
 asks, so screenshots never depend on the time they are taken. The time of day binds no herdr field: it is lighting, not a
 signal, and a lost connection is still its own grey tint, with everyone frozen, on top of it.
 
-**Offline tint.** A disconnected office (or machine's floors) is tinted. A pack may set an optional top-level
+**Offline tint.** A disconnected office (or a machine's map) is tinted. A pack may set an optional top-level
 `"stale_modulate": "8f96b8"` (6 lower-case hex digits) in `pack.json` / `manifest.json`; without it the tint is
 `Color(0.65, 0.65, 0.65)`. It is an optional additive key (`schema_version` stays 1), read through `ArtPack.stale_tint`.
 A dark pack should set its own: a 0.65 grey crushes an already dark picture (the retired dusk pack used a bluish,
@@ -661,10 +668,11 @@ Performance is also measured in a window:
 # CPU, fps, nodes, draw calls, texture memory and refresh() time, median of 3 rounds
 make perf
 make perf RUNS=5 FIGURES=1    # more rounds, plus 80 seated working people
-make perf WALKS=1             # also people walking on the stress floor
+make perf WALKS=1             # also people walking on the stress map
 ```
 
-Extra rows: `overview` (the stress floor zoomed out so the whole floor is on screen; unrelated to OVERVIEW),
+Extra rows: `spaces30` (30 workspaces of one tab each on one map, 189 panes, ten of them mezzanines: many zones, signs
+and SPACES rows), `overview` (the stress map zoomed out so the whole map is on screen; unrelated to OVERVIEW),
 `stress+overview`, `stress+lens`, `stress+strategic`, `stress400` / `stress400+strategic` (400 panes) and
 `stress400+drawer`. `refresh_ms` counts only `office.refresh()`, not the fleet feeding the state log. In the
 foreground the default cap is 30 and in the background 12; `max_fps` in the output says which was measured.
@@ -682,7 +690,8 @@ foreground the default cap is 30 and in the background 12; `max_fps` in the outp
 - People walk only when an observation changes: no wandering, no queues. The office has no other tweens, fades or lift
   animation.
 - Adding or removing panes and tabs updates only the affected nodes; panes that stay keep their person and animation.
-  Changing floor or theme rebuilds the current world (plans and camera are cached, not every floor's people). An invalid
+  Changing machine or theme rebuilds the current world (plans and camera are cached, not every map's people); panning
+  between zones of one map rebuilds nothing. An invalid
   or over-budget layout keeps the last valid picture and shows the error.
 - Machine management is read-only: no add / remove / enable / disable / rename, nothing installed or started on the
   remote, no herdr 0.9.1 `--machine` CLI prefix (0.9.0 has neither it nor an event stream there), and disabled machines
@@ -768,7 +777,7 @@ Screenshots are for looking at; there is no golden comparison. CI does not expor
 ## Repository layout
 
 ```text
-art/daylight/            hand-edited source pack: PNGs, pack.json, table/ (long-table family), fonts/
+art/daylight/            hand-edited source pack: PNGs, pack.json, table/ (the pod family), fonts/
 art/pixel_people/        people.json, the pixel people contract (canvas, pivot, facings, layers, tracks,
                          key colours, slots, looks), optional hand-drawn strips and skins/<facing>/
 art/agent_badges/        agent logo sources and ATTRIBUTIONS.md
@@ -780,9 +789,9 @@ scenes/office.tscn       main scene, connects to herdr
 scenes/preview.tscn      mock showroom (no herdr)
 scenes/avatar_studio.tscn, scenes/people_showroom.tscn
 scenes/ui/               HUD scenes: hud.tscn (layout lives here), bar, spaces (the SPACES rail: space_row,
-                         building_heading), edge_arrows / edge_arrow, inspector (staff panel),
+                         machine_heading), edge_arrows / edge_arrow, inspector (staff panel),
                          agent list, news, event list, overview, strategic, terminal_monitor
-scenes/world/            world prefabs: table, station, decor, bubble, floor_plate, zone_sign
+scenes/world/            world prefabs: table (a pod), station, decor, chip, machine_plate, zone_sign
 scenes/people/           pixel_person.tscn and the showroom cells
 scripts/office.gd        OfficeScene, the composition root
 scripts/herdr_client.gd  read-only socket client (ping, session.snapshot, events.subscribe)
@@ -795,7 +804,8 @@ scripts/office_*.gd      navigator, camera, lens, alerts, draw helpers, window (
 scripts/model/           typed models: HerdrSnapshot (the only reader of raw snapshots), OfficeFrame, StateLog,
                          command context / ticket / refusal / results, layout plans
 scripts/layout/          map and zone planning, seat planning, walk graph, validation
-scripts/world/           tables, stations, floor view, presentation (walking), rests, pointer
+scripts/world/           pods (table.gd), stations, chips, the floor view, machine plate, zone signs, shell,
+                         presentation (walking), rests, pointer
 scripts/ui/              HUD scripts: hud, theme, bar, spaces (the SPACES rail), edge arrows, agent list, staff
                          panel, monitor, NEWS, EVENTS, OVERVIEW, strategic view
 scripts/art/             typed art pack models; the only readers of manifest JSON

@@ -87,11 +87,11 @@ static func plan(
 		# Count retained capacity, not occupied seats. Empty stations still own
 		# equipment and pick targets; status changes may furnish every slot.
 		if seats.capacity > rules.max_width_cells:
-			result.problems.append(_named(zone, "table capacity exceeds the floor width budget"))
+			result.problems.append(_named(zone, "tab capacity exceeds the map width budget"))
 			return result
 		result.nodes += OfficeDeskView.node_budget(seats.capacity)
 		if result.nodes > nodes_left:
-			result.budget = "floor exceeds desk node budget"
+			result.budget = "map exceeds desk node budget"
 			return result
 		var placed := DeskPlacement.new()
 		placed.tab_key = room.key
@@ -104,7 +104,7 @@ static func plan(
 		placed.measure = OfficeTable.measure(placed.capacity)
 		var local := quantized(placed.measure.reserved_rect)
 		if local.size.y > pod:
-			result.problems.append(_named(zone, "table measurement exceeds the pod row"))
+			result.problems.append(_named(zone, "tab measurement exceeds the pod row"))
 			return result
 		placed.reserved_cells.size = local.size
 		widest = maxi(widest, local.size.x)
@@ -186,7 +186,7 @@ static func _allocate(
 			var candidate := _find(rows, placed, old, oversized, width, rules, initial, pod)
 			if candidate.row == rows.size():
 				if rows.size() >= max_rows:
-					result.budget = "floor exceeds width, height or cell budget"
+					result.budget = "map exceeds width, height or cell budget"
 					return
 				var row := RowPlan.new()
 				row.index = candidate.row
@@ -197,7 +197,7 @@ static func _allocate(
 				target.exclusive_tab_key = room.key
 			width = maxi(width, rules.zone_width(rules.lanes_for_width(candidate.x + placed.reserved_cells.size.x)))
 			if width > rules.max_zone_width_cells():
-				result.budget = "floor exceeds width, height or cell budget"
+				result.budget = "map exceeds width, height or cell budget"
 				return
 		result.desks.append(placed)
 	if rows.is_empty():

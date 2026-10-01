@@ -276,8 +276,8 @@ func _office_with(
 	office.test_args = AppArgs.parse(line)
 	office.manifest_path = MANIFEST
 	office.remember_theme = false
-	# The bubbles' reader would add its reads to every exact request sequence;
-	# only the cases about the bubbles turn it on.
+	# The chips' reader would add its reads to every exact request sequence;
+	# only the cases about the chips turn it on.
 	office.test_question_reads = questions
 	_offices.append(office)
 	root.add_child(office)
@@ -302,7 +302,7 @@ func _last_write(office: OfficeDouble) -> String:
 ## would (it reads nothing while it is one line).
 func _pick_bee(office: OfficeDouble, pane_id: String, open := true) -> void:
 	if office.navigator.shown_key != BEE:
-		await _floor_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
+		await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	await _click_visible_pane(office, HerdrFleet.pane_key(BEE, pane_id))
 	if open:
 		await _open_panel(office)
@@ -312,7 +312,7 @@ func _pick_bee(office: OfficeDouble, pane_id: String, open := true) -> void:
 ## `open`, then open the staff panel with Enter (see _pick_bee()).
 func _pick_local(office: OfficeDouble, pane_id: String, open := true) -> void:
 	if office.navigator.shown_key != HerdrFleet.LOCAL:
-		await _floor_pick(office, HerdrFleet.pane_key(HerdrFleet.LOCAL, "alpha"))
+		await _zone_pick(office, HerdrFleet.pane_key(HerdrFleet.LOCAL, "alpha"))
 	await _click_visible_pane(office, HerdrFleet.pane_key(HerdrFleet.LOCAL, pane_id))
 	if open:
 		await _open_panel(office)
@@ -364,14 +364,14 @@ func _station_of(office: OfficeDouble, key: String) -> OfficeStation:
 	return seat.node
 
 
-## A real click on the bubble over pane `key`'s seat: brought on screen the way
+## A real click on the chip over pane `key`'s seat: brought on screen the way
 ## any reveal does, then a press and a release through Input at its centre.
 func _click_bubble(office: OfficeDouble, key: String) -> void:
 	office.reveal(key)
 	await process_frame
 	await process_frame
 	var station := _station_of(office, key)
-	var at := station.bubble_rect().get_center() - office.camera.position
+	var at := station.chip_rect().get_center() - office.camera.position
 	_check(office.hud.world_rect().has_point(at), "the bubble over %s is on screen at %s" % [key, at])
 	for down: bool in [true, false]:
 		var event := InputEventMouseButton.new()
@@ -408,12 +408,12 @@ func _move_pointer(at: Vector2, held := false) -> void:
 	await physics_frame
 
 
-## Where the bubble over pane `key` is on screen, its middle, once revealed.
+## Where the chip over pane `key` is on screen, its middle, once revealed.
 func _bubble_point(office: OfficeDouble, key: String) -> Vector2:
 	office.reveal(key)
 	await process_frame
 	await process_frame
-	return _station_of(office, key).bubble_rect().get_center() - office.camera.position
+	return _station_of(office, key).chip_rect().get_center() - office.camera.position
 
 
 ## The panes fake `which` was asked to read `source` from, in order.

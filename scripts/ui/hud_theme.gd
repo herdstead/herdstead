@@ -38,7 +38,6 @@ const LABEL_SIZES: Dictionary[StringName, int] = {
 	&"Heading16Paper": 16,
 	&"Heading16Slate": 16,
 	&"RowNumber": 9,
-	&"RowNumberCurrent": 9,
 	&"Heading13Blocked": 13,
 	&"ListChevron": 8,
 	&"ListChevronCurrent": 8,
@@ -54,7 +53,6 @@ const LABEL_HEADINGS: Dictionary[StringName, StringName] = {
 	&"Heading16Paper": ArtContract.PAPER,
 	&"Heading16Slate": ArtContract.MUTED,
 	&"RowNumber": ArtContract.PAPER,
-	&"RowNumberCurrent": ArtContract.INK,
 	&"Heading13Blocked": ArtContract.BLOCKED,
 	&"ListChevron": ArtContract.MUTED,
 	&"ListChevronCurrent": ArtContract.PAPER,
@@ -88,7 +86,6 @@ const DISPLAY_COLORS: Dictionary[StringName, StringName] = {
 const FLAT_PANELS: Dictionary[StringName, StringName] = {
 	&"BarBackground": ArtContract.DEEP,
 	&"RowChip": ArtContract.SLATE,
-	&"RowChipCurrent": ArtContract.PAPER,
 	&"SpaceRowInView": ArtContract.PAPER,
 }
 ## The SPACES rail's window looks (scenes/ui/space_row.tscn picks one
@@ -493,7 +490,7 @@ static func _answer(theme: Theme, art: ArtPack) -> void:
 	_dark_field(theme, art, "CardReply", 2)
 
 
-## The floor plate in the world (scenes/world/floor_plate.tscn): a band of the
+## The machine plate in the world (scenes/world/machine_plate.tscn): a band of the
 ## pack's panel whose text keeps clear of its frame, a title in the world's
 ## own 13-unit lettering rather than a HUD heading's heavier cut, and the line
 ## that says why the map cannot be laid out (`PlateProblem`), in the blocked
@@ -511,14 +508,16 @@ static func _plate(theme: Theme, art: ArtPack) -> void:
 
 
 ## The arrows on the world's edges (scenes/ui/edge_arrow.tscn): a small dark
-## button, the same unmistakable disabled look for the `+N` note, which is a
-## count, not a way there, and the spacing of an arrow's line. The `EdgeArrows`
-## type is what OfficeEdgeArrows places them by, in units: `inset` from the
-## world's edge, `gap` between two arrows on one edge.
+## button, and the spacing of an arrow's line. The `+N` note is a disabled one
+## (a count, not a way there) in the same filled box: it stands on the floor,
+## where the hollow frame other switched-off dark buttons take left its count
+## unreadable; it has no glyph and no badge, and does not light under the
+## pointer. The `EdgeArrows` type is what OfficeEdgeArrows places them by, in
+## units: `inset` from the world's edge, `gap` between two arrows on one edge.
 static func _edge_arrows(theme: Theme, art: ArtPack) -> void:
 	theme.set_type_variation("EdgeArrow", "Button")
 	for state: String in BUTTON_STATES:
-		var box := _dark_button(art, state)
+		var box := _dark_button(art, "normal" if state == "disabled" else state)
 		box.content_margin_left = 3
 		box.content_margin_right = 3
 		box.content_margin_top = 1
@@ -873,7 +872,6 @@ static func _section(theme: Theme, art: ArtPack) -> void:
 	facade.set_content_margin_all(1)
 	theme.set_stylebox("panel", "SectionFacade", facade)
 	_label(theme, &"WindowMore", 9, art.color(ArtContract.MUTED))
-	_label(theme, &"WindowMoreCurrent", 9, art.color(ArtContract.PAPER))
 
 
 ## The terminal monitor (scenes/ui/terminal_monitor.tscn): herdr's own screen on

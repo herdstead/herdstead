@@ -5,7 +5,7 @@ extends Node2D
 ## sorts with the post; it draws over the aisle row above the zone. It says the
 ## workspace's number (`3`, a mezzanine's `3A`) and its label, beside an accent
 ## stripe that a worktree group shares (accent_of()). Hovering it asks for the
-## repository and the checkout (`hovered`); the office shows them in the bubble
+## repository and the checkout (`hovered`); the office shows them in the world
 ## tooltip (OfficeQuestionTips.on_sign_hovered()).
 ##
 ## Display only: the text is written again on every reconcile from the zone's
@@ -33,7 +33,7 @@ var _pen: OfficeDraw
 
 ## Which of the pack's accent colours (ArtContract.ACCENTS) a worktree group
 ## wears: picked from its source workspace's key alone, never from a state. The
-## floor plate and the zone sign both ask here.
+## machine plate and the zone sign both ask here.
 static func accent_of(group: String) -> int:
 	return posmod(group.hash(), ArtContract.ACCENTS.size())
 
@@ -61,15 +61,15 @@ static func words(zone: ZoneModel) -> String:
 	return (number_text(zone) + " " + title_text(zone)).strip_edges()
 
 
-## Take the pack's panel, display face and colours.
+## Take the pack's panel and colours, and the pen's display face
+## (OfficeDraw.display): the pixel font over the pen's own system fallbacks, so
+## a label's glyphs the pixel font lacks (CJK) are drawn, not boxes.
 func dress(pen: OfficeDraw) -> void:
 	var panel: NinePatchRect = %Panel
 	pen.dress_panel(panel, panel.size)
 	var labels: Array[Label] = [%Number as Label, %Title as Label]
 	for label in labels:
-		pen.style(label, 8, ArtContract.INK)
-		if pen.art.display_font != null:
-			label.add_theme_font_override("font", pen.art.display_font)
+		pen.style_display(label, 8, ArtContract.INK)
 		label.clip_text = true
 		label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS_FORCE
 	_pen = pen

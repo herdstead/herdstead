@@ -22,10 +22,10 @@ extends SceneTree
 ##                 `minimize`: 80 walk in, and 1.5 s later the window is
 ##                 minimized for 2 s. From 80 at work: `blocked40`:
 ##                 40 go blocked at once (all raise a hand at their
-##                 desks under 40 bubbles; nobody walks); `idle40`: 40 go idle
+##                 desks under 40 chips; nobody walks); `idle40`: 40 go idle
 ##                 at once (to the pantry); `approve`: once those 40 are
 ##                 blocked, one of them is answered every APPROVE_EVERY
-##                 seconds, 8 times (a bubble goes each time); `queuegrow`: 40
+##                 seconds, 8 times (a chip goes each time); `queuegrow`: 40
 ##                 go blocked, and 1.5 s later tab 0 grows by 12 under them.
 ##                 The names stay fixed so runs stay comparable.
 ## --overview=open with --mode=office, the OVERVIEW open over the office

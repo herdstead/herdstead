@@ -7,7 +7,7 @@ extends Node2D
 ## own feet: the far chair just behind its worker, the near chair just in
 ## front. The Overlay floats above the world (OVERLAY_Z) and holds the name
 ## plate, the lens line, the selection mark, herdr's state badge and, while the
-## agent is blocked, the chip on the badge's row (OfficeBubble). A done agent's
+## agent is blocked, the chip on the badge's row (OfficeChip). A done agent's
 ## stack of paper is on the desk, which is the pod's (OfficeTable.show_papers()).
 ##
 ## Rows, 30 units wide and centred on the column, stacked away from the pod:
@@ -47,12 +47,12 @@ extends Node2D
 ## and whether it stayed still enough is the office's to decide: it saw the
 ## same event one step earlier (see OfficeCamera.still_click()).
 signal picked(key: String, at: Vector2)
-## The same, released over this seat's bubble: pick the pane and answer it.
-## Only ever while the bubble is shown (its rectangle is disabled otherwise).
+## The same, released over this seat's chip: pick the pane and answer it.
+## Only ever while the chip is shown (its rectangle is disabled otherwise).
 signal asked(key: String, at: Vector2)
-## The pointer came onto this seat's bubble (`inside`) or left it: the office
+## The pointer came onto this seat's chip (`inside`) or left it: the office
 ## shows the question's excerpt in a HUD tooltip meanwhile.
-signal bubble_hovered(key: String, inside: bool)
+signal chip_hovered(key: String, inside: bool)
 
 const PERSON_SCENE := preload("res://scenes/people/pixel_person.tscn")
 ## The rows over a seat, relative to it (the far seat is at pod y -36, the near
@@ -66,13 +66,13 @@ const PERSON_SCENE := preload("res://scenes/people/pixel_person.tscn")
 ## pulse (OfficeAttention.PULSES) lifts it up to 2: [-90, -72) touches the
 ## raised hand and [28, 46) the chair, overlapping neither.
 const BADGE_AT := {"far": Vector2(0, -36), "near": Vector2(0, 24)}
-## The chip (OfficeBubble, 30 by 16) is on the tag row, by its top-left corner;
+## The chip (OfficeChip, 30 by 16) is on the tag row, by its top-left corner;
 ## while its frame is drawn the badge moves CHIP_BADGE_SHIFT left, into the
 ## chip's left half and one unit over its left edge (x [-16, -1)), so the wait
-## has daylight on both sides (OfficeBubble.WAIT_RECT); the left neighbour's
+## has daylight on both sides (OfficeChip.WAIT_RECT); the left neighbour's
 ## rows still end a unit short of it.
-const BUBBLE_SIZE := OfficeBubble.SIZE
-const BUBBLE_AT := {"far": Vector2(-15, -52), "near": Vector2(-15, 8)}
+const CHIP_SIZE := OfficeChip.SIZE
+const CHIP_AT := {"far": Vector2(-15, -52), "near": Vector2(-15, 8)}
 const CHIP_BADGE_SHIFT := Vector2(-8.5, 0)
 ## The lens row (OfficeLens, while `L` is held), 30 by 12, next out from the
 ## tag row: pod [-102, -90) far and [46, 58) near. It holds the compact wait
@@ -106,7 +106,7 @@ const UNDER_CHIP_SIZE := {"far": Vector2(30, 40), "near": Vector2(30, 49)}
 ## The chip's click rectangle (scenes/world/station.tscn), 30 by 18: the tag
 ## row with the badge's pulse envelope, far pod [-90, -72), near [28, 46).
 ## _place() lays it over the chip, CHIP_TARGET_AT from the chip's corner.
-const BUBBLE_TARGET := ^"Target/Bubble"
+const CHIP_TARGET := ^"Target/Chip"
 const CHIP_TARGET_AT := Vector2(15, 7)
 ## Over a worker resting away (the pantry), relative to where they stand: the
 ## badge right over the head; no plate: who is who is their coat, and a click on
@@ -184,9 +184,9 @@ func setup(drawing: OfficeDraw, at_table: OfficeTable, at_column: int, seat_side
 	var mark := art.selection_mark()
 	var selection: Sprite2D = $Overlay/Selection
 	art.dress(selection, art.sprite_texture(mark), mark.pivot)
-	bubble().dress(pen)
+	chip().dress(pen)
 	var badge: StatusBadge = $Overlay/Badge
-	badge.bubble = bubble()
+	badge.chip = chip()
 	if first_setup:
 		badge.clear(art)
 	if changed_art and actor() != null:
@@ -250,16 +250,16 @@ func furnish(
 	# Until the presentation says otherwise (rest_at()), at the seat.
 	rest = OfficeRests.Rest.SEAT
 	away_at = Vector2.ZERO
-	# What only a state draws at a seat: the bubble over a blocked agent, the
+	# What only a state draws at a seat: the chip over a blocked agent, the
 	# paper beside a done one's laptop. A pane still launching says nothing about
 	# its agent yet, unless herdr already says blocked: a start that asks at once
 	# is a blocked agent (blocked takes precedence; the caller passes PaneModel.launching()).
 	# A shell has no agent. Set before _place(), which enables
-	# the bubble's rectangle only while it shows.
+	# the chip's rectangle only while it shows.
 	var agent := not starting and not provider.is_empty()
-	bubble().visible = agent and state == ArtContract.STATE_BLOCKED
-	if not bubble().visible:
-		bubble().clear()
+	chip().visible = agent and state == ArtContract.STATE_BLOCKED
+	if not chip().visible:
+		chip().clear()
 	table.show_papers(column, side, agent and state == ArtContract.STATE_DONE)
 	if provider.is_empty() and not starting:
 		_drop_actor()
@@ -312,8 +312,8 @@ func vacate() -> void:
 	table.equip(column, side, false)
 	table.light(column, side, OfficeTable.Lamp.OFF)
 	table.show_papers(column, side, false)
-	bubble().visible = false
-	bubble().clear()
+	chip().visible = false
+	chip().clear()
 	_drop_actor()
 	var plate: Label = $Overlay/Plate
 	plate.text = ""
@@ -332,7 +332,7 @@ func vacate() -> void:
 ## The lens (OfficeLens) is `held`, or not: the lens line says `text` while
 ## it is, on a seat somebody's pane has and when there is anything to say (a
 ## shell, a dropped machine: nothing), the plate shows, and the chip draws none
-## of itself meanwhile (OfficeBubble.set_lensed()). Nothing is rebuilt: the
+## of itself meanwhile (OfficeChip.set_lensed()). Nothing is rebuilt: the
 ## text only when it changes, the line's and the plate's visibility, the chip's parts.
 func show_lens(held: bool, text: String) -> void:
 	var line: Label = $Overlay/Lens
@@ -340,7 +340,7 @@ func show_lens(held: bool, text: String) -> void:
 		line.text = text
 	line.visible = held and not vacant and not text.is_empty()
 	_lens_held = held
-	bubble().set_lensed(held)
+	chip().set_lensed(held)
 	var plate: Label = $Overlay/Plate
 	plate.position = rest_position() + _plate_at()
 	_show_plate()
@@ -428,19 +428,19 @@ func away() -> bool:
 	return rest == OfficeRests.Rest.PANTRY
 
 
-## The chip on this seat's tag row (OfficeBubble), shown only while its agent is blocked.
-func bubble() -> OfficeBubble:
-	return $Overlay/Bubble
+## The chip on this seat's tag row (OfficeChip), shown only while its agent is blocked.
+func chip() -> OfficeChip:
+	return $Overlay/Chip
 
 
 ## Where the chip is drawn, in global coordinates (its 30 by 16 frame, drawn
 ## or not); an empty rectangle while it is hidden. What reveal() and the
 ## question reader look at.
-func bubble_rect() -> Rect2:
-	var shown := bubble()
+func chip_rect() -> Rect2:
+	var shown := chip()
 	if not shown.visible:
 		return Rect2()
-	return Rect2(shown.global_position, BUBBLE_SIZE)
+	return Rect2(shown.global_position, CHIP_SIZE)
 
 
 ## Take the worker out of this seat without freeing them, for the presentation
@@ -483,7 +483,7 @@ func target_rect() -> Rect2:
 ## pick: a press starts a drag, and a wheel notch or another button is never a
 ## pick however still it is. The motion the Area2D also reports is the office's
 ## pan, and it already has it. Which rectangle it landed on says which signal:
-## the bubble's asks, any other picks.
+## the chip's asks, any other picks.
 func _on_target_input_event(_viewport: Node, event: InputEvent, shape_index: int) -> void:
 	if not event is InputEventMouseButton:
 		return
@@ -492,7 +492,7 @@ func _on_target_input_event(_viewport: Node, event: InputEvent, shape_index: int
 		return
 	var target: Area2D = $Target
 	var hit := target.shape_owner_get_owner(target.shape_find_owner(shape_index))
-	if hit == get_node(BUBBLE_TARGET):
+	if hit == get_node(CHIP_TARGET):
 		asked.emit(pane_key, click.position)
 	else:
 		picked.emit(pane_key, click.position)
@@ -503,19 +503,19 @@ func _on_target_input_event(_viewport: Node, event: InputEvent, shape_index: int
 ## office's business (the question's tooltip).
 func _on_target_mouse_shape_entered(shape_index: int) -> void:
 	var shape := _shape_at(shape_index)
-	if shape == _target_of(side) or shape == get_node(BUBBLE_TARGET):
+	if shape == _target_of(side) or shape == get_node(CHIP_TARGET):
 		_hovered[shape] = true
 		_show_plate()
-	if shape == get_node(BUBBLE_TARGET):
-		bubble_hovered.emit(pane_key, true)
+	if shape == get_node(CHIP_TARGET):
+		chip_hovered.emit(pane_key, true)
 
 
 func _on_target_mouse_shape_exited(shape_index: int) -> void:
 	var shape := _shape_at(shape_index)
 	if _hovered.erase(shape):
 		_show_plate()
-	if shape == get_node(BUBBLE_TARGET):
-		bubble_hovered.emit(pane_key, false)
+	if shape == get_node(CHIP_TARGET):
+		chip_hovered.emit(pane_key, false)
 
 
 func _shape_at(shape_index: int) -> Node:
@@ -596,13 +596,13 @@ func _place() -> void:
 	else:
 		selection.position = at + SELECTION_AT[side]
 		lens.position = at + LENS_AT[side]
-	var shown := bubble()
-	var bubble_at: Vector2 = BUBBLE_AT[side]
-	shown.position = bubble_at
-	var bubble_target: CollisionShape2D = get_node(BUBBLE_TARGET)
-	bubble_target.position = bubble_at + CHIP_TARGET_AT
-	bubble_target.disabled = vacant or not shown.visible
-	var under := not bubble_target.disabled
+	var shown := chip()
+	var chip_at: Vector2 = CHIP_AT[side]
+	shown.position = chip_at
+	var chip_target: CollisionShape2D = get_node(CHIP_TARGET)
+	chip_target.position = chip_at + CHIP_TARGET_AT
+	chip_target.disabled = vacant or not shown.visible
+	var under := not chip_target.disabled
 	for each: String in OfficeTable.SIDES:
 		var box := _target_of(each)
 		box.disabled = each != side
@@ -636,14 +636,14 @@ func _place_badge() -> void:
 		badge.position = rest_position() + AWAY_BADGE_AT
 		return
 	var at: Vector2 = BADGE_AT[side]
-	var shown := bubble()
+	var shown := chip()
 	if shown.visible and shown.framed():
 		at += CHIP_BADGE_SHIFT
 	badge.position = at
 
 
-## The chip's frame came or went (OfficeBubble.framed_changed): move the badge.
-func _on_bubble_framed(_framed: bool) -> void:
+## The chip's frame came or went (OfficeChip.framed_changed): move the badge.
+func _on_chip_framed(_framed: bool) -> void:
 	_place_badge()
 
 

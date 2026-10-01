@@ -29,7 +29,7 @@ var _name := ""
 ## were taken with it) and 71 per column (20 of the pod's: a desk, an apron and a screen
 ## module, a bracket, 2 laptops, 2 three-node grommets, 2 lamps, 2 papers, 2
 ## seat and 2 standing markers; 1 contact shadow; two 15-node stations and two
-## 10-node people). The bound decides which floors fit
+## 10-node people). The bound decides which maps fit
 ## FloorLayoutPolicy.max_desk_nodes. Geometry tests count real dressed prefabs
 ## so changes to the scenes cannot silently invalidate this allocation
 ## contract. This bounds the settled live group, not temporary queue_free

@@ -5,6 +5,7 @@ import contextlib
 import copy
 import io
 import json
+import re
 import shutil
 import tempfile
 import unittest
@@ -12,8 +13,8 @@ from pathlib import Path
 
 from PIL import Image
 
-from build_table_assets import (CURSOR_AT, DENSITY, FURNITURE, LEGACY, LEGACY_POD, MODULES, POD_MODULES, ROOT,
-                                SOURCE_SETS, build_pack, generate_templates)
+from build_table_assets import (CURSOR_AT, DENSITY, FURNITURE, LEGACY, LEGACY_POD, MODULES, POD_MODULES, POD_ONLY,
+                                POD_SHARED, ROOT, SOURCE_SETS, build_pack, generate_templates)
 
 
 THEMES = ("daylight",)
@@ -147,7 +148,7 @@ class SharedTableAssetTests(unittest.TestCase):
             # Either accepted source set (build_table_assets.SOURCE_SETS), and
             # every module of the set it declares is checked below.
             declared = next((sizes for sizes in SOURCE_SETS.values() if set(manifest["modules"]) == set(sizes)), None)
-            self.assertIsNotNone(declared, f"{theme}: modules are neither the legacy set nor legacy+pod")
+            self.assertIsNotNone(declared, f"{theme}: modules are none of the accepted sets {sorted(SOURCE_SETS)}")
             self.assertEqual(manifest["assembly"], {
                 "module_width": 32,
                 "surface_depth": 80,
@@ -316,9 +317,10 @@ class SharedTableAssetTests(unittest.TestCase):
 
 
 class PodSourceSetTests(unittest.TestCase):
-    """The builder accepts the LEGACY module set or LEGACY plus POD, told apart
-    by the modules the manifest declares, and requires every image of that set.
-    Built from fresh templates, so the cases hold whichever set art/ ships."""
+    """The builder accepts the LEGACY module set, LEGACY plus POD, or the pod
+    alone (POD_ONLY, what the office draws), told apart by the modules the
+    manifest declares, and requires every image of that set. Built from fresh
+    templates, so the cases hold whichever set art/ ships."""
 
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -344,10 +346,24 @@ class PodSourceSetTests(unittest.TestCase):
             (self.source / "table" / f"{name}.png").unlink()
         self.manifest.write_text(json.dumps(data, indent=2) + "\n")
 
-    def test_the_sets_are_legacy_and_legacy_with_pod(self):
-        self.assertEqual(set(SOURCE_SETS), {"legacy", "legacy+pod"})
+    def as_pod(self):
+        """The pod alone: the manifest without the long table's own modules and their images gone."""
+        data = json.loads(self.manifest.read_text())
+        for name in set(LEGACY_POD) - set(POD_ONLY):
+            del data["modules"][name]
+            (self.source / "table" / f"{name}.png").unlink()
+        self.manifest.write_text(json.dumps(data, indent=2) + "\n")
+
+    def test_the_sets_are_legacy_legacy_with_pod_and_the_pod_alone(self):
+        self.assertEqual(set(SOURCE_SETS), {"legacy", "legacy+pod", "pod"})
         self.assertEqual(LEGACY, {**MODULES, **FURNITURE})
         self.assertEqual(LEGACY_POD, {**MODULES, **FURNITURE, **POD_MODULES})
+        self.assertEqual(SOURCE_SETS["pod"], POD_ONLY)
+        self.assertEqual(POD_ONLY, {**POD_MODULES, **{name: MODULES[name] for name in POD_SHARED}, **FURNITURE})
+        self.assertEqual(set(LEGACY_POD) - set(POD_ONLY),
+                         {"surface_left", "surface_mid_a", "surface_mid_b", "surface_right",
+                          "divider_left", "divider_mid", "divider_right", "leg"},
+                         "the pod alone leaves out the long table's surface, divider and leg, and nothing else")
         self.assertFalse(set(POD_MODULES) & set(LEGACY), "the pod adds modules, it renames none")
         self.assertEqual(POD_MODULES, {
             "desk_left": (32, 48), "desk_mid_a": (32, 48), "desk_mid_b": (32, 48), "desk_right": (32, 48),
@@ -365,6 +381,33 @@ class PodSourceSetTests(unittest.TestCase):
         runtime = self.build()
         self.assertEqual({path.stem for path in runtime.glob("*.png")}, set(LEGACY))
         self.assertEqual(set(json.loads((runtime / "manifest.json").read_text())["modules"]), set(LEGACY))
+
+    def test_a_pod_only_source_is_valid_and_builds_only_the_pod(self):
+        self.as_pod()
+        self.assertEqual(set(json.loads(self.manifest.read_text())["modules"]), set(POD_ONLY))
+        runtime = self.build()
+        self.assertEqual({path.stem for path in runtime.glob("*.png")}, set(POD_ONLY))
+        self.assertEqual(set(json.loads((runtime / "manifest.json").read_text())["modules"]), set(POD_ONLY))
+        for name in POD_ONLY:
+            self.assertEqual((runtime / f"{name}.png").read_bytes(), (self.source / "table" / f"{name}.png").read_bytes(), name)
+        # A pod-only source missing one of its images is refused, like any set.
+        (self.source / "table" / "bracket.png").unlink()
+        with self.assertRaisesRegex(ValueError, "bracket"):
+            self.build("pod-missing-bracket")
+        self.assertFalse((self.root / "pod-missing-bracket").exists(), "nothing written")
+
+    def test_the_pod_only_set_is_exactly_what_the_office_draws(self):
+        """POD_ONLY is the runtime's ArtContract.TABLE_MODULES (what OfficeTable lays)
+        plus the furniture views (the chair, the laptop and its shell marks)."""
+        source = (ROOT / "scripts/art/art_contract.gd").read_text()
+        listed = re.search(r"const TABLE_MODULES: Array\[StringName\] = \[(.*?)\]", source, re.S)
+        self.assertIsNotNone(listed, "art_contract.gd still names TABLE_MODULES as a literal list")
+        runtime = set(re.findall(r'&"(\w+)"', listed.group(1)))
+        self.assertEqual(len(runtime), 12, sorted(runtime))
+        self.assertFalse(runtime & set(FURNITURE), "the furniture views are not table modules")
+        self.assertEqual(set(POD_ONLY), runtime | set(FURNITURE))
+        self.assertEqual(len(POD_ONLY), 18)
+        self.assertEqual(runtime, set(POD_MODULES) | set(POD_SHARED))
 
     def test_a_pod_set_missing_one_image_is_refused_before_writing(self):
         for name in POD_MODULES:
@@ -401,11 +444,16 @@ class PodSourceSetTests(unittest.TestCase):
         del partial["modules"]["screen_mid"]
         unknown = copy.deepcopy(original)
         unknown["modules"]["desk_corner"] = {"path": "desk_corner.png", "size": [32, 48]}
-        for label, data, reason in (("partial", partial, r"missing \['screen_mid'\]"),
-                                    ("unknown", unknown, r"unknown \['desk_corner'\]")):
+        # The pod alone with one of the long table's modules left in is no set either.
+        leftover = copy.deepcopy(original)
+        for name in set(LEGACY_POD) - set(POD_ONLY) - {"leg"}:
+            del leftover["modules"][name]
+        for label, data, reason in (("partial", partial, r"nearest legacy\+pod, missing \['screen_mid'\]"),
+                                    ("unknown", unknown, r"nearest legacy\+pod, .*unknown \['desk_corner'\]"),
+                                    ("leftover", leftover, r"nearest pod, .*unknown \['leg'\]")):
             with self.subTest(label=label):
                 self.manifest.write_text(json.dumps(data))
-                with self.assertRaisesRegex(ValueError, "neither the legacy set nor legacy\\+pod.*" + reason):
+                with self.assertRaisesRegex(ValueError, "none of the accepted sets \\(legacy, legacy\\+pod, pod\\).*" + reason):
                     self.build(f"bad-{label}")
 
 

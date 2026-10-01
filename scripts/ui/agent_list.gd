@@ -537,7 +537,7 @@ func _on_group_pressed(key: String) -> void:
 
 ## The actions a line offers, as a native popup: a pane with a live attention
 ## episode has Open, Snooze and Hide; a History line only View (Details when
-## its pane stands on no floor), greyed out once it cannot be located. Local
+## its pane stands in no zone), greyed out once it cannot be located. Local
 ## only: none of them changes herdr.
 func _open_menu(key: String, at: Vector2) -> void:
 	var entry: AgentListModel.Entry = _entry_by_key.get(key)

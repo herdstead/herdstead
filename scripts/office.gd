@@ -38,8 +38,8 @@ const SETTINGS_PATH := "user://herdstead.cfg"
 ## The bar, the SPACES rail and the inspector, laid out in their own scenes; where
 ## they stand is what leaves the world its room (see OfficeCamera.free_rect()).
 const HUD_SCENE := preload("res://scenes/ui/hud.tscn")
-const PLATE_SCENE := preload("res://scenes/world/floor_plate.tscn")
-## How often, in seconds, the office tells the question reader which bubbles are on screen.
+const PLATE_SCENE := preload("res://scenes/world/machine_plate.tscn")
+## How often, in seconds, the office tells the question reader which chips are on screen.
 const QUESTION_WATCH_SECONDS := 0.25
 ## Smallest viewport the bar and inspector still fit in.
 const MIN_SCREEN := Vector2i(480, 320)
@@ -86,7 +86,7 @@ var world: Node2D
 var camera: OfficeCamera
 ## Caps the frame rate; the agent card asks it whether the window is minimized.
 var pacer: FramePacer
-## Reads what each blocked agent on screen is asking, for the bubble over them.
+## Reads what each blocked agent on screen is asking, for the chip over them.
 var questions: OfficeQuestionReader
 ## Every runtime pack found at startup, sorted by pack directory (the pack id).
 var themes := PackedStringArray()
@@ -124,7 +124,7 @@ var frame := OfficeFrame.new()
 ## The shown map as drawn: its shell, zones, pods, seats and furniture.
 var floor_view: OfficeFloorView
 ## The shown machine's plate, above its map.
-var plate: OfficeFloorPlate
+var plate: OfficeMachinePlate
 ## What the world was built for: the shown machine and the pack. Nothing else
 ## replaces it (a workspace coming or going is a zone of the same world);
 ## everything else updates it in place.
@@ -157,9 +157,9 @@ var _world_machine := ""
 ## The shown map's drawing and its plate band, which the pan is clamped to.
 var _content_size := Vector2.ZERO
 var _inbox_left := 0.0
-## Until the bubbles on screen are looked at again: a pan moves them without a refresh.
+## Until the chips on screen are looked at again: a pan moves them without a refresh.
 var _questions_left := 0.0
-## The tooltip over a blocked agent's bubble, and what the question reader is told.
+## The tooltip over a blocked agent's chip, and what the question reader is told.
 var _tips: OfficeQuestionTips
 ## Machine key -> the state starts last projected while it was live, by pane key
 ## and terminal identity: what a stale machine's panes are ranked by, since its
@@ -334,7 +334,7 @@ func _ready() -> void:
 	hud.inspector.connect_fleet(fleet, pacer.is_minimized, _card_covered)
 	# The terminal monitor reads and types through the same fleet; it opens only on request.
 	hud.monitor.connect_fleet(fleet, pacer.is_minimized)
-	# The bubbles over blocked agents say what they ask: read, never written.
+	# The chips over blocked agents say what they ask: read, never written.
 	questions = OfficeQuestionReader.new(fleet, pacer.is_minimized)
 	questions.enabled = _question_reads()
 	_tips.attach(fleet, questions)
@@ -575,7 +575,7 @@ func _process(delta: float) -> void:
 	_new_pane.give_up()
 
 
-## Everything the office answers with a key or the wheel: zoom, theme, floor,
+## Everything the office answers with a key or the wheel: zoom, theme, zone,
 ## "next human" and scrolling. The bindings are project.godot's `[input]`, not
 ## keycodes, and no action repeats while a key is held. True when the event was
 ## one of them.
@@ -698,13 +698,13 @@ func _on_desk_picked(key: String, at: Vector2) -> void:
 	_refresh()
 
 
-## A left click released over a blocked agent's bubble: the same rules as a
+## A left click released over a blocked agent's chip: the same rules as a
 ## desk, then the pane is picked the way the agent list picks one, and the card
 ## (opened up first on a short screen) goes into answer mode once it shows the
 ## question (OfficePaneInspector.arm_answer()). Nothing is sent: answering is
 ## still the viewer's own button or key, and an office that may not write only
 ## picks.
-func _on_bubble_picked(key: String, at: Vector2) -> void:
+func _on_chip_picked(key: String, at: Vector2) -> void:
 	if hud.monitor_open() or not camera.still_click(at):
 		return
 	var pane := frame.pane(key)
@@ -759,7 +759,7 @@ func _reveal_section(key: String) -> void:
 		hud.reveal_strategic_section(key)
 
 
-## `N` and NEXT: select the next agent that needs a human, show its floor and
+## `N` and NEXT: select the next agent that needs a human, show its map and
 ## pan its desk into view, and do what NEXT's verb says (_open_card_for()): a
 ## blocked one's answer mode, a done one's panel. Repeated presses walk the
 ## queue and wrap around; `N` in answer mode leaves it first, and opens it
@@ -775,7 +775,7 @@ func _jump_to_next_human() -> void:
 
 
 ## `‹` (-1) or `›` (+1) on the staff panel's line: the one before or after the
-## pick in NEXT's queue, picked, its floor shown and its desk revealed. Only a
+## pick in NEXT's queue, picked, its map shown and its desk revealed. Only a
 ## selection: no answer mode (the new binding leaves it), and an open panel
 ## folds because the card is aimed at another pane. Not while the monitor is open.
 func _step_queue(direction: int) -> void:
@@ -803,7 +803,7 @@ func _open_card_for(pane: PaneModel) -> void:
 
 ## A top-bar counter pressed: BLOCKED walks the blocked agents, longest wait
 ## first, and opens answer mode once the question is shown, as a click on a
-## bubble does; DONE walks the UNREAD ones from the oldest, and only picks;
+## chip does; DONE walks the UNREAD ones from the oldest, and only picks;
 ## WORKING and IDLE filter the agent list, and the same press again clears it
 ## (while the overview is open they set its chips instead, and leave the list
 ## alone); PANES opens the overview, or closes it. MACHINES only has its hover.
@@ -918,7 +918,7 @@ func _refresh() -> void:
 	if not arriving.is_empty() and floor_view.seats.has(arriving):
 		reveal(arriving)
 		navigator.revealed()
-	# After the camera is placed for this map: which bubbles are on screen.
+	# After the camera is placed for this map: which chips are on screen.
 	_watch_questions()
 	_show_spaces()
 	_marks.show(frame, navigator.shown_key)
@@ -945,7 +945,7 @@ func _refresh() -> void:
 ## frame brought, however many stream lines it read. The fleet's state log has
 ## already heard each of them (HerdrFleet._note()), so nothing a refresh reads
 ## from the ledger — NEWS, EVENTS, the alerts — misses one. A click, a resize or
-## a floor picked still refreshes at once, and takes the queued changes in with it.
+## a zone picked still refreshes at once, and takes the queued changes in with it.
 func _queue_refresh() -> void:
 	if _data_pending:
 		return
@@ -979,7 +979,7 @@ func _on_room_changed() -> void:
 	_refresh()
 
 
-## What the office runs for every new snapshot, resize or change of floor, at
+## What the office runs for every new snapshot, resize or change of map, at
 ## once, for tools and tests (tools/perf_probe.gd times it); it also draws any
 ## change the fleet queued for the end of the frame (_queue_refresh()).
 func refresh() -> void:
@@ -1023,7 +1023,7 @@ func shown_machine() -> String:
 
 ## Pan just enough for the desk of `key`, its badge included, to be on screen:
 ## where it answers a click, which is where its worker rests (a pantry worker's
-## own rectangle), and the bubble over a blocked one. With `whole_table`, the
+## own rectangle), and the chip over a blocked one. With `whole_table`, the
 ## framing a map opens on: the desk and its whole pod when that fits, else
 ## the desk alone. The world is what the pan is measured in.
 func reveal(key: String, whole_table := false) -> void:
@@ -1031,9 +1031,9 @@ func reveal(key: String, whole_table := false) -> void:
 	if seat == null:
 		return
 	var bounds := seat.node.target_rect()
-	var bubble := seat.node.bubble_rect()
-	if bubble.has_area():
-		bounds = bounds.merge(bubble)
+	var chip := seat.node.chip_rect()
+	if chip.has_area():
+		bounds = bounds.merge(chip)
 	if whole_table:
 		var table := seat.node.table
 		var group := table.geometry.render_rect
@@ -1074,11 +1074,11 @@ func _fits(bounds: Rect2) -> bool:
 
 ## Give every pane of the frame when its state began (PaneModel.state_since),
 ## seated or not: it orders the pantry and the `N` key (OfficeNavigator.waiting(),
-## which ranks the panes no floor seats as it ranks the seated), and the
+## which ranks the panes no zone seats as it ranks the seated), and the
 ## terminal monitor's title reads it from frame.pane(). A live machine's come
 ## from the fleet, and are kept; a stale machine's are the ones kept from when
 ## it was last live, because its client forgets every start when it drops (and
-## when a snapshot is refused), and ranking its frozen floor by those would
+## when a snapshot is refused), and ranking its frozen map by those would
 ## reshuffle it on the next click, `N` or another machine's snapshot. The first
 ## refresh after it is back is cold anyway and ranks it afresh.
 func _stamp_starts() -> void:
@@ -1150,7 +1150,7 @@ func _build(building: BuildingModel, map: MapModel, planned: FloorPlan, problems
 	rooms.position = Vector2(0, PLATE_HEIGHT)
 	world.add_child(rooms)
 	floor_view = OfficeFloorView.new()
-	floor_view.setup(pen, rooms, _on_desk_picked, _on_bubble_picked, _tips.on_bubble_hovered, _tips.on_sign_hovered)
+	floor_view.setup(pen, rooms, _on_desk_picked, _on_chip_picked, _tips.on_chip_hovered, _tips.on_sign_hovered)
 	_marks.floor_view = floor_view
 	floor_view.set_night(night)
 	# A map whose current input cannot be planned keeps drawing the model its
@@ -1207,7 +1207,7 @@ func _building_state(key: String) -> MachineLiveness.State:
 	return MachineLiveness.State.OFFLINE
 
 
-## Tell the question reader what the shown map asks and which bubbles are on
+## Tell the question reader what the shown map asks and which chips are on
 ## screen (OfficeQuestionTips.watch()): a refresh, and a timer for a pan.
 func _watch_questions() -> void:
 	if floor_view != null:
@@ -1224,7 +1224,7 @@ func _visible_world() -> Rect2:
 	return Rect2(camera.pan.clamp(Vector2.ZERO, reach).round() + room.position, room.size)
 
 
-## Whether the bubbles' reader reads at all; a test double turns it off.
+## Whether the chips' reader reads at all; a test double turns it off.
 func _question_reads() -> bool:
 	return true
 
@@ -1396,9 +1396,9 @@ func _show_events() -> void:
 
 ## Open the overview over the world (PANES, `O`, `--overview=open`). It covers
 ## the world and both side columns without taking their room: nothing is laid
-## out again, no floor is planned for it, and the people keep walking under it.
-## Hidden meanwhile: the world, the edge arrows and the bubble tooltip; the
-## bubbles' reader stops at once (it reads nothing the overview covers). Not
+## out again, no map is planned for it, and the people keep walking under it.
+## Hidden meanwhile: the world, the edge arrows and the world tooltip; the
+## chips' reader stops at once (it reads nothing the overview covers). Not
 ## while the terminal monitor is open; answer mode on the staff panel stays.
 func _open_overview() -> void:
 	if hud.monitor_open() or hud.overview_open():
@@ -1419,7 +1419,7 @@ func _close_overview() -> void:
 	hud.close_overview()
 
 
-## The overview closed, however: the world, its edge arrows and the bubbles'
+## The overview closed, however: the world, its edge arrows and the chips'
 ## reader come back with a refresh.
 func _on_overview_closed() -> void:
 	_overview_tick.stop()
@@ -1468,7 +1468,7 @@ func _show_overview() -> void:
 
 ## Open the strategic view over the world rect (`S`, `--strategic=open`): the
 ## world hides (the people keep walking under it), and so do the edge arrows and
-## the bubble tooltip; the bubbles' reader stops (it reads nothing the view
+## the world tooltip; the chips' reader stops (it reads nothing the view
 ## covers) and the lens cannot come on (_may_lens()). SPACES, the drawer, the
 ## staff panel and NEWS stay where they are and keep working. Not under the
 ## terminal monitor.
@@ -1503,7 +1503,7 @@ func _on_strategic_closed() -> void:
 
 
 ## A square was clicked (the view closed already): pick that pane as a list
-## row does, which shows its floor and reveals its desk once drawn.
+## row does, which shows its map and reveals its desk once drawn.
 func _on_strategic_picked(key: String) -> void:
 	_pick_from_list(key)
 
@@ -1624,7 +1624,7 @@ func _pick_from_list(key: String) -> void:
 
 
 ## The one way a list or an attention record picks a pane: select that
-## terminal, show its floor and reveal its desk once drawn, like `N`. A pick,
+## terminal, show its map and reveal its desk once drawn, like `N`. A pick,
 ## as on a desk, ends the card's answer mode first.
 func _pick_pane(pane: PaneModel) -> void:
 	camera.cancel_press()
@@ -1746,7 +1746,7 @@ func _may_lens() -> bool:
 	return not (focus is LineEdit or focus is TextEdit)
 
 
-## The lens came on or went off: the top bar says so, the bubble's tooltip goes
+## The lens came on or went off: the top bar says so, the chip's tooltip goes
 ## away while it is on, and the world shows it or puts everything back.
 func _on_lens(held: bool) -> void:
 	if held:

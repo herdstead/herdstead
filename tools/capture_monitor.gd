@@ -144,7 +144,7 @@ func _open(office: OfficeDouble) -> void:
 	await _until(func() -> bool: return not office.frame.zone_of(key).is_empty(), "the pane's zone is known")
 	var zone_key := office.frame.zone_of(key)
 	if office.navigator.shown_key != HerdrFleet.split_key(zone_key)[0]:
-		await _floor_pick(office, zone_key)
+		await _zone_pick(office, zone_key)
 	await _click_visible_pane(office, key)
 	var name := "%CompactMonitor" if office.hud.card_compact() else "%MonitorButton"
 	var button: Button = office.hud.inspector.get_node(name)

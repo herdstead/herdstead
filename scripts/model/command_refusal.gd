@@ -131,14 +131,14 @@ enum Reason {
 	PANE_TOO_SMALL,
 	## Split only: herdr's layout gives this pane no size.
 	SIZE_UNKNOWN,
-	## Close only: the last pane of a repository's own floor while its linked
+	## Close only: the last pane of a repository's own space while its linked
 	## worktrees are open here: herdr would close the whole group (or stop its
 	## own view on a confirm dialog). Never sent.
 	GROUP_PARENT,
 	## Close only: the card's own, at a first click: a second click within ten
 	## seconds sends; nothing was sent.
 	CONFIRM_NEEDED,
-	## Close only: what the close would take with it (its tab, its floor, the
+	## Close only: what the close would take with it (its tab, its space, the
 	## pane's state) changed since the first click, or the pane is not listed.
 	SCOPE_CHANGED,
 	## New space only: the pane's directory is unknown, empty or not absolute.
@@ -148,8 +148,8 @@ enum Reason {
 	CWD_UNCLEAN,
 	## New space only: the pane's directory moved between the press and the send.
 	CWD_CHANGED,
-	## New worktree only: the pane's floor is itself a linked worktree (a
-	## mezzanine); herdr starts one only from the repository's own floor.
+	## New worktree only: the pane's space is itself a linked worktree (a
+	## mezzanine); herdr starts one only from the repository's own space.
 	MEZZANINE_SOURCE,
 	## New worktree only: no branch name, or whitespace anywhere in it.
 	BRANCH_BLANK,
@@ -164,9 +164,9 @@ enum Reason {
 	## The card's own, at the release of New worktree: the branch box no longer
 	## holds the name aimed at the press.
 	BRANCH_EDITED,
-	## New worktree only: the pane stands on another floor than the one aimed at.
+	## New worktree only: the pane stands in another space than the one aimed at.
 	FLOOR_CHANGED,
-	## New worktree only: the snapshot no longer lists the pane's floor.
+	## New worktree only: the snapshot no longer lists the pane's space.
 	FLOOR_GONE,
 }
 

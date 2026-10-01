@@ -673,7 +673,7 @@ func test_a_switch_over_an_ssh_forward_settles_when_its_machine_goes() -> void:
 	)
 	_eq(office.fleet.link_state(far), MachineLink.State.FORWARDING, "through an ssh -L forward")
 	var key := HerdrFleet.pane_key(far, "alpha:p3")
-	await _floor_pick(office, HerdrFleet.pane_key(far, "alpha"))
+	await _zone_pick(office, HerdrFleet.pane_key(far, "alpha"))
 	await _click_visible_pane(office, key)
 	await _open_panel(office)
 	var card := _card(office)

@@ -960,7 +960,7 @@ func test_the_rail_says_number_windows_and_blocked_with_the_name_in_its_tooltip(
 	hud.spaces.show_machines(machine, "local", true)
 	await _frames(2)
 	var heading := hud.spaces.headings()[0]
-	var label: Label = heading.get_node("%BuildingLabel")
+	var label: Label = heading.get_node("%MachineLabel")
 	_eq(heading.button().tooltip_text, "a-machine-with-a-long-name", "the heading's tooltip names the machine")
 	_check(heading.button().mouse_filter != Control.MOUSE_FILTER_IGNORE, "and the pointer can rest on it")
 	_check(hud.spaces.get_global_rect().encloses(label.get_global_rect()), "its name clipped inside the rail")
@@ -1015,7 +1015,7 @@ func test_rail_heading_and_arrow_gestures_count_and_panning_does_not() -> void:
 	var arrow := office.hud.edge_arrows.shown()[0]
 	await _click_at(arrow.get_global_rect().get_center())
 	_eq(navigator.nav_revision, revision + 1, "an edge arrow: one navigation")
-	await _visit_floor(office, _zone("notes"))
+	await _visit_zone(office, _zone("notes"))
 	_eq([zone.call(), navigator.nav_revision], [_zone("notes"), revision + 2], "a SPACES row: one")
 	var clicked := [zone.call(), navigator.picked_machine, office.world_model, office.camera.pan]
 	await _office_key(office, KEY_PAGEUP)
@@ -1149,7 +1149,7 @@ func test_the_heading_of_the_shown_machine_is_highlighted_alone() -> void:
 	await _click_heading(office, BEE)
 	_eq(_current_headings(office), [BEE], "bee's map is shown: bee's heading, alone")
 	# A zone of Local's picked from bee's map takes the highlight back with the map.
-	await _visit_floor(office, _zone("notes"))
+	await _visit_zone(office, _zone("notes"))
 	_eq(_current_headings(office), [LOCAL], "a row of Local's shows Local's map: Local's heading again")
 	_done(office)
 	var alone := await _live_office()
@@ -1389,8 +1389,45 @@ func test_an_arrow_handed_another_zone_under_the_pointer_outlines_that_zones_row
 	_feed(office, _six_zones())
 	await _frames(3)
 	_eq(office.hud.edge_arrows.shown().size(), 0, "nobody waits: the arrow goes")
-	var outlined := rail.row_keys().filter(func(key: String) -> bool: return rail.row_for(key).pointed())
-	_eq(outlined, [], "and no row is outlined")
+	_eq(_rows_pointed(office), [], "and no row is outlined")
+	_done(office)
+
+
+## Two arrows change places in the pool while neither moves on screen (the
+## bottom zone's pane takes a new terminal, its wait starts over, the top zone
+## is the longest wait now): the row outlined stays the zone of the arrow under
+## the resting pointer. And an arrow that comes back under the resting pointer,
+## an overlay closed, outlines its row again with no move of the pointer.
+func test_arrows_changing_pool_places_keep_the_row_under_the_pointer_outlined() -> void:
+	var raw := _six_zones()
+	_record_of(raw, "w5:t0:p0").agent_status = "blocked"
+	var office := await _live_office(raw)
+	await _frames(4)
+	_record_of(raw, "w0:t0:p1").agent_status = "blocked"
+	_feed(office, raw)
+	await _frames(3)
+	await _visit_zone(office, _zone("w2"))
+	await _frames(3)
+	var bottom := _zone("w5")
+	_eq(_arrow_zones(office), [bottom, _zone("w0")], "6 below and 1 above the view; 6 has waited longer")
+	var at := office.hud.edge_arrows.shown()[0].get_global_rect().get_center()
+	await _pointer_to(at)
+	_eq(_rows_pointed(office), [bottom], "the pointer on 6's arrow outlines 6's row")
+	_record_of(raw, "w5:t0:p0").terminal_id = "another-terminal"
+	_feed(office, raw)
+	await _frames(4)
+	_eq(_arrow_zones(office), [_zone("w0"), bottom], "6's wait started over: the two changed pool places")
+	var under: Array[String] = []
+	for arrow in office.hud.edge_arrows.shown():
+		if arrow.get_global_rect().has_point(at):
+			under.append(arrow.zone_key())
+	_eq(under, [bottom] as Array[String], "6's arrow is where it was, under the pointer")
+	_eq(_rows_pointed(office), [bottom], "and 6's row is still the one outlined")
+	await _office_key(office, KEY_O)
+	_eq(_rows_pointed(office), [], "the overview over the world: no arrow, no row outlined")
+	await _office_key(office, KEY_O)
+	await _frames(2)
+	_eq(_rows_pointed(office), [bottom], "closed: the arrow is back under the pointer, and its row outlined")
 	_done(office)
 
 
@@ -1536,7 +1573,7 @@ func test_in_view_marks_follow_a_zone_pick() -> void:
 
 
 ## Hovering a zone's sign, by real mouse motion over its area and physics
-## frames, brings up the bubble tooltip naming the workspace's repository and
+## frames, brings up the world tooltip naming the workspace's repository and
 ## checkout, and for a mezzanine whose worktree it is; moving off hides it, and
 ## so does moving just past the panel's right end (the hover area is the drawn
 ## panel, as wide as what the sign says). It
@@ -1551,7 +1588,7 @@ func test_hovering_a_zone_sign_names_its_repo_and_checkout() -> void:
 	}
 	for key: String in cases:
 		# A row click pans the sign's aisle row to the top of the world.
-		await _visit_floor(office, key)
+		await _visit_zone(office, key)
 		await _frames(3)
 		var board := office.floor_view.zone_sign(key)
 		_check(board != null, key + ": the zone has its sign")
@@ -1562,20 +1599,20 @@ func test_hovering_a_zone_sign_names_its_repo_and_checkout() -> void:
 		var on := drawn.get_center() - office.camera.position
 		_check(office.hud.world_rect().has_point(on), "%s: the sign is on screen at %s" % [key, on])
 		_check(not _under_arrow(office, on), "%s: and no arrow stands over it" % key)
-		_check(not office.hud.bubble_tip_shown(), key + ": no tooltip before the pointer comes")
+		_check(not office.hud.world_tip_shown(), key + ": no tooltip before the pointer comes")
 		await _pointer_to(on)
-		_check(office.hud.bubble_tip_shown(), key + ": hovering the sign shows the tooltip")
-		_eq(office.hud.bubble_tip_text(), cases[key], key + ": naming its repository and checkout")
+		_check(office.hud.world_tip_shown(), key + ": hovering the sign shows the tooltip")
+		_eq(office.hud.world_tip_text(), cases[key], key + ": naming its repository and checkout")
 		await _pointer_to(on + Vector2(0, 120))
-		_check(not office.hud.bubble_tip_shown(), key + ": moving off hides it")
+		_check(not office.hud.world_tip_shown(), key + ": moving off hides it")
 		# The hover area is the drawn panel, sized to what the sign says: just
 		# inside its right end the tooltip shows, just past it it does not.
 		var middle := on.y
 		var end := drawn.end.x - office.camera.position.x
 		await _pointer_to(Vector2(end - 2.0, middle))
-		_check(office.hud.bubble_tip_shown(), key + ": just inside the panel's right end, the tooltip")
+		_check(office.hud.world_tip_shown(), key + ": just inside the panel's right end, the tooltip")
 		await _pointer_to(Vector2(end + 3.0, middle))
-		_check(not office.hud.bubble_tip_shown(), key + ": just past it, none")
+		_check(not office.hud.world_tip_shown(), key + ": just past it, none")
 	_done(office)
 
 
@@ -1668,8 +1705,8 @@ func _current_headings(office: OfficeDouble) -> Array:
 		. hud
 		. spaces
 		. headings()
-		. filter(func(heading: OfficeBuildingHeading) -> bool: return heading.is_current())
-		. map(func(heading: OfficeBuildingHeading) -> String: return heading.key)
+		. filter(func(heading: OfficeMachineHeading) -> bool: return heading.is_current())
+		. map(func(heading: OfficeMachineHeading) -> String: return heading.key)
 	)
 
 
@@ -1698,12 +1735,23 @@ func _chip_on_screen(office: OfficeDouble, key: String) -> bool:
 	var seat := office.floor_view.seat(key)
 	if seat == null:
 		return false
-	var chip := seat.node.bubble_rect()
+	var chip := seat.node.chip_rect()
 	var rect := chip if chip.has_area() else seat.node.target_rect()
 	return rect.intersects(_view(office))
 
 
 ## Each shown arrow's words, glyph to count, as one string.
+## The zones of the arrows shown, in pool order (longest wait first).
+func _arrow_zones(office: OfficeDouble) -> Array:
+	return office.hud.edge_arrows.shown().map(func(arrow: OfficeEdgeArrow) -> String: return arrow.zone_key())
+
+
+## The rows the rail outlines as pointed at.
+func _rows_pointed(office: OfficeDouble) -> Array:
+	var rail := office.hud.spaces
+	return rail.row_keys().filter(func(key: String) -> bool: return rail.row_for(key).pointed())
+
+
 func _arrow_texts(office: OfficeDouble) -> Array:
 	return office.hud.edge_arrows.shown().map(
 		func(arrow: OfficeEdgeArrow) -> String:

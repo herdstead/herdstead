@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/ui/spaces.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/ui/space_row.tscn" id="2"]
-[ext_resource type="PackedScene" path="res://scenes/ui/building_heading.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://scenes/ui/machine_heading.tscn" id="3"]
 
 [node name="Spaces" type="PanelContainer"]
 anchor_bottom = 1.0

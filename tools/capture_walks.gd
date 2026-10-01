@@ -168,7 +168,7 @@ func _seat_move_after_a_table_grows(zoom: int) -> void:
 
 
 ## api:p2 goes blocked at work: nobody walks. The hand goes up at the desk and
-## the bubble shows over the head at once (on this read-only office it says
+## the chip shows over the head at once (on this read-only office it says
 ## `read-only`); a few frames of the raised hand, STEP apart.
 func _blocked_raises_a_hand(zoom: int) -> void:
 	var office := await _strip_office(zoom, fixture)
@@ -264,13 +264,13 @@ func _film(office: OfficeDouble, scenario: String, zoom: int, step := STEP, lead
 
 
 ## `count` frames STEP apart of the seat of pane `lead`, nobody walking: its
-## seat, its labels and its bubble, the camera still; the frames and their
+## seat, its labels and its chip, the camera still; the frames and their
 ## sheet go to OUT like a walk's.
 func _still(office: OfficeDouble, scenario: String, zoom: int, lead: String, count: int) -> void:
 	Engine.time_scale = 0.0
 	var station := office.floor_view.seat(HerdrFleet.pane_key(LOCAL, lead)).node
 	var sorted := office.floor_view.sorted
-	var box := station.target_rect().merge(station.bubble_rect())
+	var box := station.target_rect().merge(station.chip_rect())
 	var area := Rect2(sorted.to_local(box.position), box.size).grow_individual(MARGIN.x, MARGIN.x, MARGIN.x, MARGIN.x)
 	var dir := _out.path_join("%s-zoom%d" % [scenario, zoom])
 	DirAccess.make_dir_recursive_absolute(dir)

@@ -685,7 +685,7 @@ func test_decorations_are_validated_and_thin_obstacles_block_graph_edges() -> vo
 	)
 	prop.footprint = value.desks[0].measure.physical_rect
 	prop.footprint.position += value.desks[0].origin
-	_check("; ".join(OfficeFloorLayout.validate(value, rules)).contains("table footprint"), "table overlap diagnosed")
+	_check("; ".join(OfficeFloorLayout.validate(value, rules)).contains("tab footprint"), "table overlap diagnosed")
 	# A synthetic furniture-only profile isolates path geometry from labels.
 	# Four thin barriers surround one approach without covering any grid centre.
 	var trapped := _plan(_floor([_room("a", 2)]), null, rules)
@@ -731,7 +731,7 @@ func test_empty_tabs_pay_for_real_render_allocations() -> void:
 		floor_model.rooms.append(_room("empty-%04d" % index))
 	var result := OfficeFloorLayout.plan(MapModel.of(floor_model), null, rules)
 	_check(result.plan == null, "1000 empty tabs cannot allocate thousands of full vacant stations")
-	_check(result.problems.has("floor exceeds desk node budget"), "empty tabs hit render, not input or cell budget")
+	_check(result.problems.has("map exceeds desk node budget"), "empty tabs hit render, not input or cell budget")
 
 
 func test_moving_panes_cannot_hide_retained_capacity() -> void:
@@ -747,7 +747,7 @@ func test_moving_panes_cannot_hide_retained_capacity() -> void:
 	_eq(floor_model.pane_count(), 500, "migration does not increase the input pane count")
 	var rejected := OfficeFloorLayout.plan(MapModel.of(floor_model), previous, rules)
 	_check(rejected.plan == null, "both retained source columns and destination columns consume the budget")
-	_check(rejected.problems.has("floor exceeds desk node budget"), "migration is rejected by render budget")
+	_check(rejected.problems.has("map exceeds desk node budget"), "migration is rejected by render budget")
 	_eq(previous.geometry_signature(), signature, "rejection leaves the last valid geometry and seats untouched")
 	var cold := _plan(floor_model, null, rules)
 	_eq(cold.desk("first").capacity, 2, "same current input without history is small enough")
@@ -769,7 +769,7 @@ func test_desk_node_budget_boundary_includes_fixed_cost_and_both_sides() -> void
 			_eq(result.plan.desk("empty").capacity, 2, "empty table reserves both pairs of seats")
 			_eq(result.plan.desk("full").capacity, 4, "occupied table has four columns, not eight")
 		else:
-			_eq(result.problems, PackedStringArray(["floor exceeds desk node budget"]), "only allocation fails")
+			_eq(result.problems, PackedStringArray(["map exceeds desk node budget"]), "only allocation fails")
 	for limit: int in [-1, 0, 1]:
 		var rules := FloorLayoutPolicy.new()
 		rules.max_desk_nodes = limit
@@ -798,7 +798,7 @@ func test_repeated_migrations_retain_seats_until_cumulative_budget_is_full() -> 
 		_eq(model.pane_count(), 16, "every step carries the same sixteen panes")
 		if step == 4:
 			_check(result.plan == null, "five retained eight-column pods cost 2970, not 2800")
-			_eq(result.problems, PackedStringArray(["floor exceeds desk node budget"]), "cumulative refusal")
+			_eq(result.problems, PackedStringArray(["map exceeds desk node budget"]), "cumulative refusal")
 			_eq(previous.desks.size(), 4, "failed addition never mutates previous table membership")
 			_check(previous.seat(panes[0].key) != null, "previous pane binding survives rejection")
 			continue
@@ -840,9 +840,7 @@ func test_previous_empty_capacity_is_validated_against_current_budgets() -> void
 		)
 	_eq(empty.geometry_signature(), signature, "budget changes neither shrink nor reflow previous desks")
 	rules.max_tables = 1
-	_eq(
-		OfficeFloorLayout.validate(empty, rules), PackedStringArray(["layout exceeds table budget"]), "old tabs bounded"
-	)
+	_eq(OfficeFloorLayout.validate(empty, rules), PackedStringArray(["layout exceeds tab budget"]), "old tabs bounded")
 	rules.max_tables = 1024
 	rules.max_panes = 999
 	_eq(OfficeFloorLayout.validate(full, rules), PackedStringArray(["layout exceeds pane budget"]), "old panes bounded")
@@ -856,14 +854,14 @@ func test_previous_plan_cannot_understate_its_render_allocation() -> void:
 		previous.desks[0].capacity = capacity
 		_eq(
 			OfficeFloorLayout.validate(previous),
-			PackedStringArray(["table capacity must be at least two and grow in pairs"]),
+			PackedStringArray(["tab capacity must be at least two and grow in pairs"]),
 			"malformed capacity is rejected before arithmetic or allocation"
 		)
 	previous.desks[0].capacity = 2
 	for width: float in [NAN, INF, 32000000.0]:
 		previous.desks[0].measure.table_width = width
 		_check(
-			OfficeFloorLayout.validate(previous).has("table width or columns disagree with measured capacity"),
+			OfficeFloorLayout.validate(previous).has("tab width or columns disagree with measured capacity"),
 			"a two-column plan cannot request unbudgeted table modules"
 		)
 		_check(
@@ -908,7 +906,7 @@ func test_over_budget_in_place_growth_uses_a_valid_relocation() -> void:
 # --- the plan cache and the decor planner -------------------------------------
 
 
-## Puts one cabinet across the entrance band, which nobody can walk past.
+## Puts one piece across the entrance band, which nobody can walk past.
 class BlockingDecor:
 	extends OfficeDecorPlanner
 
@@ -918,7 +916,7 @@ class BlockingDecor:
 		)
 		var block := DecorPlacement.new()
 		block.key = "block"
-		block.piece = ArtContract.PROP_CABINET
+		block.piece = ArtContract.PROP_SIDE_TABLE
 		block.position = entrance.get_center()
 		block.footprint = entrance
 		block.draw_rect = entrance

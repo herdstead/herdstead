@@ -2,7 +2,7 @@ class_name SpaceCreateResult
 extends RefCounted
 ## What herdr answered a `workspace.create` or a `worktree.create` with: the
 ## new workspace, its tab and its root pane, as the office uses them to name
-## the new floor and pick its shell once a snapshot shows it, and never to
+## the new space and pick its shell once a snapshot shows it, and never to
 ## write to it. `from_wire()` is the one place that reads herdr's raw
 ## `workspace_created` / `worktree_created` result (herdr 0.9.0, measured:
 ## `{type, workspace: WorkspaceInfo, tab: TabInfo, root_pane: PaneInfo}`, the

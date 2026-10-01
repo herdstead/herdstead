@@ -229,7 +229,7 @@ func space_refusal(view: View) -> CommandRefusal.Reason:
 
 
 ## Why a new worktree may not be made from the pane shown now, or NONE: the
-## card's own state, the boundary's word on the pane and its floor, and the
+## card's own state, the boundary's word on the pane and its space, and the
 ## branch typed (HerdrFleet.branch_refusal()).
 func worktree_refusal(view: View) -> CommandRefusal.Reason:
 	var reason := view.card_refusal

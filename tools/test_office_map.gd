@@ -697,7 +697,7 @@ func test_the_budget_is_charged_on_the_composed_map() -> void:
 		plan,
 		"over the budget: the previous map stays"
 	)
-	_eq(cache.problems(), PackedStringArray(["floor exceeds desk node budget"]), "charged on the whole map")
+	_eq(cache.problems(), PackedStringArray(["map exceeds desk node budget"]), "charged on the whole map")
 	_eq(cache.failing_zones("machine"), PackedStringArray(["machine/2"]), "the zone it ran out at")
 
 
@@ -837,6 +837,46 @@ func test_the_zone_sign_is_as_wide_as_what_it_says() -> void:
 	board.free()
 
 
+## A workspace's label may be anything. The sign writes it in the pen's own
+## display face (OfficeDraw.display: the pixel font over the system fallbacks,
+## the one the plates and the chips wear), so the glyphs the pixel font lacks
+## are filled and `数据` is not two missing-glyph boxes. One fallback list, the
+## pen's: the sign makes no font of its own. A label with such glyphs leaves
+## the panel as tall as it was, and its text inside the panel.
+func test_the_zone_sign_writes_a_cjk_label_in_the_pens_display_face() -> void:
+	var board: OfficeZoneSign = OfficeFloorView.ZONE_SIGN_SCENE.instantiate()
+	board.dress(_pen())
+	# In the tree: a Label reports its line's height only there.
+	root.add_child(board)
+	var pixel := _pen().art.display_font
+	_check(pixel != null and not pixel.has_char("数".unicode_at(0)), "the pixel face alone has no 数")
+	var panel: NinePatchRect = board.get_node("%Panel")
+	var tall: Array[float] = []
+	for label: String in ["DATA", "数据", "数据 PIPELINE"]:
+		var zone := _zoned("machine/" + label, 5, [])
+		zone.label = label
+		# Twice, a frame apart, as the office's reconciles write it: a Label
+		# takes its line's height once its minimum size has settled.
+		board.show_zone(zone)
+		await process_frame
+		board.show_zone(zone)
+		for part: String in ["%Number", "%Title"]:
+			var text: Label = board.get_node(part)
+			var face := text.get_theme_font("font")
+			_check(face == _pen().display, "%s %s: the pen's display face" % [label, part])
+			_check(not face.fallbacks.is_empty(), "%s %s: with its fallbacks" % [label, part])
+			var box := Rect2(panel.position, panel.size * panel.scale)
+			_check(
+				box.encloses(Rect2(text.position, text.size)),
+				"%s %s: inside the panel: %s in %s" % [label, part, Rect2(text.position, text.size), box]
+			)
+		var title: Label = board.get_node("%Title")
+		_eq(title.text, label, label + ": written as it is")
+		tall.append(board.drawn_rect().size.y)
+	_eq(tall, [16.0, 16.0, 16.0] as Array[float], "the panel is 16 tall whatever the label")
+	board.free()
+
+
 ## The map's final width is settled before any retained zone is held, grown or
 ## moved (codex's review of ba943f9, P1): in one refresh the blocker left of A
 ## goes, A grows 2 → 20 panes (two lanes) and B under both grows 20 → 48 (three
@@ -881,9 +921,9 @@ func test_many_empty_workspaces_are_refused_before_they_are_placed() -> void:
 	var cases := [
 		[100, ""],
 		[290, ""],
-		[291, "floor exceeds width, height or cell budget"],
-		[600, "floor exceeds width, height or cell budget"],
-		[HerdrSnapshot.MAX_WORKSPACES, "input exceeds table budget"],
+		[291, "map exceeds width, height or cell budget"],
+		[600, "map exceeds width, height or cell budget"],
+		[HerdrSnapshot.MAX_WORKSPACES, "input exceeds tab budget"],
 	]
 	for each: Array in cases:
 		var count: int = each[0]

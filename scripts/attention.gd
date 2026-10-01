@@ -243,7 +243,7 @@ func _longest_wait() -> String:
 func _update_waits() -> void:
 	var now := Time.get_unix_time_from_system()
 	for badge: StatusBadge in get_tree().get_nodes_in_group(StatusBadge.GROUP):
-		if not is_instance_valid(badge.wait) and not is_instance_valid(badge.bubble):
+		if not is_instance_valid(badge.wait) and not is_instance_valid(badge.chip):
 			continue
 		var seconds := -1.0
 		if badge.state == ArtContract.STATE_BLOCKED and not machine_stale(badge.machine):

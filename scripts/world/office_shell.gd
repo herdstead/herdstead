@@ -16,13 +16,6 @@ extends RefCounted
 ## front of it.
 const WINDOW_FOOT := 56.0
 const DOOR_FOOT := 84.0
-## The showroom's row room (scripts/preview.gd) still stands a sign, a title, a
-## cabinet and a plant against its wall at these feet; the live office has no
-## row walls any more.
-const SIGN_FOOT := 44.0
-const TITLE_TOP := 24.0
-const CABINET_FOOT := 80.0
-const PLANT_FOOT := 76.0
 ## How far a window keeps from the lift door (see door()), and how far apart the
 ## evenly spaced windows are.
 const WINDOW_CLEARANCE := 64.0

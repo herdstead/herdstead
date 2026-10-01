@@ -1,9 +1,9 @@
 [gd_scene load_steps=3 format=3]
 
-[ext_resource type="Script" path="res://scripts/world/floor_plate.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/world/machine_plate.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/ui/hd_panel.gd" id="2"]
 
-[node name="FloorPlate" type="Control"]
+[node name="MachinePlate" type="Control"]
 custom_minimum_size = Vector2(160, 32)
 layout_mode = 3
 anchors_preset = 0

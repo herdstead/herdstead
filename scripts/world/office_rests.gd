@@ -6,13 +6,13 @@ extends RefCounted
 ## An agent's state decides the kind of place: idle rests in the floor's pantry,
 ## everything else sits at its own seat — working, starting and unknown, done
 ## (UNREAD, with a stack of paper on the desk) and blocked (hand up, with a
-## bubble over the head). What a state looks like at the seat is the station's.
+## chip over the head). What a state looks like at the seat is the station's.
 ## The floor's capacity and the order they have waited
 ## (OfficeProjection.wait_order(), the `N` key's order) decide the exact place
 ## of the idle: every idle one has a spot of their own (a hash of their pane
 ## key) and whoever finds it taken, in order, takes the next free one, and when
-## none is free sits down. A floor without the pantry seats them all. Nobody
-## rests at the reception. Nothing here remembers anything: a cold pass and a
+## none is free sits down. A map without the pantry seats them all. Nothing
+## here remembers anything: a cold pass and a
 ## live pass that settles see the same places.
 ##
 ## The population is the one the floor's people and counts are: panes with an

@@ -44,7 +44,7 @@ signal step_requested(direction: int)
 ## OfficePaneInspector.pane_split): the office picks it once it shows.
 signal pane_split(target_key: String, pane_id: String, terminal_id: String, generation: int)
 ## The card made a new space or worktree from pane `from_key` (OfficePaneInspector.space_created):
-## the office picks its root pane, on its new floor, once it shows.
+## the office picks its root pane, in its new zone, once it shows.
 signal space_created(from_key: String, workspace_id: String, pane_id: String, terminal_id: String, generation: int)
 ## A panel's placement changed without the window changing: the office lays the
 ## world out again (see _fit_room()).
@@ -85,11 +85,11 @@ signal strategic_picked(key: String)
 ## The drawer's two pages, in the order of their tabs.
 enum DrawerTab { AGENTS, EVENTS }
 
-## What the world keeps clear of the panels: to the side of the minimap and
+## What the world keeps clear of the panels: to the side of the SPACES rail and
 ## the right column, and above the staff panel and below the bar. The rest of
 ## the geometry is the scene's.
 @export var world_gap := Vector2(8, 16)
-## Where the tooltip over a blocked agent's bubble stands from the pointer. Set in the scene.
+## Where the world tooltip (over a blocked agent's chip, over a zone's sign) stands from the pointer. Set in the scene.
 @export var tip_gap := Vector2.ZERO
 ## The right-hand drawer's left edge, open and closed, from the screen's right
 ## (see _fit_drawer()). Set in the scene.
@@ -318,16 +318,16 @@ func dress(art: ArtPack, font: Font) -> void:
 	event_list.dress(art)
 	overview.dress(art)
 	strategic.dress(art)
-	var tip: HdPanel = %BubbleTip
+	var tip: HdPanel = %WorldTip
 	tip.dress(art)
 
 
-## The tooltip over a blocked agent's bubble: `text` (the question's excerpt,
-## or why there is none), near the pointer at `at` (viewport pixels), kept
+## The world tooltip, over a blocked agent's chip or a zone's sign: `text` (the question's excerpt
+## or why there is none; the sign's repository and checkout), near the pointer at `at` (viewport pixels), kept
 ## inside world_rect(). The office says what and where; nothing here reads herdr.
-func show_bubble_tip(text: String, at: Vector2) -> void:
-	var tip: Control = %BubbleTip
-	var label: Label = %BubbleTipText
+func show_world_tip(text: String, at: Vector2) -> void:
+	var tip: Control = %WorldTip
+	var label: Label = %WorldTipText
 	if label.text != text:
 		label.text = text
 	tip.reset_size()
@@ -337,24 +337,24 @@ func show_bubble_tip(text: String, at: Vector2) -> void:
 	tip.visible = true
 
 
-func hide_bubble_tip() -> void:
-	var tip: Control = %BubbleTip
+func hide_world_tip() -> void:
+	var tip: Control = %WorldTip
 	tip.visible = false
 
 
-## Whether the bubble tooltip is up, and what it says.
-func bubble_tip_shown() -> bool:
-	var tip: Control = %BubbleTip
+## Whether the world tooltip is up, and what it says.
+func world_tip_shown() -> bool:
+	var tip: Control = %WorldTip
 	return tip.visible
 
 
-func bubble_tip_text() -> String:
-	var label: Label = %BubbleTipText
+func world_tip_text() -> String:
+	var label: Label = %WorldTipText
 	return label.text
 
 
 ## The Theme dress() built, for furniture in the world that reads like the HUD
-## (the floor plate): the same pack, the same variations, built once.
+## (the machine plate): the same pack, the same variations, built once.
 func screen_theme() -> Theme:
 	var screen: Control = $Screen
 	return screen.theme
@@ -476,7 +476,7 @@ func overview_open() -> bool:
 func open_overview() -> void:
 	if agent_list.has_keyboard():
 		agent_list.release_keyboard()
-	hide_bubble_tip()
+	hide_world_tip()
 	overview.open()
 	_fit_edge_arrows()
 	bar.set_overview(true)
@@ -534,11 +534,11 @@ func strategic_open() -> bool:
 
 
 ## Open the strategic view over the world rect (the office shows it a model
-## right after). The bubble tooltip and the edge arrows go; the list keeps the
+## right after). The world tooltip and the edge arrows go; the list keeps the
 ## keyboard it has, and the staff panel stays as it is. The top bar's theme
 ## line says `STRATEGIC · S`.
 func open_strategic() -> void:
-	hide_bubble_tip()
+	hide_world_tip()
 	strategic.open()
 	_fit_edge_arrows()
 	bar.show_strategic(true)
@@ -781,7 +781,7 @@ func _label_tab() -> void:
 ## card itself; its slot along the bottom stays where it was and the world keeps
 ## clear of it, so leaving answer mode drops the panel back into it and lays
 ## nothing out again. The dim only darkens: a click goes through it, so a click
-## on another desk or bubble picks that pane, which leaves answer mode as it
+## on another desk or chip picks that pane, which leaves answer mode as it
 ## always has (a new binding), and the next agent can be answered from there.
 func _fit_staff() -> bool:
 	var answering := inspector.answering()

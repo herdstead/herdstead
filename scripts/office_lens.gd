@@ -6,7 +6,7 @@ extends Node
 ## StateLog.wait_of(), in the in-world form OfficeAttention.compact_duration()),
 ## every seat's name plate shows, the blocked chip draws nothing meanwhile (the
 ## wait is said once), every pod's floor is washed in its
-## most urgent state (tone_for(), on the FLOORS windows' scale) and the
+## most urgent state (tone_for(), on the SPACES windows' scale) and the
 ## furnishing dims. Let go, all of it is as it was. The office draws it
 ## (OfficeScene._show_lens()); this node only knows whether the lens is held and
 ## when its lines are due again.
@@ -78,7 +78,7 @@ static func tone_for(room: RoomModel, stale: bool) -> StringName:
 	var best := 5
 	if not stale:
 		for pane in room.panes:
-			# The FLOORS window's own look: a shell's is dark, and never wins.
+			# The SPACES window's own look: a shell's is dark, and never wins.
 			var pane_look := OfficeSpaceRow.window_look(pane, true)
 			if pane_look == &"WindowDark":
 				continue

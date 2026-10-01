@@ -40,12 +40,12 @@ PYTHON="${PYTHON:-$DEFAULT_PYTHON}"
 # Cases discover themselves (tools/test_base.gd), so nothing lists them.
 # These floors are what each file runs today: a file that silently loses
 # its cases fails here instead of staying green. Raise them as cases are added.
-MIN_CASES_ART=23
+MIN_CASES_ART=24
 MIN_CASES_CLIENT=52
 MIN_CASES_MACHINE=34
 MIN_CASES_INCREMENTAL=54
 MIN_CASES_OFFICE_LAYOUT=51
-MIN_CASES_OFFICE_MAP=21
+MIN_CASES_OFFICE_MAP=22
 MIN_CASES_OFFICE_SERVICE=16
 # GEOMETRY 27 -> 25: its two row-wall sign and title cases went with the row
 # walls (lane B2a); MAP's test_top_run_and_lane_gap_pieces_clear_... covers
@@ -61,7 +61,7 @@ MIN_CASES_OFFICE_NAVIGATOR=26
 # FLOORS (22 cases, tools/test_floors.gd) was retired with the FLOORS minimap and
 # its signposts (lane B3): SPACE RAIL covers every one of its cases on the
 # SPACES rail and the edge arrows, and adds ten.
-MIN_CASES_SPACE_RAIL=39
+MIN_CASES_SPACE_RAIL=40
 MIN_CASES_ATTENTION_STORE=28
 MIN_CASES_AGENT_LIST=35
 MIN_CASES_ATTENTION_INTEGRATION=19
@@ -74,7 +74,7 @@ MIN_CASES_RAW_INPUT=14
 MIN_CASES_ANSWERS=42
 MIN_CASES_BUBBLES=24
 MIN_CASES_MONITOR=36
-MIN_CASES_TOP_BAR=26
+MIN_CASES_TOP_BAR=27
 MIN_CASES_STATE_LOG=21
 MIN_CASES_NEWS_EVENTS=15
 MIN_CASES_LENS=17
@@ -375,7 +375,7 @@ run_scene_suite test_office_reconcile "RECONCILE TESTS" "$MIN_CASES_OFFICE_RECON
 # passes, freezing, re-routing; offices fed like the incremental suite's.
 run_scene_suite test_office_walking "WALKING TESTS" "$MIN_CASES_OFFICE_WALKING" -- --read-only \
 	--socket="$WORK/walking-nowhere.sock" --work="$WORK"
-# Who rests where: the seat with its bubble and its paper, the pantry.
+# Who rests where: the seat with its chip and its paper, the pantry.
 run_scene_suite test_office_rests "RESTS TESTS" "$MIN_CASES_OFFICE_RESTS" -- --read-only \
 	--socket="$WORK/rests-nowhere.sock" --work="$WORK"
 # The left column's SPACES rail (rows, headings, in-view marks), the edge arrows,
@@ -438,7 +438,7 @@ run_scene_suite test_answers "ANSWER TESTS" "$MIN_CASES_ANSWERS" -- \
 	--socket-a="$WORK/answer-a.sock" --control-a="$WORK/answer-a-ctl.sock" \
 	--socket-b="$WORK/answer-b.sock" --control-b="$WORK/answer-b-ctl.sock" --work="$WORK" --ssh="$WORK/ssh"
 
-# The bubbles over blocked agents, and the clicks in the world and on the
+# The chips over blocked agents, and the clicks in the world and on the
 # bar that open answer mode, against two more.
 start_fake bubble-a
 SERVER_S_PID=$FAKE_PID

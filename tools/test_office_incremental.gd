@@ -80,7 +80,7 @@ func test_status_change_redraws_one_desk() -> void:
 	var desk: Node2D = office.floor_view.seats[target].node
 	_eq(_badge(desk).state, ArtContract.STATE_BLOCKED, "the changed desk shows the new badge at once")
 	_eq(_badge_state(LOCAL, "api:p4"), "blocked", "attention sees exactly one badge for the pane")
-	# A blocked agent stays at its seat, under its bubble: nobody walks.
+	# A blocked agent stays at its seat, under its chip: nobody walks.
 	_eq(office.floor_view.presentation.walkers(), [], "nobody walks: a blocked agent stays seated")
 	_eq(_worker(desk).animation, &"blocked", "and the worker shows the new animation at once")
 	await _same_as_rebuild(office, "after a status change")
@@ -183,7 +183,7 @@ func test_standing_spots_are_clear() -> void:
 	holder.free()
 	for workspace: String in ["api", "web", "infra"]:
 		var office := await _live_office(fixture, Vector2(880, 480))
-		await _visit_floor(office, HerdrFleet.pane_key(LOCAL, workspace))
+		await _visit_zone(office, HerdrFleet.pane_key(LOCAL, workspace))
 		var standing := _decor(office)
 		_check(not standing.is_empty(), "%s really has furniture to stand clear of" % workspace)
 		var checked := 0
@@ -210,7 +210,7 @@ func test_standing_spots_are_clear() -> void:
 
 ## The plate, the badge and the selection mark hang off the seat whatever its
 ## agent is doing: done and blocked sit, so nothing moves; blocked only shows
-## the bubble over the head, on this side's spot, and done only the paper on the
+## the chip over the head, on this side's spot, and done only the paper on the
 ## table. The Overlay keeps the same nodes throughout.
 func test_labels_follow_the_pose() -> void:
 	var both_sides := _both_sides()
@@ -235,7 +235,7 @@ func test_labels_follow_the_pose() -> void:
 			],
 			"%s: seated, the labels hang off the seat" % key
 		)
-		_check(not station.bubble().visible, "%s: working, no bubble" % key)
+		_check(not station.chip().visible, "%s: working, no bubble" % key)
 		for state: String in ["done", "blocked"]:
 			_feed(office, _with(both_sides, HerdrFleet.split_key(key)[1], {"agent_status": state}))
 			_eq(
@@ -247,10 +247,10 @@ func test_labels_follow_the_pose() -> void:
 				seated,
 				"%s %s: the labels stay where they were" % [key, state]
 			)
-			_eq(station.bubble().visible, state == "blocked", "%s %s: a bubble only while blocked" % [key, state])
+			_eq(station.chip().visible, state == "blocked", "%s %s: a bubble only while blocked" % [key, state])
 			_eq(
-				station.bubble().global_position,
-				station.seat.global_position + OfficeStation.BUBBLE_AT[side],
+				station.chip().global_position,
+				station.seat.global_position + OfficeStation.CHIP_AT[side],
 				"%s %s: the bubble hangs off this side's seat" % [key, state]
 			)
 			_eq(_child_ids(overlay), nodes, "%s %s: the overlay keeps every node" % [key, state])
@@ -315,7 +315,7 @@ func test_papers_change_in_place() -> void:
 	_done(office)
 
 
-## A blocked agent's bubble is the seat's own node from the start: blocked and
+## A blocked agent's chip is the seat's own node from the start: blocked and
 ## back only shows and hides it, and the Overlay keeps the same nodes.
 func test_the_bubble_changes_in_place() -> void:
 	var office := await _live_office()
@@ -323,7 +323,7 @@ func test_the_bubble_changes_in_place() -> void:
 	var station := _station(office, key)
 	var overlay := station.get_node("Overlay")
 	var nodes := _subtree_ids(overlay)
-	var bubble := station.bubble()
+	var bubble := station.chip()
 	_check(not bubble.visible, "working: no bubble")
 	for state: String in ["blocked", "working", "blocked"]:
 		_feed(office, _with(fixture, "api:p2", {"agent_status": state}))
@@ -332,7 +332,7 @@ func test_the_bubble_changes_in_place() -> void:
 			state == "blocked",
 			"%s: the bubble %s" % [state, "shows" if state == "blocked" else "is hidden"]
 		)
-		_eq(station.bubble(), bubble, "%s: the same bubble" % state)
+		_eq(station.chip(), bubble, "%s: the same bubble" % state)
 		_eq(_subtree_ids(overlay), nodes, "%s: the overlay keeps every node" % state)
 	_done(office)
 
@@ -598,7 +598,7 @@ func test_selection_only_moves_the_mark() -> void:
 	)
 	_eq(
 		_names(new_desk.get_node("Overlay")),
-		["Plate", "Lens", "Selection", "Bubble", "Badge"],
+		["Plate", "Lens", "Selection", "Chip", "Badge"],
 		(
 			"the lens line goes right after the plate, the mark under the badge, and so does the bubble"
 			+ " over a blocked agent: the badge is drawn over it"
@@ -649,7 +649,7 @@ func test_task_lamps_follow_focus_and_open_tab() -> void:
 		"the focused seat, its neighbours, and a tab nobody has open"
 	)
 	# web names no open tab at all, and not saying is not a no: nothing dims.
-	await _visit_floor(office, HerdrFleet.pane_key(LOCAL, "web"))
+	await _visit_zone(office, HerdrFleet.pane_key(LOCAL, "web"))
 	_eq(
 		_lamps(office, "web").values(),
 		[OfficeTable.Lamp.ON, OfficeTable.Lamp.ON, OfficeTable.Lamp.ON],
@@ -766,7 +766,7 @@ func test_the_plate_pans_like_the_floor() -> void:
 	office.camera.pan = Vector2.ZERO
 	await _frames(2)
 	_check(office.world_bounds().size.x - office.camera.free_rect().size.x >= 48.0, "the floor is wider than the view")
-	var plate: Control = office.world.get_node("FloorPlate")
+	var plate: Control = office.world.get_node("MachinePlate")
 	# An edge arrow stands over the world along its edge and takes a click
 	# there; none stands on this point.
 	var on_plate := plate.get_global_rect().position + Vector2(100, 12) - office.camera.position
@@ -791,7 +791,7 @@ func test_the_plate_pans_like_the_floor() -> void:
 	_done(office)
 
 
-## How long a blocked agent has been kept waiting, in the bubble over them, in
+## How long a blocked agent has been kept waiting, in the chip over them, in
 ## the same words as the inspector's. Nobody else shows a number.
 func test_blocked_seats_show_the_wait_in_the_bubble() -> void:
 	var office := await _live_office(_with(fixture, "api:p2", {"agent_status": "blocked"}))
@@ -811,8 +811,8 @@ func test_blocked_seats_show_the_wait_in_the_bubble() -> void:
 	_eq(_wait_text(office, shell), "", "and neither does a shell nobody is waiting on")
 	await _frame_table(office, shell)
 	var empty := _vacant_seat(office)
-	_eq(_label(empty.bubble(), "%Wait").text, "", "nor a seat with no pane at all")
-	_check(_station(office, blocked).bubble().visible, "the wait is in the blocked seat's bubble")
+	_eq(_label(empty.chip(), "%Wait").text, "", "nor a seat with no pane at all")
+	_check(_station(office, blocked).chip().visible, "the wait is in the blocked seat's bubble")
 	# Leaving blocked takes the number away at once, not on the next beat.
 	_feed(office, fixture)
 	_eq(_wait_text(office, blocked), "", "a seat that stopped being blocked shows no wait")
@@ -986,7 +986,7 @@ func test_structural_changes_reconcile() -> void:
 	var office := await _live_office()
 	var world_id: int = office.world.get_instance_id()
 	# The plate says how many spaces and panes the machine has; a new count is new text.
-	var plate_id := office.world.get_node("FloorPlate").get_instance_id()
+	var plate_id := office.world.get_node("MachinePlate").get_instance_id()
 	_check(_plate_lines(office).has("5 SPACES / 13 PANES"), "the plate counts the machine's panes")
 	# A new pane in api's first room.
 	var grown: Dictionary = fixture.duplicate(true)
@@ -999,7 +999,7 @@ func test_structural_changes_reconcile() -> void:
 	_check(office.world.get_instance_id() == world_id, "a new pane reconciles within the world")
 	_check(office.floor_view.seats.has(HerdrFleet.pane_key(LOCAL, "api:p9")), "and gets a desk")
 	_check(_plate_lines(office).has("5 SPACES / 14 PANES"), "the plate counts it")
-	_eq(office.world.get_node("FloorPlate").get_instance_id(), plate_id, "in the plate it already had")
+	_eq(office.world.get_node("MachinePlate").get_instance_id(), plate_id, "in the plate it already had")
 	world_id = office.world.get_instance_id()
 	var renamed: Dictionary = grown.duplicate(true)
 	for tab: Dictionary in renamed.tabs:
@@ -1013,7 +1013,7 @@ func test_structural_changes_reconcile() -> void:
 	_feed(office, shrunk)
 	_check(office.world.get_instance_id() == world_id, "a closed pane vacates its seat")
 	_check(not office.floor_view.seats.has(HerdrFleet.pane_key(LOCAL, "api:p9")), "and loses its desk")
-	_eq(office.world.get_node("FloorPlate").get_instance_id(), plate_id, "and the plate keeps its nodes throughout")
+	_eq(office.world.get_node("MachinePlate").get_instance_id(), plate_id, "and the plate keeps its nodes throughout")
 	renamed = shrunk
 	office.test_screen = Vector2(1600, 480)
 	office.refresh()
@@ -1165,7 +1165,7 @@ func test_a_picked_floor_that_disappears_falls_back_at_once() -> void:
 		_eq(office.world.get_instance_id(), world_id, "the zone goes from the same world")
 		await create_timer(1.1).timeout
 		_eq(office.navigator.current_zone(office.frame), expected, "nothing later brings a removed zone back")
-		await _visit_floor(office, HerdrFleet.pane_key(LOCAL, "infra"))
+		await _visit_zone(office, HerdrFleet.pane_key(LOCAL, "infra"))
 		_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "infra"), "the next call works")
 		_done(office)
 
@@ -1276,7 +1276,7 @@ func test_the_first_plan_uses_the_window_the_refresh_is_for() -> void:
 func test_the_current_floor_and_the_bottom_rebuild_nothing() -> void:
 	var office := await _live_office()
 	var before := office.world.get_instance_id()
-	await _visit_floor(office, HerdrFleet.pane_key(LOCAL, "api"))
+	await _visit_zone(office, HerdrFleet.pane_key(LOCAL, "api"))
 	_eq(office.world.get_instance_id(), before, "the current zone's call does not rebuild the office")
 	await _office_key(office, KEY_PAGEUP)
 	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "api"), "the first zone stays")
@@ -1292,7 +1292,7 @@ func test_floor_change_rebuilds() -> void:
 	var office := await _live_office()
 	var world_id: int = office.world.get_instance_id()
 	var web := HerdrFleet.pane_key(LOCAL, "web")
-	await _visit_floor(office, web)
+	await _visit_zone(office, web)
 	_eq(office.navigator.current_zone(office.frame), web, "the minimap pans to web")
 	_eq(office.world.get_instance_id(), world_id, "and nothing is rebuilt")
 	_check(
@@ -1313,7 +1313,7 @@ func test_floor_change_rebuilds() -> void:
 	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "notes"), "herdr's focus moving pans")
 	_eq(office.world.get_instance_id(), world_id, "and rebuilds nothing")
 	# A status change in the zone the viewer moved to is in place, as everywhere.
-	await _visit_floor(office, web)
+	await _visit_zone(office, web)
 	_feed(office, _with(focused, "web:p1", {"agent_status": "working"}))
 	_eq(office.world.get_instance_id(), world_id, "a status change is in place")
 	# web:p1 was blocked at its seat: it goes back to work where it sits.
@@ -1448,7 +1448,7 @@ func test_zoom_change_keeps_the_world() -> void:
 	var progress := _actor_progress(office, "")
 	var model: String = office.world_model
 	var hud_nodes := _hud_nodes(office)
-	var desk_texture: Texture2D = office.art.sprite_texture(office.art.prop_sprite(&"cabinet"))
+	var desk_texture: Texture2D = office.art.sprite_texture(office.art.prop_sprite(ArtContract.PROP_PLANT))
 	_check(
 		progress.values().any(func(p: Array) -> bool: return p[2] > 0.0), "workers have been animating before the zoom"
 	)
@@ -1456,7 +1456,7 @@ func test_zoom_change_keeps_the_world() -> void:
 		office.zoom = wanted
 		office.fit_window()
 		_check(
-			office.art.sprite_texture(office.art.prop_sprite(&"cabinet")) == desk_texture,
+			office.art.sprite_texture(office.art.prop_sprite(ArtContract.PROP_PLANT)) == desk_texture,
 			"zoom %d hands out the same texture" % wanted
 		)
 	_eq(office.world.get_instance_id(), world_id, "the world was never rebuilt")
@@ -1689,7 +1689,7 @@ func test_standing_furniture_blocks_nothing() -> void:
 ## the only z_index anywhere in the world is OVERLAY_Z.
 func test_world_rules() -> void:
 	for manifest: String in [MANIFESTS[0], _second_pack()]:
-		# A done worker's paper and a blocked worker's bubble, on both sides, so the
+		# A done worker's paper and a blocked worker's chip, on both sides, so the
 		# rules hold for them too.
 		var office := await _live_office(
 			_with(_with(_both_sides(), "api:p1", {"agent_status": "done"}), "api:p3", {"agent_status": "blocked"})

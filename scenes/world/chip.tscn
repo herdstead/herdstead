@@ -1,9 +1,9 @@
 [gd_scene load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://scripts/world/bubble.gd" id="1_bubble"]
+[ext_resource type="Script" path="res://scripts/world/chip.gd" id="1_chip"]
 
-[node name="Bubble" type="Node2D"]
-script = ExtResource("1_bubble")
+[node name="Chip" type="Node2D"]
+script = ExtResource("1_chip")
 
 [node name="Frame" type="NinePatchRect" parent="."]
 unique_name_in_owner = true

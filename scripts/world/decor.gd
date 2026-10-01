@@ -2,7 +2,7 @@ class_name OfficeDecor
 extends StaticBody2D
 ## One piece of standing furniture on a floor: scenes/world/decor.tscn.
 ##
-## Furniture, never a signal. A plant does not wilt, a cabinet does not count
+## Furniture, never a signal. A plant does not wilt, a side table does not count
 ## repositories, and nothing here ever reads a herdr field: where these stand
 ## follows only from the floor's own layout, so the same floor looks the same
 ## every time and a status change moves not one pixel of it.
@@ -10,7 +10,7 @@ extends StaticBody2D
 ## The origin is where the piece meets the floor, it goes in the floor's
 ## y-sorted root, and it carries a footprint on OfficeWorld.FURNITURE, because
 ## walking is already decided and a walker's feet have to be stopped by a
-## cabinet exactly the way they are stopped by a table.
+## side table exactly the way they are stopped by a table.
 
 ## Where a piece that carries something (a side table) has its top plane, over
 ## its foot: the foot of what stands on it (hold()). Measured on the shipped
@@ -93,10 +93,9 @@ func _notification(what: int) -> void:
 
 ## What `id` stands on, in units, measured at its foot (its pack entry's `item`
 ## footprint, docs/ITEMS.md): the prefab's own geometry, the way the
-## cross-section is the table's. The two counters of the entry band stand on
-## their whole width, which the fixture planner lays the reception's queue
-## slots and the pantry's spots out from. Zero for a piece that does not stand
-## on the floor.
+## cross-section is the table's. The entry band's pantry counter stands on
+## its whole width, which the fixture planner lays its spots out from. Zero
+## for a piece that does not stand on the floor.
 static func footprint_of(art: ArtPack, id: StringName) -> Vector2:
 	var sprite := art.prop_sprite(id)
 	if sprite == null or sprite.item == null or sprite.item.place != ItemSpec.PLACE_FLOOR:

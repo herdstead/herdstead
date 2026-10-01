@@ -2,10 +2,10 @@ class_name OfficeFrame
 extends RefCounted
 ## One refresh's whole projection, made once by OfficeProjection.frame() and
 ## read by everything that refresh draws: the navigator, the map, the plate,
-## the minimap, the inspector, attention and the `N` queue. Nothing in a
-## refresh projects a snapshot a second time or scans the buildings for a key.
+## the SPACES rail, the inspector, attention and the `N` queue. Nothing in a
+## refresh projects a snapshot a second time or scans the machines for a key.
 
-## One building per machine, Local first; each is one map (BuildingModel.map).
+## One BuildingModel per machine, Local first; each is one map (BuildingModel.map).
 var buildings: Array[BuildingModel] = []
 ## Every pane of every machine by composite key, seated in a zone or not, with
 ## the labels of the workspace and tab it names: what the inspector and
@@ -58,7 +58,7 @@ func map_of(machine: String) -> MapModel:
 	return null if found == null else found.map
 
 
-## Building headings, the plate's machine line and the inspector's `@ machine`
+## Machine headings, the plate's machine line and the inspector's `@ machine`
 ## only appear once there is more than Local.
 func several_machines() -> bool:
 	return buildings.size() > 1

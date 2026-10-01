@@ -1,4 +1,4 @@
-class_name OfficeBuildingHeading
+class_name OfficeMachineHeading
 extends VBoxContainer
 ## One machine's heading in the SPACES rail: the pack's icon for how its machine
 ## is answering, and its label, on a button (`%Press`). A click on it shows that
@@ -46,7 +46,7 @@ func dress(art: ArtPack) -> void:
 func show_machine(machine: String, label: String, state: MachineLiveness.State, gap: bool, current: bool) -> void:
 	key = machine
 	_state = state
-	var machine_label: Label = %BuildingLabel
+	var machine_label: Label = %MachineLabel
 	var gap_row: Control = %Gap
 	var press := button()
 	machine_label.text = label.to_upper()

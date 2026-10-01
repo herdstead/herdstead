@@ -117,7 +117,7 @@ static func plan(
 	if not _cannot_fit(next.lanes, zones, layouts, retained, rules):
 		slots = _place(next, zones, layouts, retained, rules)
 	if slots.size() != zones.size():
-		result.problems.append("floor exceeds width, height or cell budget")
+		result.problems.append("map exceeds width, height or cell budget")
 		return result
 	var height := maxi(rules.min_height_cells, rules.wall_cells + rules.entry_cells)
 	if retained != null:
@@ -126,7 +126,7 @@ static func plan(
 		height = maxi(height, slots[key].end.y)
 	var size := Vector2i(rules.map_width(next.lanes), height)
 	if not _within_budget(size, rules):
-		result.problems.append("floor exceeds width, height or cell budget")
+		result.problems.append("map exceeds width, height or cell budget")
 		return result
 	for index in zones.size():
 		next.zones.append(_compose(next, zones[index], layouts[index], slots[zones[index].key], rules))
@@ -173,7 +173,7 @@ static func validate(value: FloorPlan, policy: FloorLayoutPolicy = null) -> Pack
 static func _input_problems(map: MapModel, rules: FloorLayoutPolicy, failing: PackedStringArray) -> PackedStringArray:
 	var found := rules.problems()
 	if map == null or map.key.is_empty():
-		found.append("floor has no stable identity")
+		found.append("map has no stable identity")
 		return found
 	var tables := 0
 	var panes_total := 0
@@ -187,7 +187,7 @@ static func _input_problems(map: MapModel, rules: FloorLayoutPolicy, failing: Pa
 		tables += maxi(zone.rooms.size(), 1)
 		panes_total += zone.pane_count()
 	if tables > rules.max_tables:
-		found.append("input exceeds table budget")
+		found.append("input exceeds tab budget")
 		return found
 	if panes_total > rules.max_panes:
 		found.append("input exceeds pane budget")
@@ -198,7 +198,7 @@ static func _input_problems(map: MapModel, rules: FloorLayoutPolicy, failing: Pa
 	var pair_growth := OfficeZoneLayout.quantized(OfficeTable.measure(4).reserved_rect).size.x - minimum
 	var available := rules.max_zone_width_cells() - rules.zone_pad_left_cells
 	if pair_growth <= 0 or available < minimum:
-		found.append("floor width budget cannot contain the minimum table")
+		found.append("map width budget cannot contain the minimum tab")
 		return found
 	var max_capacity := 2 + 2 * floori(float(available - minimum) / pair_growth)
 	var owners: Dictionary[String, String] = {}

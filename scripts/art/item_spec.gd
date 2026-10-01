@@ -8,7 +8,7 @@ extends RefCounted
 ## Size is not here: an item's size is its drawing (the canvas and what
 ## tools/build_assets.py measures of its pixels), never scaled (invariant 6).
 
-## A table's working plane, the floor, a row's back wall.
+## A working plane (a side table's top), the floor, the top wall.
 const PLACE_DESK := &"desk"
 const PLACE_FLOOR := &"floor"
 const PLACE_WALL := &"wall"

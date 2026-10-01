@@ -371,9 +371,9 @@ func next_of(frame: OfficeFrame, state: String) -> bool:
 	return true
 
 
-## Every agent in `state` on a live building, not still launching, who waited
+## Every agent in `state` on a live machine, not still launching, who waited
 ## longest first (OfficeProjection.wait_order(): an unknown start first): the
-## seated in building, zone and room order, then the ones no zone seats, so a
+## seated in machine, zone and room order, then the ones no zone seats, so a
 ## tie keeps a seated pane first. The one order of `N`, NEXT and the counters.
 static func waiting(frame: OfficeFrame, state: String) -> Array[PaneModel]:
 	var found := _seated_in_state(frame, state)
@@ -386,7 +386,7 @@ static func waiting(frame: OfficeFrame, state: String) -> Array[PaneModel]:
 	return OfficeProjection.wait_order(found)
 
 
-## Every seated agent in `state` on a live building, in building, zone and
+## Every seated agent in `state` on a live machine, in machine, zone and
 ## room order: the same rule as OfficeProjection.attention_queue().
 static func _seated_in_state(frame: OfficeFrame, state: String) -> Array[PaneModel]:
 	var found: Array[PaneModel] = []

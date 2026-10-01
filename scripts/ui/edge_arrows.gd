@@ -26,8 +26,9 @@ extends Control
 ## An arrow was pressed: pan to the desk of pane `pane_key`.
 signal arrow_picked(pane_key: String)
 ## The mouse came onto an arrow for zone `zone_key` (`""` for the `+N` note),
-## or left it (`""`); or the arrow under a resting mouse was handed another
-## zone, or hidden (`""`).
+## or left it (`""`); or what stands under a resting mouse changed: the arrow
+## there was handed another zone, another arrow took its place, it went
+## (`""`), or one came (back) under it.
 signal zone_pointed(zone_key: String)
 
 ## What the office handed last (show_arrows()), all of it.
@@ -36,6 +37,9 @@ var _handed: Array[EdgeArrowModel] = []
 ## folded for the room each edge has (_arrange()).
 var _models: Array[EdgeArrowModel] = []
 var _compact := false
+## The zone said last (zone_pointed): what stands under the mouse is said
+## again only when it is another.
+var _said := ""
 
 
 func _ready() -> void:
@@ -44,6 +48,7 @@ func _ready() -> void:
 		arrow.mouse_entered.connect(_on_entered.bind(arrow))
 		arrow.mouse_exited.connect(_on_exited)
 	resized.connect(_arrange)
+	visibility_changed.connect(_say_pointed)
 
 
 ## Take the pack's art in every arrow; a theme switch rebuilds nothing.
@@ -90,11 +95,10 @@ func models() -> Array[EdgeArrowModel]:
 ## edge. Measured, not reckoned: the arrows are written into the nodes, each
 ## edge's are added up along its run, and an edge they overflow is given one
 ## fewer (EdgeArrowModel.fit() folds the rest into its note, whose own width
-## counts) until every edge holds its own. A zone whose arrow is under a
-## resting mouse is said again when that node changed hands.
+## counts) until every edge holds its own. Then the zone under a resting mouse
+## is said again if it is another now (_say_pointed()).
 func _arrange() -> void:
 	var nodes := _nodes()
-	var pointed := _pointed()
 	var room: Dictionary[EdgeArrowModel.Edge, int] = {}
 	# An edge loses one each time round, so the pool bounds the tries.
 	for _attempt in nodes.size() + 1:
@@ -109,8 +113,7 @@ func _arrange() -> void:
 			break
 		room.merge(short, true)
 	_place(nodes)
-	if _pointed() != pointed:
-		zone_pointed.emit(_pointed())
+	_say_pointed()
 
 
 ## The edges whose arrows, with the gaps between them, are longer than the
@@ -202,12 +205,28 @@ static func _across(edge: EdgeArrowModel.Edge) -> bool:
 	return edge == EdgeArrowModel.Edge.TOP or edge == EdgeArrowModel.Edge.BOTTOM
 
 
-## The zone of the arrow the mouse is on; empty for none, and for the note.
+## The zone of the arrow the mouse is on now; empty for none, and for the note.
+## By where the mouse is and where the arrows shown stand, never by a node's
+## hover flag: the pool's nodes are moved and handed other zones under a
+## resting mouse, and the flag stays with the node that had it until the mouse
+## moves. Nothing while the arrows are hidden (an overlay covers the world).
 func _pointed() -> String:
+	if not is_visible_in_tree():
+		return ""
+	var at := get_global_mouse_position()
 	for arrow in _nodes():
-		if arrow.visible and arrow.is_hovered():
+		if arrow.visible and arrow.get_global_rect().has_point(at):
 			return arrow.zone_key()
 	return ""
+
+
+## Say the zone under the mouse when it is not the one said last: after the
+## arrows were arranged, and when they come back or go as a whole.
+func _say_pointed() -> void:
+	var zone := _pointed()
+	if zone != _said:
+		_said = zone
+		zone_pointed.emit(zone)
 
 
 func _on_picked(pane_key: String) -> void:
@@ -215,10 +234,12 @@ func _on_picked(pane_key: String) -> void:
 
 
 func _on_entered(arrow: OfficeEdgeArrow) -> void:
-	zone_pointed.emit(arrow.zone_key())
+	_said = arrow.zone_key()
+	zone_pointed.emit(_said)
 
 
 func _on_exited() -> void:
+	_said = ""
 	zone_pointed.emit("")
 
 

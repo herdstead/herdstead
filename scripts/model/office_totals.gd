@@ -60,8 +60,8 @@ var idle := 0
 ## Every counted blocked pane's StateLog track (null for one the log has none
 ## of), for the BLOCKED counter's `max`: StateLog.longest() of them.
 var blocked_tracks: Array[StateLog.Track] = []
-## Each count's breakdown, in building order and then by workspace number; a
-## space no floor seats after the numbered ones.
+## Each count's breakdown, in machine order and then by workspace number; a
+## space no zone seats after the numbered ones.
 var blocked_rows: Array[CounterRow] = []
 var done_rows: Array[CounterRow] = []
 var working_rows: Array[CounterRow] = []
@@ -70,7 +70,7 @@ var idle_rows: Array[CounterRow] = []
 var machine_rows: Array[MachineRow] = []
 
 
-## The counts of `frame`'s live buildings, with `machines` for the MACHINES
+## The counts of `frame`'s live machines, with `machines` for the MACHINES
 ## breakdown (the office's, from the fleet) and `ledger` for each pane's track
 ## (HerdrFleet.state_log()).
 static func of(frame: OfficeFrame, machines: Array[MachineRow], ledger: StateLog) -> OfficeTotals:
@@ -82,7 +82,7 @@ static func of(frame: OfficeFrame, machines: Array[MachineRow], ledger: StateLog
 			continue
 		totals.machines_live += 1
 		totals.panes += building.panes
-		# Seated panes first, by floor (the breakdown's order); then the rest.
+		# Seated panes first, by zone (the breakdown's order); then the rest.
 		var numbers: Dictionary[String, int] = {}
 		var ordered: Array[PaneModel] = []
 		var seen: Dictionary[String, bool] = {}
@@ -130,7 +130,7 @@ func rows_of(id: StringName) -> Array[CounterRow]:
 
 
 ## One machine's `counted` panes, all in `state`, a row per space: by herdr's workspace
-## number (`numbers`, from its floors), a space no floor seats after them in
+## number (`numbers`, from its zones), a space no zone seats after them in
 ## the order its panes came. Only BLOCKED and IDLE keep the tracks.
 static func _by_space(
 	machine: String, counted: Array[PaneModel], numbers: Dictionary[String, int], state: String, ledger: StateLog

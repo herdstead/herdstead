@@ -1,7 +1,7 @@
-class_name OfficeBubble
+class_name OfficeChip
 extends Node2D
-## The chip over a blocked agent: scenes/world/bubble.tscn, in the station's
-## Overlay (OfficeStation.BUBBLE_AT), on the tag row where the badge is.
+## The chip over a blocked agent: scenes/world/chip.tscn, in the station's
+## Overlay (OfficeStation.CHIP_AT), on the tag row where the badge is.
 ##
 ## What reads at a glance about the one wait at this seat: a 30 by 16 `panel`
 ## frame, the seat's own badge in its left half (the station moves the same
@@ -15,7 +15,7 @@ extends Node2D
 ## the badge. What the agent asks is not written here. Hovering the chip shows
 ## the excerpt in a HUD tooltip (the office's), and the card shows the whole
 ## question. Nothing here answers the agent: there is no button and no key, and
-## a click on the chip is the station's (its `Target/Bubble` shape), which only
+## a click on the chip is the station's (its `Target/Chip` shape), which only
 ## picks the pane and opens answer mode on the card.
 ##
 ## Every node is the scene's; data only changes their properties. Nothing is

@@ -32,10 +32,10 @@ const WOOD_LIGHT := &"wood_light"
 const TASK_LIGHT := &"task_light"
 const CONTACT_SHADOW := &"contact_shadow"
 ## The done state's own colour (its badge is `unread`): an UNREAD window in the
-## building section.
+## SPACES rail.
 const UNREAD := &"unread"
-## Structure accents, never state: a worktree group's floors share one on their
-## plates (HudTheme's PlateAccent variations, in this order).
+## Structure accents, never state: a worktree group's zones share one on their
+## signs (and HudTheme's PlateAccent variations, in this order).
 const SAGE := &"sage"
 const SKY := &"sky"
 const TERRA := &"terra"
@@ -76,8 +76,6 @@ const FLOOR_WALKWAY := &"floor.walkway"
 ## The three interchangeable wood variants, picked per cell so a floor does not
 ## read as one plank repeated; their outer 3px match, so the seam never moves.
 const FLOOR_WOOD: Array[StringName] = [&"floor.wood_a", &"floor.wood_b", &"floor.wood_c"]
-const RUG_ROWS: Array[StringName] = [&"top", &"middle", &"bottom"]
-const RUG_COLUMNS: Array[StringName] = [&"left", &"center", &"right"]
 ## The map's shell: the top wall is two courses of brick, the cap on top and
 ## the face below it, and the two side walls run the whole depth of the map.
 ## `wall.front_*` and `wall.threshold` stay unused — see docs/WORLD_MODEL.md
@@ -96,12 +94,8 @@ const WALL_SIDE_RIGHT := &"wall.side_right"
 ## plants, the pictures, the pantry, the zones' partitions and the side tables
 ## of the lane gaps. All of it is furniture in the strict sense — it carries
 ## no herdr field — and `desk`, `monitor` and `chair` are drawn from the shared
-## table's own art rather than from these. The showroom's row room
-## (scripts/preview.gd) still stands the retired row-wall sign and cabinet
-## (PROP_SIGN, PROP_CABINET), which the office no longer draws: they stay
-## required until the showroom stops drawing them (lane C), so a pack without
-## them is refused rather than dressing the showroom with holes.
-const PROP_SIGN := &"sign"
+## table's own art rather than from these. The showroom (scripts/preview.gd)
+## draws its two zones from the same ids.
 const PROP_WINDOW := &"window"
 ## The same window at night (DayLight): its frame pixel for pixel, the view dark.
 const PROP_WINDOW_NIGHT := &"window_night"
@@ -110,7 +104,6 @@ const PROP_PLANT := &"plant"
 ## The second plant: the same piece in another pot, alternating with
 ## PROP_PLANT by place along a run (OfficeDecorPlanner.plant_at()).
 const PROP_PLANT_B := &"plant_b"
-const PROP_CABINET := &"cabinet"
 ## A small table standing on the floor that carries one piece from the `desk`
 ## or `cat` pool on its top (OfficeDecor.hold()): furniture, never a signal.
 ## The decor planner stands one in a lane gap (OfficeDecorPlanner).
@@ -134,7 +127,6 @@ const PROP_PARTITION_H := &"partition_h"
 ## code, by state.
 const PROP_DONE_STACK_SMALL := &"done_stack_small"
 const PROP_IDS: Array[StringName] = [
-	PROP_SIGN,
 	PROP_WINDOW,
 	PROP_WINDOW_NIGHT,
 	PROP_DOOR,
@@ -148,7 +140,6 @@ const PROP_IDS: Array[StringName] = [
 	PROP_PARTITION_CORNER_BR,
 	PROP_PARTITION_H,
 	PROP_SIDE_TABLE,
-	PROP_CABINET,
 ]
 ## The pools scenes draw furniture from by weight (ItemSpec.group in the pack,
 ## docs/ITEMS.md), and what their members must stand on: never agent states.
@@ -160,14 +151,14 @@ const ITEM_GROUPS: Dictionary[StringName, StringName] = {
 }
 const UI_PANEL := &"panel"
 ## The dark HUD's panels (HdPanel); `panel` stays the world's and the tools'
-## light one (the blocked bubble, the Avatar Studio, the showroom's notes).
+## light one (the blocked chip, the Avatar Studio, the showroom's notes).
 const UI_HUD_PANEL := &"hud_panel"
 ## The corner marks round a selected seat, and round a worker resting away.
 const UI_SELECTION_SEAT := &"selection_seat"
 const UI_BRANCH := &"branch"
 ## Three display overlays, not herdr states: a pane whose agent is still
 ## starting, a machine that has dropped, and one that is answering. The
-## minimap's building headings wear all three.
+## SPACES rail's machine headings wear all three.
 const UI_STARTING := &"starting"
 const UI_OFFLINE := &"offline"
 const UI_CONNECTED := &"connected"
@@ -280,14 +271,11 @@ static func problems(pack: ArtPack) -> PackedStringArray:
 
 
 ## Every tile a map is laid out of: the wood variants, the walkway of the entry
-## band and the main corridor, the nine-slice rug under each table, and the
-## map's shell (the top wall's two courses and the side walls).
+## band and the main corridor, and the map's shell (the top wall's two courses
+## and the side walls). No rug: a pod stands on the floor itself.
 static func tile_ids() -> Array[StringName]:
 	var result: Array[StringName] = [FLOOR_WALKWAY, WALL_SIDE_LEFT, WALL_SIDE_RIGHT]
 	result.append_array(FLOOR_WOOD)
-	for row in RUG_ROWS:
-		for column in RUG_COLUMNS:
-			result.append(rug_cell(row, column))
 	for course in WALL_COURSES:
 		for end in WALL_ENDS:
 			result.append(wall_cell(course, end))
@@ -295,16 +283,10 @@ static func tile_ids() -> Array[StringName]:
 
 
 ## One brick of the top wall: the cap course or the face course, at the left
-## end, the right end or anywhere between. Built rather than named,
-## the way a rug cell is; atlas positions remain the art family's business.
+## end, the right end or anywhere between. The one semantic ID the scenes
+## build rather than name; atlas positions remain the art family's business.
 static func wall_cell(course: StringName, end: StringName) -> StringName:
 	return StringName("wall.%s_%s" % [course, end])
-
-
-## One cell of the stretchable rug. The row and column come from the rug's size,
-## so this is the one semantic ID the scenes build rather than name.
-static func rug_cell(row: StringName, column: StringName) -> StringName:
-	return StringName("rug.%s_%s" % [row, column])
 
 
 ## Every UI image a scene draws: the fixed ones, plus every state's badge.

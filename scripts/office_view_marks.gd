@@ -115,7 +115,7 @@ func _targets(frame: OfficeFrame, machine: String) -> Array[EdgeArrowModel.Targe
 				target.words = OfficeZoneSign.words(zone)
 				target.machine = building.key
 				target.pane_key = pane.key
-				var chip := seat.node.bubble_rect()
+				var chip := seat.node.chip_rect()
 				target.rect = chip if chip.has_area() else seat.node.target_rect()
 				target.wait = StateLog.wait_of(ledger.track(pane.key), now)
 				targets.append(target)

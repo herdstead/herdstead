@@ -334,7 +334,7 @@ func test_the_line_names_the_table_floor_or_mezzanine_and_they_go() -> void:
 	var closer := _close_button(office)
 	var hs := HerdrFleet.pane_key(HerdrFleet.LOCAL, "hs")
 	var p4 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "hs:p4")
-	await _floor_pick(office, hs)
+	await _zone_pick(office, hs)
 	await _click_visible_pane(office, p4)
 	await _open_panel(office)
 	await _until(func() -> bool: return closer.is_visible_in_tree() and not closer.disabled, "hs:p4: Close offered")
@@ -349,7 +349,7 @@ func test_the_line_names_the_table_floor_or_mezzanine_and_they_go() -> void:
 	# The last pane of a plain floor.
 	var notes := HerdrFleet.pane_key(HerdrFleet.LOCAL, "notes")
 	var notes_p1 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "notes:p1")
-	await _floor_pick(office, notes)
+	await _zone_pick(office, notes)
 	await _click_visible_pane(office, notes_p1)
 	await _open_panel(office)
 	await _until(func() -> bool: return closer.is_visible_in_tree() and not closer.disabled, "notes:p1: Close offered")
@@ -365,7 +365,7 @@ func test_the_line_names_the_table_floor_or_mezzanine_and_they_go() -> void:
 	# The last pane of a mezzanine, its agent blocked: heavier words.
 	var hud := HerdrFleet.pane_key(HerdrFleet.LOCAL, "hud")
 	var hud_p1 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "hud:p1")
-	await _floor_pick(office, hud)
+	await _zone_pick(office, hud)
 	await _click_visible_pane(office, hud_p1)
 	await _open_panel(office)
 	if card.answering():
@@ -403,7 +403,7 @@ func test_the_repos_own_floor_with_mezzanines_open_never_closes() -> void:
 	var office := await _office_with(false, false)
 	var closer := _close_button(office)
 	var hs_p3 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "hs:p3")
-	await _floor_pick(office, HerdrFleet.pane_key(HerdrFleet.LOCAL, "hs"))
+	await _zone_pick(office, HerdrFleet.pane_key(HerdrFleet.LOCAL, "hs"))
 	await _click_visible_pane(office, hs_p3)
 	await _open_panel(office)
 	await _until(closer.is_visible_in_tree, "the manage rows")
@@ -871,7 +871,7 @@ func _close_button(office: OfficeDouble) -> Button:
 ## open the panel with Enter (answer mode, for a blocked agent) and leave
 ## answer mode with Escape: the block shows.
 func _pick_bee_bravo(office: OfficeDouble) -> void:
-	await _floor_pick(office, HerdrFleet.pane_key(BEE, "bravo"))
+	await _zone_pick(office, HerdrFleet.pane_key(BEE, "bravo"))
 	await _click_visible_pane(office, bee_p1)
 	await _open_panel(office)
 	if _card(office).answering():

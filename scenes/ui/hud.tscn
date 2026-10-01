@@ -199,7 +199,7 @@ offset_bottom = -16.0
 grow_horizontal = 2
 grow_vertical = 0
 
-[node name="BubbleTip" type="PanelContainer" parent="Screen"]
+[node name="WorldTip" type="PanelContainer" parent="Screen"]
 unique_name_in_owner = true
 visible = false
 offset_right = 168.0
@@ -208,7 +208,7 @@ mouse_filter = 2
 theme_type_variation = &"HdPanel"
 script = ExtResource("7_panel")
 
-[node name="BubbleTipText" type="Label" parent="Screen/BubbleTip"]
+[node name="WorldTipText" type="Label" parent="Screen/WorldTip"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(160, 0)
 layout_mode = 2

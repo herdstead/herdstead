@@ -18,7 +18,7 @@ extends RefCounted
 ## for input (`launch_pending`, `name`, `interactive_ready`).
 
 ## Record caps, comfortably above what FloorLayoutPolicy lets the office lay out
-## (4096 panes and 1024 tables a floor): a snapshot beyond any of them is refused
+## (4096 panes and 1024 tabs a map): a snapshot beyond any of them is refused
 ## before anything in it is cleaned. Layouts count against MAX_TABS (one per
 ## tab), agent records against MAX_PANES (one per pane).
 const MAX_WORKSPACES := 4096
@@ -252,7 +252,7 @@ static func refusal(raw: Variant) -> String:
 
 ## Nothing has been read into this snapshot: none arrived yet, or what arrived
 ## was no snapshot object, or an empty one. Like the `{}` it stands for, it
-## projects to no floors at all.
+## projects to no zones at all.
 func is_empty() -> bool:
 	return _empty
 

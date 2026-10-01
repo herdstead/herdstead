@@ -383,16 +383,16 @@ func test_the_timeline_draws_baseline_states_and_hatches_the_unobserved() -> voi
 	_check(idle != art.color(ArtContract.PAPER) and idle != art.color(ArtContract.CREAM), "nor the panel's")
 
 
-## While the overview covers the world the bubbles' reader reads nothing and
-## no tooltip shows; a click where a bubble was picks no desk (it lands on the
-## overview). Closed again, the bubble is read on schedule.
+## While the overview covers the world the chips' reader reads nothing and
+## no tooltip shows; a click where a chip was picks no desk (it lands on the
+## overview). Closed again, the chip is read on schedule.
 func test_bubbles_read_nothing_and_no_tip_while_the_overview_covers_the_world() -> void:
 	_fakes("snapshot_basic", ["pane.read"])
 	_ctl("control-b", "set_snapshot", {"snapshot": _changed(_raw(), "alpha:p1", {"agent_status": "blocked"})})
 	_ctl("control-b", "set_preview", {"pane_id": "alpha:p1", "source": "detection", "text": QUESTION})
 	var office := await _office_with(false, true, true, Vector2(SCREEN), true)
 	var key := HerdrFleet.pane_key(BEE, "alpha:p1")
-	await _floor_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
+	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	var at := await _bubble_point(office, key)
 	await _until_stats(
 		"control-b", func(_stats: Dictionary) -> bool: return _read_panes("control-b").size() >= 1, "read"
@@ -406,9 +406,9 @@ func test_bubbles_read_nothing_and_no_tip_while_the_overview_covers_the_world() 
 	_eq(_read_panes("control-b"), ["alpha:p1"], "under the overview, past the ten seconds: nothing read")
 	_check(not office.questions.reading(), "and nothing out")
 	await _move_pointer(at)
-	_check(not office.hud.bubble_tip_shown(), "no tooltip where the bubble is")
+	_check(not office.hud.world_tip_shown(), "no tooltip where the bubble is")
 	# No row under the pointer: DONE keeps nobody, so the click lands on the
-	# overview's own panel, where the bubble would be.
+	# overview's own panel, where the chip would be.
 	await _click_control(_part(office.hud.overview, "%ChipDone"))
 	_eq(office.hud.overview.shown_keys(), PackedStringArray(), "no row shown")
 	_check(office.hud.overview.get_global_rect().has_point(at), "the bubble's place is under the overview")

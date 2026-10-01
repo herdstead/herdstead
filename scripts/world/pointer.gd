@@ -3,7 +3,7 @@ extends Node2D
 ## Herdstead's pointing: while the mouse rests on a HUD line about a pane
 ## (a NEWS item, a row of the agent list or of EVENTS), a dashed frame around
 ## that pane's desk on the shown floor: its click area and, while it shows, its
-## bubble. A third thing beside herdr's focus (the lamp) and the selection (the
+## chip. A third thing beside herdr's focus (the lamp) and the selection (the
 ## corners, the table's frame), drawn its own way: a static dash of the pack's
 ## `ink` and `paper`, 1 unit thick, DASH units a stroke, on whole units. No
 ## texture and no new art; it points only, and never selects, pans, reads or writes.

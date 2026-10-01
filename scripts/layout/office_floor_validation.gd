@@ -20,23 +20,23 @@ static func problems(value: FloorPlan, rules: FloorLayoutPolicy) -> PackedString
 		return found
 	var size := value.floor_cells.size
 	if value.floor_cells.position != Vector2i.ZERO or size.x <= 0 or size.y <= 0:
-		found.append("floor must be a positive rectangle at the fixed origin")
+		found.append("map must be a positive rectangle at the fixed origin")
 	if size.x > rules.max_width_cells or size.y > rules.max_height_cells or size.x * size.y > rules.max_floor_cells:
-		found.append("floor exceeds width, height or cell budget")
+		found.append("map exceeds width, height or cell budget")
 	if not found.is_empty():
 		return found
 	# Previous plans are inputs too. Reject before copying rows, enumerating
 	# historical columns or allocating measurements for any of their desks.
 	if value.desks.size() > rules.max_tables:
-		return PackedStringArray(["layout exceeds table budget"])
+		return PackedStringArray(["layout exceeds tab budget"])
 	var remaining_nodes := rules.max_desk_nodes
 	var remaining_panes := rules.max_panes
 	for placed in value.desks:
 		if placed.capacity < 2 or placed.capacity % 2 != 0 or placed.capacity > rules.max_width_cells:
-			return PackedStringArray(["table capacity must be at least two and grow in pairs"])
+			return PackedStringArray(["tab capacity must be at least two and grow in pairs"])
 		remaining_nodes -= OfficeDeskView.node_budget(placed.capacity)
 		if remaining_nodes < 0:
-			return PackedStringArray(["floor exceeds desk node budget"])
+			return PackedStringArray(["map exceeds desk node budget"])
 		remaining_panes -= placed.seats.size()
 		if remaining_panes < 0:
 			return PackedStringArray(["layout exceeds pane budget"])
@@ -52,11 +52,11 @@ static func problems(value: FloorPlan, rules: FloorLayoutPolicy) -> PackedString
 		size.y - rules.wall_cells
 	)
 	if value.entry_cells != expected_entry or value.main_corridor_cells != expected_main:
-		found.append("floor does not contain its declared entrance and main corridor")
+		found.append("map does not contain its declared entrance and main corridor")
 	if value.corridors.size() != 2 or value.corridors[0] != expected_entry or value.corridors[1] != expected_main:
 		found.append("walkways are not the entrance and the main corridor")
 	if not value.render_bounds.encloses(Rect2(value.floor_cells.position * grid, size * grid)):
-		found.append("drawing bounds do not contain the complete floor")
+		found.append("drawing bounds do not contain the complete map")
 	found.append_array(_zone_problems(value, rules))
 	var keys: Dictionary[String, bool] = {}
 	var panes: Dictionary[String, bool] = {}
@@ -64,38 +64,38 @@ static func problems(value: FloorPlan, rules: FloorLayoutPolicy) -> PackedString
 	keep_out.append_array(value.aisles)
 	for placed in value.desks:
 		if placed.tab_key.is_empty() or keys.has(placed.tab_key):
-			found.append("duplicate or missing table identity")
+			found.append("duplicate or missing tab identity")
 		keys[placed.tab_key] = true
 		var zone := value.zone(placed.zone_key)
 		if zone == null or placed.row < 0 or placed.row >= zone.rows.size() or placed.measure == null:
-			found.append("table has no valid zone, row or measurement")
+			found.append("tab has no valid zone, row or measurement")
 			continue
 		if not zone.rows[placed.row].desks.has(placed):
-			found.append("table missing from its row")
+			found.append("tab missing from its row")
 		var measurement := placed.measure
 		if measurement.capacity != placed.capacity or measurement.columns.size() != placed.capacity:
-			found.append("table capacity and measurement disagree")
+			found.append("tab capacity and measurement disagree")
 		# The renderer uses table_width to allocate modules. A stale/tampered
 		# measure must not buy an arbitrarily wide table with a small capacity.
 		var expected := OfficeTable.measure(placed.capacity)
 		if measurement.table_width != expected.table_width or measurement.columns != expected.columns:
-			found.append("table width or columns disagree with measured capacity")
+			found.append("tab width or columns disagree with measured capacity")
 		for positions: Array[Vector2] in [measurement.far_approaches, measurement.near_approaches]:
 			if positions.size() != placed.capacity:
-				found.append("table is missing measured approaches")
+				found.append("tab is missing measured approaches")
 		if not placed.origin.is_finite():
-			found.append("table origin is not finite")
+			found.append("tab origin is not finite")
 		var reserved := Rect2(placed.reserved_cells.position * grid, placed.reserved_cells.size * grid)
 		for bounds: Rect2 in [measurement.reserved_rect, measurement.render_rect, measurement.physical_rect]:
 			if not bounds.position.is_finite() or not bounds.size.is_finite() or not bounds.has_area():
-				found.append("invalid table measurement")
+				found.append("invalid tab measurement")
 			bounds.position += placed.origin
 			if not reserved.encloses(bounds):
-				found.append("table measurement leaves its reservation")
+				found.append("tab measurement leaves its reservation")
 		var drawing := measurement.render_rect
 		drawing.position += placed.origin
 		if not value.render_bounds.encloses(drawing):
-			found.append("drawing bounds omit part of a table")
+			found.append("drawing bounds omit part of a tab")
 		var inner := Rect2i(
 			zone.cells.position.x + rules.zone_pad_left_cells,
 			zone.cells.position.y,
@@ -103,12 +103,12 @@ static func problems(value: FloorPlan, rules: FloorLayoutPolicy) -> PackedString
 			zone.cells.size.y
 		)
 		if not inner.encloses(placed.reserved_cells):
-			found.append("table reservation leaves its zone")
+			found.append("tab reservation leaves its zone")
 		if not zone.rows[placed.row].band_cells.encloses(placed.reserved_cells):
-			found.append("table reservation leaves its row")
+			found.append("tab reservation leaves its row")
 		for walkway in keep_out:
 			if placed.reserved_cells.intersects(walkway):
-				found.append("table reservation intersects a corridor or aisle")
+				found.append("tab reservation intersects a corridor or aisle")
 		var occupied: Dictionary[String, bool] = {}
 		for seat in placed.seats:
 			var seat_key := "%d:%s" % [seat.column, seat.side]
@@ -122,14 +122,14 @@ static func problems(value: FloorPlan, rules: FloorLayoutPolicy) -> PackedString
 				or seat.column >= placed.capacity
 				or seat.side not in ["far", "near"]
 			):
-				found.append("seat does not belong to the measured table")
+				found.append("seat does not belong to the measured tab")
 	for index in value.desks.size():
 		for later in range(index + 1, value.desks.size()):
 			if value.desks[index].reserved_cells.intersects(value.desks[later].reserved_cells):
-				found.append("table reservations overlap")
+				found.append("tab reservations overlap")
 	for walkway in keep_out:
 		if not value.floor_cells.encloses(walkway):
-			found.append("corridor or aisle leaves the floor")
+			found.append("corridor or aisle leaves the map")
 	found.append_array(_decor_problems(value))
 	found.append_array(_fixture_problems(value))
 	if not found.is_empty():
@@ -172,7 +172,7 @@ static func _zone_problems(value: FloorPlan, rules: FloorLayoutPolicy) -> Packed
 		if area.position.y < rules.zones_top_cells() or area.size.y <= 0 or area.size.y % pod != 0:
 			found.append("zone %s is not whole pod rows under the top aisle" % zone.zone_key)
 		if not bay.encloses(zone.slot()):
-			found.append("zone %s leaves the floor" % zone.zone_key)
+			found.append("zone %s leaves the map" % zone.zone_key)
 		if zone.rows.size() * pod != area.size.y:
 			found.append("zone %s rows do not fill it" % zone.zone_key)
 		for index in zone.rows.size():
@@ -188,12 +188,12 @@ static func _zone_problems(value: FloorPlan, rules: FloorLayoutPolicy) -> Packed
 			for placed in row.desks:
 				desks += 1
 				if placed.zone_key != zone.zone_key or placed.row != index or not value.desks.has(placed):
-					found.append("zone %s row %d holds a table not placed there" % [zone.zone_key, index])
+					found.append("zone %s row %d holds a tab not placed there" % [zone.zone_key, index])
 		for corridor in value.corridors:
 			if area.intersects(corridor):
 				found.append("zone %s stands on a corridor" % zone.zone_key)
 	if desks != value.desks.size():
-		found.append("a table stands in no zone row")
+		found.append("a tab stands in no zone row")
 	for index in value.zones.size():
 		for later in range(index + 1, value.zones.size()):
 			if value.zones[index].slot().intersects(value.zones[later].slot()):
@@ -329,7 +329,7 @@ static func _decor_problems(value: FloorPlan) -> PackedStringArray:
 			if not bounds.position.is_finite() or not bounds.size.is_finite() or not bounds.has_area():
 				found.append("invalid decoration measurement")
 		if not floor_rect.encloses(decoration.footprint):
-			found.append("decoration footprint leaves the floor")
+			found.append("decoration footprint leaves the map")
 		if not value.render_bounds.encloses(decoration.draw_rect):
 			found.append("drawing bounds omit a decoration")
 		for walkway in walkways(value):
@@ -343,7 +343,7 @@ static func _decor_problems(value: FloorPlan) -> PackedStringArray:
 			var drawing := placed.measure.render_rect
 			drawing.position += placed.origin
 			if decoration.footprint.intersects(physical):
-				found.append("decoration overlaps a table footprint")
+				found.append("decoration overlaps a tab footprint")
 			if decoration.draw_rect.intersects(drawing):
 				found.append("decoration drawing overlaps a workstation")
 	for index in value.decorations.size():

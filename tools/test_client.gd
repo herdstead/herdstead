@@ -1634,7 +1634,7 @@ func test_office_minimap() -> void:
 	await _frames(2)
 	_eq(minimap.row_keys(), ["a1", "a2", "a3"], "zones ascending, machines in order; an empty map has no row")
 	_eq(
-		minimap.headings().map(func(h: OfficeBuildingHeading) -> String: return _label_text(h, "%BuildingLabel")),
+		minimap.headings().map(func(h: OfficeMachineHeading) -> String: return _label_text(h, "%MachineLabel")),
 		["LOCAL", "FAR"],
 		"a heading per building with more than Local"
 	)
@@ -1642,8 +1642,8 @@ func test_office_minimap() -> void:
 	var highlighted := (
 		minimap
 		. headings()
-		. filter(func(h: OfficeBuildingHeading) -> bool: return h.is_current())
-		. map(func(h: OfficeBuildingHeading) -> String: return h.key)
+		. filter(func(h: OfficeMachineHeading) -> bool: return h.is_current())
+		. map(func(h: OfficeMachineHeading) -> String: return h.key)
 	)
 	_eq(highlighted, ["local"], "the shown machine's heading is the only highlighted one")
 	_eq(Array(minimap.in_view()), [], "no row is marked before the office says which zones are in view")
@@ -1668,7 +1668,7 @@ func test_office_minimap() -> void:
 	# not with a coloured square nobody has a legend for.
 	var art: ArtPack = minimap.art
 	_eq(
-		minimap.headings().map(func(h: OfficeBuildingHeading) -> Texture2D: return h.mark_icon().texture),
+		minimap.headings().map(func(h: OfficeMachineHeading) -> Texture2D: return h.mark_icon().texture),
 		[ArtContract.UI_CONNECTED, ArtContract.UI_OFFLINE].map(
 			func(id: StringName) -> Texture2D: return art.sprite_texture(art.ui_sprite(id))
 		),
@@ -1687,7 +1687,7 @@ func test_office_minimap() -> void:
 	)
 	_check(
 		minimap.headings().all(
-			func(h: OfficeBuildingHeading) -> bool: return h.mark_icon().position == h.mark_icon().offset / -art.density
+			func(h: OfficeMachineHeading) -> bool: return h.mark_icon().position == h.mark_icon().offset / -art.density
 		),
 		"each icon stands at its own pivot, so the picture lands in the same square"
 	)
@@ -1724,7 +1724,7 @@ func test_office_minimap() -> void:
 	minimap.show_machines(alone, "local", true)
 	await _frames(1)
 	_eq(
-		minimap.headings().map(func(h: OfficeBuildingHeading) -> String: return _label_text(h, "%BuildingLabel")),
+		minimap.headings().map(func(h: OfficeMachineHeading) -> String: return _label_text(h, "%MachineLabel")),
 		["LOCAL"],
 		"a machine that went away loses its heading"
 	)

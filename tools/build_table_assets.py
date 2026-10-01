@@ -35,11 +35,16 @@ numbers are world units; a probe in the PNG is the unit times DENSITY):
   normal view plus a `$_` mark with the same silhouette: ink on the rear lid,
   paper on the front screen, its cursor at CURSOR_AT (texels).
 
-Two source module sets are accepted, told apart by the modules the source
-manifest declares (exactly one set or the other, nothing in between): LEGACY,
-the 18 above, or LEGACY plus POD, the small-desk pod's 8 below. The native
-manifest is built for the set declared and every image of that set is
-required. The templates draw LEGACY plus POD.
+Three source module sets are accepted (SOURCE_SETS), told apart by the modules
+the source manifest declares (exactly one of them, nothing in between):
+`legacy`, the 18 above (the long table's 12 modules and the 6 furniture
+views); `legacy+pod`, those and the small-desk pod's 8 below (26); or `pod`,
+what the office draws today and nothing else (POD_ONLY, 18): the pod's 8, the
+apron's three, the bracket and the 6 furniture views, which is exactly the
+runtime's ArtContract.TABLE_MODULES plus the furniture (a test holds the two
+together). The long table's surface_*, divider_* and leg are in no `pod`
+source. The native manifest is built for the set declared and every image of
+that set is required. The templates draw `legacy+pod`.
 
 What every POD drawing keeps. They are drawn texel by texel at DENSITY in the
 painted table's hand (unit-thick outlines and bands, one-texel grain and
@@ -115,10 +120,18 @@ POD_MODULES: dict[str, tuple[int, int]] = {
     "leg_short": (6, 22),
 }
 
+## The long table's modules the pod still lays: its apron and a bracket per desk.
+POD_SHARED: tuple[str, ...] = ("apron_left", "apron_mid", "apron_right", "bracket")
+
 ## The source module sets a pack may declare, by name: exactly one of these.
+## POD_ONLY is what the office draws (ArtContract.TABLE_MODULES and the
+## furniture views): the pod without the long table's surface, divider and leg.
 LEGACY: dict[str, tuple[int, int]] = {**MODULES, **FURNITURE}
 LEGACY_POD: dict[str, tuple[int, int]] = {**LEGACY, **POD_MODULES}
-SOURCE_SETS: dict[str, dict[str, tuple[int, int]]] = {"legacy": LEGACY, "legacy+pod": LEGACY_POD}
+POD_ONLY: dict[str, tuple[int, int]] = {
+    **POD_MODULES, **{name: MODULES[name] for name in POD_SHARED}, **FURNITURE}
+SOURCE_SETS: dict[str, dict[str, tuple[int, int]]] = {
+    "legacy": LEGACY, "legacy+pod": LEGACY_POD, "pod": POD_ONLY}
 
 
 def rgba(palette: dict[str, str], name: str, alpha: int = 255) -> tuple[int, int, int, int]:
@@ -675,8 +688,8 @@ def source_set(manifest: dict, path: Path) -> dict[str, tuple[int, int]]:
     closest = min(SOURCE_SETS, key=lambda name: len(declared ^ set(SOURCE_SETS[name])))
     missing = sorted(set(SOURCE_SETS[closest]) - declared)
     extra = sorted(declared - set(SOURCE_SETS[closest]))
-    raise ValueError(f"{path}: the modules are neither the legacy set nor legacy+pod; nearest {closest}, "
-                     f"missing {missing}, unknown {extra}")
+    raise ValueError(f"{path}: the modules are none of the accepted sets ({', '.join(SOURCE_SETS)}); "
+                     f"nearest {closest}, missing {missing}, unknown {extra}")
 
 
 def validate_source(source: Path) -> dict:
