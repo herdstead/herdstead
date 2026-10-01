@@ -845,7 +845,9 @@ func _fit_overview() -> bool:
 ## The arrows on the world's edges toward the zones of the shown map with
 ## blocked desks off screen (EdgeArrowModel, the office's); none hides them.
 ## Kept by the arrows themselves, so an overlay closing or the world's room
-## changing shows or places the same arrows without a refresh (_fit_edge_arrows()).
+## changing shows or places the same arrows without a refresh
+## (_fit_edge_arrows()): an edge too short for its arrows folds the last of
+## them into a `+N` note, and unfolds them when it has the room again.
 func show_edge_arrows(arrows: Array[EdgeArrowModel]) -> void:
 	_arrows_shown = not arrows.is_empty()
 	edge_arrows.show_arrows(arrows)

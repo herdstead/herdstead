@@ -69,6 +69,10 @@ var _picked_zone := ""
 ## it between two settles is revealed (settle()).
 var _last_focus := ""
 var _settled := false
+## A machine picked or a desk asked for (pick_machine(), pan_to_desk()) that no
+## settle() has carried out yet: the next one does, and herdr's focus moving
+## meanwhile does not take the map or the pan from it.
+var _asked := false
 
 # --- a refresh ----------------------------------------------------------------
 
@@ -88,7 +92,11 @@ var _settled := false
 ## nothing, so a pan the viewer made stays; the picked pane going is not the
 ## focus moving either (the selection falls back to the focus where it was, and
 ## the map and the machine the viewer chose stay). An explicit navigation
-## waiting to be carried out wins over it. A pick whose pane is gone is still
+## waiting to be carried out wins over it: a zone picked or a pane located
+## (pan_zone, reveal_on_arrival), and a machine picked or a desk asked for
+## (pick_machine(), pan_to_desk()) in the settle that carries it out. That
+## settle still records the focus it saw, so the move it passed over is not
+## revealed later; the next move is. A pick whose pane is gone is still
 ## remembered: the pane back, it is the selection again, and the focus is no
 ## longer followed.
 func settle(frame: OfficeFrame) -> String:
@@ -111,7 +119,7 @@ func settle(frame: OfficeFrame) -> String:
 	if frame.find_zone(_picked_zone) == null:
 		_picked_zone = ""
 	var moved := _settled and not pick_alive and frame.herdr_focus != _last_focus
-	if moved and pan_zone.is_empty() and reveal_on_arrival.is_empty():
+	if moved and not _asked and pan_zone.is_empty() and reveal_on_arrival.is_empty():
 		var zone := frame.find_zone(frame.zone_of(active_key))
 		if zone != null:
 			_ask_pan(active_key, false)
@@ -119,6 +127,7 @@ func settle(frame: OfficeFrame) -> String:
 			_picked_zone = ""
 	_last_focus = frame.herdr_focus
 	_settled = true
+	_asked = false
 	var chosen := frame.choose_machine(picked_machine, active_key)
 	if chosen == shown_key:
 		_open(frame, chosen)
@@ -224,13 +233,15 @@ func pick_zone(key: String) -> void:
 ## machine without a zone as an empty map. Where it opens is the map's own: its
 ## first arrival (_open()) or where the viewer left it (pan_of()); no zone is
 ## picked, and a pan or reveal still pending belongs to the navigation this
-## one replaces. It counts as a navigation (nav_revision).
+## one replaces. It counts as a navigation (nav_revision), and it wins over
+## herdr's focus moving before the settle that carries it out (settle()).
 func pick_machine(key: String) -> void:
 	picked_machine = key
 	_picked_zone = ""
 	pan_zone = ""
 	pan_to = ""
 	reveal_on_arrival = ""
+	_asked = true
 	nav_revision += 1
 
 
@@ -238,10 +249,15 @@ func pick_machine(key: String) -> void:
 ## arrow): the office pans as far as it takes for that desk to be on screen
 ## (pan_to, not its whole pod). Nothing is selected and no zone is picked; a
 ## pan or reveal still pending belongs to the navigation this one replaces. It
-## counts as a navigation (nav_revision).
+## counts as a navigation (nav_revision), and it wins over herdr's focus moving
+## before the settle that carries it out (settle()): its desk's machine is the
+## one the viewer chose, as a zone picked there would make it, so a focus that
+## moved onto another machine does not take the map either.
 func pan_to_desk(key: String) -> void:
+	picked_machine = HerdrFleet.split_key(key)[0]
 	_ask_pan(key, false)
 	reveal_on_arrival = ""
+	_asked = true
 	nav_revision += 1
 
 

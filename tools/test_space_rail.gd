@@ -600,6 +600,198 @@ func test_the_hud_keeps_the_arrow_nodes_as_the_world_resizes() -> void:
 	hud.free()
 
 
+## However many zones wait beyond one edge, the arrows there never meet: an
+## edge shows as many as it has room for (its run between the corners' rows,
+## the theme's inset and gap, the arrows' own sizes, compact or not), longest
+## wait first, and folds the rest into a `+N` note on that edge whose tooltip
+## names each of them. At the 480x320 minimum, there with the drawer open, and
+## at 2x with the drawer open, on each of the four edges, with a full pool and
+## with more zones than the pool holds: every arrow inside the world, the side
+## edges' clear of the corners' rows, and arrows and notes counting every zone.
+func test_a_crowded_edge_folds_what_it_has_no_room_for() -> void:
+	var hud := await _hud()
+	# Each window, and whether its drawer is open.
+	var screens: Dictionary[String, Vector2] = {
+		"480x320": Vector2(480, 320),
+		"480x320, the drawer open": Vector2(480, 320),
+		"960x480, the drawer open": Vector2(960, 480),
+	}
+	for screen: String in screens:
+		hud.fit(screens[screen])
+		if screen.ends_with("open"):
+			hud.open_drawer()
+		else:
+			hud.close_drawer()
+		await _frames(2)
+		var view := Rect2(Vector2.ZERO, hud.world_rect().size)
+		for edge: EdgeArrowModel.Edge in EdgeArrowModel.GLYPHS:
+			for zones: int in [EdgeArrowModel.POOL, EdgeArrowModel.POOL + 4]:
+				var where := "%s, %s, %d zones" % [screen, EdgeArrowModel.GLYPHS[edge], zones]
+				hud.show_edge_arrows(EdgeArrowModel.of(view, _beyond(view, edge, zones)))
+				await _frames(2)
+				var stood := _standing(hud, where)
+				print("EDGE_FOLD: %s in %s: %s" % [where, hud.world_rect().size, stood.said()])
+				_check(not stood.ways.is_empty(), where + ": at least one arrow is a way to its zone")
+				_eq(stood.ways.size() + stood.folded, zones, where + ": the arrows and the notes count every zone")
+				_eq(stood.lines.size(), stood.folded, where + ": a note's tooltip has a line for each zone it counts")
+				for index in zones:
+					var zone := "z%d" % index
+					# The zones that keep an arrow are the ones that waited longest.
+					_eq(stood.ways.has(zone), index < stood.ways.size(), "%s: %s by its wait" % [where, zone])
+					if index >= stood.ways.size():
+						var line := (
+							"%s %d %s · 1 blocked · " % [EdgeArrowModel.GLYPHS[edge], index + 1, zone.to_upper()]
+						)
+						var named := Array(stood.lines).any(func(said: String) -> bool: return said.begins_with(line))
+						_check(named, "%s: a note names %s: %s" % [where, zone, stood.lines])
+	hud.free()
+
+
+## Pure (EdgeArrowModel.fit()): given how many arrows each edge has room for,
+## an edge with more than that keeps its first ones and gives its last place
+## to a `+N` note for the rest, where the first of them stood in the list and
+## on the edge; an edge that is not short is left alone, one with room for
+## none shows none, and the pool's own note is counted in like any arrow, for
+## the zones it stands for.
+func test_an_edge_keeps_what_it_has_room_for_and_notes_the_rest() -> void:
+	var view := Rect2(0, 0, 400, 300)
+	var targets: Array[EdgeArrowModel.Target] = []
+	# z0..z4 below the view and y0, y1 to its right; z0 has waited longest, y1 least.
+	for index in 5:
+		targets.append(_target("z%d" % index, str(index + 1), Rect2(40 * index, 400, 16, 16), (9 - index) * 60000))
+	for index in 2:
+		targets.append(
+			_target("y%d" % index, str(index + 6), Rect2(600, 100 + 40 * index, 16, 16), (2 - index) * 60000)
+		)
+	var all := EdgeArrowModel.of(view, targets)
+	var keys := func(arrows: Array[EdgeArrowModel]) -> Array:
+		return arrows.map(func(arrow: EdgeArrowModel) -> String: return arrow.zone_key)
+	_eq(keys.call(all), ["z0", "z1", "z2", "z3", "z4", "y0", "y1"], "seven zones: five below, two to the right")
+	var room: Dictionary[EdgeArrowModel.Edge, int] = {}
+	_eq(EdgeArrowModel.fit(all, room), all, "no edge named: every arrow as handed")
+	room = {EdgeArrowModel.Edge.BOTTOM: 5, EdgeArrowModel.Edge.RIGHT: 2}
+	_eq(EdgeArrowModel.fit(all, room), all, "room for all of them: the same")
+	room = {EdgeArrowModel.Edge.BOTTOM: 3}
+	var short := EdgeArrowModel.fit(all, room)
+	_eq(keys.call(short), ["z0", "z1", "", "y0", "y1"], "the bottom holds three: two arrows, then a note")
+	var note := short[2]
+	_eq([note.number, note.more, note.blocked], ["+3", 3, 3], "which counts the other three zones and their desks")
+	_eq([note.edge, note.along, note.pane_key], [EdgeArrowModel.Edge.BOTTOM, all[2].along, ""], "where the first stood")
+	_eq(note.wait.msec, all[2].wait.msec, "with its wait")
+	var lines := note.tip.split("\n")
+	_eq(lines.size(), 3, "its tooltip has their three lines: " + note.tip)
+	for index in 3:
+		_check(lines[index].begins_with("↓ %d Z%d · 1 blocked · longest " % [index + 3, index + 2]), lines[index])
+	_eq([short[3], short[4]], [all[5], all[6]], "the right edge is left alone")
+	room = {EdgeArrowModel.Edge.BOTTOM: 1, EdgeArrowModel.Edge.RIGHT: 1}
+	var notes := EdgeArrowModel.fit(all, room)
+	_eq(
+		notes.map(func(arrow: EdgeArrowModel) -> Array: return [arrow.number, arrow.edge, arrow.zone_key]),
+		[["+5", EdgeArrowModel.Edge.BOTTOM, ""], ["+2", EdgeArrowModel.Edge.RIGHT, ""]],
+		"one place each: a note per edge, for all of its zones"
+	)
+	_check(
+		notes[1].tip.begins_with("→ 6 Y0 · ") and notes[1].tip.contains("\n→ 7 Y1 · "),
+		"each with its own: " + notes[1].tip
+	)
+	room = {EdgeArrowModel.Edge.BOTTOM: 0}
+	_eq(keys.call(EdgeArrowModel.fit(all, room)), ["y0", "y1"], "an edge with room for none shows none")
+	# Ten zones below: of() keeps seven and notes three; a bottom edge that holds
+	# four keeps three of the seven and counts the other four in with that note.
+	var many: Array[EdgeArrowModel.Target] = []
+	for index in 10:
+		many.append(_target("f%d" % index, str(index + 1), Rect2(40 * index, 400, 16, 16), (20 - index) * 60000))
+	many.append(_target("f8", "9", Rect2(0, 440, 16, 16), 1000))
+	var pooled := EdgeArrowModel.of(view, many)
+	_eq(
+		[pooled.size(), pooled[7].number, pooled[7].blocked], [8, "+3", 4], "the pool: seven and a note for three zones"
+	)
+	room = {EdgeArrowModel.Edge.BOTTOM: 4}
+	var both := EdgeArrowModel.fit(pooled, room)
+	_eq(keys.call(both), ["f0", "f1", "f2", ""], "three arrows and one note")
+	_eq([both[3].number, both[3].more, both[3].blocked], ["+7", 7, 8], "for seven zones and their eight desks")
+	_eq(both[3].tip.split("\n").size(), 7, "a line each: " + both[3].tip)
+	_check(both[3].tip.ends_with(pooled[7].tip), "the pool's own lines last")
+	_eq([pooled[7].number, pooled[7].tip.split("\n").size()], ["+3", 3], "and the list handed in is not changed")
+
+
+## Eight zones blocked below the view at the 480x320 minimum, in a live office:
+## the arrows stand apart inside the world and count all eight between them,
+## and a real click at the centre of the first, the zone that has waited
+## longest, is that arrow's: the map pans to its desk and to no other zone's.
+func test_a_click_on_the_first_of_a_crowd_of_arrows_pans_to_its_desk() -> void:
+	var office := await _live_office(_blocked_zones(9), Vector2(480, 320))
+	await _frames(3)
+	var stood := _standing(office.hud, "nine zones at 480x320")
+	_eq(stood.ways.size() + stood.folded, 8, "the arrows and the note count the eight blocked zones")
+	var first := office.hud.edge_arrows.shown()[0]
+	var wanted := _pane("w1:p0")
+	_eq([first.pane_key(), first.disabled], [wanted, false], "the first arrow is the way to the longest wait")
+	_check(not _desk_in_view(office, wanted), "whose desk is out of the world's room")
+	var picked: Array = []
+	office.hud.arrow_picked.connect(func(key: String) -> void: picked.append(key))
+	var revision := office.navigator.nav_revision
+	var selected := office.navigator.active_key
+	await _click_at(first.get_global_rect().get_center())
+	await _frames(2)
+	_eq(picked, [wanted], "a real click at its centre is that arrow's")
+	_check(_desk_in_view(office, wanted), "and the map pans to its desk")
+	_eq(
+		[office.navigator.nav_revision, office.navigator.active_key],
+		[revision + 1, selected],
+		"one navigation, no pick"
+	)
+	var after := _standing(office.hud, "after the pan")
+	_check(not after.ways.has(_zone("w1")), "its desk in view, that zone's arrow is gone: " + after.said())
+	_done(office)
+
+
+## What the arrows were handed is kept whole: zones folded for a narrow world
+## get their arrows back the moment it widens, and are folded again when it
+## narrows or goes compact, with no new list from the office and no new node.
+func test_arrows_folded_for_a_narrow_world_come_back_as_it_widens() -> void:
+	var hud := await _hud()
+	var nodes := hud.edge_arrows.find_children("*", "OfficeEdgeArrow", true, false)
+	hud.fit(Vector2(480, 320))
+	await _frames(2)
+	var view := Rect2(Vector2.ZERO, hud.world_rect().size)
+	hud.show_edge_arrows(EdgeArrowModel.of(view, _beyond(view, EdgeArrowModel.Edge.BOTTOM, 8)))
+	await _frames(2)
+	var narrow := _standing(hud, "480x320")
+	_check(narrow.ways.size() < 8 and narrow.folded > 0, "a 340-wide world folds some: " + narrow.said())
+	_eq(narrow.ways.size() + narrow.folded, 8, "counting all eight")
+	hud.fit(Vector2(960, 480))
+	await _frames(2)
+	var wide := _standing(hud, "960x480")
+	_eq([wide.ways.size(), wide.folded], [8, 0], "an 820-wide world has room for all eight: every zone its own arrow")
+	_eq(wide.ways, ["z0", "z1", "z2", "z3", "z4", "z5", "z6", "z7"], "in the order handed, longest wait first")
+	_check(
+		hud.edge_arrows.shown().all(
+			func(arrow: OfficeEdgeArrow) -> bool: return not arrow.disabled and not arrow.compact()
+		),
+		"each a way there, in full"
+	)
+	# 560x320: 420 wide with the drawer closed (full arrows), 296 and compact with it open.
+	hud.fit(Vector2(560, 320))
+	await _frames(2)
+	var closed := _standing(hud, "560x320")
+	_eq(closed.ways.size() + closed.folded, 8, "560x320: all eight counted")
+	_check(closed.folded > 0, "560x320: folded again: " + closed.said())
+	hud.open_drawer()
+	await _frames(2)
+	_check(hud.edge_arrows_compact(), "the drawer open narrows the world: compact")
+	var opened := _standing(hud, "560x320, the drawer open")
+	_eq(opened.ways.size() + opened.folded, 8, "the drawer open: all eight counted")
+	_check(opened.ways.size() < closed.ways.size(), "with fewer arrows of their own: " + opened.said())
+	hud.close_drawer()
+	hud.fit(Vector2(480, 320))
+	await _frames(2)
+	var again := _standing(hud, "480x320 again")
+	_eq([again.ways, again.folded], [narrow.ways, narrow.folded], "back at 480x320: folded as at first")
+	_eq(hud.edge_arrows.find_children("*", "OfficeEdgeArrow", true, false), nodes, "the same eight nodes throughout")
+	hud.free()
+
+
 ## An arrow is tall enough for its badge's pulse: at every lift the pulse takes
 ## (OfficeAttention.PULSES, up to 2 units), full or compact, the badge's drawn
 ## pixels stay inside the arrow's frame.
@@ -996,6 +1188,69 @@ func test_an_arrow_click_pans_to_the_desk_and_selects_nothing() -> void:
 	_done(office)
 
 
+## A heading click wins over herdr's focus moving in a snapshot that arrived
+## but is not drawn yet: a real press on bee's heading, the snapshot, the
+## release. The release's own refresh takes that snapshot in, and bee's map is
+## the one shown, not the map the focus moved on; the selection is herdr's new
+## focus all the same, and the next move of the focus is followed as ever.
+func test_a_heading_click_wins_over_a_focus_move_not_drawn_yet() -> void:
+	var office := await _two_machine_office()
+	await _frames(2)
+	var navigator := office.navigator
+	var at := office.hud.spaces.heading_for(BEE).button().get_global_rect().get_center()
+	var revision := navigator.nav_revision
+	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, true))
+	var drawn := office.refreshes
+	_arrive(office, _focused_on(fixture, "hs:p2"))
+	_eq(
+		[office.refreshes, navigator.active_key, navigator.shown_key],
+		[drawn, _pane("hs:p1"), LOCAL],
+		"a snapshot with the focus moved is waiting, not drawn"
+	)
+	_release_now(at)
+	_eq(navigator.shown_key, BEE, "released: bee's map is shown, though the focus moved on Local's")
+	await _frames(3)
+	_eq([navigator.shown_key, office.shown_machine()], [BEE, BEE], "and it stays shown once the frame's queue has run")
+	_eq(navigator.active_key, _pane("hs:p2"), "the selection is herdr's new focus")
+	_eq(navigator.nav_revision, revision + 1, "one navigation: the heading")
+	_feed(office, _focused_on(fixture, "ops:p1"))
+	await _frames(3)
+	_eq(navigator.shown_key, LOCAL, "the next move of the focus is followed again: Local's map")
+	_check(_desk_in_view(office, _pane("ops:p1")), "its desk panned into the world's room")
+	_done(office)
+
+
+## An edge arrow wins the same way: a real press on 1A's arrow, a snapshot with
+## the focus moved to a desk out of sight, the release. The map pans to the
+## arrow's desk, not to the newly focused one; the next move is followed again.
+func test_an_arrow_click_wins_over_a_focus_move_not_drawn_yet() -> void:
+	var office := await _live_office()
+	await _frames(2)
+	var navigator := office.navigator
+	var arrow := office.hud.edge_arrows.shown()[0]
+	var wanted := arrow.pane_key()
+	var focused := _pane("notes:p1")
+	var at := arrow.get_global_rect().get_center()
+	var revision := navigator.nav_revision
+	_eq(wanted, _pane("hud:p1"), "the arrow is for 1A's blocked desk")
+	_check(not _desk_in_view(office, wanted) and not _desk_in_view(office, focused), "it and 4's desk are out of sight")
+	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, true))
+	var drawn := office.refreshes
+	_arrive(office, _focused_on(fixture, "notes:p1"))
+	_eq([office.refreshes, navigator.active_key], [drawn, _pane("hs:p1")], "a snapshot with the focus moved is waiting")
+	_release_now(at)
+	await _frames(3)
+	_check(_desk_in_view(office, wanted), "released: the arrow's desk is inside the world's room")
+	_check(not _desk_in_view(office, focused), "and not the newly focused one")
+	_eq(navigator.active_key, focused, "which is the selection all the same")
+	_eq(navigator.nav_revision, revision + 1, "one navigation: the arrow")
+	_check(not _desk_in_view(office, _pane("data:p2")), "1B's desk is out of sight too")
+	_feed(office, _focused_on(fixture, "data:p2"))
+	await _frames(3)
+	_check(_desk_in_view(office, _pane("data:p2")), "the next move of the focus is followed again")
+	_done(office)
+
+
 ## An arrow goes when a real drag brings its zone's blocked desks into view,
 ## and comes back when another drag takes them out again: worked out from the
 ## view as it moves, with no refresh at all.
@@ -1084,14 +1339,58 @@ func test_hovering_an_arrow_outlines_its_zones_row() -> void:
 	_eq([office.camera.pan, office.navigator.nav_revision], [pan, revision], "nothing panned or navigated")
 	await _pointer_to(office.hud.world_rect().get_center())
 	_eq(row.theme_type_variation, &"SpaceRow", "leaving restores it")
-	# In view and pointed at once: the mark and the outline are apart.
-	await _visit_floor(office, _zone("hs"))
-	office.camera.pan = Vector2(office.camera.pan.x, office.camera.pan.y + 40)
-	await _frames(3)
+	# In view and pointed at once: the mark and the outline are apart. Pan down
+	# until 1A's zone comes into view; its blocked desk is still below it.
+	_check(not row.in_view(), "1A's zone starts out of view")
+	var steps := 0
+	while not row.in_view() and steps < 40:
+		office.camera.pan += Vector2(0, 4)
+		await _frames(2)
+		steps += 1
+	_check(row.in_view(), "panned down, 1A's zone is in view and its row marked")
 	var shown := office.hud.edge_arrows.shown()
-	if not shown.is_empty() and row.in_view():
-		await _pointer_to(shown[0].get_global_rect().get_center())
-		_check(row.pointed() and row.in_view(), "a row in view can be outlined too")
+	_eq(
+		shown.map(func(each: OfficeEdgeArrow) -> String: return each.zone_key()),
+		[_zone("hud")],
+		"while its blocked desk is still off screen: its arrow stands"
+	)
+	_eq(row.theme_type_variation, &"SpaceRow", "not outlined yet")
+	await _pointer_to(shown[0].get_global_rect().get_center())
+	_check(row.pointed() and row.in_view(), "a row in view is outlined too, and keeps its mark")
+	_eq(row.theme_type_variation, &"SpaceRowPointed", "by the theme's look")
+	_done(office)
+
+
+## An arrow's node is handed another zone while the pointer rests on it (the
+## zone it stood for stopped waiting, another one waits): the row outlined is
+## the zone the arrow stands for now, with no move of the pointer; and when
+## nobody waits any more and the arrow goes, no row is outlined.
+func test_an_arrow_handed_another_zone_under_the_pointer_outlines_that_zones_row() -> void:
+	var first := _six_zones()
+	_record_of(first, "w4:t0:p0").agent_status = "blocked"
+	var office := await _live_office(first)
+	await _frames(2)
+	var arrow := office.hud.edge_arrows.shown()[0]
+	var rail := office.hud.spaces
+	_eq(arrow.zone_key(), _zone("w4"), "an arrow for 5, whose blocked desk is below the view")
+	var at := arrow.get_global_rect().get_center()
+	await _pointer_to(at)
+	_check(rail.row_for(_zone("w4")).pointed(), "the pointer on it outlines 5's row")
+	var second := _six_zones()
+	_record_of(second, "w5:t0:p0").agent_status = "blocked"
+	_feed(office, second)
+	await _frames(3)
+	var still := office.hud.edge_arrows.shown()
+	_check(still.size() == 1 and still[0] == arrow, "the same node is the one arrow still")
+	_eq(arrow.zone_key(), _zone("w5"), "handed 6, which waits now")
+	_check(arrow.get_global_rect().has_point(at), "and still under the pointer, which has not moved")
+	_check(rail.row_for(_zone("w5")).pointed(), "6's row is the one outlined")
+	_check(not rail.row_for(_zone("w4")).pointed(), "5's no more")
+	_feed(office, _six_zones())
+	await _frames(3)
+	_eq(office.hud.edge_arrows.shown().size(), 0, "nobody waits: the arrow goes")
+	var outlined := rail.row_keys().filter(func(key: String) -> bool: return rail.row_for(key).pointed())
+	_eq(outlined, [], "and no row is outlined")
 	_done(office)
 
 
@@ -1431,6 +1730,104 @@ func _target(zone: String, number: String, rect: Rect2, msec: int) -> EdgeArrowM
 	return target
 
 
+## What _standing() read off the arrows a HUD shows.
+class Standing:
+	extends RefCounted
+	## The zones with an arrow of their own, in the arrows' order.
+	var ways: Array = []
+	## How many zones the `+N` notes count between them, and their tooltips' lines.
+	var folded := 0
+	var lines := PackedStringArray()
+
+	func said() -> String:
+		return "%d arrows, +%d folded" % [ways.size(), folded]
+
+
+## The arrows `hud` shows now, read off its nodes. Checks, wherever they stand,
+## that no two meet, that each is inside the world's rectangle, and that an
+## arrow on a side edge is clear of the rows along the top and the bottom.
+func _standing(hud: OfficeHud, where: String) -> Standing:
+	var stood := Standing.new()
+	var room := hud.world_rect()
+	var inset := float(hud.edge_arrows.get_theme_constant(&"inset", &"EdgeArrows"))
+	var gap := float(hud.edge_arrows.get_theme_constant(&"gap", &"EdgeArrows"))
+	var shown := hud.edge_arrows.shown()
+	var models := hud.edge_arrows.models()
+	for index in shown.size():
+		var arrow := shown[index]
+		var rect := arrow.get_global_rect()
+		_check(room.encloses(rect), "%s: arrow %d inside the world %s: %s" % [where, index, room, rect])
+		for other in range(index + 1, shown.size()):
+			var beside := shown[other].get_global_rect()
+			_check(
+				not rect.intersects(beside), "%s: arrows %d and %d apart: %s, %s" % [where, index, other, rect, beside]
+			)
+		var edge := models[index].edge
+		if edge == EdgeArrowModel.Edge.LEFT or edge == EdgeArrowModel.Edge.RIGHT:
+			var row := inset + rect.size.y + gap
+			var clear := rect.position.y >= room.position.y + row and rect.end.y <= room.end.y - row
+			_check(clear, "%s: arrow %d clear of the corners' rows: %s in %s" % [where, index, rect, room])
+		if arrow.disabled:
+			stood.folded += _label(arrow, "%Zone").text.trim_prefix("+").to_int()
+			stood.lines.append_array(arrow.tooltip_text.split("\n"))
+		else:
+			stood.ways.append(arrow.zone_key())
+	return stood
+
+
+## `count` blocked desks of as many zones `z0`.., all at one place 1000 units
+## beyond `edge` of `view`; `z0` has waited longest.
+func _beyond(view: Rect2, edge: EdgeArrowModel.Edge, count: int) -> Array[EdgeArrowModel.Target]:
+	var at := view.get_center()
+	match edge:
+		EdgeArrowModel.Edge.TOP:
+			at.y = view.position.y - 1000.0
+		EdgeArrowModel.Edge.BOTTOM:
+			at.y = view.end.y + 1000.0
+		EdgeArrowModel.Edge.LEFT:
+			at.x = view.position.x - 1000.0
+		EdgeArrowModel.Edge.RIGHT:
+			at.x = view.end.x + 1000.0
+	var targets: Array[EdgeArrowModel.Target] = []
+	for index in count:
+		targets.append(
+			_target("z%d" % index, str(index + 1), Rect2(at - Vector2(8, 8), Vector2(16, 16)), 1000 * (count - index))
+		)
+	return targets
+
+
+## `count` workspaces `w0`.. of one tab and one claude agent each, herdr's
+## focus in the first, which works; every other one is blocked.
+func _blocked_zones(count: int) -> Dictionary:
+	var raw := {"workspaces": [], "tabs": [], "panes": [], "layouts": [], "focused_pane_id": "w0:p0"}
+	for index in count:
+		var workspace := "w%d" % index
+		var tab := workspace + ":t"
+		_list(raw, "workspaces").append({"workspace_id": workspace, "number": index + 1, "label": workspace})
+		_list(raw, "tabs").append({"workspace_id": workspace, "tab_id": tab, "number": 1, "label": "main"})
+		var pane := {"workspace_id": workspace, "tab_id": tab, "pane_id": workspace + ":p0"}
+		pane.merge({"terminal_id": "terminal-" + workspace, "agent": "claude"})
+		pane.agent_status = "working" if index == 0 else "blocked"
+		_list(raw, "panes").append(pane)
+	return raw
+
+
+## A snapshot reaches Local as its stream delivers one: the fleet queues its
+## refresh for the end of the frame and nothing is drawn yet (_feed() draws it
+## at once).
+func _arrive(office: OfficeDouble, snapshot: Dictionary) -> void:
+	_fed[office.get_instance_id()] = snapshot.duplicate(true)
+	_local(office)._apply_snapshot(snapshot.duplicate(true))
+
+
+## The release of a left press at `at`, handed to the window with no frame
+## going by: what was queued for the end of this frame is still waiting when
+## the gesture's own refresh runs.
+func _release_now(at: Vector2) -> void:
+	Input.parse_input_event(_mouse_button(at, MOUSE_BUTTON_LEFT, false))
+	Input.flush_buffered_events()
+
+
 ## A HUD on its own, laid out for the suite's screen.
 func _hud() -> OfficeHud:
 	var art := ArtPack.from_manifest(MANIFESTS[0])
@@ -1488,6 +1885,15 @@ func _nobody_blocked(snapshot: Dictionary) -> Dictionary:
 func _desk_in_view(office: OfficeDouble, key: String) -> bool:
 	var target := _desk_target(office, key)
 	return office.hud.world_rect().encloses(Rect2(target.position - office.camera.position, target.size))
+
+
+## The record of pane `pane_id` in `snapshot`, to change in place.
+func _record_of(snapshot: Dictionary, pane_id: String) -> Dictionary:
+	for pane: Dictionary in _list(snapshot, "panes"):
+		if str(pane.get("pane_id", "")) == pane_id:
+			return pane
+	_fail("no pane " + pane_id)
+	return {}
 
 
 ## Six workspaces of four working agents each, herdr's focus on the first: a

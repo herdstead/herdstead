@@ -12,11 +12,15 @@ extends RefCounted
 ## fits a column is kept whole: in the column it starts in when what is left of
 ## that holds it, else in the next. One taller than the room is split at a row
 ## boundary, and its caption is repeated at the top of each column it runs on
-## into (`continued`). A column is as wide as its widest row or caption.
+## into (`continued`). A column is as wide as its widest row.
 ##
 ## fit() takes the largest cell of the ladder at which that flow fits the room;
 ## if nothing fits even at the smallest cell, it uses that cell, the shortest
-## columns the width holds, and the view scrolls vertically. Pure: no node, no
+## columns the width holds, and the view scrolls vertically. The captions have
+## no say in that: the cell and the columns are the desks' alone. A caption
+## wider than its column's rows then widens the column only into the width the
+## desks leave over in the room, the first columns first; what it does not get
+## it is cut to (the view draws it with an ellipsis). Pure: no node, no
 ## theme lookup; the view hands in the scene's ladder and the theme's measures
 ## (Rules).
 
@@ -75,8 +79,9 @@ var _first := PackedInt32Array()
 ## Lay out `rows` (per view row, each table's capacity in columns, left to
 ## right) in a room `room` units big, by `rules`. `sections` says how many of
 ## those rows, in order, each section holds, and `captions` how wide each
-## section's caption is drawn (a column is never narrower than a caption in
-## it); without `sections` the rows are one run with no caption band.
+## section's caption would be drawn whole (its column is widened to it as far
+## as the room has width the desks do not need); without `sections` the rows
+## are one run with no caption band.
 static func fit(
 	rows: Array[PackedInt32Array],
 	room: Vector2,
@@ -95,7 +100,7 @@ static func fit(
 	for tried: int in ladder:
 		var laid := flow.laid(tried, room.y)
 		if laid.size.x <= room.x and laid.size.y <= room.y:
-			return laid
+			return flow.laid(tried, room.y, room.x - laid.size.x)
 	# Nothing fits: the smallest cell, and columns only as much taller than the
 	# room as it takes for them to fit its width; one column when none does.
 	var smallest := ladder[ladder.size() - 1]
@@ -105,6 +110,7 @@ static func fit(
 	while found.size.x > room.x and found.columns > 1:
 		tall += step
 		found = flow.laid(smallest, tall)
+	found = flow.laid(smallest, tall, room.x - found.size.x)
 	found.scrolls = true
 	return found
 
@@ -187,7 +193,10 @@ class Flow:
 
 	## The rows flowed into columns `tall` units high, at cell `at_cell`. A
 	## column always takes a caption with its first row, however short `tall` is.
-	func laid(at_cell: int, tall: float) -> StrategicLayout:
+	## `spare` is the width the columns may take beyond their rows for captions
+	## wider than those, the first columns first; none by default, which is how
+	## fit() finds the cell and the columns.
+	func laid(at_cell: int, tall: float, spare := 0.0) -> StrategicLayout:
 		var made := StrategicLayout.new()
 		made._rules = _rules
 		made.cell = at_cell
@@ -196,6 +205,7 @@ class Flow:
 		var band := float(_rules.section) if _captioned else 0.0
 		var unit := _rules.caption + _box_height(at_cell)
 		var pen := Pen.new()
+		pen.spare = maxf(spare, 0.0)
 		var row := 0
 		for section in _sections.size():
 			var count := mini(_sections[section], _rows.size() - row)
@@ -252,11 +262,15 @@ class Pen:
 	## The column's left edge, and how far down it the next thing goes.
 	var x := 0.0
 	var y := 0.0
-	## Rows placed in this column, its widest row or caption, and the lowest
-	## box bottom of all columns.
+	## Rows placed in this column, its widest row, and the lowest box bottom of
+	## all columns.
 	var rows := 0
 	var widest := 0.0
 	var bottom := 0.0
+	## The widest caption of this column as it would be drawn whole, and the
+	## width the columns still to close may take beyond their rows for theirs.
+	var wanted := 0.0
+	var spare := 0.0
 	## The caption bands of this column, widened to it when it closes.
 	var _open: Array[Heading] = []
 
@@ -271,11 +285,16 @@ class Pen:
 		heading.continued = continued
 		made.headings.append(heading)
 		_open.append(heading)
-		widest = maxf(widest, wide)
+		wanted = maxf(wanted, wide)
 		bottom = maxf(bottom, y)
 
-	## This column is done: its captions are as wide as it is.
+	## This column is done: it takes what its captions want beyond its rows out
+	## of the spare width, as far as that goes, and its captions are as wide as
+	## it is.
 	func close(made: StrategicLayout) -> void:
+		var more := clampf(wanted - widest, 0.0, spare)
+		spare -= more
+		widest += more
 		for heading in _open:
 			heading.rect.size.x = widest
 		_open.clear()
@@ -287,4 +306,5 @@ class Pen:
 		y = 0.0
 		rows = 0
 		widest = 0.0
+		wanted = 0.0
 		column += 1

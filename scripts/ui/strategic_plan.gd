@@ -8,7 +8,9 @@ extends Control
 ## A caption is plain text (paper, the sign's face; never the zone's accent,
 ## which is structure in the world) with a rule on to its column's edge; a
 ## section that runs on into another column repeats it with `…`; hovering one
-## says what the sign's tooltip says. Captions are not clickable.
+## says what the sign's tooltip says. Captions are not clickable. A caption
+## never changes the cell its desks get: one longer than its column has width
+## for is cut with an ellipsis, and its tooltip leads with its whole words.
 ## The selected pane has four corners
 ## round its square (the world selection's shape, in the blocked colour), and
 ## a pane a HUD line points at has the pointer's ink / paper dash round it,
@@ -18,9 +20,12 @@ extends Control
 ##
 ## Where everything stands is StrategicLayout's, for the room the view hands
 ## in and the ladder of cells set in the scene (`cells`); the layout is made
-## again only when the map's sections, tables or the room change. It is drawn again
-## only when what it shows changes: the model's signature, the waits it writes,
-## the pointer or the layout.
+## again, and its text shaped again, only when the map's shape, words or the
+## room change. Which zone each caption stands for is read from every model: a
+## map with the same shape and words (another machine's, or a workspace
+## replaced by one with its number and label) has its own sections. It is drawn
+## again only when what it shows changes: the model's signature, the waits it
+## writes, the pointer or the layout.
 ##
 ## A left press and release on the same square, CLICK_SLOP apart at most, say
 ## picked(); a drag, or a click between squares, says nothing. The wheel is
@@ -56,11 +61,13 @@ var _waits: Dictionary[String, String] = {}
 ## Tab key -> its caption, shaped once per layout.
 var _captions: Dictionary[String, TextLine] = {}
 ## Every section caption of the layout, in reading order (StrategicLayout.headings):
-## what it says, its shaped line and its band in this control's units.
+## what it says, its shaped line and its band in this control's units, and
+## whether the band is too narrow for the words (the line is cut).
 var _heading_words := PackedStringArray()
 var _heading_lines: Array[TextLine] = []
 var _heading_rects: Array[Rect2] = []
-## The zone each of those captions names.
+var _heading_cut: Array[bool] = []
+## The zone each of those captions names, in the model shown now (_bind_headings()).
 var _heading_keys := PackedStringArray()
 var _pointed := ""
 ## The square a left press came down on, and where; empty while none is down.
@@ -206,14 +213,17 @@ func pointed_key() -> String:
 ## agent (`shell` for none), its state in the pack's words (`OFFLINE` on a
 ## machine that is not answering, `STARTING` while herdr launches it) and its
 ## wait, then where it sits; over a section's caption, what its zone's sign
-## tooltip says (repository, checkout, whose worktree); nothing elsewhere.
+## tooltip says (repository, checkout, whose worktree), under the caption's
+## whole words when it is cut; nothing elsewhere.
 func tooltip_at(at: Vector2) -> String:
 	var seat := _model.seat_of(_seat_at(at)) if _model != null else null
 	if seat == null:
 		for index in _heading_rects.size():
 			if _heading_rects[index].has_point(at):
 				var section := _model.section_of(_heading_keys[index])
-				return "" if section == null else section.tip
+				if section == null:
+					return ""
+				return section.caption + "\n" + section.tip if _heading_cut[index] else section.tip
 		return ""
 	var words := PackedStringArray()
 	if seat.provider.is_empty():
@@ -260,7 +270,8 @@ func _seat_at(at: Vector2) -> String:
 	return ""
 
 
-## The layout for this model's tables in `room`, made again only when either changed.
+## The layout for this model's tables in `room`, made again only when either
+## changed; the captions' zones are the model's own every time.
 func _relayout(room: Vector2, bar: float) -> void:
 	_last_room = room
 	_last_bar = bar
@@ -282,6 +293,7 @@ func _relayout(room: Vector2, bar: float) -> void:
 			_layout = StrategicLayout.fit(rows, room - Vector2(bar, 0), made, sections, wide)
 		_captions.clear()
 		_shape_headings()
+	_bind_headings()
 	custom_minimum_size = _layout.size
 	_squares.clear()
 	_boxes.clear()
@@ -309,7 +321,8 @@ func _relayout(room: Vector2, bar: float) -> void:
 
 
 ## How wide each section's caption is drawn at its widest (repeated, with
-## CONTINUED): StrategicLayout makes no column narrower than a caption in it.
+## CONTINUED): StrategicLayout widens a caption's column to it as far as the
+## desks leave width over, and no further.
 func _caption_widths() -> PackedFloat32Array:
 	var font := get_theme_font(&"section_font", &"Strategic")
 	var pixels := get_theme_constant(&"section_size", &"Strategic")
@@ -320,25 +333,33 @@ func _caption_widths() -> PackedFloat32Array:
 
 
 ## The layout's section captions, shaped once per layout: each in its band, cut
-## with an ellipsis where the room is narrower than even one caption.
+## with an ellipsis where its column is narrower than its words.
 func _shape_headings() -> void:
 	_heading_words = PackedStringArray()
 	_heading_lines.clear()
 	_heading_rects.clear()
-	_heading_keys = PackedStringArray()
+	_heading_cut.clear()
 	var font := get_theme_font(&"section_font", &"Strategic")
 	var pixels := get_theme_constant(&"section_size", &"Strategic")
 	for heading in _layout.headings:
-		var section := _model.sections[heading.section]
-		var said := section.caption + (CONTINUED if heading.continued else "")
+		var said := _model.sections[heading.section].caption + (CONTINUED if heading.continued else "")
 		var line := TextLine.new()
 		line.add_string(said, font, pixels)
+		_heading_cut.append(line.get_size().x > heading.rect.size.x)
 		line.width = heading.rect.size.x
 		line.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		_heading_words.append(said)
 		_heading_lines.append(line)
 		_heading_rects.append(heading.rect)
-		_heading_keys.append(section.key)
+
+
+## Which zone each caption stands for, from the model shown now. Every model,
+## not once per layout: a model with the same rows and words keeps the shaped
+## text and still names its own zones.
+func _bind_headings() -> void:
+	_heading_keys = PackedStringArray()
+	for heading in _layout.headings:
+		_heading_keys.append(_model.sections[heading.section].key)
 
 
 ## Queue a drawing when what it would show differs from the last one queued.

@@ -4,10 +4,12 @@ extends RefCounted
 ## with blocked desks off screen, which edge they lie beyond and where along
 ## it, and how many are waiting there. A click pans to its longest-waiting
 ## desk; it selects nothing. The office works the list out from the view and
-## the map it drew (OfficeViewMarks); the arrows only draw it.
+## the map it drew (OfficeViewMarks); the arrows only draw it, folding what an
+## edge has no room for (fit()).
 ##
 ## Pure: of() takes the view and the blocked desks as rectangles and waits, and
-## never asks a clock or a node.
+## fit() how many arrows each edge holds as numbers; neither asks a clock or a
+## node.
 
 ## The edge of the view an arrow stands on.
 enum Edge { TOP, RIGHT, BOTTOM, LEFT }
@@ -100,23 +102,41 @@ static func of(view: Rect2, targets: Array[Target]) -> Array[EdgeArrowModel]:
 		arrow.tip = "%s · %d blocked · longest %s" % [words[arrow.zone_key], arrow.blocked, _wait_words(arrow.wait)]
 	if found.size() <= POOL:
 		return found
-	var rest: Array[EdgeArrowModel] = []
-	rest.assign(found.slice(POOL - 1))
 	var note := EdgeArrowModel.new()
-	note.machine = rest[0].machine
-	note.edge = rest[0].edge
-	note.along = rest[0].along
-	note.wait = rest[0].wait
-	note.more = rest.size()
-	note.number = "+%d" % rest.size()
-	var lines := PackedStringArray()
-	for arrow in rest:
-		note.blocked += arrow.blocked
-		lines.append("%s %s" % [GLYPHS[arrow.edge], arrow.tip])
-	note.tip = "\n".join(lines)
+	for arrow: EdgeArrowModel in found.slice(POOL - 1):
+		note._count(arrow)
 	var shown: Array[EdgeArrowModel] = []
 	shown.assign(found.slice(0, POOL - 1))
 	shown.append(note)
+	return shown
+
+
+## `arrows` (of()'s, longest wait first) for edges that hold only so many:
+## `room` says how many arrows an edge has room for, and an edge it does not
+## name holds all of its own. An edge with more than its room keeps the first
+## of them, and its last place goes to a `+N` note for the rest: standing where
+## the first of them would, counting them, their lines in its tooltip, in the
+## list where the first of them was. An edge with room for none shows none.
+## of()'s own note is folded like an arrow and counts for the zones it stands
+## for. Per edge, so that a note still stands on the side its zones lie on.
+static func fit(arrows: Array[EdgeArrowModel], room: Dictionary[Edge, int]) -> Array[EdgeArrowModel]:
+	var wanted: Dictionary[Edge, int] = {}
+	for arrow in arrows:
+		wanted[arrow.edge] = wanted.get(arrow.edge, 0) + 1
+	var shown: Array[EdgeArrowModel] = []
+	var placed: Dictionary[Edge, int] = {}
+	var notes: Dictionary[Edge, EdgeArrowModel] = {}
+	for arrow in arrows:
+		var holds: int = room.get(arrow.edge, wanted[arrow.edge])
+		var before: int = placed.get(arrow.edge, 0)
+		placed[arrow.edge] = before + 1
+		if wanted[arrow.edge] <= holds or before < holds - 1:
+			shown.append(arrow)
+		elif holds > 0:
+			if not notes.has(arrow.edge):
+				notes[arrow.edge] = EdgeArrowModel.new()
+				shown.append(notes[arrow.edge])
+			notes[arrow.edge]._count(arrow)
 	return shown
 
 
@@ -158,6 +178,21 @@ static func _reach(view: Rect2, rect: Rect2) -> Vector2:
 		INF if is_zero_approx(toward.x) else half.x / absf(toward.x),
 		INF if is_zero_approx(toward.y) else half.y / absf(toward.y)
 	)
+
+
+## Count `arrow` (a zone's, or another note) in this `+N` note: the first one
+## counted says where the note stands and how long it has waited.
+func _count(arrow: EdgeArrowModel) -> void:
+	if more == 0:
+		machine = arrow.machine
+		edge = arrow.edge
+		along = arrow.along
+		wait = arrow.wait
+	var line := arrow.tip if arrow.more > 0 else "%s %s" % [GLYPHS[arrow.edge], arrow.tip]
+	tip = line if more == 0 else tip + "\n" + line
+	more += maxi(arrow.more, 1)
+	blocked += arrow.blocked
+	number = "+%d" % more
 
 
 ## A wait in the HUD's words (OfficeAttention.wait_text()): `12m`, `5s+`.

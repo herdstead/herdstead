@@ -829,6 +829,63 @@ func test_a_machine_pick_and_a_desk_pan_count_one_and_select_nothing() -> void:
 	_eq([navigator.take_pan_to(), navigator.take_pan_to()], [_local("infra:p1"), ""], "taken once")
 
 
+## A machine picked wins over herdr's focus moving in the settle that carries
+## the pick out (a snapshot with a moved focus can be waiting when the heading
+## is clicked): that machine's map is the one wanted, and nothing is asked for
+## the focus. The settle still sees where the focus is, so the move it passed
+## over is not replayed by the next one; a later move is followed as ever.
+func test_a_machine_pick_wins_over_a_focus_move_in_the_same_settle() -> void:
+	var navigator := OfficeNavigator.new()
+	_eq(_show(navigator, _frame(floors, basic)), LOCAL, "Local's map, herdr's focus followed")
+	var revision := navigator.nav_revision
+	navigator.pick_machine(BEE)
+	var moved := _frame(floors, basic)
+	moved.herdr_focus = _local("web:p1")
+	_eq(navigator.settle(moved), BEE, "the machine asked for, though the focus moved before its settle")
+	_eq([navigator.picked_machine, navigator.pan_to], [BEE, ""], "nothing asked for the focus")
+	_eq(navigator.active_key, _local("web:p1"), "which is still the selection")
+	_eq(_show(navigator, moved), BEE, "bee's map is shown")
+	_eq(navigator.settle(moved), BEE, "the next settle, the focus where that one saw it")
+	_eq(navigator.pan_to, "", "does not replay the move it passed over")
+	var again := _frame(floors, basic)
+	again.herdr_focus = _local("infra:p1")
+	_eq(navigator.settle(again), LOCAL, "a later move of the focus is followed again, to its machine")
+	_eq([navigator.pan_to, navigator.pan_whole_table], [_local("infra:p1"), false], "and revealed as far as it takes")
+	_eq(navigator.nav_revision, revision + 1, "one navigation: the pick")
+
+
+## A desk asked for (an edge arrow) wins the same way: the pan the settle
+## leaves is to that desk, not to a focus that moved before it, on this machine
+## or onto another; the move is not replayed, and a later one is followed.
+func test_a_desk_pan_wins_over_a_focus_move_in_the_same_settle() -> void:
+	var navigator := OfficeNavigator.new()
+	_eq(_show(navigator, _frame(floors, basic)), LOCAL, "Local's map, herdr's focus followed")
+	var revision := navigator.nav_revision
+	navigator.pan_to_desk(_local("infra:p1"))
+	var moved := _frame(floors, basic)
+	moved.herdr_focus = _local("web:p1")
+	_eq(navigator.settle(moved), LOCAL, "the same map")
+	_eq(
+		[navigator.pan_to, navigator.pan_whole_table],
+		[_local("infra:p1"), false],
+		"the desk asked for, though the focus moved before its settle"
+	)
+	_eq(navigator.active_key, _local("web:p1"), "the focus is still the selection")
+	_eq(navigator.take_pan_to(), _local("infra:p1"), "taken by the office")
+	navigator.settle(moved)
+	_eq(navigator.pan_to, "", "the next settle does not replay the move it passed over")
+	navigator.pan_to_desk(_local("notes:p1"))
+	var away := _frame(floors, basic)
+	away.herdr_focus = _bee("bravo:p1")
+	_eq(navigator.settle(away), LOCAL, "a focus that moved onto another machine does not take the map either")
+	_eq(navigator.take_pan_to(), _local("notes:p1"), "the desk asked for")
+	var again := _frame(floors, basic)
+	again.herdr_focus = _local("api:p2")
+	_eq(navigator.settle(again), LOCAL, "a later move of the focus")
+	_eq([navigator.pan_to, navigator.pan_whole_table], [_local("api:p2"), false], "is followed again")
+	_eq(navigator.nav_revision, revision + 2, "two navigations: the two desks asked for")
+
+
 # --- the command line ---------------------------------------------------------
 
 

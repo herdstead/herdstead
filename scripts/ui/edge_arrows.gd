@@ -16,14 +16,24 @@ extends Control
 ## only writes text, visibility and where each stands. An arrow stands at
 ## `along` of its edge, kept inside by the theme's `inset` and clear of its
 ## neighbours by its `gap`; the corners belong to the top and bottom edges.
+##
+## No two arrows ever meet, and none leaves this control: an edge shows as many
+## as it has room for between its ends, by the arrows' own sizes, and folds the
+## rest, the ones that waited least, into a `+N` note on that edge
+## (EdgeArrowModel.fit()). What was handed is kept whole, so the fold follows
+## the room: a wider world or full arrows after compact ones bring them back.
 
 ## An arrow was pressed: pan to the desk of pane `pane_key`.
 signal arrow_picked(pane_key: String)
 ## The mouse came onto an arrow for zone `zone_key` (`""` for the `+N` note),
-## or left it (`""`).
+## or left it (`""`); or the arrow under a resting mouse was handed another
+## zone, or hidden (`""`).
 signal zone_pointed(zone_key: String)
 
-## What the arrows shown now were drawn from, in the nodes' order.
+## What the office handed last (show_arrows()), all of it.
+var _handed: Array[EdgeArrowModel] = []
+## What the arrows shown now were drawn from, in the nodes' order: `_handed`,
+## folded for the room each edge has (_arrange()).
 var _models: Array[EdgeArrowModel] = []
 var _compact := false
 
@@ -33,29 +43,23 @@ func _ready() -> void:
 		arrow.picked.connect(_on_picked)
 		arrow.mouse_entered.connect(_on_entered.bind(arrow))
 		arrow.mouse_exited.connect(_on_exited)
-	resized.connect(_place)
+	resized.connect(_arrange)
 
 
 ## Take the pack's art in every arrow; a theme switch rebuilds nothing.
 func dress(art: ArtPack) -> void:
 	for arrow in _nodes():
 		arrow.dress(art)
-	_place()
+	_arrange()
 
 
 ## Draw `arrows`, in order, one node each (the office never hands more than the
-## scene holds: EdgeArrowModel.of() folds the rest into its last one), and hide
-## the nodes past them. Whether the control shows at all is the HUD's.
+## scene holds: EdgeArrowModel.of() folds the rest into its last one), as far
+## as their edges have room (_arrange()), and hide the nodes past them. Whether
+## the control shows at all is the HUD's.
 func show_arrows(arrows: Array[EdgeArrowModel]) -> void:
-	var nodes := _nodes()
-	_models.assign(arrows.slice(0, nodes.size()))
-	for index in nodes.size():
-		var arrow := nodes[index]
-		if index < _models.size():
-			arrow.show_arrow(_models[index])
-		elif arrow.visible:
-			arrow.hide_arrow()
-	_place()
+	_handed.assign(arrows.slice(0, _nodes().size()))
+	_arrange()
 
 
 ## Leave each zone's number to its arrow's tooltip (`on`): a narrow world's arrows.
@@ -65,7 +69,7 @@ func set_compact(on: bool) -> void:
 	_compact = on
 	for arrow in _nodes():
 		arrow.set_compact(on)
-	_place()
+	_arrange()
 
 
 ## The arrows shown now, longest wait first.
@@ -82,40 +86,76 @@ func models() -> Array[EdgeArrowModel]:
 	return _models
 
 
+## Draw what was handed in the room there is now, and stand each arrow on its
+## edge. Measured, not reckoned: the arrows are written into the nodes, each
+## edge's are added up along its run, and an edge they overflow is given one
+## fewer (EdgeArrowModel.fit() folds the rest into its note, whose own width
+## counts) until every edge holds its own. A zone whose arrow is under a
+## resting mouse is said again when that node changed hands.
+func _arrange() -> void:
+	var nodes := _nodes()
+	var pointed := _pointed()
+	var room: Dictionary[EdgeArrowModel.Edge, int] = {}
+	# An edge loses one each time round, so the pool bounds the tries.
+	for _attempt in nodes.size() + 1:
+		_models = EdgeArrowModel.fit(_handed, room)
+		for index in nodes.size():
+			if index < _models.size():
+				nodes[index].show_arrow(_models[index])
+			elif nodes[index].visible:
+				nodes[index].hide_arrow()
+		var short := _overflowing(nodes)
+		if short.is_empty():
+			break
+		room.merge(short, true)
+	_place(nodes)
+	if _pointed() != pointed:
+		zone_pointed.emit(_pointed())
+
+
+## The edges whose arrows, with the gaps between them, are longer than the
+## edge's run: each with one fewer than it holds now.
+func _overflowing(nodes: Array[OfficeEdgeArrow]) -> Dictionary[EdgeArrowModel.Edge, int]:
+	var gap := float(get_theme_constant(&"gap", &"EdgeArrows"))
+	var short: Dictionary[EdgeArrowModel.Edge, int] = {}
+	for edge: EdgeArrowModel.Edge in EdgeArrowModel.GLYPHS:
+		var on_edge := _on_edge(edge)
+		if on_edge.is_empty():
+			continue
+		var run := _run(edge, nodes[on_edge[0]])
+		var taken := -gap
+		for index in on_edge:
+			taken += _long(edge, nodes[index]) + gap
+		if taken > run.y - run.x:
+			short[edge] = on_edge.size() - 1
+	return short
+
+
 ## Stand every arrow shown on its edge. Along an edge they go in `along` order,
 ## each at its own place when that is free, pushed on by the one before it and
-## back by the edge's end. The side edges leave the top and bottom rows to the
-## arrows there, so no two ever share a corner.
-func _place() -> void:
-	var nodes := _nodes()
+## back by the edge's end; _arrange() has seen to it that they fit. The side
+## edges leave the top and bottom rows to the arrows there, so no two ever
+## share a corner.
+func _place(nodes: Array[OfficeEdgeArrow]) -> void:
 	var inset := float(get_theme_constant(&"inset", &"EdgeArrows"))
 	var gap := float(get_theme_constant(&"gap", &"EdgeArrows"))
 	for edge: EdgeArrowModel.Edge in EdgeArrowModel.GLYPHS:
-		var across := edge == EdgeArrowModel.Edge.TOP or edge == EdgeArrowModel.Edge.BOTTOM
-		var on_edge: Array[int] = []
-		for index in _models.size():
-			if _models[index].edge == edge:
-				on_edge.append(index)
-		on_edge.sort_custom(func(a: int, b: int) -> bool: return _models[a].along < _models[b].along)
+		var on_edge := _on_edge(edge)
+		if on_edge.is_empty():
+			continue
+		var across := _across(edge)
 		var span := size.x if across else size.y
+		var run := _run(edge, nodes[on_edge[0]])
 		var starts := PackedFloat32Array()
-		var first := inset
-		var limit := span - inset
-		if not across and not on_edge.is_empty():
-			# The rows along the top and the bottom are the arrows' there.
-			var corner := nodes[on_edge[0]].size.y + gap
-			first += corner
-			limit -= corner
-		var from := first
+		var from := run.x
 		for index in on_edge:
-			var long := nodes[index].size.x if across else nodes[index].size.y
-			var start := maxf(_models[index].along * span - long / 2.0, from)
+			var start := maxf(_models[index].along * span - _long(edge, nodes[index]) / 2.0, from)
 			starts.append(start)
-			from = start + long + gap
+			from = start + _long(edge, nodes[index]) + gap
+		var limit := run.y
 		for at in range(on_edge.size() - 1, -1, -1):
 			var node := nodes[on_edge[at]]
-			var long := node.size.x if across else node.size.y
-			starts[at] = maxf(minf(starts[at], limit - long), first)
+			starts[at] = maxf(minf(starts[at], limit - _long(edge, node)), run.x)
 			limit = starts[at] - gap
 			var along := roundf(starts[at])
 			match edge:
@@ -127,6 +167,47 @@ func _place() -> void:
 					node.position = Vector2(inset, along)
 				EdgeArrowModel.Edge.RIGHT:
 					node.position = Vector2(size.x - inset - node.size.x, along)
+
+
+## The models' places in `_models` (and so the nodes') that stand on `edge`, in
+## `along` order.
+func _on_edge(edge: EdgeArrowModel.Edge) -> Array[int]:
+	var on_edge: Array[int] = []
+	for index in _models.size():
+		if _models[index].edge == edge:
+			on_edge.append(index)
+	on_edge.sort_custom(func(a: int, b: int) -> bool: return _models[a].along < _models[b].along)
+	return on_edge
+
+
+## Where the arrows on `edge` may stand along it, from `x` to `y`: the theme's
+## inset in from both ends, and on a side edge the rows along the top and the
+## bottom, which are the arrows' there (a row is as high as `arrow`, one of its
+## own, and the gap).
+func _run(edge: EdgeArrowModel.Edge, arrow: OfficeEdgeArrow) -> Vector2:
+	var inset := float(get_theme_constant(&"inset", &"EdgeArrows"))
+	if _across(edge):
+		return Vector2(inset, size.x - inset)
+	var corner := inset + arrow.size.y + float(get_theme_constant(&"gap", &"EdgeArrows"))
+	return Vector2(corner, size.y - corner)
+
+
+## How much of `edge` `arrow` takes along it.
+func _long(edge: EdgeArrowModel.Edge, arrow: OfficeEdgeArrow) -> float:
+	return arrow.size.x if _across(edge) else arrow.size.y
+
+
+## Whether `edge` runs across the world (top, bottom) rather than down it.
+static func _across(edge: EdgeArrowModel.Edge) -> bool:
+	return edge == EdgeArrowModel.Edge.TOP or edge == EdgeArrowModel.Edge.BOTTOM
+
+
+## The zone of the arrow the mouse is on; empty for none, and for the note.
+func _pointed() -> String:
+	for arrow in _nodes():
+		if arrow.visible and arrow.is_hovered():
+			return arrow.zone_key()
+	return ""
 
 
 func _on_picked(pane_key: String) -> void:

@@ -1065,6 +1065,186 @@ func test_a_rail_click_while_open_scrolls_to_its_section() -> void:
 	_done(office)
 
 
+## Two machines with the same map (the same zones, numbers and labels): the
+## view open on Local's, a real click on bee's heading draws bee's. The
+## sections are bee's zones then, though nothing about their captions or their
+## places changed: a caption's tooltip is its own zone's sign, and a click on
+## bee's last rail row, or PageDown, scrolls to that zone's caption.
+func test_a_machine_with_the_same_map_has_its_own_sections() -> void:
+	var raw := _many_zones(40)
+	var office := await _two_machine_office(raw, SMALL)
+	_feed_bee(office, raw)
+	office.refresh()
+	await _frames(3)
+	await _office_key(office, KEY_S)
+	await _frames(3)
+	var plan := _plan(office)
+	var scroll: ScrollContainer = office.hud.strategic.get_node("%Scroll")
+	var local_last := _pk("z39")
+	var bee_last := HerdrFleet.pane_key(BEE, "z39")
+	_eq(plan.section_rects(local_last).size(), 1, "Local's map: its last zone has a caption")
+	var band := plan.section_rects(local_last)[0]
+	var captions := plan.captions_drawn()
+	var heading := office.hud.spaces.heading_for(BEE)
+	var rail: ScrollContainer = office.hud.spaces.get_node("%Scroll")
+	rail.ensure_control_visible(heading)
+	await _frames(2)
+	await _press(heading.button())
+	await _frames(3)
+	_eq(office.navigator.shown_key, BEE, "a real click on bee's heading shows bee's map")
+	_check(office.hud.strategic_open(), "the view stays open")
+	_eq(office.hud.strategic.title_text(), "@ BEE", "and is titled for bee")
+	_eq(plan.captions_drawn(), captions, "the same captions, word for word")
+	_eq(plan.section_rects(bee_last), [band] as Array[Rect2], "bee's last zone has the caption there now")
+	_eq(plan.section_rects(local_last).size(), 0, "and Local's zone has none")
+	var tip := OfficeQuestionTips.sign_text(office.frame.find_zone(bee_last))
+	_check(not tip.is_empty(), "bee's zone has a sign tooltip")
+	_eq(plan.tooltip_at(band.get_center()), tip, "hovering the caption says bee's zone's sign")
+	_eq(scroll.scroll_vertical, 0, "the schematic is at the top")
+	_check(not _caption_seen(office, bee_last), "bee's last caption out of sight below")
+	await _visit_floor(office, bee_last)
+	await _frames(3)
+	_check(scroll.scroll_vertical > 0, "a real click on bee's last rail row scrolls the schematic")
+	_check(_caption_seen(office, bee_last), "to that zone's caption")
+	# PageDown from bee's first zone to the first one whose caption is out of sight.
+	await _visit_floor(office, HerdrFleet.pane_key(BEE, "z0"))
+	await _frames(3)
+	_eq(scroll.scroll_vertical, 0, "bee's first row scrolls back to the top")
+	var steps := 1
+	while steps < 39 and _caption_seen(office, HerdrFleet.pane_key(BEE, "z%d" % steps)):
+		steps += 1
+	var below := HerdrFleet.pane_key(BEE, "z%d" % steps)
+	_check(not _caption_seen(office, below), "bee's zone %d is out of sight" % (steps + 1))
+	for step in steps:
+		await _office_key(office, KEY_PAGEDOWN)
+	await _frames(3)
+	_eq(office.navigator.current_zone(office.frame), below, "PageDown to it")
+	_check(_caption_seen(office, below), "scrolls its caption into sight")
+	_done(office)
+
+
+## One machine, a workspace closed and another opened with the same number and
+## label: nothing the schematic draws changes, but the section is the new
+## zone's. Its caption's tooltip resolves, the zone that left has no caption,
+## and a real click on the new zone's rail row scrolls to it.
+func test_a_workspace_replaced_under_the_same_caption_is_a_new_section() -> void:
+	var raw := _many_zones(40)
+	var office := await _live_office(raw, SMALL)
+	await _office_key(office, KEY_S)
+	await _frames(3)
+	var plan := _plan(office)
+	var scroll: ScrollContainer = office.hud.strategic.get_node("%Scroll")
+	var old := _pk("z39")
+	_eq(plan.section_rects(old).size(), 1, "the last zone has a caption")
+	var band := plan.section_rects(old)[0]
+	var captions := plan.captions_drawn()
+	var replaced: Dictionary = raw.duplicate(true)
+	for list: String in ["workspaces", "tabs", "panes"]:
+		for record: Dictionary in _list(replaced, list):
+			if str(record.get("workspace_id", "")) == "z39":
+				record.workspace_id = "y39"
+				if list == "workspaces":
+					record.label = "z39"
+	_feed(office, replaced)
+	await _frames(3)
+	var fresh := _pk("y39")
+	_eq(Array(office.hud.spaces.row_keys()).back(), fresh, "the rail's last row is the new workspace")
+	_eq(plan.captions_drawn(), captions, "the same captions, word for word")
+	_eq(plan.section_rects(fresh), [band] as Array[Rect2], "the new zone has the caption there")
+	_eq(plan.section_rects(old).size(), 0, "and the zone that left has none")
+	var tip := OfficeQuestionTips.sign_text(office.frame.find_zone(fresh))
+	_eq(plan.tooltip_at(band.get_center()), tip, "hovering the caption says the new zone's sign")
+	_eq(plan.get_tooltip(band.get_center()), tip, "the Control's own tooltip")
+	_eq(scroll.scroll_vertical, 0, "the schematic is at the top")
+	await _visit_floor(office, fresh)
+	await _frames(3)
+	_check(scroll.scroll_vertical > 0, "a real click on its rail row scrolls the schematic")
+	_check(_caption_seen(office, fresh), "to its caption")
+	_done(office)
+
+
+## A workspace's label can be long (a remote one, read by HerdrSnapshot's
+## from_wire()). Its caption never changes the cell the desks get: the same
+## desks under a short and under a 100-character label have the same cell, the
+## schematic is no wider than its room, the caption is cut inside its column
+## and its whole words lead its tooltip. Pure too (StrategicLayout.fit()): a
+## caption widens its column only into width the desks leave over.
+func test_a_long_caption_is_cut_and_never_changes_the_cells() -> void:
+	var short := _many_zones(3)
+	var office := await _live_office(short, SMALL)
+	await _office_key(office, KEY_S)
+	await _frames(3)
+	var plan := _plan(office)
+	var room := office.hud.strategic.room_for(office.hud.strategic.size)
+	var cell := plan.cell()
+	var columns := plan.columns()
+	var key := _pk("z1")
+	var boxes := plan.seat_keys()
+	var on_sign := OfficeQuestionTips.sign_text(office.frame.find_zone(key))
+	_eq(plan.tooltip_at(plan.section_rects(key)[0].get_center()), on_sign, "a short caption's tooltip is its sign's")
+	var long: Dictionary = short.duplicate(true)
+	var label := "W".repeat(100)
+	_record(long, "workspaces", "workspace_id", "z1").label = label
+	_feed(office, long)
+	await _frames(3)
+	var words := "2 " + label
+	_eq(office.frame.find_zone(key).zone_model.label, label, "all 100 characters arrive")
+	_eq(Array(plan.captions_drawn())[1], words, "the caption says the sign's words")
+	_eq([plan.cell(), plan.columns()], [cell, columns], "the same cell and columns as under the short label")
+	_eq(plan.seat_keys(), boxes, "and the same squares")
+	_check(not plan.scrolls(), "nothing scrolls")
+	_check(plan.custom_minimum_size.x <= room.x, "no wider than its room: %s in %s" % [plan.custom_minimum_size, room])
+	var band := plan.section_rects(key)[0]
+	var font := plan.get_theme_font(&"section_font", &"Strategic")
+	var pixels := plan.get_theme_constant(&"section_size", &"Strategic")
+	var whole := font.get_string_size(words, HORIZONTAL_ALIGNMENT_LEFT, -1, pixels).x
+	_check(band.end.x <= room.x, "its band is inside the room: %s" % band)
+	_check(whole > band.size.x, "which is narrower than its words (%d): the caption is cut" % whole)
+	var tip := plan.tooltip_at(band.get_center())
+	_check(tip.begins_with(words + "\n"), "its tooltip leads with the whole words: " + tip.left(24))
+	_eq(tip, words + "\n" + on_sign, "then what the sign's tooltip says")
+	_eq(plan.get_tooltip(band.get_center()), tip, "the Control's own tooltip")
+	_eq(plan.tooltip_at(plan.section_rects(_pk("z0"))[0].get_center()), on_sign, "a caption that fits says only that")
+	_done(office)
+	# Pure: four rows in two sections, two columns of one 40-wide box each (88 in all).
+	var rules := StrategicLayout.Rules.new()
+	rules.cells = PackedInt32Array([16, 8])
+	rules.pad = 4
+	rules.gap = 8
+	rules.caption = 12
+	rules.divider = 2
+	rules.ring = 2
+	rules.section = 9
+	var two := PackedInt32Array([2, 2])
+	var bare := StrategicLayout.fit(_rows_of(4), Vector2(170, 150), rules, two)
+	_eq([bare.cell, bare.columns, bare.size.x], [16, 2, 152.0], "without captions: cell 16, two columns of 72")
+	var wide := PackedFloat32Array([1000.0, 1000.0])
+	var fit := StrategicLayout.fit(_rows_of(4), Vector2(170, 150), rules, two, wide)
+	_eq(
+		[fit.cell, fit.columns, fit.scrolls],
+		[16, 2, false],
+		"captions far wider than the room: the same cell and columns"
+	)
+	_eq(fit.size.x, 170.0, "as wide as the room and no wider")
+	_eq(
+		[fit.headings[0].rect.size.x, fit.headings[1].rect.size.x],
+		[90.0, 72.0],
+		"the first caption takes the 18 the desks leave over, the second its column's 72"
+	)
+	_eq(fit.box(2, 0).position.x, 98.0, "the second column starts a gap past the first")
+	# Desks wider than the room at the smallest cell: the caption adds nothing to them.
+	var narrow := StrategicLayout.fit(
+		_rows_of(2), Vector2(30, 400), rules, PackedInt32Array([2]), PackedFloat32Array([1000.0])
+	)
+	var without := StrategicLayout.fit(_rows_of(2), Vector2(30, 400), rules, PackedInt32Array([2]))
+	_eq(
+		[narrow.cell, narrow.size],
+		[without.cell, without.size],
+		"a room narrower than the desks: as wide as they need, no more"
+	)
+	_eq(narrow.headings[0].rect.size.x, 40.0, "the caption as wide as its column")
+
+
 # --- helpers ------------------------------------------------------------------
 
 
@@ -1149,10 +1329,13 @@ func _record(snapshot: Dictionary, list: String, field: String, value: String) -
 
 
 ## Whether the caption of zone `key`'s section is inside the schematic's
-## scrolled room.
+## scrolled room; false for a zone with no caption.
 func _caption_seen(office: OfficeDouble, key: String) -> bool:
 	var scroll: ScrollContainer = office.hud.strategic.get_node("%Scroll")
-	var band := _plan(office).section_rects(key)[0]
+	var bands := _plan(office).section_rects(key)
+	if bands.is_empty():
+		return false
+	var band := bands[0]
 	return band.position.y >= scroll.scroll_vertical and band.end.y <= scroll.scroll_vertical + scroll.size.y
 
 

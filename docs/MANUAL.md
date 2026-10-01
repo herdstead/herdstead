@@ -132,7 +132,8 @@ disappears, selection returns to herdr's focus. Clicking a seat never changes th
 one of its zones, PageUp / PageDown, `N`, a list pick) while it exists; otherwise the selected pane's machine (your
 pick, else herdr's focus, Local first); otherwise the first machine with a workspace; otherwise Local's empty map. A
 row click pans to its zone, its sign at the top of the world. While you have picked nothing, or the pane you picked is
-gone, herdr's focus moving pans to the new desk as far as it takes (and to another machine's map if it is there). A map
+gone, herdr's focus moving pans to the new desk as far as it takes (and to another machine's map if it is there); a
+heading or an edge arrow you click at the same moment wins, and the next move of the focus is followed again. A map
 seen for the first time opens on the selected pane's pod, else on its first zone; each map keeps where you left it
 panned.
 
@@ -190,8 +191,9 @@ windows right under the number; name, UNREAD count and mezzanine indent move int
 it: `↓ 3 ! 2` (the way, the zone's number, how many blocked desks are out of view). Hover it for the zone's name and the
 longest wait (`3 INFRA · 2 blocked · longest 12m`), which also outlines that zone's SPACES row. Click it to pan to the
 longest-waiting of those desks; it selects nothing. The arrows follow a drag or the wheel at once. At most 8, longest
-wait first; the eighth says `+N` and lists the rest in its tooltip. An arrow covers the world where it stands, so a chip
-under it cannot be clicked. When the world is narrower than 360 units (the 480×320 minimum screen) an arrow drops the
+wait first; the eighth says `+N` and lists the rest in its tooltip. Arrows never overlap: an edge too short for all of
+its arrows keeps the longest waits and ends in its own `+N` for the rest, and shows them again when the world is wider.
+An arrow covers the world where it stands, so a chip under it cannot be clicked. When the world is narrower than 360 units (the 480×320 minimum screen) an arrow drops the
 number (way, badge, count). Arrows are for the map shown only: **another machine's blocked agents show as its SPACES
 rows' counts**, and NEXT and the top bar reach them.
 
@@ -426,7 +428,8 @@ arrow outlines its zone's row. Pointing never selects, reads, writes, pans or ch
 as its sign reads (`3 INFRA`; a section too tall for the room runs on into the next column under `3 INFRA …`), and in it
 one box per tab (name on top), one cell per seated pane in the SPACES colours, and the wait written in each blocked cell.
 It shows at a glance who on the machine is blocked / done / working / idle and where they sit. The hover tip gives
-provider, state, time and place; over a caption, the space's repository and checkout. Click a cell to select that pane,
+provider, state, time and place; over a caption, the space's repository and checkout (a caption too long for its column
+is cut, never shrinking the cells, and its tip starts with the whole name). Click a cell to select that pane,
 close the view and pan its seat into view. `S` or `Esc` closes it. SPACES, the drawer, the staff panel, NEWS, `N` and
 PageUp / PageDown keep working (a SPACES row or a page key scrolls the diagram to that space's section; another
 machine's row or heading redraws it for that machine); arrows and the wheel do not pan the world. The top bar's theme cell reads

@@ -372,6 +372,23 @@ func _frames(count: int) -> void:
 		await process_frame
 
 
+## One half of a real left click on the middle of `control`, as the window
+## delivers it (the suite's window is the project's, so the point goes through
+## the viewport's own stretch), then the physics frames the viewport needs.
+func _mouse(control: Control, down: bool) -> void:
+	var at := root.get_final_transform() * control.get_global_rect().get_center()
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.button_mask = MOUSE_BUTTON_MASK_LEFT if down else 0
+	event.position = at
+	event.global_position = at
+	event.pressed = down
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
+	await physics_frame
+	await physics_frame
+
+
 ## The number chips of every minimap row, top to bottom.
 func _row_numbers(minimap: OfficeSpaces) -> Array:
 	return minimap.row_keys().map(func(key: String) -> String: return _label_text(minimap.row_for(key), "%Number"))
