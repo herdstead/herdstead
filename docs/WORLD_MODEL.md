@@ -40,8 +40,10 @@ These were tried and dropped as a whole. Do not bring them back under any name.
    are table geometry and live only in `table.gd`; which seat gets which level is `OfficeFloorView.lamp_of()`'s call.
 5. **Sitting = snapping to the seat `Marker2D` with collision off; standing up is only for going to the pantry
    (idle), with collision on.** A far seat lies inside the table's footprint, so the table hides the legs. A near seat
-   is outside the table's edge, so the person draws wholly in front of the table, and the near chair back sorts after
-   the person (closer to the viewer). Done and blocked agents stay seated (done's paper stack is a child of the table;
+   is just outside the table's near edge (`NEAR_SEAT = 8`), the chair pushed in under the desk: the person sorts after
+   the table and is drawn over it, head and shoulders over the near working plane and their laptop, and the near chair
+   back sorts after the person (closer to the viewer). Done and blocked agents stay seated (done's paper stack is a
+   child of the table;
    blocked's chip is in the station's `Overlay`). Only idle agents that are not starting leave their seat for the
    map's pantry (see "Entry-band fixtures"; the rule lives only in `OfficeRests.rest_of()`): the same actor node
    changes pose and walks there, is never rebuilt, keeps origin = feet, sorts by the y of its feet, faces the viewer,
@@ -150,16 +152,16 @@ Coordinates are relative to the pod's origin at the left end of its near edge:
 | Capacity and width | `capacity` is at least 2 and counts columns per side; the planner grows it 2 columns at a time and keeps old capacity. Width is `max(64, capacity × 32)` (`MIN_WIDTH` 64) |
 | Column x | `16 + 32 × i`; growth never re-centres existing columns |
 | `physical_rect` | `(0, -48, width, 48)` (`SURFACE_DEPTH` 48), the desktop's collision footprint only |
-| `render_rect` | `(0, -90, width, 136)`: y [−90, 46), the stationary drawing: the tag rows' badge pulse envelopes, the chips, laptops, paper and the seat marks. The plate and lens rows are transient (hover, selection, held `L`) and lie outside it; so does the pod's selection frame, an overlay 2 units outside it (`FRAME_OUTSIDE`) so its bars cover neither the end desks' paper nor the near chips |
+| `render_rect` | `(0, -90, width, 122)`: y [−90, 32), the stationary drawing: the tag rows' badge pulse envelopes, the chips, laptops, paper and the seat marks. The plate and lens rows are transient (hover, selection, held `L`) and lie outside it; so does the pod's selection frame, an overlay 2 units outside it (`FRAME_OUTSIDE`) so its bars cover neither the end desks' paper nor the near chips |
 | `reserved_rect` | `(0, -128, width + 32, 192)`: six cells, from the far approach row to the near one, with a one-cell passage on the right; bottom edge 64 |
-| Seats | far `(x, -36)` (`FAR_SEAT` 12 inside the far edge), near `(x, 22)` |
+| Seats | far `(x, -36)` (`FAR_SEAT` 12 inside the far edge), near `(x, 8)` (`NEAR_SEAT` 8 below the near edge: the sitter's head reaches −23 and the shoulders −10, over the near working plane; the near row used to sit at 22, wholly below the apron, typing on air) |
 | Laptops | same x as the seat; far foot `(x, -40)` (8 inside the far edge: the rear view −48..−40, clear of the far worker, who shows only above −48), near `(x, -10)` (−21..−10). 14 units wide; rear view 8 units tall, front view with keyboard 11. A shell's empty chair gets the same laptop as an agent |
-| Near edge and supports | The working surface ends at `NEAR_SURFACE_EDGE = -8`; a 3-unit lip meets the apron at `APRON_DROP = -5`, `APRON_HEIGHT = 3`. Two `leg_short` legs, `LEG_DROP = -2`, centred under the end columns' near chairs (x 16 and width − 16), which hide them whenever somebody sits there; the foot ends at y 19, above the chair's gas lift. A `bracket` per desk at `BRACKET_DROP = -11`. Lamp light stops at the working surface, never past the edge |
+| Near edge and supports | The working surface ends at `NEAR_SURFACE_EDGE = -8`; a 3-unit lip meets the apron at `APRON_DROP = -5`, `APRON_HEIGHT = 3`. Two `leg_short` legs, `LEG_DROP = -2`, centred under the end columns' near chairs (x 16 and width − 16), which hide them, somebody in the chair or not: the foot ends at y 5, behind the chair's solid back (opaque across the leg over −7..5.5; only its gas lift and base below). A `bracket` per desk at `BRACKET_DROP = -11`. Lamp light stops at the working surface, never past the edge |
 | Low screen | `SCREEN_TOP = 16` below the far edge, `SCREEN_HEIGHT = 6` (−32..−26). The far working plane is −48..−32, the near one −26..−8 |
 | Lamps | `LAMP_HALF_WIDTH = 4` at the screen, `LIGHT_HALF_WIDTH = 14` at the sitter's edge |
-| Chair | `CHAIR_OFFSET` far −4 (sorts just behind the worker), near 6 (just in front; opaque down to y 28) |
-| Paper stack | `done_stack_small` (6×9 opaque), `PAPERS_ASIDE = 13` right of the column: opaque x+10..x+16, clear of the laptop, of its worker's raised hand (to x+12) and of the next column's worker (from x+22), inside the desktop on the last column. Far foot `PAPERS_FAR = -33` (−42..−33, far plane), near `PAPERS_NEAR = -15` (−24..−15, near plane, above the near raised hand's top at −14) |
-| Standing spots | far `(x + 16, -54)`, near `(x + 16, 22)`: the near seat leg's corner, in the gap between two chairs; nobody stands there |
+| Chair | `CHAIR_OFFSET` far −4 (sorts just behind the worker), near 6 (just in front; opaque over y −7.5..14: its top right under the working top's near edge at −8, so it covers none of the working top and none of a shell's laptop) |
+| Paper stack | `done_stack_small` (6×9 opaque), `PAPERS_ASIDE = 13` right of the column: opaque x+10..x+16, clear of the laptop and of the next column's worker (from x+24), inside the desktop on the last column. Far foot `PAPERS_FAR = -33` (−42..−33, far plane, under the far edge the far worker shows above), near `PAPERS_NEAR = -15` (−24..−15, near plane): beside the near worker, who sits over that plane (a done agent's head is x−6..x+6 there, the shoulders x−8..x+8 from −11 down). A near blocked agent's raised hand (x+7..x+12, −28..−11) would pass over the paper's left 2 units and never does: a seat shows the paper (done) or the hand (blocked), never both |
+| Standing spots | far `(x + 16, -54)`, near `(x + 16, 8)`: the near seat leg's corner, in the gap between two chairs, the feet (y 4..8) 4 clear of the desktop's footprint; nobody stands there |
 | Approach points | far `(x, -80)`, near `(x, 48)`, both cell centres; read via `approach_position()`. They start the walk-graph legs to seat and standing spot (see "Collision and walking") |
 
 No trinket, cat or rug belongs to a pod: nothing stands on a desk but a seat's own equipment and its paper.
@@ -169,20 +171,29 @@ No trinket, cat or rug belongs to a pod: nothing stands on a desk but a seat's o
 Every row is 30 units wide and centred on its column, so neighbours (32 apart) keep 2 units between them. Pod y,
 half-open; the badge's pulse (`OfficeAttention.PULSES`) lifts it by 0, −1 or −2:
 
-| Row | Far (above the head; raised hand top −72) | Near (below the chair; chair bottom 28) |
+| Row | Far (above the head; raised hand top −72) | Near (below the chair; chair bottom 14) |
 |---|---|---|
-| Tag (the badge, 15 opaque, centred) | [−88, −72); pulse envelope [−90, −72) | [30, 46); pulse envelope [28, 46) |
-| Chip (blocked with a known wait) | `panel` [−15, 15) × [−88, −72); the badge in x [−16, −1) (one unit over the chip's left edge), the wait's 14-wide label in [0, 14): the widest form inks 13 units, so daylight stays between it and the badge and before the frame's right border | the same, over [30, 46) |
-| Lens (held `L`), 30×12 | [−102, −90) | [46, 58) |
-| Plate (hover, selection, held `L`), 30×12, display face at 8, upper case, forced ellipsis | the lens row's slot [−102, −90); while `L` is held, [−114, −102) | the lens row's slot [46, 58); while `L` is held, [58, 70) |
-| Seat click rectangle | [−90, −32); [−72, −32) while the chip shows | [−21, 46); [−21, 28) while the chip shows |
-| Chip click rectangle | [−90, −72) | [28, 46) |
-| Pod selection frame (2-unit bars, `FRAME_OUTSIDE` 2 outside `render_rect`) | top bar [−92, −90), sides x [−2, 0) and [w, w + 2) | bottom bar [46, 48) |
-| Seat mark (`selection_seat`, 32×48, pivot (16, 46)) | `SELECTION_AT` (0, 10): [−72, −24) | `SELECTION_AT` (0, 4): [−20, 28) |
+| Tag (the badge, 15 opaque, centred) | [−88, −72); pulse envelope [−90, −72) | [16, 32); pulse envelope [14, 32) |
+| Chip (blocked with a known wait) | `panel` [−15, 15) × [−88, −72); the badge in x [−16, −1) (one unit over the chip's left edge), the wait's 14-wide label in [0, 14): the widest form inks 13 units, so daylight stays between it and the badge and before the frame's right border | the same, over [16, 32) |
+| Lens (held `L`), 30×12 | [−102, −90) | [32, 44) |
+| Plate (hover, selection, held `L`), 30×12, display face at 8, upper case, forced ellipsis | the lens row's slot [−102, −90); while `L` is held, [−114, −102) | the lens row's slot [32, 44); while `L` is held, [44, 56) |
+| Seat click rectangle | [−90, −32); [−72, −32) while the chip shows | [−24, 32) (from the far seat mark's foot, a unit over the near head, to the tag row; only a raised hand's tip, −28..−24, is above it); [−24, 14) while the chip shows |
+| Chip click rectangle | [−90, −72) | [14, 32) |
+| Pod selection frame (2-unit bars, `FRAME_OUTSIDE` 2 outside `render_rect`) | top bar [−92, −90), sides x [−2, 0) and [w, w + 2) | bottom bar [32, 34) |
+| Seat mark (`selection_seat`, 32×48, pivot (16, 46)) | `SELECTION_AT` (0, 10): [−72, −24) | `SELECTION_AT` (0, 6): [−32, 16), from the far seat's click rectangle's end to the tag row, the raised hand (−28) and the chair (to 14) inside |
 
-At the 192-unit row pitch the next row's far plate starts at 192 − 114 = 78, past this row's near plate (70): 8 units
+At the 192-unit row pitch the next row's far plate starts at 192 − 114 = 78, past this row's near plate (56): 22 units
 to spare. The geometry suite pins every row, both pulse extremes, known and unknown waits and held `L` across two rows
-(`test_rows_at_the_pod_pitch_never_meet`).
+(`test_rows_at_the_pod_pitch_never_meet`). One pair may meet: the seat marks of the two seats facing each other across
+a desk share [−32, −24), because the near worker's raised hand (−28) is above the far mark's foot (−24); only one seat
+is ever selected, so the two are never drawn together. The near mark's foot touches the near tag row (16): on a
+selected, blocked near seat the chip's badge, lifted 1 or 2 by its pulse, is drawn over the mark's bottom-left corner
+for that beat (7 and 18 texels measured; a seat's own mark may meet its own rows).
+
+The near rows follow the near seat, so the pod's stationary drawing ends at y 32, the top of the near approach row
+(the cell row [32, 64), walked at y 48). The plan's geometry did not follow: `reserved_rect`, the approach rows and
+the 192-unit pitch are as they were, and the 14 units the near tag row left, [32, 46), are plain floor: the tab label
+stands at their top and the near lens and plate rows show over them.
 
 `reserved_rect` includes walkable space and must not be used whole as a navigation obstacle. The planner rounds it
 outward to a grid reservation and derives the table origin from that; `office.gd` never copies table width, column
@@ -234,8 +245,9 @@ each cell centre between them along the bottom edge; and `partition_post` (6 × 
 its foot `POST_FOOT` (6) below the zone's top, where it covers the side run's top end (the art lane's mock). They are
 Sorted sprites placed by id (`OfficeDraw.prop()`), in a y-sorted holder per zone (so each sorts by its own foot), made
 again only when the zone's rectangle changes; they have no collider and no item block: the walk graph's partitions are
-the obstacle (see "Collision and walking"). The bottom run draws at [y1 − 10, y1), right under the last pod row's tab
-labels, which end at y1 − 10: a tab label is `OfficeDraw.TAB_LABEL_HEIGHT` (8) deep (`tab_face` gives up the display
+the obstacle (see "Collision and walking"). The bottom run draws at [y1 − 10, y1), 14 units under the last pod row's tab
+labels, which stand where the pod's drawing ends and end at y1 − 24: a tab label is `OfficeDraw.TAB_LABEL_HEIGHT` (8)
+deep (`tab_face` gives up the display
 face's lowest descent row; the labels are upper case).
 The zone's **sign** (`scenes/world/zone_sign.tscn`) hangs from the top-left post, at its foot, and draws over the aisle
 row at zone y − 18 .. − 2: a `panel`, the workspace's number (a mezzanine's `3A`), its label and a 3-unit accent stripe
@@ -278,7 +290,8 @@ with two, even places `plant`, odd `plant_b`). `OfficeFloorLayout.plan()` places
 the one validation a candidate plan gets (see "Entry-band fixtures" for what it drops when that fails). Furniture never
 moves a table group. The wall-front and floor position constants (door, windows, pictures, partitions, furniture feet)
 all live in `OfficeShell`, so planning and drawing read the same numbers. Standing furniture stays a direct child of
-`Sorted`; each table's lens wash, tab label and contact shadow may be grouped under Ground, but people must never be wrapped
+`Sorted`; each table's lens wash (the cells under the pod's drawing and its tab label), tab label and contact shadow may
+be grouped under Ground, but people must never be wrapped
 in a table group with y-sort off.
 
 ### Entry-band fixtures
@@ -444,8 +457,9 @@ kept is the plan and the view, not the people's nodes or animation clocks across
   the reverse (`from_lane()`); spot to spot is down to the lane, along it, and up again. No per-spot distance field and
   no search: someone coming in reads the door's field and passes along this lane anyway.
 - **The two legs.** A table gives each column and side one approach point (a cell centre); both legs start at the
-  approach point's cell centre. The standing spot is dx 24, dy 26 from the approach point, and nobody walks
-  diagonally. Far side: approach → seat is one straight segment into the table's footprint (rule 5), which is this
+  approach point's cell centre. The near standing spot is dx 16, dy −40 from the approach point (the far one dx 16,
+  dy 26), and nobody walks diagonally. Far side: approach → seat is one straight segment into the table's footprint
+  (rule 5), which is this
   table's entry; approach → standing spot is an L, first along the seat's column to the standing spot's depth, then
   across, with the corner on the seat leg. Near side: the chair is in the approach point's column, and a leg must not
   pass through the chair, so it first walks along the near walkway to the standing spot's column, up to the standing
@@ -518,7 +532,9 @@ kept is the plan and the view, not the people's nodes or animation clocks across
   headwear that hides the hair layer while worn.
 - `chair_front` / `chair_back` are one office chair from the front and from behind: armrests, a gas-lift column
   and casters, 17 wide over rows 24–45, at a person's scale (the far one mostly hides behind its seated worker).
-  `CHAIR_OFFSET.near = 6` only keeps the front/back order; there is no large offset to dodge the person. Chairs
+  `CHAIR_OFFSET.near = 6` only keeps the front/back order; there is no large offset to dodge the person. The near
+  chair stands pushed in under the desk: its back's top (pod y −7.5) is right under the working top's near edge, and
+  the sitter in it leans over the near working plane, in front of the pod and drawn over it. Chairs
   belong to the table family and are density 2 like the floor (painted at 2x); geometry is in units and does not
   change with density.
 - The preview keeps a capped bystander in a terra top in front of the API zone's pod as a regression check.
@@ -541,7 +557,10 @@ Besides the client / machine / incremental-update tests, `tools/run_tests.sh` ch
   partitions in a y-sorted holder per zone, each piece sorting by its own foot); each piece's position is unchanged
   across state changes and intersects no seat's click area, table footprint, walkway or aisle. No row wall and no row
   wall joint is laid; the top wall's courses are drawn once per cell.
-- In every occupied column: far chair y < far person y < table y < near person y < near chair y.
+- In every occupied column: far chair y < far person y < table y < near person y < near chair y. A near sitter's
+  shoulders are above the desk's near working edge and the figure draws over part of its laptop, in every state; the
+  near chair's top is under that edge and above the apron's foot, and covers none of a shell's laptop. From the
+  chair's top down, every texel of a short leg is behind the end column's near chair, vacant or occupied.
 - A person is always the pixel-people family's six layers + one `AnimationPlayer`, no chest badge; all layers show the
   same `frame` at every moment; state changes, sitting / standing and re-dressing never replace nodes. Far people face
   the viewer; near people show their backs.
@@ -552,8 +571,11 @@ Besides the client / machine / incremental-update tests, `tools/run_tests.sh` ch
   both sides of every column intersect no seat click area and no other chip. Two rows at the 192 pitch (and a pod
   across a passage cell) never meet, at every pulse lift, with and without a wait, with and without the lens; the
   near badge shares no texel with the near chair at the −2 lift. The paper stack is right of the laptop and clear of
-  it, clear of its own and the next column's blocked worker, with its opaque pixels on its side's working plane, the
-  last column included. The far laptop covers no pixel of the far worker. The compact duration is at most 14 wide in
+  it, clear of its own worker as a done agent sits and of the blocked workers on either side, with its opaque pixels
+  on its side's working plane, the last column included; no texel of a near paper is behind a sitter or a chair, and
+  a seat never shows the paper and the chip together. On each side of a near sitter at least 140 texels of the lamp's
+  wedge stay in sight (248 measured; 146 on the right of a raised hand). The far laptop covers no pixel of the far
+  worker. The compact duration is at most 14 wide in
   the chip and 18 in the lens row, measured on the Label once the face is on. A pointer over a seat shows only its
   plate.
 - A standing person walking into a table is stopped by its footprint collider; a seated person's feet collider is
