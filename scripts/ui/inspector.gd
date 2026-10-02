@@ -565,6 +565,7 @@ func _show_stack() -> void:
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL if carded else Control.SIZE_FILL
 	var title: Control = %Title
 	title.visible = not carded and not _answering
+	_details().set_noted(not carded)
 	_show_more()
 	for words: Control in [%CompactLine, %CompactWait]:
 		words.visible = not carded

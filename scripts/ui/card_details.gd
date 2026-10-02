@@ -19,6 +19,10 @@ const TITLE_LINES := 5
 ## re-dresses it and nothing else does.
 var _portrait_look := ""
 var _actor: PixelPerson
+## Whether the shown state has a note (a dropped machine's, or UNREAD's), and
+## whether the header has a row for it (set_noted()).
+var _has_note := false
+var _noted := true
 
 
 func _ready() -> void:
@@ -44,6 +48,15 @@ func portrait() -> PixelPerson:
 ## No pane: no person and no badge.
 func clear() -> void:
 	_show_portrait(null, "", &"", false)
+
+
+## Whether the header has a row for the state's note. The card form has none
+## (OfficePaneInspector.set_card()): it is as tall as the portrait, and the
+## note would push the name out of its frame; the opened panel says it.
+func set_noted(on: bool) -> void:
+	_noted = on
+	var footnote: Label = %Footnote
+	footnote.visible = _has_note and _noted
 
 
 ## The provider, the caption and the seat as the header shows them, for the
@@ -120,7 +133,8 @@ func show_pane(pane: PaneModel, machine: String, dimmed: bool, art: ArtPack) -> 
 	title.tooltip_text = pane.terminal_title
 	# The note under the caption explains the state it names: a dropped
 	# machine's, or UNREAD's. Other states need none.
-	footnote.visible = dimmed or (state == ArtContract.STATE_DONE and not starting)
+	_has_note = dimmed or (state == ArtContract.STATE_DONE and not starting)
+	footnote.visible = _has_note and _noted
 	footnote.text = ("Connection lost.\nNot an idle signal." if dimmed else "UNREAD = not yet seen\nNot task success.")
 	_show_portrait(art, pane.provider, &"" if shell else state, starting, dimmed, pane.key)
 

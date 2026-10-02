@@ -625,6 +625,53 @@ func test_the_staff_panel_is_compact_at_every_size_until_opened() -> void:
 	_eq(recorder.keys, [], "nothing went past the HUD")
 
 
+## The card is the header over the line's buttons and nothing more: the note
+## that explains a state (UNREAD's under a done agent, a dropped machine's)
+## has no row there, so the card holds everything it shows and the note waits
+## for the opened panel. Seen on a real fleet: with the note in the card the
+## name was cut off above the frame and the note stood under the buttons.
+## The header's last row and the buttons are not compared box to box: they
+## touch on macOS and share a unit on Linux, where `Open ⏎` is a unit taller
+## (its glyph comes from a fallback), with or without a note.
+func test_the_card_holds_all_it_shows_for_a_state_with_a_note() -> void:
+	await _hud(Vector2i(800, 480), false)
+	var frame := _frame([_machine(LOCAL, _snapshot(FLOORS))])
+	var card: Control = hud.inspector.get_node("%CardFrame")
+	var footnote: Label = hud.inspector.get_node("%Footnote")
+	var seat: Control = hud.inspector.get_node("%Seat")
+	var open: Button = hud.inspector.get_node("%CompactOpen")
+	var fold: Button = hud.inspector.get_node("%FoldButton")
+	var shown: Array[Control] = [seat, open]
+	for unique: String in ["%Provider", "%CaptionPill"]:
+		var part: Control = hud.inspector.get_node(unique)
+		shown.append(part)
+	for step: Array in [["web:p2", false, "done"], ["api:p1", true, "a dropped machine's"]]:
+		var what: String = step[2]
+		var dropped: bool = step[1]
+		hud.inspector.show_pane(frame.pane(_local(str(step[0]))), "", dropped)
+		await _frames(3)
+		_check(hud.card_compact() and hud.inspector.card(), "%s: the compact panel is a card" % what)
+		for part: Control in shown:
+			_check(part.is_visible_in_tree(), "%s: %s shows" % [what, part.name])
+			_check(
+				card.get_global_rect().encloses(part.get_global_rect()),
+				(
+					"%s: %s is inside the card: %s in %s"
+					% [what, part.name, part.get_global_rect(), card.get_global_rect()]
+				)
+			)
+		_check(not footnote.is_visible_in_tree(), "%s: the card has no row for the note" % what)
+		await _click(open)
+		await _frames(2)
+		_check(not hud.card_compact(), "%s: `Open` opens the panel" % what)
+		_check(footnote.is_visible_in_tree(), "%s: the opened panel says the note" % what)
+		_check(hud.inspector.get_global_rect().encloses(footnote.get_global_rect()), "%s: inside the panel" % what)
+		await _click(fold)
+		await _frames(2)
+		_check(hud.inspector.card() and not footnote.is_visible_in_tree(), "%s: folded, the card again" % what)
+	_eq(recorder.keys, [], "nothing went past the HUD")
+
+
 ## Every run starts with the drawer closed to its tab, whatever an earlier
 ## run left: the scene says so, and the HUD does too. A floor's first plan is
 ## made for the world with the drawer closed, and stays that width with it open,
