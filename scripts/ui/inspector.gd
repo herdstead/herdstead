@@ -75,7 +75,7 @@ signal pane_split(target_key: String, pane_id: String, terminal_id: String, gene
 ## A new space or worktree from this card of pane `from_key` made workspace
 ## `workspace_id` with root pane `pane_id` (herdr's spelling) in terminal
 ## `terminal_id`, on that machine at `generation`: the office picks that
-## shell once a snapshot shows it, on its new floor, if the viewer's pick is
+## shell once a snapshot shows it, in its new zone, if the viewer's pick is
 ## still the pane it came from. Only a selection follows; nothing is sent to it.
 signal space_created(from_key: String, workspace_id: String, pane_id: String, terminal_id: String, generation: int)
 
@@ -108,7 +108,7 @@ enum Form {
 enum Unpicked {
 	## No snapshot showed it within the office's wait (PENDING_PICK_MSEC).
 	UNSEEN,
-	## The viewer had moved on while it was on its way: another floor, or answer mode.
+	## The viewer had moved on while it was on its way: another zone, or answer mode.
 	MOVED_ON,
 	## It showed with another terminal than the one herdr named for it.
 	OTHER_TERMINAL,
@@ -218,7 +218,7 @@ var _pick := Pick.FOLLOWING
 ## string; empty with no pane. A change is a new binding.
 var _bound := ""
 var _binding := 0
-## The binding a click on a bubble asked to answer once its question is shown
+## The binding a click on a chip asked to answer once its question is shown
 ## (arm_answer()); -1 for none.
 var _armed_binding := -1
 ## Aimed when the card bound its pane; every read of this binding starts here.
@@ -280,7 +280,7 @@ var _next: NextModel
 var _next_tip := ""
 ## The aiming family: what a press aims, the confirms, the launch line (CardActions).
 var _actions := CardActions.new()
-## The footer text a pending pick (a split's new pane, a new floor's shell) was
+## The footer text a pending pick (a split's new pane, a new zone's shell) was
 ## announced with: new_pane_not_picked() speaks only while it still shows.
 var _pending_outcome := ""
 ## Seconds to the next look at how this pane's start is going, and what that
@@ -685,7 +685,7 @@ func leave_answer() -> void:
 		_show_action()
 
 
-## Answer mode for the pane shown, as a click on its bubble asks: at once when
+## Answer mode for the pane shown, as a click on its chip asks: at once when
 ## something may be pressed now; else once this binding's next preview read is
 ## shown, if something may be pressed then. Either way only once, and leaving
 ## answer mode or a new binding forgets it. The office picks the pane first
@@ -903,7 +903,7 @@ func _on_read_finished(ticket: CommandTicket, binding_then: int, seq: int) -> vo
 	# A reply for an older binding or an older read is dropped, whatever it says.
 	if binding_then != _binding or seq != _read_seq:
 		return
-	# A bubble's click waits for this read, whatever it brings (arm_answer()).
+	# A chip's click waits for this read, whatever it brings (arm_answer()).
 	var armed := _armed_binding == _binding
 	_armed_binding = -1
 	var blocked := _pane != null and _pane.state == str(ArtContract.STATE_BLOCKED)
@@ -1111,7 +1111,7 @@ func _on_write_finished(ticket: CommandTicket) -> void:
 		_pending_outcome = CardWords.write_outcome(ticket)
 		pane_split.emit(context.pane_key, ticket.split.pane_id, ticket.split.terminal_id, context.generation)
 	if ticket.space != null and ticket.state == CommandTicket.State.ACCEPTED:
-		# The office picks the new floor's shell once it shows, likewise.
+		# The office picks the new zone's shell once it shows, likewise.
 		var made := ticket.context
 		_pending_outcome = CardWords.write_outcome(ticket)
 		space_created.emit(
@@ -1229,7 +1229,7 @@ func _show_action() -> void:
 	button.text = "Switch herdr here" if _machine.is_empty() else "Switch herdr on " + _machine
 	button.tooltip_text = (
 		"Switches the shared view of %s to this pane: every terminal attached to it follows." % where
-		+ "\nIt also clears UNREAD for every pane on this table, not just this one."
+		+ "\nIt also clears UNREAD for every pane on this tab, not just this one."
 	)
 
 

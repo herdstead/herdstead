@@ -284,7 +284,7 @@ func _open_tabs(active: Variant) -> Array:
 
 
 ## The floor of a single workspace whose `worktree` field is this.
-func _worktree_floor(worktree: Variant) -> FloorModel:
+func _worktree_floor(worktree: Variant) -> ZoneModel:
 	var snapshot := {"workspaces": [{"workspace_id": "w", "number": 1, "worktree": worktree}]}
 	return OfficeProjection.project(_view(snapshot), _states())[0]
 
@@ -372,8 +372,25 @@ func _frames(count: int) -> void:
 		await process_frame
 
 
+## One half of a real left click on the middle of `control`, as the window
+## delivers it (the suite's window is the project's, so the point goes through
+## the viewport's own stretch), then the physics frames the viewport needs.
+func _mouse(control: Control, down: bool) -> void:
+	var at := root.get_final_transform() * control.get_global_rect().get_center()
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.button_mask = MOUSE_BUTTON_MASK_LEFT if down else 0
+	event.position = at
+	event.global_position = at
+	event.pressed = down
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
+	await physics_frame
+	await physics_frame
+
+
 ## The number chips of every minimap row, top to bottom.
-func _row_numbers(minimap: OfficeFloors) -> Array:
+func _row_numbers(minimap: OfficeSpaces) -> Array:
 	return minimap.row_keys().map(func(key: String) -> String: return _label_text(minimap.row_for(key), "%Number"))
 
 
@@ -384,13 +401,13 @@ func _label_text(holder: Node, unique_name: String) -> String:
 
 
 ## A floor row's name label, which carries the variation that dims a quiet floor.
-func _row_label(minimap: OfficeFloors, key: String) -> Label:
-	return minimap.row_for(key).get_node("%FloorLabel")
+func _row_label(minimap: OfficeSpaces, key: String) -> Label:
+	return minimap.row_for(key).get_node("%SpaceLabel")
 
 
 ## Every icon the minimap shows now, in row order. A floor without a count
 ## keeps its icon node hidden and out of the badge group.
-func _floor_icons(minimap: OfficeFloors) -> Array:
+func _floor_icons(minimap: OfficeSpaces) -> Array:
 	# A building heading's mark is a plain sprite, not a badge: it stands for a
 	# machine answering, which nobody is waiting on, so it never pulses.
 	return minimap.find_children("*", "StatusBadge", true, false).filter(
@@ -399,8 +416,8 @@ func _floor_icons(minimap: OfficeFloors) -> Array:
 
 
 ## One floor for the minimap, which draws a row per floor and nothing else.
-func _floor_row(key: String, number: int, agents: int, blocked: int, done: int) -> FloorModel:
-	var floor_model := FloorModel.new()
+func _floor_row(key: String, number: int, agents: int, blocked: int, done: int) -> ZoneModel:
+	var floor_model := ZoneModel.new()
 	floor_model.key = key
 	floor_model.number = number
 	floor_model.label = key
@@ -410,12 +427,10 @@ func _floor_row(key: String, number: int, agents: int, blocked: int, done: int) 
 	return floor_model
 
 
-func _building_rows(
-	key: String, label: String, state: MachineLiveness.State, floors: Array[FloorModel]
-) -> BuildingRows:
-	var building := BuildingRows.new()
+func _building_rows(key: String, label: String, state: MachineLiveness.State, floors: Array[ZoneModel]) -> SpaceRows:
+	var building := SpaceRows.new()
 	building.key = key
 	building.label = label
 	building.state = state
-	building.floors = floors
+	building.zones = floors
 	return building

@@ -102,7 +102,7 @@ const _TEXTS: Dictionary[Code, String] = {
 	Code.CONFIRMATION_REQUIRED: "needs herdr's own confirm",
 	Code.WORKSPACE_NOT_FOUND: "space gone",
 	Code.NOT_GIT_WORKTREE: "not a git repo",
-	Code.LINKED_WORKTREE_SOURCE: "start from the repo's own floor",
+	Code.LINKED_WORKTREE_SOURCE: "start from the repo's own space",
 	Code.WORKTREE_CREATE_FAILED: "git: ",
 	Code.WORKSPACE_CREATE_FAILED: "space not made",
 	Code.INVALID_ENV: "bad environment",

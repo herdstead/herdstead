@@ -7,12 +7,12 @@ extends RefCounted
 ##
 ## Two views of the same panes. Flat groups every pane by how urgently it wants
 ## a human: blocked (who waited longest first, an unknown start first, the order
-## of the reception queue and `N`), UNREAD, working, idle, then what is snoozed
+## of the BLOCKED counter's queue and `N`), UNREAD, working, idle, then what is snoozed
 ## or hidden locally, what stands on a machine that dropped, the shells, and
 ## History: the panes that needed a human this run and wait no more
 ## (AgentHistory, from the StateLog). Tree nests them the way herdr does:
-## machine, floor, the floor's worktree mezzanines (OfficeProjection.group_worktrees()), tab,
-## agent; the shells and panes no floor could seat get groups of their own.
+## machine, space, the space's worktree mezzanines (OfficeProjection.group_worktrees()), tab,
+## agent; the shells and panes no zone could seat get groups of their own.
 ##
 ## A pane is keyed by its composite key (HerdrFleet.pane_key) in both views, so
 ## the same row node serves both; a group by its view and what it stands for.
@@ -45,7 +45,7 @@ const FLAT_GROUPS: Dictionary[String, String] = {
 ## Groups that start collapsed: plain terminals and the record of the past.
 const COLLAPSED_BY_DEFAULT: Array[String] = [FLAT_SHELLS, FLAT_HISTORY, "tree:shells"]
 ## Deepest indent a row draws; the tree never goes deeper than an agent under a
-## tab under a mezzanine under its floor under its machine.
+## tab under a mezzanine under its space under its machine.
 const MAX_DEPTH := 4
 ## A History line's last state as its badge shows it.
 const HISTORY_PRESENCE: Dictionary[String, Presence] = {"blocked": Presence.BLOCKED, "done": Presence.UNREAD}
@@ -75,9 +75,9 @@ class Entry:
 	var history: AgentHistory.Line
 	## Blocked or UNREAD, but snoozed or hidden locally.
 	var muted := false
-	## Where the pane stands, for search(): its machine's label and its floor.
+	## Where the pane stands, for search(): its machine's label and its space.
 	var building_label := ""
-	var floor_ref: FloorRef
+	var floor_ref: ZoneRef
 	## A group standing for a machine that dropped: no counts, never a state.
 	var offline := false
 	## A group's lines that build() did not make (a folded History), counted.
@@ -94,7 +94,7 @@ class Entry:
 	var _search := ""
 	var _searched := false
 
-	## Lower-case text the filter box matches: provider, labels, floor, repo,
+	## Lower-case text the filter box matches: provider, labels, space, repo,
 	## worktree, machine. Made the first time a filter asks, not per refresh.
 	func search() -> String:
 		if _searched:
@@ -104,7 +104,7 @@ class Entry:
 		if pane != null:
 			words.append_array([pane.provider, pane.label, pane.tab_label, pane.workspace_label, building_label])
 			if floor_ref != null:
-				var at := floor_ref.floor_model
+				var at := floor_ref.zone_model
 				words.append_array([at.label, at.repo, at.worktree])
 		elif history != null:
 			words.append_array([history.provider, history.space, history.tab, history.machine_label])
@@ -236,21 +236,21 @@ static func _flat(
 	var buckets: Dictionary[String, Array] = {}
 	for key: String in FLAT_GROUPS:
 		buckets[key] = []
-	# Blocked and UNREAD are ranked like the reception queue: seated panes by
+	# Blocked and UNREAD are ranked like `N`'s queue: seated panes by
 	# how long they waited (their state_since is stamped), then the unplaced.
 	var waiting_seated: Array[PaneModel] = []
 	var unread_seated: Array[PaneModel] = []
 	var waiting_loose: Array[Entry] = []
 	var unread_loose: Array[Entry] = []
 	var entries_by_key: Dictionary[String, Entry] = {}
-	# Every pane once: seated panes first as their floors seat them (these
-	# carry state_since), then the ones no floor could seat.
+	# Every pane once: seated panes first as their zones seat them (these
+	# carry state_since), then the ones no zone could seat.
 	for seated: bool in [true, false]:
 		for building in frame.buildings:
 			var panes: Array[PaneModel] = building.all_panes
 			if seated:
 				panes = []
-				for floor_model in building.floors:
+				for floor_model in building.zones:
 					for room in floor_model.rooms:
 						panes.append_array(room.panes)
 			for pane in panes:
@@ -322,9 +322,7 @@ static func _tree(frame: OfficeFrame, live_items: Dictionary[String, AttentionIt
 		machine.offline = building.stale
 		result.append(machine)
 		var floor_groups: Dictionary[String, Entry] = {}
-		for floor_model in building.floor_tree:
-			if floor_model.lobby:
-				continue
+		for floor_model in building.zone_tree:
 			var parent: Entry = floor_groups.get(floor_model.mezzanine_of, machine)
 			var name := "%s  %s" % [floor_model.level_label, floor_model.label]
 			var floor_group := _group("tree:f:" + floor_model.key, name.strip_edges(), parent.key, parent.depth + 1)
@@ -347,7 +345,7 @@ static func _tree(frame: OfficeFrame, live_items: Dictionary[String, AttentionIt
 					entry.parent = tab.key
 					entry.depth = mini(tab.depth + 1, MAX_DEPTH)
 					result.append(entry)
-		var loose := _group("tree:u:" + building.key, "Not on a floor", machine.key, 1)
+		var loose := _group("tree:u:" + building.key, "Not in a space", machine.key, 1)
 		loose.offline = building.stale
 		result.append(loose)
 		for pane in building.all_panes:
@@ -395,7 +393,7 @@ static func _pane_entry(
 			entry.presence in [Presence.BLOCKED, Presence.UNREAD] and (item.hidden or item.is_snoozed(now_msec))
 		)
 	entry.building_label = building.label
-	entry.floor_ref = frame.find_floor(frame.floor_of(pane.key))
+	entry.floor_ref = frame.find_zone(frame.zone_of(pane.key))
 	entry.note = note_of(entry, now_msec)
 	return entry
 

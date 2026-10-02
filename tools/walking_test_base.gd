@@ -8,12 +8,16 @@ extends "res://tools/office_test_base.gd"
 ## The frame rates walks are stepped at: the office in use, and minimized.
 const FPS := 30.0
 const MINIMIZED_FPS := 8.0
-## The second machine of the cases that need one (see _two_machine_office()).
-const BEE := "socket:bee"
 ## The window these suites lay floors out in: 628x480 plans a floor 488 units
 ## wide (OfficeHud.plan_width()). The walks, pantries and rows the
 ## cases here measure stand on that geometry.
 const PLAN_SCREEN := Vector2(628, 480)
+## How many agents api:t1 takes on in _stacked(): enough that its pod (twelve
+## panes, six columns, seven cells) and api:t2's (three cells) no longer share a
+## pod row of the suites' one-lane map (eight inner cells), so api:t2 is laid
+## out on the row below, as the long tables always were. (Ten made a pod of
+## nine cells, which takes two lanes and api:t2 beside it.)
+const STACKED := 9
 
 
 func _initialize() -> void:
@@ -177,6 +181,17 @@ func _without(snapshot: Dictionary, pane_id: String) -> Dictionary:
 	return result
 
 
+## `snapshot` with only workspace `workspace_id`: a map of that one zone, for
+## the cases about how a zone grows, with no other zone below it to move round.
+func _only(snapshot: Dictionary, workspace_id: String) -> Dictionary:
+	var result: Dictionary = snapshot.duplicate(true)
+	for field: String in ["workspaces", "tabs", "panes", "agents", "layouts"]:
+		result[field] = _list(result, field).filter(
+			func(each: Dictionary) -> bool: return str(each.get("workspace_id", "")) == workspace_id
+		)
+	return result
+
+
 ## api:t1 laid out anew: api:p1 near in column 1, api:p2 far in column 0,
 ## api:p3 far in column 1 (as test_office_reconcile.gd swaps them).
 func _swapped(snapshot: Dictionary) -> Dictionary:
@@ -204,6 +219,12 @@ func _grown(snapshot: Dictionary, count: int) -> Dictionary:
 		extra.terminal_id = "term-grow-%d" % index
 		_list(result, "panes").append(extra)
 	return result
+
+
+## `snapshot` with api:t1 STACKED agents larger (_grown()): api:t1 alone on the
+## first row, api:t2 on the second.
+func _stacked(snapshot: Dictionary) -> Dictionary:
+	return _grown(snapshot, STACKED)
 
 
 ## An office of the shared fixture in the suites' window (PLAN_SCREEN).
@@ -263,8 +284,8 @@ func _without_many(snapshot: Dictionary, first: int, last: int) -> Dictionary:
 
 ## The stress fixture's floor as the office models it: ten tabs of eight panes
 ## (tab 0 `extra` more), two to a column, every one an agent, or every one a shell.
-func _stress_model(agents: bool, extra := 0) -> FloorModel:
-	var floor_model := FloorModel.new()
+func _stress_model(agents: bool, extra := 0) -> ZoneModel:
+	var floor_model := ZoneModel.new()
 	floor_model.key = HerdrFleet.pane_key(LOCAL, "stress")
 	for tab in 10:
 		var room := RoomModel.new()
@@ -348,19 +369,14 @@ static func _table_legs(plan: FloorPlan) -> Dictionary[String, PackedVector2Arra
 	return legs
 
 
-## Every leg up to a spot of `plan`'s fixtures and the reception's step legs
-## end to end (still in the walk graph, walked by nobody), as pairs of
-## points: the only way onto the fixture row. Read off the plan's own fixtures,
-## not the walk graph.
+## Every leg up to a spot of `plan`'s pantry, as pairs of points: the only way
+## onto the fixture row. Read off the plan's own fixtures, not the walk graph.
 static func _fixture_legs(plan: FloorPlan) -> PackedVector2Array:
 	var pairs := PackedVector2Array()
 	for counter in plan.fixtures():
 		for index in counter.spots.size():
 			pairs.append(counter.approaches[index])
 			pairs.append(counter.spots[index])
-	if plan.reception != null and plan.reception.spots.size() > 1:
-		pairs.append(plan.reception.spots[plan.reception.spots.size() - 1])
-		pairs.append(plan.reception.spots[0])
 	return pairs
 
 
@@ -388,7 +404,7 @@ static func _inside_on(a: Vector2, b: Vector2, box: Rect2, pairs: PackedVector2A
 ## the walker is on its route; what it has left to walk is straight segments;
 ## none enters an obstacle but a table along one of its far seat legs where it
 ## stands now, the top wall's drawing clearance along the door's threshold leg,
-## and the fixture row along a spot's leg or the reception's step legs (nothing
+## and the fixture row along a pantry spot's leg (nothing
 ## runs along the row otherwise); the route ends where the walker belongs (a
 ## ghost's at the door); nobody walks faster than TOP_SPEED.
 func _check_routes(view: OfficeFloorView, people: PixelPeople, when: String) -> void:

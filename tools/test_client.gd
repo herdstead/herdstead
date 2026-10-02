@@ -1187,13 +1187,13 @@ func test_office_projection() -> void:
 	var states := _states()
 	var floors := OfficeProjection.project(_view_fixture("snapshot_office"), states)
 	_eq(
-		floors.map(func(f: FloorModel) -> String: return f.label),
+		floors.map(func(f: ZoneModel) -> String: return f.label),
 		["charlie", "中文 space", "echo"],
 		"floors follow workspace number"
 	)
-	_eq(floors.map(func(f: FloorModel) -> int: return f.number), [1, 2, 3], "each floor keeps herdr's number")
+	_eq(floors.map(func(f: ZoneModel) -> int: return f.number), [1, 2, 3], "each floor keeps herdr's number")
 	_eq(
-		floors.map(func(f: FloorModel) -> String: return f.repo),
+		floors.map(func(f: ZoneModel) -> String: return f.repo),
 		["sample-repo", "", "echo-repo"],
 		"repo from worktree, empty without one"
 	)
@@ -1271,7 +1271,7 @@ func test_office_projection() -> void:
 		),
 		states
 	)
-	_eq(twice.map(func(f: FloorModel) -> String: return f.label), ["first"], "a repeated workspace id is one floor")
+	_eq(twice.map(func(f: ZoneModel) -> String: return f.label), ["first"], "a repeated workspace id is one floor")
 
 
 ## Herdr's session focus reaches the desk it belongs to, and nothing else.
@@ -1408,18 +1408,18 @@ func test_office_floor_counts() -> void:
 	var snapshot := _view_fixture("snapshot_floors")
 	var floors := OfficeProjection.project(snapshot, states)
 	_eq(
-		floors.map(func(f: FloorModel) -> String: return f.label),
+		floors.map(func(f: ZoneModel) -> String: return f.label),
 		["api", "web", "infra", "notes", "数据 pipeline"],
 		"floors by number, not listing order"
 	)
 	_eq(
-		floors.map(func(f: FloorModel) -> Array: return [f.blocked, f.done]),
+		floors.map(func(f: ZoneModel) -> Array: return [f.blocked, f.done]),
 		[[0, 0], [1, 1], [1, 1], [0, 0], [0, 0]],
 		"blocked and UNREAD per floor_model"
 	)
 	# data: a working agent plus one still launching; notes: a shell only.
 	_eq(
-		floors.map(func(f: FloorModel) -> int: return f.agents),
+		floors.map(func(f: ZoneModel) -> int: return f.agents),
 		[3, 2, 3, 0, 2],
 		"agents per floor_model, a launching one included"
 	)
@@ -1442,13 +1442,13 @@ func test_office_floor_counts() -> void:
 	)
 	var dropped := OfficeProjection.project(snapshot, states, HerdrFleet.LOCAL, true)
 	_eq(
-		dropped.map(func(f: FloorModel) -> Array: return [f.blocked, f.done]),
+		dropped.map(func(f: ZoneModel) -> Array: return [f.blocked, f.done]),
 		[[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
 		"a stale machine's floors report none"
 	)
 	_eq(
-		dropped.map(func(f: FloorModel) -> String: return f.label),
-		floors.map(func(f: FloorModel) -> String: return f.label),
+		dropped.map(func(f: ZoneModel) -> String: return f.label),
+		floors.map(func(f: ZoneModel) -> String: return f.label),
 		"but keep their rooms"
 	)
 	# The counts are not part of where desks stand: a machine that flaps must not re-plan it.
@@ -1459,25 +1459,21 @@ func test_office_floor_counts() -> void:
 	_eq(floors[1].geometry_signature(), drawn, "counts stay out of the floor's geometry")
 
 
-## A building with no floors gets a lobby whose key no workspace can have.
+## A machine with no workspace has no zone and an empty map under its own key;
+## a workspace whose id reads empty is still a zone.
 func test_office_lobby() -> void:
 	var states := _states()
 	var empty := OfficeProjection.building("machine:x", "far", HerdrSnapshot.new(), states, true)
-	_eq(empty.floors.size(), 1, "one lobby")
-	var lobby := empty.floors[0]
-	_check(lobby.lobby and lobby.rooms.is_empty(), "the lobby has no rooms")
-	_eq(HerdrFleet.split_key(lobby.key)[0], "machine:x", "the lobby belongs to its machine")
+	_eq(empty.zones.size(), 0, "no zone")
+	_eq([empty.map.key, empty.map.zones.size(), empty.map.rooms.size()], ["machine:x", 0, 0], "an empty map, its own")
 	var blank := OfficeProjection.building(
 		"machine:x", "far", _view({"workspaces": [{"workspace_id": "", "number": 1}]}), states, false
 	)
-	_eq(blank.floors.size(), 1, "a workspace whose id reads empty is a floor, not a lobby")
-	_check(not blank.floors[0].lobby and blank.floors[0].key != lobby.key, "and never shares the lobby's key")
+	_eq(blank.zones.size(), 1, "a workspace whose id reads empty is a zone")
+	_eq(HerdrFleet.split_key(blank.zones[0].key)[0], "machine:x", "of its machine")
+	_eq([blank.map.key, blank.map.zones], ["machine:x", blank.zones], "on the machine's map")
 	var local := OfficeProjection.building("local", "Local", _view_fixture("snapshot_basic"), states, false)
-	_eq(
-		local.floors.map(func(f: FloorModel) -> bool: return f.lobby),
-		[false, false],
-		"a building with floors has no lobby"
-	)
+	_eq(local.map.zones, local.zones, "a building's map holds every zone, in the building's order")
 	# The bar adds machines up from these, not from the snapshot behind them.
 	_eq([local.spaces, local.tabs, local.panes], [2, 2, 4], "a building counts its machine's whole snapshot")
 
@@ -1510,80 +1506,76 @@ func test_office_selection() -> void:
 	_eq(OfficeProjection.effective_selection(without, picked, focus), focus, "picked pane gone -> back to herdr focus")
 
 
-## Picked floor, else the selection's floor, else the first real floor, else the lobby.
+## Picked machine, else the selection's, else the first with a zone, else the first.
 func test_office_floor_choice() -> void:
 	var states := _states()
 	var local := OfficeProjection.building(HerdrFleet.LOCAL, "Local", _view_fixture("snapshot_floors"), states, false)
 	var bee := OfficeProjection.building("socket:bee", "bee", _view_fixture("snapshot_basic"), states, false)
 	var buildings: Array[BuildingModel] = [local, bee]
-	var floor_model := func(machine: String, workspace: String) -> String:
-		return HerdrFleet.pane_key(machine, workspace)
+	var zone_model := func(machine: String, workspace: String) -> String: return HerdrFleet.pane_key(machine, workspace)
 	var on_api := HerdrFleet.pane_key(HerdrFleet.LOCAL, "api:p1")
-	_eq(
-		OfficeProjection.choose_floor(buildings, "", on_api),
-		floor_model.call(HerdrFleet.LOCAL, "api"),
-		"herdr focus brings its floor_model"
-	)
+	_eq(OfficeProjection.choose_machine(buildings, "", on_api), HerdrFleet.LOCAL, "herdr focus brings its machine")
 	var on_bravo := HerdrFleet.pane_key("socket:bee", "bravo:p1")
 	_eq(
-		OfficeProjection.choose_floor(buildings, "", on_bravo),
-		floor_model.call("socket:bee", "bravo"),
-		"a selection on another building brings that floor_model"
+		OfficeProjection.choose_machine(buildings, "", on_bravo),
+		"socket:bee",
+		"a selection on another building brings that machine"
 	)
 	_eq(
-		OfficeProjection.choose_floor(buildings, str(floor_model.call(HerdrFleet.LOCAL, "infra")), on_bravo),
-		floor_model.call(HerdrFleet.LOCAL, "infra"),
-		"a picked floor_model beats the selection"
+		OfficeProjection.choose_machine(buildings, HerdrFleet.LOCAL, on_bravo),
+		HerdrFleet.LOCAL,
+		"a picked machine beats the selection"
 	)
 	_eq(
-		OfficeProjection.choose_floor(buildings, str(floor_model.call(HerdrFleet.LOCAL, "gone")), on_bravo),
-		floor_model.call("socket:bee", "bravo"),
-		"a picked floor_model that is gone falls back to the selection's"
+		OfficeProjection.choose_machine(buildings, "machine:gone", on_bravo),
+		"socket:bee",
+		"a picked machine that is gone falls back to the selection's"
 	)
-	var lobby_first: Array[BuildingModel] = [
+	var empty_first: Array[BuildingModel] = [
 		OfficeProjection.building(HerdrFleet.LOCAL, "Local", HerdrSnapshot.new(), states, true), bee
 	]
 	_eq(
-		OfficeProjection.choose_floor(lobby_first, "", ""),
-		floor_model.call("socket:bee", "alpha"),
-		"no selection: the first real floor_model of the first building that has one"
+		OfficeProjection.choose_machine(empty_first, "", ""),
+		"socket:bee",
+		"no selection: the first machine that has a zone"
 	)
 	var nothing: Array[BuildingModel] = [
 		OfficeProjection.building(HerdrFleet.LOCAL, "Local", HerdrSnapshot.new(), states, true),
 		OfficeProjection.building("socket:bee", "bee", HerdrSnapshot.new(), states, true)
 	]
-	_eq(OfficeProjection.choose_floor(nothing, "", ""), nothing[0].floors[0].key, "nothing anywhere: Local's lobby")
+	_eq(OfficeProjection.choose_machine(nothing, "", ""), HerdrFleet.LOCAL, "nothing anywhere: Local's empty map")
 	_eq(
-		OfficeProjection.floor_of(buildings, HerdrFleet.pane_key("socket:bee", "alpha:p1")),
-		floor_model.call("socket:bee", "alpha"),
-		"a desk's floor_model, by machine"
+		OfficeProjection.zone_of(buildings, HerdrFleet.pane_key("socket:bee", "alpha:p1")),
+		zone_model.call("socket:bee", "alpha"),
+		"a desk's zone, by machine"
 	)
 	_eq(
-		OfficeProjection.floor_of(buildings, HerdrFleet.pane_key("socket:bee", "api:p1")),
+		OfficeProjection.zone_of(buildings, HerdrFleet.pane_key("socket:bee", "api:p1")),
 		"",
-		"a pane id from another machine is not on this floor_model"
+		"a pane id from another machine is not in this zone"
 	)
 
 
-## PageUp/PageDown walk every floor bottom to top, building after building;
-## `N` takes blocked agents first, longest wait first, then UNREAD.
+## PageUp/PageDown walk every zone as the rail draws them, building after
+## building (a machine without workspaces has none); `N` takes blocked agents
+## first, longest wait first, then UNREAD.
 func test_office_floor_order_and_queue() -> void:
 	var states := _states()
 	var local := OfficeProjection.building(HerdrFleet.LOCAL, "Local", _view_fixture("snapshot_floors"), states, false)
 	var bee := OfficeProjection.building("socket:bee", "bee", _view_fixture("snapshot_basic"), states, false)
 	var far := OfficeProjection.building("machine:far", "far", HerdrSnapshot.new(), states, true)
 	var buildings: Array[BuildingModel] = [local, bee, far]
-	var numbers: Array = OfficeProjection.floor_order(buildings).map(
+	var numbers: Array = OfficeProjection.zone_order(buildings).map(
 		func(key: String) -> String:
-			var found := OfficeProjection.find_floor(buildings, key)
-			return "%s/%s" % [found.building.label, "L" if found.floor_model.lobby else str(found.floor_model.number)]
+			var found := OfficeProjection.find_zone(buildings, key)
+			return "%s/%s" % [found.building.label, str(found.zone_model.number)]
 	)
 	_eq(
 		numbers,
-		["Local/1", "Local/2", "Local/3", "Local/4", "Local/5", "bee/1", "bee/2", "far/L"],
-		"floor order across buildings"
+		["Local/1", "Local/2", "Local/3", "Local/4", "Local/5", "bee/1", "bee/2"],
+		"zone order across machines, as the rail draws them: ascending; the empty machine has none"
 	)
-	_check(OfficeProjection.find_floor(buildings, "no such floor") == null, "a floor key nobody has is nobody's floor")
+	_check(OfficeProjection.find_zone(buildings, "no such zone") == null, "a zone key nobody has is nobody's zone")
 	var starts := {
 		HerdrFleet.pane_key(HerdrFleet.LOCAL, "web:p1"): 200.0,
 		HerdrFleet.pane_key(HerdrFleet.LOCAL, "infra:p1"): 100.0,
@@ -1591,7 +1583,7 @@ func test_office_floor_order_and_queue() -> void:
 	}
 	# The office's frame builder stamps these (PaneModel.state_since).
 	for building_model in buildings:
-		for floor_model in building_model.floors:
+		for floor_model in building_model.zones:
 			for room in floor_model.rooms:
 				for pane in room.panes:
 					pane.state_since = starts.get(pane.key, -1.0)
@@ -1616,44 +1608,51 @@ func test_office_floor_order_and_queue() -> void:
 	)
 
 
-## The minimap: buildings top to bottom, highest floor on top, the shown floor
-## highlighted, a row press names the floor, counts as pulsing icons. The rows
-## are scene nodes now, so the panel has to be in the tree and laid out.
+## The SPACES rail: machines top to bottom, each one's zones ascending, the
+## shown machine's heading highlighted, the rows of the zones in view marked, a
+## row press names its zone and a heading press its machine, counts as pulsing
+## icons. The rows are scene nodes, so the panel has to be in the tree and laid
+## out. (It was the FLOORS minimap: highest floor on top, the shown floor's row
+## highlighted, headings that took no mouse.)
 func test_office_minimap() -> void:
-	# 1280 wide: the column says the floors' names (below it, the rail; tools/test_floors.gd).
+	# 1280 wide: the column says the zones' names (below it, the rail; tools/test_space_rail.gd).
 	var hud := await _hud(Vector2(1280, 480))
-	var minimap: OfficeFloors = hud.floors
+	var minimap: OfficeSpaces = hud.spaces
 	var picked: Array = []
-	hud.floor_picked.connect(func(key: String) -> void: picked.append(key))
-	var tower: Array[FloorModel] = [
+	hud.zone_picked.connect(func(key: String) -> void: picked.append(key))
+	var machines: Array = []
+	hud.machine_picked.connect(func(key: String) -> void: machines.append(key))
+	var tower: Array[ZoneModel] = [
 		_floor_row("a1", 1, 1, 0, 0), _floor_row("a2", 2, 0, 0, 0), _floor_row("a3", 3, 2, 1, 2)
 	]
-	var lobby := _floor_row("lobby", 0, 0, 0, 0)
-	lobby.label = "LOBBY"
-	lobby.lobby = true
-	var empty: Array[FloorModel] = [lobby]
-	var model: Array[BuildingRows] = [
+	var empty: Array[ZoneModel] = []
+	var model: Array[SpaceRows] = [
 		_building_rows("local", "Local", MachineLiveness.State.LIVE, tower),
 		_building_rows("machine:far", "far", MachineLiveness.State.OFFLINE, empty)
 	]
-	minimap.show_buildings(model, "a2", true)
+	minimap.show_machines(model, "local", true)
 	await _frames(2)
-	_eq(minimap.row_keys(), ["a3", "a2", "a1", "lobby"], "highest floor on top, buildings in order")
+	_eq(minimap.row_keys(), ["a1", "a2", "a3"], "zones ascending, machines in order; an empty map has no row")
 	_eq(
-		minimap.headings().map(func(h: OfficeBuildingHeading) -> String: return _label_text(h, "%BuildingLabel")),
+		minimap.headings().map(func(h: OfficeMachineHeading) -> String: return _label_text(h, "%MachineLabel")),
 		["LOCAL", "FAR"],
 		"a heading per building with more than Local"
 	)
-	_eq(_row_numbers(minimap), ["3F", "2F", "1F", "L"], "floor numbers, L for a lobby")
-	var highlighted := minimap.row_keys().filter(
-		func(key: String) -> bool:
-			var row := minimap.row_for(key)
-			return row.theme_type_variation == &"FloorRowCurrent"
+	_eq(_row_numbers(minimap), ["1", "2", "3"], "zone numbers, as their signs write them")
+	var highlighted := (
+		minimap
+		. headings()
+		. filter(func(h: OfficeMachineHeading) -> bool: return h.is_current())
+		. map(func(h: OfficeMachineHeading) -> String: return h.key)
 	)
-	_eq(highlighted, ["a2"], "the shown floor is the only highlighted row")
-	_eq(_row_label(minimap, "a3").theme_type_variation, &"", "a floor with agents reads in ink")
-	_eq(_row_label(minimap, "a1").theme_type_variation, &"", "so does a floor with one")
-	_eq(_row_label(minimap, "lobby").theme_type_variation, &"LabelMuted", "a quiet floor steps back")
+	_eq(highlighted, ["local"], "the shown machine's heading is the only highlighted one")
+	_eq(Array(minimap.in_view()), [], "no row is marked before the office says which zones are in view")
+	minimap.set_in_view(PackedStringArray(["a2"]))
+	_eq(Array(minimap.in_view()), ["a2"], "the row of a zone in view is marked, alone")
+	_eq(_row_label(minimap, "a3").theme_type_variation, &"", "a zone with agents reads in ink")
+	_eq(_row_label(minimap, "a1").theme_type_variation, &"", "so does a zone with one")
+	# A quiet zone steps back, in view or not (a2 here): an empty machine has no row.
+	_eq(_row_label(minimap, "a2").theme_type_variation, &"LabelMuted", "a quiet zone steps back")
 	var badges := _floor_icons(minimap)
 	_eq(
 		badges.map(func(b: StatusBadge) -> Array: return [b.machine, str(b.state), b.pane_id]),
@@ -1669,17 +1668,17 @@ func test_office_minimap() -> void:
 	# not with a coloured square nobody has a legend for.
 	var art: ArtPack = minimap.art
 	_eq(
-		minimap.headings().map(func(h: OfficeBuildingHeading) -> Texture2D: return h.mark_icon().texture),
+		minimap.headings().map(func(h: OfficeMachineHeading) -> Texture2D: return h.mark_icon().texture),
 		[ArtContract.UI_CONNECTED, ArtContract.UI_OFFLINE].map(
 			func(id: StringName) -> Texture2D: return art.sprite_texture(art.ui_sprite(id))
 		),
 		"a live machine is connected, a dropped one is offline"
 	)
-	var connecting: Array[BuildingRows] = [
+	var connecting: Array[SpaceRows] = [
 		_building_rows("local", "Local", MachineLiveness.State.LIVE, tower),
 		_building_rows("machine:far", "far", MachineLiveness.State.CONNECTING, empty)
 	]
-	minimap.show_buildings(connecting, "a2", true)
+	minimap.show_machines(connecting, "local", true)
 	await _frames(1)
 	_eq(
 		minimap.headings()[1].mark_icon().texture,
@@ -1688,81 +1687,88 @@ func test_office_minimap() -> void:
 	)
 	_check(
 		minimap.headings().all(
-			func(h: OfficeBuildingHeading) -> bool: return h.mark_icon().position == h.mark_icon().offset / -art.density
+			func(h: OfficeMachineHeading) -> bool: return h.mark_icon().position == h.mark_icon().offset / -art.density
 		),
 		"each icon stands at its own pivot, so the picture lands in the same square"
 	)
-	minimap.show_buildings(model, "a2", true)
+	minimap.show_machines(model, "local", true)
 	await _frames(1)
-	minimap.row_for("a1").pressed.emit()
-	_eq(picked, ["a1"], "pressing a row names that floor")
-	_check(
-		minimap.headings()[0].mouse_filter == Control.MOUSE_FILTER_IGNORE,
-		"a heading takes no mouse, so it picks nothing"
-	)
+	# Real clicks: a press alone says nothing, the release on the same control does.
+	var row := minimap.row_for("a1")
+	await _mouse(row, true)
+	_eq([machines, picked], [[], []], "a press on a row says nothing yet")
+	await _mouse(row, false)
+	_eq(picked, ["a1"], "pressing a row names that zone")
+	var far := minimap.headings()[1].button()
+	await _mouse(far, true)
+	await _mouse(far, false)
+	_eq([machines, picked], [["machine:far"], ["a1"]], "pressing a heading names its machine, and no zone")
 	var rows := minimap.row_keys().map(func(key: String) -> int: return minimap.row_for(key).get_instance_id())
-	minimap.show_buildings(model, "a2", true)
+	minimap.show_machines(model, "local", true)
 	await _frames(1)
+	_eq(Array(minimap.in_view()), ["a2"], "the same model keeps the marks")
 	_eq(
 		minimap.row_keys().map(func(key: String) -> int: return minimap.row_for(key).get_instance_id()),
 		rows,
 		"the same model keeps every row node"
 	)
-	minimap.show_buildings(model, "a2", false)
+	minimap.show_machines(model, "local", false)
 	await _frames(1)
-	_eq(minimap.row_keys(), ["a3", "a2", "a1", "lobby"], "without headings the rows stay")
-	_eq(minimap.headings(), [], "but no building heading")
-	# A building that goes away loses its heading, while the others keep theirs.
-	minimap.show_buildings(model, "a2", true)
+	_eq(minimap.row_keys(), ["a1", "a2", "a3"], "without headings the rows stay")
+	_eq(minimap.headings(), [], "but no machine heading")
+	# A machine that goes away loses its heading, while the others keep theirs.
+	minimap.show_machines(model, "local", true)
 	await _frames(1)
 	var kept := minimap.headings()[0]
-	var alone: Array[BuildingRows] = [_building_rows("local", "Local", MachineLiveness.State.LIVE, tower)]
-	minimap.show_buildings(alone, "a2", true)
+	var alone: Array[SpaceRows] = [_building_rows("local", "Local", MachineLiveness.State.LIVE, tower)]
+	minimap.show_machines(alone, "local", true)
 	await _frames(1)
 	_eq(
-		minimap.headings().map(func(h: OfficeBuildingHeading) -> String: return _label_text(h, "%BuildingLabel")),
+		minimap.headings().map(func(h: OfficeMachineHeading) -> String: return _label_text(h, "%MachineLabel")),
 		["LOCAL"],
 		"a machine that went away loses its heading"
 	)
 	_eq(minimap.headings()[0], kept, "and the one that stayed keeps its node")
-	_eq(minimap.row_keys(), ["a3", "a2", "a1"], "with only its own floors left")
-	minimap.show_buildings(model, "a2", false)
+	_eq(minimap.row_keys(), ["a1", "a2", "a3"], "with only its own zones left")
+	minimap.show_machines(model, "local", false)
 	await _frames(1)
 	# A floor that goes away loses its row; the rest keep theirs.
-	var short: Array[BuildingRows] = [
-		_building_rows("local", "Local", MachineLiveness.State.LIVE, [tower[1], tower[2]] as Array[FloorModel])
+	var short: Array[SpaceRows] = [
+		_building_rows("local", "Local", MachineLiveness.State.LIVE, [tower[1], tower[2]] as Array[ZoneModel])
 	]
-	minimap.show_buildings(short, "a2", false)
+	minimap.show_machines(short, "local", false)
 	await _frames(1)
-	_eq(minimap.row_keys(), ["a3", "a2"], "a closed floor loses its row")
+	_eq(minimap.row_keys(), ["a2", "a3"], "a closed zone loses its row")
 	_check(minimap.row_for("a1") == null, "and nothing keeps it alive")
 	_eq(minimap.row_for("a2").get_instance_id(), rows[1], "the floors that stayed keep their row node")
 	hud.free()
 
 
-## A tall building in a short panel: the shown floor stays in view and the
-## wheel scrolls the list in place.
+## A machine of many zones in a short panel: the list follows the first row in
+## view into sight, and the wheel scrolls the list in place.
 func test_office_minimap_scroll() -> void:
 	# 312 - 40 - 72 leaves a 200-tall panel: the staff panel's
 	# compact line over the NEWS strip, and its gap (72 in all), stand under the column.
 	var hud := await _hud(Vector2(800, 312))
-	var minimap: OfficeFloors = hud.floors
+	var minimap: OfficeSpaces = hud.spaces
 	_eq(hud.placed(minimap).size.y, 200.0, "the minimap is the 200-tall panel")
-	var high: Array[FloorModel] = []
+	var high: Array[ZoneModel] = []
 	for number in range(1, 31):
 		high.append(_floor_row("t%d" % number, number, 1, 0, 0))
-	var tall: Array[BuildingRows] = [_building_rows("local", "Local", MachineLiveness.State.LIVE, high)]
-	minimap.show_buildings(tall, "t1", false)
+	var tall: Array[SpaceRows] = [_building_rows("local", "Local", MachineLiveness.State.LIVE, high)]
+	minimap.show_machines(tall, "local", false)
+	# The zone in view is the last of the ascending list, below the panel's fold.
+	minimap.set_in_view(PackedStringArray(["t30"]))
 	await _frames(2)
 	var list_height: float = minimap.list_height()
 	# The panel's heading is all it keeps above the list now: the lift's
 	# portal (108) and its footer (24) are gone, and the rows have that room.
 	_eq(list_height, 168.0, "the short panel keeps only its heading and gives the rest to the rows")
-	var bottom: Control = minimap.row_for("t1")
+	var bottom: Control = minimap.row_for("t30")
 	var offset := minimap.scroll_offset()
 	_check(
 		bottom.position.y >= offset and bottom.position.y + bottom.size.y <= offset + list_height,
-		"the shown floor at the bottom is scrolled into view"
+		"the row in view, at the bottom, is scrolled into sight"
 	)
 	var holder: Control = minimap.get_node("%Rows")
 	minimap.scroll_by(-10000)
@@ -1771,15 +1777,16 @@ func test_office_minimap_scroll() -> void:
 	_check(minimap.get_node("%Rows") == holder, "scrolling is not a rebuild")
 	minimap.scroll_by(10000)
 	await _frames(1)
-	_eq(minimap.scroll_offset(), 30.0 * OfficeFloors.ROW - list_height, "and at the bottom")
+	_eq(minimap.scroll_offset(), 30.0 * OfficeSpaces.ROW - list_height, "and at the bottom")
 	minimap.scroll_by(-100)
 	await _frames(1)
-	minimap.show_buildings(tall, "t1", false)
+	minimap.show_machines(tall, "local", false)
+	minimap.set_in_view(PackedStringArray(["t30"]))
 	await _frames(2)
 	_eq(
 		minimap.scroll_offset(),
-		30.0 * OfficeFloors.ROW - list_height - 100,
-		"an unchanged model keeps the viewer's scroll"
+		30.0 * OfficeSpaces.ROW - list_height - 100,
+		"an unchanged model and view keep the viewer's scroll"
 	)
 	hud.free()
 
@@ -1790,7 +1797,7 @@ func test_office_arrange() -> void:
 	var floor_model := OfficeProjection.project(_view_fixture("snapshot_office"), _states())[0]
 	var policy := FloorLayoutPolicy.new()
 	policy.width_cells = 15
-	var initial := OfficeFloorLayout.plan(floor_model, null, policy)
+	var initial := OfficeFloorLayout.plan(MapModel.of(floor_model), null, policy)
 	_check(initial.problems.is_empty(), "the fixture produces a valid floor plan")
 	_check(initial.plan != null, "the public allocator returns its plan")
 	if initial.plan == null:
@@ -1800,12 +1807,12 @@ func test_office_arrange() -> void:
 		_check(initial.plan.floor_cells.encloses(placed.reserved_cells), "each tab is within the complete floor")
 	var signature := initial.plan.geometry_signature()
 	policy.width_cells = 40
-	var widened := OfficeFloorLayout.plan(floor_model, initial.plan, policy)
+	var widened := OfficeFloorLayout.plan(MapModel.of(floor_model), initial.plan, policy)
 	_check(widened.problems.is_empty(), "a wider viewport keeps a valid retained plan")
 	_eq(widened.plan.geometry_signature(), signature, "viewport width does not rearrange existing desks")
-	var empty := FloorModel.new()
+	var empty := ZoneModel.new()
 	empty.key = "empty-workspace"
-	var empty_result := OfficeFloorLayout.plan(empty, null, policy)
+	var empty_result := OfficeFloorLayout.plan(MapModel.of(empty), null, policy)
 	_check(empty_result.plan != null, "an empty workspace still has a complete floor")
 	_check(empty_result.plan.floor_cells.size.y > 0, "empty floor height is real, not zero")
 	_eq(empty_result.plan.desks.size(), 0, "an empty workspace invents no tab")
@@ -1818,10 +1825,10 @@ func test_hud_free_area() -> void:
 	_eq(
 		hud.world_rect(),
 		Rect2(96, 48, 660, 308),
-		"right of the FLOORS rail, left of the drawer's tab, below the bar, above the staff panel's card"
+		"right of the SPACES rail, left of the drawer's tab, below the bar, above the staff panel's card"
 	)
 	_eq(hud.placed(hud.bar), Rect2(0, 0, 800, 32), "the bar spans the top")
-	_eq(hud.placed(hud.floors), Rect2(16, 40, 72, 316), "the minimap is a 72-wide rail, 16 in from the left")
+	_eq(hud.placed(hud.spaces), Rect2(16, 40, 72, 316), "the minimap is a 72-wide rail, 16 in from the left")
 	_eq(
 		hud.placed(hud.right_column),
 		Rect2(764, 40, 20, 316),
@@ -1831,7 +1838,7 @@ func test_hud_free_area() -> void:
 	_eq(hud.placed(hud.staff), Rect2(16, 372, 768, 80), "the staff panel's card slot spans the bottom, 16 in")
 	_eq(hud.placed(hud.news), Rect2(16, 456, 768, 20), "the NEWS strip under it, along the bottom")
 	hud.fit(Vector2(1600, 960))
-	_eq(hud.placed(hud.floors).size.x, 120.0, "from 1280 wide the minimap names its floors")
+	_eq(hud.placed(hud.spaces).size.x, 120.0, "from 1280 wide the minimap names its floors")
 	_eq(hud.world_rect(), Rect2(144, 48, 1412, 788), "a bigger window is more office, not a bigger HUD")
 	await _frames(2)
 	var lines: Control = hud.bar.get_node("%Lines")
@@ -1858,7 +1865,7 @@ func test_hud_free_area() -> void:
 		"the wider bar gives the counters the room, up to the switch"
 	)
 	# Every panel swallows the mouse, so nothing over one reaches the office.
-	for panel: Control in [hud.bar, hud.floors, hud.inspector, hud.agent_list]:
+	for panel: Control in [hud.bar, hud.spaces, hud.inspector, hud.agent_list]:
 		_eq(panel.mouse_filter, Control.MOUSE_FILTER_STOP, "%s stops the mouse" % panel.name)
 	hud.free()
 

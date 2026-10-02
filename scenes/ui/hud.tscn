@@ -1,14 +1,13 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/ui/bar.tscn" id="2"]
-[ext_resource type="PackedScene" path="res://scenes/ui/floors.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://scenes/ui/spaces.tscn" id="3"]
 [ext_resource type="PackedScene" path="res://scenes/ui/inspector.tscn" id="4"]
 [ext_resource type="PackedScene" path="res://scenes/ui/agent_list.tscn" id="5"]
 [ext_resource type="PackedScene" path="res://scenes/ui/terminal_monitor.tscn" id="6_monitor"]
 [ext_resource type="Script" path="res://scripts/ui/hd_panel.gd" id="7_panel"]
-[ext_resource type="Script" path="res://scripts/ui/signposts.gd" id="8_signposts"]
-[ext_resource type="PackedScene" path="res://scenes/ui/signpost.tscn" id="9_signpost"]
+[ext_resource type="PackedScene" path="res://scenes/ui/edge_arrows.tscn" id="8_arrows"]
 [ext_resource type="PackedScene" path="res://scenes/ui/news.tscn" id="10_news"]
 [ext_resource type="PackedScene" path="res://scenes/ui/overview.tscn" id="11_overview"]
 [ext_resource type="PackedScene" path="res://scenes/ui/event_list.tscn" id="12_events"]
@@ -30,12 +29,10 @@ staff_tall_from = 400.0
 staff_next_from = 640.0
 next_width = 128.0
 next_wide_width = 244.0
-floors_rail_right = 88.0
-floors_named_right = 136.0
-floors_named_from = 1280.0
-signpost_inset = Vector2(8, 8)
-signpost_full_width = 108.0
-signposts_from = 360.0
+spaces_rail_right = 88.0
+spaces_named_right = 136.0
+spaces_named_from = 1280.0
+edge_arrows_compact_from = 360.0
 bar_titles_from = 640.0
 news_top = -24.0
 news_gap = 4.0
@@ -48,7 +45,7 @@ mouse_filter = 2
 
 [node name="Bar" parent="Screen" instance=ExtResource("2")]
 
-[node name="Floors" parent="Screen" instance=ExtResource("3")]
+[node name="Spaces" parent="Screen" instance=ExtResource("3")]
 unique_name_in_owner = true
 
 [node name="RightColumn" type="Control" parent="Screen"]
@@ -159,39 +156,9 @@ offset_bottom = -4.0
 grow_horizontal = 2
 grow_vertical = 0
 
-[node name="Signposts" type="VBoxContainer" parent="Screen"]
+[node name="EdgeArrows" parent="Screen" instance=ExtResource("8_arrows")]
 unique_name_in_owner = true
 visible = false
-custom_minimum_size = Vector2(108, 0)
-offset_right = 108.0
-offset_bottom = 24.0
-mouse_filter = 2
-theme_override_constants/separation = 4
-script = ExtResource("8_signposts")
-
-[node name="Post0" parent="Screen/Signposts" instance=ExtResource("9_signpost")]
-visible = false
-layout_mode = 2
-
-[node name="Post1" parent="Screen/Signposts" instance=ExtResource("9_signpost")]
-visible = false
-layout_mode = 2
-
-[node name="Post2" parent="Screen/Signposts" instance=ExtResource("9_signpost")]
-visible = false
-layout_mode = 2
-
-[node name="Post3" parent="Screen/Signposts" instance=ExtResource("9_signpost")]
-visible = false
-layout_mode = 2
-
-[node name="Post4" parent="Screen/Signposts" instance=ExtResource("9_signpost")]
-visible = false
-layout_mode = 2
-
-[node name="Post5" parent="Screen/Signposts" instance=ExtResource("9_signpost")]
-visible = false
-layout_mode = 2
 
 [node name="Strategic" parent="Screen" instance=ExtResource("13_strategic")]
 unique_name_in_owner = true
@@ -232,7 +199,7 @@ offset_bottom = -16.0
 grow_horizontal = 2
 grow_vertical = 0
 
-[node name="BubbleTip" type="PanelContainer" parent="Screen"]
+[node name="WorldTip" type="PanelContainer" parent="Screen"]
 unique_name_in_owner = true
 visible = false
 offset_right = 168.0
@@ -241,7 +208,7 @@ mouse_filter = 2
 theme_type_variation = &"HdPanel"
 script = ExtResource("7_panel")
 
-[node name="BubbleTipText" type="Label" parent="Screen/BubbleTip"]
+[node name="WorldTipText" type="Label" parent="Screen/WorldTip"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(160, 0)
 layout_mode = 2

@@ -537,7 +537,7 @@ func _on_group_pressed(key: String) -> void:
 
 ## The actions a line offers, as a native popup: a pane with a live attention
 ## episode has Open, Snooze and Hide; a History line only View (Details when
-## its pane stands on no floor), greyed out once it cannot be located. Local
+## its pane stands in no zone), greyed out once it cannot be located. Local
 ## only: none of them changes herdr.
 func _open_menu(key: String, at: Vector2) -> void:
 	var entry: AgentListModel.Entry = _entry_by_key.get(key)
@@ -547,7 +547,7 @@ func _open_menu(key: String, at: Vector2) -> void:
 	var menu: PopupMenu = %Actions
 	menu.clear()
 	if entry.history != null:
-		var seated := not _office_frame.floor_of(entry.history.key).is_empty()
+		var seated := not _office_frame.zone_of(entry.history.key).is_empty()
 		menu.add_item("View" if entry.history.locatable and seated else "Details", Action.VIEW)
 		menu.set_item_disabled(menu.get_item_index(Action.VIEW), not entry.history.locatable)
 		_pop(menu, at)

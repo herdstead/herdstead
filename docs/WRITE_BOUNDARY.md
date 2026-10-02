@@ -24,7 +24,7 @@ Twelve methods. "Reply cap" is the longest reply line the boundary reads before 
 | Method | Used for | Payload and limits |
 |---|---|---|
 | `pane.read` | The agent card's terminal preview (not a write). | `{pane_id, source, format: "text", strip_ansi: true, lines}`. `source` is `detection` (a blocked agent: 200 lines, the whole question) or `recent_unwrapped` (anything else: 12 lines), `lines` 1–200. Reply cap 1 MiB, 5 s. `result.read.pane_id` must be the pane asked for. The decoded text keeps at most its last 64 KiB (`PaneReadResult`). |
-| `pane.read` | A blocked station's bubble tooltip: the question excerpt (not a write, not a gesture). | As the card's `detection` read, 200 lines. When it runs: section 2. Never counts as a look. |
+| `pane.read` | The tooltip over a blocked seat's chip: the question excerpt (not a write, not a gesture). | As the card's `detection` read, 200 lines. When it runs: section 2. Never counts as a look. |
 | `pane.read` | The terminal monitor's screen and local scrollback (not a write). | `{pane_id, source, format: "ansi", strip_ansi: false}`, `source` `visible` (no `lines`) or `recent` (`lines` 1–999). Reply cap 1 MiB, 5 s. `format` in the result must be `ansi`. The result (`ScreenReadResult`) keeps ESC, CR, LF and TAB, drops every other control and the bidi controls, and keeps at most its last 256 KiB. |
 | `pane.focus` | **Switch herdr here** (on the card and in the monitor's title bar). | `{pane_id}` only. Any result object counts as accepted. Reply cap 4 KiB, 5 s. |
 | `pane.send_keys` | Answer mode's approval keys (section 2). | `{pane_id, keys: [one key]}`. The key is compared exactly against `1`–`9`, `y`, `n`, `enter`, `esc`; `esc` only from the named **Send Esc** button. Only to a blocked agent. Reply cap 4 KiB, 5 s. |
@@ -46,9 +46,9 @@ a second write after a refusal would be a write with no gesture of its own (rule
 
 **What `pane.focus` does.** It changes herdr's *shared* selection: every attached client follows it to that
 workspace, tab and pane, and so does herdr with no client attached. On a remote machine it moves that machine's
-view. It activates no local window. It also marks the **whole tab** seen: every `done` pane on that table turns
+view. It activates no local window. It also marks the **whole tab** seen: every `done` pane of that tab turns
 `idle`, not just the one on the card. So the button is called **Switch herdr here** (**Switch herdr on
-<machine>** with several machines), says `Clears table's UNREAD` under it, and its tooltip spells out both side
+<machine>** with several machines), says `Clears tab's UNREAD` under it, and its tooltip spells out both side
 effects. It is never called "mark read" or "open in terminal". `tools/fake_herdr.py` models the whole-tab effect.
 
 ### Rules
@@ -137,7 +137,7 @@ effects. It is never called "mark read" or "open in terminal". `tools/fake_herdr
    **pane key**, not per identity: the write may be what changed the agent session (`/clear`), and it is owed all
    the same; leaving and coming back does not clear it. The last 256 panes are remembered. This applies to every
    write except raw input: **Switch herdr here**, **New pane**, **Close**, **New space** and **Worktree** wait for
-   the look too. A read shown by the terminal monitor counts as a look; a bubble's question read never does.
+   the look too. A read shown by the terminal monitor counts as a look; a chip's question read never does.
    Writes that do not type into a terminal (switch, split, close, space, worktree) have no re-read: they are
    checked at the release against the latest fleet facts and written on the next frame.
    Raw mode (section 3) does no re-read and no write-then-look between its own writes; section 3 revises this
@@ -250,7 +250,7 @@ The same button sits in the monitor's title bar.
 
 **Entering and leaving.** Answer mode exists only for a station the viewer picked, on an agent, on an operator
 card. Enter (or keypad Enter; never `ui_accept`, which includes Space), the heading's `Answer` chip or a click on
-the station's bubble opens it. That Enter is consumed and sends nothing: **Enter on the keyboard never sends**, so
+the seat's chip opens it. That Enter is consumed and sends nothing: **Enter on the keyboard never sends**, so
 pressing it twice cannot confirm a dialog's default. `Esc` is always local: it leaves answer mode and leaves the
 panel open; it is never sent to the terminal. A remote Esc is only the named **Send Esc** button. Picking another
 station, rebinding the card, opening the terminal monitor, or giving the keyboard to the agent list (`A`) leaves
@@ -278,13 +278,18 @@ pane key and identity, in memory only (at most 32), and never follow the card to
 note says `herdr typed the line and Enter; not whether the agent acted.` herdr's refusals are shown in its terms
 (`herdr refused: blocked: use the keys`, `no agent here`, `still starting`).
 
-**Bubble reads.** The hover tooltip over a blocked station's bubble shows an excerpt of the question
+**Chip reads.** The hover tooltip over a blocked seat's chip shows an excerpt of the question
 (`OfficeQuestionReader`, `scripts/question_reader.gd`). It is not a gesture and never writes. It reads only
-blocked panes (a launching one that asks too) on the floor shown whose bubble is on screen, on a live machine
+blocked panes (a launching one that asks too) on the map shown whose chip is on screen, on a live machine
 with a current snapshot, while neither the monitor nor OVERVIEW covers the world and the window is not minimized;
 never in `--read-only`. One read at a time for the whole office; no pane is read again sooner than 10 s after its
-last read began, and that is not reset by leaving blocked or changing floors. It never calls `preview_shown`, so
+last read began, and that is not reset by leaving blocked or switching maps. It never calls `preview_shown`, so
 it never counts as a look and never turns writes back on.
+
+**Clicks that only navigate.** A click on a SPACES heading (show that machine's map), on a SPACES row (pan to its
+zone) and on an edge arrow (pan to its desk, selecting nothing) are navigation, like the clicks in NEWS, EVENTS and
+OVERVIEW that only select a pane: none of them is a write gesture, and none sends a write. (A click that selects a
+pane while the card is expanded still schedules the card's preview read of it, a read, as a list click does.)
 
 ## 3. Raw mode
 
@@ -447,7 +452,7 @@ recognises the agent, then its first session appears). The office carries the vi
 terminal, of the same kind, under this start's name (the first step may still have no name), and while the step
 before had no session yet. Anything after that (a `/clear`, another kind, any later write to it) is a new identity
 and the card says `New terminal: pick again`. A launching agent that is blocked counts as blocked everywhere (the
-counter, NEXT, its bubble), and its keys are open; a line is not.
+counter, NEXT, its chip), and its keys are open; a line is not.
 
 ### New pane
 
@@ -469,8 +474,9 @@ and a different side is refused `DIRECTION_INVALID`.
 **After it is sent.** The result (`PaneSplitResult`: the new pane's id and terminal id) is used only to pick the
 new pane, never for a second write: starting an agent there is another gesture on its own card. The office picks
 it (`navigator.locate()`, a selection only) when a current snapshot shows it with the terminal herdr named, on the
-same connection generation, while the viewer's pick is still the pane that was split, on the same floor, and not in
-answer mode. If the pick or the generation changed meanwhile, it gives up silently; if the floor changed, answer
+same connection generation, while the viewer's pick is still the pane that was split, the viewer has not navigated since
+(`OfficeNavigator.nav_revision`), and not in answer mode. If the pick or the generation changed meanwhile, it gives
+up silently; if the viewer navigated (another zone or machine picked, PageUp / PageDown, `N`, an edge arrow …), answer
 mode opened, the terminal differs, or it does not show within 10 s, the footer says the new pane was not picked.
 Only one new pane is waited for: a second split replaces the first wait.
 
@@ -491,20 +497,20 @@ fetches a snapshot at once. Each result's new workspace or pane id is used only 
 **What it sends.** `pane.close {pane_id}`. herdr has no confirm and hangs up the pane's terminal at once,
 working or blocked agent included.
 
-**What it takes with it** (`CloseScope`, a pure function of the typed snapshot): the pane; its table, when it is
-the tab's last pane (herdr sends no `tab_closed` event); its floor, when it is the workspace's last pane; or a
-mezzanine (a linked worktree's floor, named by its level label such as `3A`), whose checkout stays on disk. The
+**What it takes with it** (`CloseScope`, a pure function of the typed snapshot): the pane; its tab, when it is
+the tab's last pane (herdr sends no `tab_closed` event); its space, when it is the workspace's last pane; or a
+mezzanine (a linked worktree's space, named by its level label such as `3A`), whose checkout stays on disk. The
 scope also carries the pane's terminal id and its state word (`shell`, `starting`, or herdr's status; blocked
 before starting), and all of it signs `CloseScope.signature()`.
 
-**Never the parent of an open group.** The last pane of a repository's own floor, while another workspace on the
+**Never the parent of an open group.** The last pane of a repository's own space, while another workspace on the
 machine shares its repository, is refused `GROUP_PARENT` and never sent: herdr would close the whole worktree
 group. This is as far as the snapshot shows it: a parent's `worktree` field appears only after its first
 `worktree.create`. A parent the snapshot cannot show is stopped by herdr's own `confirmation_required`; the card
 says so and does not retry.
 
 **Two real clicks.** The first click sends nothing (`CONFIRM_NEEDED`): it writes what closes in the note and the
-terminal strip (the pane, the table, the floor or the mezzanine; a working, blocked, launching or unknown-state
+terminal strip (the pane, the tab, the space or the mezzanine; a working, blocked, launching or unknown-state
 agent is named as killed) and arms a 10 s confirm bound to the binding, the identity and the scope signature. The
 button then reads `Close · click again` (`Close · kills` when an agent would be killed). The second click sends only
 on the same binding, the same identity and the same signature. A change of pick, binding, scope or state, entering
@@ -525,7 +531,7 @@ no `env`, no source workspace. `focus: false` holds when other workspaces exist;
 workspace is focused regardless, and the tooltip says so.
 
 **After it is sent.** `SpaceCreateResult` (the new workspace, tab and root pane) is used only to pick the new
-shell on its new floor, the way a split's new pane is picked.
+shell in its new zone, the way a split's new pane is picked.
 
 ### Worktree
 
@@ -548,9 +554,9 @@ the only guard. If the box changed between the press and the release, the send i
 Enter in the box sends nothing; the box is cleared when the card is rebound, so a typed name never follows to
 another pane. An existing branch that is not checked out is checked out rather than created; the note says so.
 
-**The source.** The pane must still stand on the floor aimed at (`FLOOR_CHANGED`), that floor must still be listed
+**The source.** The pane must still stand in the space aimed at (`FLOOR_CHANGED`), that space must still be listed
 (`FLOOR_GONE`), and it must not itself be a linked worktree (`MEZZANINE_SOURCE`; herdr would answer
-`linked_worktree_source`). A floor that is not a git repository is still offered: the office cannot tell, and
+`linked_worktree_source`). A space that is not a git repository is still offered: the office cannot tell, and
 herdr's `not_git_worktree` is the answer.
 
 **The answer.** herdr runs git synchronously before answering, so the timeout is 30 s and the reply cap 16 KiB.
@@ -575,7 +581,7 @@ against a user's session. A test agent was a scripted fake the detection manifes
 - `revision` in every `pane.read` result is 0, for every source.
 
 **Focus.** `pane.focus` moves the shared selection for every attached client (one attached TUI client measured),
-and with none attached, and switches the active tab. It marks the whole tab seen: two `done` panes on one table
+and with none attached, and switches the active tab. It marks the whole tab seen: two `done` panes of one tab
 both turn `idle` when one is focused. herdr's documentation says "marks the target seen"; the target is the tab.
 
 **Keys and input.**
@@ -590,8 +596,8 @@ both turn `idle` when one is focused. herdr's documentation says "marks the targ
   xterm `CSI 27`). herdr encodes them in the application's current keyboard mode.
 - Home, End, PgUp, PgDn, Insert and Delete cannot be sent: every spelling is `invalid_key`. `f13` is accepted and
   sends nothing.
-- Sending keys or text has no side effect: a `done` pane on a background table stays `done`, and focus and the
-  active table do not move, with or without an attached TUI client.
+- Sending keys or text has no side effect: a `done` pane on a background tab stays `done`, and focus and the
+  active tab do not move, with or without an attached TUI client.
 
 **Text and paste.**
 - `pane.send_text` writes the bytes as they are and **never** brackets them (ESC and Ctrl-C pass through): typing.

@@ -18,9 +18,9 @@ extends OfficeScene
 
 var test_screen := Vector2.ZERO
 var test_args: AppArgs
-## Whether the bubbles' question reader reads (OfficeScene._question_reads()).
+## Whether the chips' question reader reads (OfficeScene._question_reads()).
 ## The write-boundary suites assert exact request sequences and turn it off
-## unless a case is about the bubbles; set it before the office is in the tree.
+## unless a case is about the chips; set it before the office is in the tree.
 var test_question_reads := true
 ## How many refreshes ran, how deep they are nested now, and the deepest they
 ## ever were: a refresh that starts inside another shows up as 2.

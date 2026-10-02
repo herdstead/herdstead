@@ -47,10 +47,10 @@ enum Kind {
 	## tab or the workspace it was the last pane of (CloseScope).
 	CLOSE,
 	## Make a new workspace whose root shell starts in this pane's directory (a
-	## write): a new floor, never focused by this office.
+	## write): a new space, never focused by this office.
 	SPACE,
 	## Make a linked worktree of this pane's workspace on a branch (a write): git
-	## runs on the machine, and a new floor opens on the checkout.
+	## runs on the machine, and a new space opens on the checkout.
 	WORKTREE,
 }
 

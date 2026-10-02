@@ -1,27 +1,40 @@
 extends "res://tools/walking_test_base.gd"
 ## Who rests where by state (OfficeRests) on the live office, and how they get
 ## there. Every state but idle rests at its own seat: a blocked agent
-## sits with a hand up and a bubble over the head (its question's excerpt, how
-## long it has waited, a patience bar), a done one sits with a stack of paper
+## sits with a hand up and a chip on the badge's row (its question's excerpt in
+## the tooltip, how long it has waited), a done one sits with a stack of paper
 ## beside the laptop, and an idle one takes a pantry spot with a cup while the
 ## pantry has one; the full pantry seats the rest. A newcomer never displaces
 ## anyone; cold passes place everyone; a stale floor never re-ranks; clicks by
-## real input, on the bubble too; depth by the feet; the framing a floor opens
+## real input, on the chip too; depth by the feet; the framing a floor opens
 ## on. The office and its helpers are tools/walking_test_base.gd's.
 ##
 ## godot --headless --path . --script tools/test_office_rests.gd -- \
 ##     --read-only --socket=<a socket nobody listens on> --work=<short tmp dir>
+
+## The shared fixture with every zone, for the cases that page between zones.
+var whole: Dictionary = {}
 
 
 func _marker() -> String:
 	return "RESTS TESTS"
 
 
+## These cases are about one zone's people: api's, on a map of api alone, as
+## its floor was before one map per machine (the fixture's other zones would
+## put their own idle agents in the one pantry, and their papers on the map).
+## How zones share the pantry is test_the_pantry_is_shared_by_the_zones_in_wait_order.
+func _run() -> void:
+	whole = fixture
+	fixture = _only(fixture, "api")
+	await super()
+
+
 # --- blocked and done at the seat -------------------------------------------------
 
 
 ## A working agent that goes blocked stays in the chair: nobody walks, the hand
-## goes up at the desk, and the bubble appears over the head at once, with the
+## goes up at the desk, and the chip appears over the head at once, with the
 ## wait inside it (the seat has no wait label of its own) and, on an
 ## office that reads nothing, `read-only` where the question would be. A freshly
 ## launched agent that comes up blocked stays seated too.
@@ -35,10 +48,13 @@ func test_a_blocked_agent_stays_seated_with_a_hand_up_and_a_bubble() -> void:
 	_eq([_ids(_walkers(office)), _ids(_ghosts(office))], [[], []], "nobody walks")
 	_eq(_floor_point(office, body), _seat_of(office, "api:p2"), "still in the chair")
 	_eq([str(body.look.context), body.track], ["desk", &"desk_blocked"], "hand up at the desk")
-	_check(_plate(station).visible, "the plate stays on the seat")
-	var bubble := station.bubble()
+	# The plate names the seat only while it is hovered, selected or under the
+	# lens (it used to show always; a 30-wide plate row is transient now).
+	_eq(_plate(station).text, "CODEX", "the plate still names the seat")
+	_check(not _plate(station).visible, "and shows only on hover, selection or the lens")
+	var bubble := station.chip()
 	_check(bubble.visible, "the bubble shows at once")
-	_eq(bubble.position, OfficeStation.BUBBLE_AT[station.side], "over this side's head")
+	_eq(bubble.position, OfficeStation.CHIP_AT[station.side], "over this side's head")
 	_check(station.get_node_or_null("Overlay/Wait") == null, "no wait label outside the lens")
 	var lens: Label = station.get_node("Overlay/Lens")
 	_check(not lens.visible, "and the lens line is hidden while L is not held")
@@ -54,14 +70,14 @@ func test_a_blocked_agent_stays_seated_with_a_hand_up_and_a_bubble() -> void:
 	_feed(office, _with(_with(start, "api:p1", {"agent": "claude"}), "api:p1", {"launch_pending": true}))
 	office.settle()
 	var launching := _station(office, _pane("api:p1"))
-	_check(not launching.bubble().visible, "a pane still launching has no bubble")
+	_check(not launching.chip().visible, "a pane still launching has no bubble")
 	# Blocked comes first: the launch above is at work; one that asks while herdr
-	# still launches it is a blocked agent, hand up, bubble, blocked badge.
+	# still launches it is a blocked agent, hand up, chip, blocked badge.
 	var asking := _with(start, "api:p1", {"agent": "claude", "agent_status": "blocked"})
 	_feed(office, _with(asking, "api:p1", {"launch_pending": true}))
 	office.settle()
 	_check(office.frame.pane(_pane("api:p1")).starting, "herdr still launches it")
-	_check(launching.bubble().visible, "launching but blocked: the bubble shows")
+	_check(launching.chip().visible, "launching but blocked: the bubble shows")
 	_eq(launching.actor().track, &"desk_blocked", "the hand is up at the desk")
 	var badge: StatusBadge = launching.get_node("Overlay/Badge")
 	_eq(badge.state, ArtContract.STATE_BLOCKED, "its badge pulses for blocked")
@@ -76,14 +92,14 @@ func test_a_blocked_agent_stays_seated_with_a_hand_up_and_a_bubble() -> void:
 	)
 	_eq(launching.rest, OfficeRests.Rest.SEAT, "launched straight into blocked: it stays seated")
 	_check(not office.floor_view.presentation.is_walking(_pane("api:p1")), "and does not walk")
-	_check(launching.bubble().visible, "with its bubble")
+	_check(launching.chip().visible, "with its bubble")
 	await _same_as_rebuild(office, "with a blocked agent seated")
 	_done(office)
 
 
 ## However many are blocked, every one sits with their hand up and their own
-## bubble: there is no queue to fill and no `+N` anywhere; the reception is a
-## plain counter.
+## chip: there is no queue to fill and no `+N` anywhere; there is no
+## reception counter at all.
 func test_every_blocked_agent_sits_however_many() -> void:
 	var crowd := _crowded(12)
 	var office := await _live_office(crowd)
@@ -97,13 +113,10 @@ func test_every_blocked_agent_sits_however_many() -> void:
 		var station := _station(office, key)
 		_eq(station.rest, OfficeRests.Rest.SEAT, key + " sits")
 		_eq(station.actor().track, &"desk_blocked", key + ": hand up at the desk")
-		_check(station.bubble().visible, key + ": with a bubble")
+		_check(station.chip().visible, key + ": with a bubble")
 		seated += 1
 	_eq(seated, 12, "all twelve at their seats")
-	var reception := office.floor_view.sorted.get_node_or_null("Fixture_reception")
-	_check(reception is OfficeDecor, "the reception is a plain counter")
-	if reception != null:
-		_check(reception.get_node_or_null("Overlay") == null, "with nothing written over it")
+	_eq(office.floor_view.sorted.get_node_or_null("Fixture_reception"), null, "no reception counter")
 	for label: Node in office.world.find_children("*", "Label", true, false):
 		_check(not (label as Label).text.begins_with("+"), "no +N anywhere: " + (label as Label).text)
 	_done(office)
@@ -121,13 +134,13 @@ func test_a_done_agent_sits_with_papers_on_the_desk() -> void:
 	_eq(_floor_point(office, station.actor()), _seat_of(office, "api:p1"), "still in the chair")
 	_eq(_shown_papers(office), [_pane("api:p1")], "only its seat has paper")
 	var stack := station.table.papers(station.column, station.side)
-	var decor := OfficeTable.DECOR_FAR if station.side == "far" else OfficeTable.DECOR_NEAR
+	var plane := OfficeTable.PAPERS_FAR if station.side == "far" else OfficeTable.PAPERS_NEAR
 	_eq(
 		stack.position,
-		Vector2(station.table.columns[station.column] + OfficeTable.PAPERS_ASIDE, decor),
+		Vector2(station.table.columns[station.column] + OfficeTable.PAPERS_ASIDE, plane),
 		"beside the laptop, on its side's working plane"
 	)
-	_check(station.bubble().visible == false, "and no bubble")
+	_check(station.chip().visible == false, "and no bubble")
 	_feed(office, fixture)
 	_eq(_shown_papers(office), [], "back at work: no paper")
 	var start := _with(fixture, "api:p1", {"agent": null})
@@ -141,8 +154,8 @@ func test_a_done_agent_sits_with_papers_on_the_desk() -> void:
 	_done(office)
 
 
-## A click on a bubble, by real input, picks its pane: once over a far seat's
-## bubble and once over a near one's. It is the bubble's rectangle that answers
+## A click on a chip, by real input, picks its pane: once over a far seat's
+## chip and once over a near one's. It is the chip's rectangle that answers
 ## (the station says `asked`, not `picked`), and a click on the seat below it
 ## still only picks. A read-only office has no answer mode to open.
 func test_a_click_on_a_bubble_picks_its_pane() -> void:
@@ -170,7 +183,7 @@ func test_a_click_on_a_bubble_picks_its_pane() -> void:
 		await _click_desk(office, other)
 		_eq(office.picked_key, other, side + ": another desk is picked first")
 		heard.clear()
-		var bubble := station.bubble_rect()
+		var bubble := station.chip_rect()
 		office.camera.reveal(
 			Rect2(office.world.to_local(bubble.position - Vector2(8, 8)), bubble.size + Vector2(16, 16))
 		)
@@ -188,9 +201,9 @@ func test_a_click_on_a_bubble_picks_its_pane() -> void:
 	_done(office)
 
 
-## The bubble follows its agent: back at work it goes, and its rectangle stops
+## The chip follows its agent: back at work it goes, and its rectangle stops
 ## answering; blocked again it comes back, in its frame. When the machine drops,
-## the bubble stays where it was, dimmed with the floor, with no wait, no bar and
+## the chip stays where it was, dimmed with the floor, with no wait, no bar and
 ## no frame: a number that would go on growing off a snapshot nobody receives is
 ## not drawn, and an empty frame would read as a blank speech bubble. Its
 ## rectangle still answers.
@@ -199,34 +212,37 @@ func test_a_bubble_follows_its_agent_and_its_machine() -> void:
 	var blocked := _with(fixture, "api:p2", {"agent_status": "blocked"})
 	_feed(office, blocked)
 	var station := _station(office, _pane("api:p2"))
-	var target: CollisionShape2D = station.get_node(OfficeStation.BUBBLE_TARGET)
-	_check(station.bubble().visible and not target.disabled, "blocked: the bubble shows and answers")
+	var target: CollisionShape2D = station.get_node(OfficeStation.CHIP_TARGET)
+	_check(station.chip().visible and not target.disabled, "blocked: the bubble shows and answers")
 	_feed(office, fixture)
-	_check(not station.bubble().visible, "working: the bubble goes")
+	_check(not station.chip().visible, "working: the bubble goes")
 	_check(target.disabled, "and its rectangle answers nothing")
-	_eq(station.bubble_rect(), Rect2(), "nor is there a rectangle to reveal")
+	_eq(station.chip_rect(), Rect2(), "nor is there a rectangle to reveal")
 	OS.delay_msec(5)
 	_feed(office, blocked)
 	await _text_tick()
-	_check(station.bubble().visible and not target.disabled, "blocked again: back")
-	var track: ColorRect = station.bubble().get_node("%Track")
-	var fill: ColorRect = station.bubble().get_node("%Fill")
-	var frame: NinePatchRect = station.bubble().get_node("%Frame")
+	_check(station.chip().visible and not target.disabled, "blocked again: back")
+	var frame: NinePatchRect = station.chip().get_node("%Frame")
+	var badge: Sprite2D = station.get_node("Overlay/Badge")
 	_check(not _wait_text(office, _pane("api:p2")).is_empty(), "live: a wait")
-	_check(track.visible and fill.visible, "and a bar")
-	_check(frame.visible, "in the bubble's frame")
+	_check(frame.visible, "in the chip's frame")
+	_eq(
+		badge.position,
+		OfficeStation.BADGE_AT[station.side] + OfficeStation.CHIP_BADGE_SHIFT,
+		"and the badge in the chip's left half"
+	)
 	_set_online(office, false)
 	await _text_tick()
-	_check(station.bubble().is_visible_in_tree(), "dropped: the bubble stays")
+	_check(station.chip().is_visible_in_tree(), "dropped: the chip stays")
 	_eq(office.floor_view.root.modulate, office.art.stale_tint, "dimmed with the floor")
 	_eq(_wait_text(office, _pane("api:p2")), "", "no wait")
-	_check(not track.visible and not fill.visible, "and no bar")
 	_check(not frame.visible, "nor an empty frame")
+	_eq(badge.position, OfficeStation.BADGE_AT[station.side], "the badge back in the middle of its row")
 	_check(not target.disabled, "its rectangle stays where it was")
 	_done(office)
 
 
-## A floor with bubbles and paper updated in place is the floor a rebuild draws.
+## A floor with chips and paper updated in place is the floor a rebuild draws.
 func test_bubbles_and_papers_match_a_rebuild() -> void:
 	var office := await _live_office()
 	OS.delay_msec(5)
@@ -242,7 +258,7 @@ func test_bubbles_and_papers_match_a_rebuild() -> void:
 
 
 ## The framing a floor opens on shows the selected desk, the whole of its
-## table and, the desk's agent being blocked, the bubble over it.
+## table and, the desk's agent being blocked, the chip over it.
 func test_the_first_framing_shows_the_desk_its_table_and_its_bubble() -> void:
 	var office := await _live_office(_focused_on(_with(fixture, "api:p2", {"agent_status": "blocked"}), "api:p2"))
 	office.settle()
@@ -252,13 +268,13 @@ func test_the_first_framing_shows_the_desk_its_table_and_its_bubble() -> void:
 	var visible := Rect2(office.camera.pan, room)
 	var table := station.table.geometry.render_rect
 	table.position += station.table.global_position
-	for box: Rect2 in [station.target_rect(), station.bubble_rect(), table]:
+	for box: Rect2 in [station.target_rect(), station.chip_rect(), table]:
 		var shown := Rect2(office.world.to_local(box.position), box.size)
 		_check(visible.encloses(shown), "in view: %s in %s" % [shown, visible])
 	_done(office)
 
 
-## The excerpt a bubble says is the line of the detection text that asks: the
+## The excerpt a chip says is the line of the detection text that asks: the
 ## last one with a `?`, trimmed of blanks and of the box and block characters a
 ## TUI frames it with; without one, the last line with anything on it; never
 ## more than OfficeQuestionReader.EXCERPT_MAX characters.
@@ -274,35 +290,38 @@ func test_the_question_excerpt_is_the_asking_line() -> void:
 	_eq(OfficeQuestionReader.excerpt("a\r\nwhy?\r\n"), "why?", "carriage returns are blanks")
 
 
-## The patience bar is full when the wait starts and empties over ten minutes,
-## always in the pack's `blocked` colour: only its length says anything. The
-## fill never goes below two units. Without a known wait there is no bar.
-func test_the_patience_bar_shortens_with_the_wait() -> void:
+## The chip says a known wait in its right half, compactly
+## (OfficeAttention.compact_duration(), never `+`), in its frame, and the
+## badge moves into its left half; without a known wait there is no number
+## and no frame, and the badge is back in the middle of the tag row. (It
+## replaces the patience bar's case, test_the_patience_bar_shortens_with_the_wait:
+## the bar is gone, the chip keeps only the number.)
+func test_the_chip_says_the_wait_and_takes_the_badge() -> void:
 	var office := await _live_office(_with(fixture, "api:p2", {"agent_status": "blocked"}))
-	var bubble := _station(office, _pane("api:p2")).bubble()
-	var track: ColorRect = bubble.get_node("%Track")
-	var fill: ColorRect = bubble.get_node("%Fill")
+	var station := _station(office, _pane("api:p2"))
+	var bubble := station.chip()
+	var frame: NinePatchRect = bubble.get_node("%Frame")
 	var wait: Label = bubble.get_node("%Wait")
-	var widths := {0.0: 40.0, 60.0: 36.0, 300.0: 20.0, 600.0: 2.0, 900.0: 2.0}
-	for seconds: float in widths:
+	var badge: Sprite2D = station.get_node("Overlay/Badge")
+	var middle: Vector2 = OfficeStation.BADGE_AT[station.side]
+	var forms := {0.0: "0s", 60.0: "1m", 300.0: "5m", 5999.0: "99m", 7200.0: "2h", 400000.0: "4d"}
+	for seconds: float in forms:
 		bubble.show_wait(seconds)
-		_eq(fill.size.x, widths[seconds], "%d s: the fill's width" % seconds)
-		_eq(fill.color, office.art.color(ArtContract.BLOCKED), "%d s: always the blocked colour" % seconds)
-		_check(track.visible and fill.visible, "%d s: a bar" % seconds)
-		_eq(wait.text, OfficeBubble.wait_text(seconds), "%d s: the wait, in the bubble's short form" % seconds)
-	_eq(OfficeBubble.patience(0.0), 1.0, "full at the start")
-	_eq(OfficeBubble.patience(300.0), 0.5, "half after five minutes")
-	_eq(OfficeBubble.patience(900.0), 0.0, "empty after ten")
-	_eq(track.color, office.art.color(ArtContract.MUTED), "the track is muted")
+		_eq(wait.text, forms[seconds], "%d s: the wait, compactly" % seconds)
+		_check(frame.visible and wait.visible, "%d s: in its frame" % seconds)
+		_eq(badge.position, middle + OfficeStation.CHIP_BADGE_SHIFT, "%d s: the badge in the chip" % seconds)
+	_check(bubble.get_node_or_null("%Track") == null and bubble.get_node_or_null("%Fill") == null, "no bar")
 	bubble.show_wait(-1.0)
-	_check(not track.visible and not fill.visible, "no known wait: no bar")
+	_check(not frame.visible and not wait.visible, "no known wait: no frame")
 	_eq(wait.text, "", "and no number")
+	_eq(badge.position, middle, "and the badge in the middle of its row")
 	_done(office)
 
 
-## The bubble's wait is at most three characters, so it fits beside the badge
-## at its larger size: seconds under a minute, minutes under 100, then whole
-## hours; nothing below 0. Every form, at the bubble's own font, fits its label.
+## The chip's wait is at most three characters (compact_duration() without its
+## `+`): seconds under a minute, minutes under 100, hours under 100, then whole
+## days up to 99; nothing below 0. Every form, in the chip's own face, fits its
+## label: the pack's display face at 8, in a 14-unit slot.
 func test_the_bubble_wait_is_short_enough_to_read() -> void:
 	var forms := {
 		-1.0: "",
@@ -314,77 +333,80 @@ func test_the_bubble_wait_is_short_enough_to_read() -> void:
 		7199.0: "1h",
 		7200.0: "2h",
 		359999.0: "99h",
+		360000.0: "4d",
+		1.0e9: "99d",
 	}
 	for seconds: float in forms:
-		_eq(OfficeBubble.wait_text(seconds), forms[seconds], "%d s" % seconds)
+		_eq(OfficeAttention.compact_duration(seconds, false), forms[seconds], "%d s" % seconds)
 	var office := await _live_office(_with(fixture, "api:p2", {"agent_status": "blocked"}))
-	var wait: Label = _station(office, _pane("api:p2")).bubble().get_node("%Wait")
-	_eq(wait.get_theme_font_size("font_size"), OfficeBubble.WAIT_PIXELS, "larger than a plate's 10")
+	var wait: Label = _station(office, _pane("api:p2")).chip().get_node("%Wait")
+	_eq(wait.get_theme_font_size("font_size"), OfficeChip.WAIT_PIXELS, "the display face's native 8")
+	_eq(wait.get_theme_font("font"), office.pen.display, "in the display face")
 	var font := wait.get_theme_font("font")
-	for text: String in ["59s", "99m", "99h"]:
-		var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, OfficeBubble.WAIT_PIXELS).x
+	for text: String in ["59s", "99m", "99h", "99d"]:
+		var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, OfficeChip.WAIT_PIXELS).x
 		_check(width <= wait.size.x, "%s is %s wide, within the label's %s" % [text, width, wait.size.x])
 	_done(office)
 
 
-## Hovering a blocked agent's bubble, by real pointer motion, shows a HUD
+## Hovering a blocked agent's chip, by real pointer motion, shows a HUD
 ## tooltip near the pointer, inside the world's part of the screen; on this
 ## read-only office it says read-only. Blocked in the first snapshot, its start
-## was never seen: nothing of the bubble is drawn, frame included, only the
-## raised hand and the badge, and the bubble's rectangle is where it always is,
+## was never seen: nothing of the chip is drawn, frame included, only the
+## raised hand and the badge, and the chip's rectangle is where it always is,
 ## over the far badge, so the pointer on the badge shows the tooltip. The
-## pointer leaving takes it away; a drag over the bubble shows none; switching
+## pointer leaving takes it away; a drag over the chip shows none; switching
 ## floors takes it away.
 func test_hovering_a_bubble_shows_a_tooltip() -> void:
-	var office := await _live_office(_with(fixture, "api:p2", {"agent_status": "blocked"}))
+	var office := await _live_office(_with(whole, "api:p2", {"agent_status": "blocked"}))
 	var key := _pane("api:p2")
 	var station := _station(office, key)
 	office.reveal(key)
 	await _text_tick()
-	var bubble := station.bubble()
+	var bubble := station.chip()
 	_eq(station.side, "far", "api:p2 sits on the far side, under its badge")
 	_eq(_wait_text(office, key), "", "blocked in the first snapshot: no wait to tell")
 	_check(bubble.visible, "the bubble is there")
 	var frame: NinePatchRect = bubble.get_node("%Frame")
-	var track: ColorRect = bubble.get_node("%Track")
 	_check(not frame.visible, "but draws no frame")
-	_check(not track.visible, "nor a bar")
 	_eq(station.actor().track, &"desk_blocked", "the hand is up")
 	var badge: Sprite2D = station.get_node("Overlay/Badge")
 	_check(badge.visible, "and the badge shows")
-	var target: CollisionShape2D = station.get_node(OfficeStation.BUBBLE_TARGET)
+	var target: CollisionShape2D = station.get_node(OfficeStation.CHIP_TARGET)
 	_check(not target.disabled, "the bubble's rectangle answers")
-	var over := station.bubble_rect().intersection(badge.get_global_transform() * badge.get_rect())
+	var over := station.chip_rect().intersection(badge.get_global_transform() * badge.get_rect())
 	_check(over.has_area(), "over the badge: %s" % over)
-	_check(not office.hud.bubble_tip_shown(), "no tooltip before the pointer comes")
+	_check(not office.hud.world_tip_shown(), "no tooltip before the pointer comes")
 	await _parsed(_motion(over.get_center() - office.camera.position))
-	_check(office.hud.bubble_tip_shown(), "the pointer on the badge: the bubble's tooltip")
-	_eq(office.hud.bubble_tip_text(), OfficeQuestionReader.READ_ONLY_TEXT, "saying read-only")
-	var at := station.bubble_rect().get_center() - office.camera.position
+	_check(office.hud.world_tip_shown(), "the pointer on the badge: the bubble's tooltip")
+	_eq(office.hud.world_tip_text(), OfficeQuestionReader.READ_ONLY_TEXT, "saying read-only")
+	var at := station.chip_rect().get_center() - office.camera.position
 	await _parsed(_motion(at + Vector2(0, 70)))
-	_check(not office.hud.bubble_tip_shown(), "off it: none")
+	_check(not office.hud.world_tip_shown(), "off it: none")
 	await _parsed(_motion(at))
-	_check(office.hud.bubble_tip_shown(), "the pointer on the bubble: a tooltip")
-	_eq(office.hud.bubble_tip_text(), OfficeQuestionReader.READ_ONLY_TEXT, "read-only says so")
-	var tip: Control = office.hud.get_node("%BubbleTip")
+	_check(office.hud.world_tip_shown(), "the pointer on the bubble: a tooltip")
+	_eq(office.hud.world_tip_text(), OfficeQuestionReader.READ_ONLY_TEXT, "read-only says so")
+	var tip: Control = office.hud.get_node("%WorldTip")
 	_check(office.hud.world_rect().encloses(tip.get_global_rect()), "inside the world's part of the screen")
 	await _parsed(_motion(at + Vector2(0, 70)))
-	_check(not office.hud.bubble_tip_shown(), "the pointer leaves: no tooltip")
+	_check(not office.hud.world_tip_shown(), "the pointer leaves: no tooltip")
 	await _parsed(_mouse_button(at + Vector2(0, 70), MOUSE_BUTTON_LEFT, true))
 	await _parsed(_motion(at, true))
-	_check(not office.hud.bubble_tip_shown(), "a drag over the bubble shows none")
+	_check(not office.hud.world_tip_shown(), "a drag over the bubble shows none")
 	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, false))
 	office.camera.pan = Vector2.ZERO
 	office.reveal(key)
 	await _frames(2)
-	at = _station(office, key).bubble_rect().get_center() - office.camera.position
+	at = _station(office, key).chip_rect().get_center() - office.camera.position
 	await _parsed(_motion(at + Vector2(0, 70)))
 	await _parsed(_motion(at))
-	_check(office.hud.bubble_tip_shown(), "back on the bubble: the tooltip again")
-	# PageUp, the pointer staying where it is: the floor it pointed at is gone.
-	await _office_key(office, KEY_PAGEUP)
-	_eq(office.navigator.shown_key, HerdrFleet.pane_key(LOCAL, "web"), "PageUp shows web")
-	_check(not office.hud.bubble_tip_shown(), "another floor: no tooltip")
+	_check(office.hud.world_tip_shown(), "back on the bubble: the tooltip again")
+	# PageDown, the pointer staying where it is: the camera pans to web's zone,
+	# and the chip it pointed at moves away from under it.
+	await _office_key(office, KEY_PAGEDOWN)
+	await _physics_frames(2)
+	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(LOCAL, "web"), "PageDown pans to web")
+	_check(not office.hud.world_tip_shown(), "another zone in view: no tooltip")
 	_done(office)
 
 
@@ -423,11 +445,12 @@ func test_an_idle_agent_rests_in_the_pantry_with_a_cup() -> void:
 
 
 ## A pantry with no free spot seats whoever comes after it, idle at the desk.
+## Three residents hold three of the narrowest map's five spots first.
 func test_a_full_pantry_seats_the_rest() -> void:
-	var office := await _live_office()
+	var office := await _live_office(_with_residents(fixture))
 	var spots := office.layout_plan().pantry.spots.size()
-	var snapshot := _with(fixture, "api:p3", {"agent": "codex"})
-	var panes: Array[String] = ["api:p1", "api:p2", "api:p3", "api:p4"]
+	var snapshot := _with(_with_residents(fixture), "api:p3", {"agent": "codex"})
+	var panes: Array[String] = ["api:r0", "api:r1", "api:r2", "api:p1", "api:p2", "api:p3", "api:p4"]
 	_check(spots < panes.size(), "a pantry of %d for %d idle" % [spots, panes.size()])
 	for pane_id in panes:
 		snapshot = _with(snapshot, pane_id, {"agent_status": "idle"})
@@ -526,14 +549,14 @@ func test_another_agent_in_the_pantry_walks_out_and_in() -> void:
 ## the one who waited at the desk, and sits down there itself. The same body, no
 ## ghost.
 func test_a_new_session_in_the_pantry_ranks_from_then() -> void:
-	var office := await _live_office()
-	var snapshot := fixture
+	var office := await _live_office(_with_residents(fixture))
+	var snapshot := _with_residents(fixture)
 	for pane_id: String in ["api:p1", "api:p2", "api:p4"]:
 		OS.delay_msec(5)
 		snapshot = _with(snapshot, pane_id, {"agent_status": "idle"})
 		_feed(office, snapshot)
 	office.settle()
-	_eq(office.layout_plan().pantry.spots.size(), 2, "a pantry of two")
+	_eq(office.layout_plan().pantry.spots.size(), 5, "a pantry of five, three residents' already")
 	var rests := func() -> Array:
 		var found: Array = []
 		for pane_id: String in ["api:p1", "api:p2", "api:p4"]:
@@ -541,10 +564,12 @@ func test_a_new_session_in_the_pantry_ranks_from_then() -> void:
 		return found
 	var pantry := OfficeRests.Rest.PANTRY
 	var seat := OfficeRests.Rest.SEAT
-	_eq(rests.call(), [pantry, pantry, seat], "p1 and p2 idle first take the pantry, p4 sits")
+	_eq(rests.call(), [pantry, pantry, seat], "p1 and p2 idle first take the last two spots, p4 sits")
 	var p1 := _station(office, _pane("api:p1")).actor()
 	OS.delay_msec(5)
 	_feed(office, _with(snapshot, "api:p1", {"terminal_id": "term-api-p1-again"}))
+	for resident: String in ["api:r0", "api:r1", "api:r2"]:
+		_eq(_station(office, _pane(resident)).rest, pantry, resident + " keeps its spot")
 	_eq(_ids(_ghosts(office)), [], "nobody leaves")
 	_eq(_station(office, _pane("api:p1")).actor(), p1, "the same body")
 	_eq(rests.call(), [seat, pantry, pantry], "p1, its start now, sits; p4 takes the spot")
@@ -556,7 +581,7 @@ func test_a_new_session_in_the_pantry_ranks_from_then() -> void:
 
 ## Drawn afresh, a floor puts everyone where they rest at once, walking nobody:
 ## the first draw, another theme, a reconnect. The blocked sit with their hand
-## up and their bubble, the done with their paper, the idle in the pantry.
+## up and their chip, the done with their paper, the idle in the pantry.
 func test_a_cold_pass_places_the_pantry_and_the_seated() -> void:
 	var snapshot := _with(_with(fixture, "api:p1", {"agent_status": "blocked"}), "api:p2", {"agent_status": "idle"})
 	snapshot = _with(snapshot, "api:p4", {"agent_status": "done"})
@@ -571,7 +596,7 @@ func test_a_cold_pass_places_the_pantry_and_the_seated() -> void:
 		var blocked := _station(office, _pane("api:p1"))
 		_eq(blocked.rest, OfficeRests.Rest.SEAT, when + ": p1 sits")
 		_eq(blocked.actor().track, &"desk_blocked", when + ": hand up")
-		_check(blocked.bubble().visible, when + ": under its bubble")
+		_check(blocked.chip().visible, when + ": under its bubble")
 		_eq(_station(office, _pane("api:p2")).rest, OfficeRests.Rest.PANTRY, when + ": p2 in the pantry")
 	check.call("first drawn")
 	_eq(_shown_papers(office), [_pane("api:p4")], "first drawn: p4's paper")
@@ -591,13 +616,13 @@ func test_a_cold_pass_places_the_pantry_and_the_seated() -> void:
 ## the moment it drops, but the office ranks the frozen floor by the starts it
 ## last saw live, so a refresh never reshuffles who has a spot: a real click,
 ## `N` (which finds a blocked agent on a second, live machine and switches to
-## its floor; the section brings us back, the floor drawn afresh) and a real
+## its map; the section brings us back, the map drawn afresh) and a real
 ## snapshot from that other machine. The first snapshot after the reconnect is
 ## cold and ranks afresh: every start is unknown then, so the projection order
 ## decides.
 func test_a_stale_pantry_is_never_reranked() -> void:
-	var office := await _two_machine_office()
-	var snapshot := fixture
+	var office := await _two_machine_office(_with_residents(fixture), PLAN_SCREEN)
+	var snapshot := _with_residents(fixture)
 	for pane_id: String in ["api:p4", "api:p2", "api:p1"]:
 		OS.delay_msec(5)
 		snapshot = _with(snapshot, pane_id, {"agent_status": "idle"})
@@ -623,9 +648,9 @@ func test_a_stale_pantry_is_never_reranked() -> void:
 	var api := HerdrFleet.pane_key(LOCAL, "api")
 	await _office_key(office, KEY_N)
 	_eq(office.picked_key, HerdrFleet.pane_key(BEE, "hive:p1"), "N finds the live machine's blocked agent")
-	_check(office.navigator.shown_key != api, "and switches to its floor")
-	await _visit_floor(office, api)
-	_eq(office.navigator.shown_key, api, "the section brings us back")
+	_eq(office.navigator.shown_key, BEE, "and switches to its map")
+	await _visit_zone(office, api)
+	_eq(office.navigator.shown_key, LOCAL, "the section brings us back")
 	_eq(rests.call(), [seat, pantry, pantry], "after N and back: drawn afresh, the same pantry")
 	var seen := office.frame.pane(HerdrFleet.pane_key(BEE, "hive:p1"))
 	_feed_bee(office, _bee_snapshot("working"))
@@ -644,7 +669,7 @@ func test_a_stale_pantry_is_never_reranked() -> void:
 
 
 ## Clicks, by real input: a worker in the pantry and the seat they left both
-## pick that pane; the counters and the empty floor beside them pick nothing.
+## pick that pane; the pantry counter picks nothing.
 func test_clicks_pick_pantry_workers_and_their_seats() -> void:
 	var office := await _live_office()
 	_feed(office, _with(fixture, "api:p2", {"agent_status": "idle"}))
@@ -667,7 +692,7 @@ func test_clicks_pick_pantry_workers_and_their_seats() -> void:
 	await _click(seat.global_position - office.camera.position)
 	_eq(office.picked_key, _pane("api:p2"), "and a click on the seat they left picks it too")
 	await _click_desk(office, other)
-	for fixture_key: String in ["reception", "pantry"]:
+	for fixture_key: String in ["pantry"]:
 		var counter: Node2D = office.floor_view.sorted.get_node("Fixture_" + fixture_key)
 		office.camera.reveal(Rect2(office.world.to_local(counter.global_position - Vector2(40, 60)), Vector2(80, 80)))
 		await _frames(2)
@@ -677,8 +702,8 @@ func test_clicks_pick_pantry_workers_and_their_seats() -> void:
 
 
 ## Depth is the feet's: a pantry worker (on the fixture row) draws in front of
-## the pantry, the reception counter sorts as itself, and a walker passing on
-## the walking lane draws in front of the pantry's people.
+## the pantry, the pantry counter sorts as itself, and a walker passing on the
+## walking lane draws in front of the pantry's people.
 func test_the_pantry_sorts_by_feet() -> void:
 	var office := await _live_office()
 	var snapshot := _with(fixture, "api:p2", {"agent_status": "idle"})
@@ -686,10 +711,9 @@ func test_the_pantry_sorts_by_feet() -> void:
 	office.settle()
 	var sorted := office.floor_view.sorted
 	var resting := _station(office, _pane("api:p2")).actor()
-	var reception: Node2D = sorted.get_node("Fixture_reception")
 	var pantry: Node2D = sorted.get_node("Fixture_pantry")
 	_eq(_entity_of(sorted, resting), resting, "the pantry worker sorts as themselves")
-	_eq(_entity_of(sorted, reception), reception, "and so does the reception counter")
+	_eq(_entity_of(sorted, pantry), pantry, "and so does the pantry counter")
 	_check(resting.global_position.y > pantry.global_position.y, "the pantry worker in front of the pantry")
 	_feed(office, _with(snapshot, "api:p4", {"agent_status": "idle"}))
 	var walker := _station(office, _pane("api:p4")).actor()
@@ -710,16 +734,17 @@ func test_the_pantry_sorts_by_feet() -> void:
 ## pantry is full (and so while every spot, its own hashed one included, is
 ## someone's), it sits at its desk: nobody in the pantry moves. The residents
 ## were there from the first snapshot, their starts unknown, and api:p1 is
-## projected before them, which is the order that decided it before.
+## projected before them, which is the order that decided it before. Three
+## more residents hold three of the narrowest map's five spots.
 func test_a_launched_agent_never_takes_a_pantry_spot() -> void:
-	var start := _with(_with(fixture, "api:p1", {"agent": null}), "api:p2", {"agent_status": "idle"})
+	var start := _with(_with(_with_residents(fixture), "api:p1", {"agent": null}), "api:p2", {"agent_status": "idle"})
 	start = _with(start, "api:p4", {"agent_status": "idle"})
 	var office := await _live_office(start)
 	office.settle()
 	var spots := office.layout_plan().pantry.spots
-	_eq(spots.size(), 2, "a pantry of two")
+	_eq(spots.size(), 5, "a pantry of five")
 	var residents: Dictionary[String, Vector2] = {}
-	for pane_id: String in ["api:p2", "api:p4"]:
+	for pane_id: String in ["api:r0", "api:r1", "api:r2", "api:p2", "api:p4"]:
 		var station := _station(office, _pane(pane_id))
 		_eq(station.rest, OfficeRests.Rest.PANTRY, pane_id + " rests in the pantry")
 		residents[pane_id] = station.position + station.rest_position()
@@ -747,18 +772,21 @@ func test_a_launched_agent_never_takes_a_pantry_spot() -> void:
 	_done(office)
 
 
-## A floor drawn afresh (another floor and back) puts everyone where they rest
-## at once, walking nobody: the idle back in the pantry with a cup, the blocked
-## at the desk with a hand up.
+## A map drawn afresh (another machine's and back) puts everyone where they
+## rest at once, walking nobody: the idle back in the pantry with a cup, the
+## blocked at the desk with a hand up. (Another zone of the same map pans and
+## walks on: WALKING's test_a_pageup_pans_without_rebuilding.)
 func test_a_floor_switch_places_everyone() -> void:
-	var office := await _live_office()
+	var office := await _two_machine_office(fixture, PLAN_SCREEN)
 	var snapshot := _with(fixture, "api:p2", {"agent_status": "idle"})
 	_feed(office, snapshot)
 	snapshot = _with(snapshot, "api:p1", {"agent_status": "blocked"})
 	_feed(office, snapshot)
 	_check(not _walkers(office).is_empty(), "api:p2 is still walking to the pantry when we leave")
-	await _visit_floor(office, HerdrFleet.pane_key(LOCAL, "web"))
-	await _visit_floor(office, HerdrFleet.pane_key(LOCAL, "api"))
+	await _visit_zone(office, HerdrFleet.pane_key(BEE, "hive"))
+	_eq(office.navigator.shown_key, BEE, "bee's map")
+	await _visit_zone(office, HerdrFleet.pane_key(LOCAL, "api"))
+	_eq(office.navigator.shown_key, LOCAL, "and back")
 	_eq([_ids(_walkers(office)), _ids(_ghosts(office))], [[], []], "back: nobody walks")
 	var resting := _station(office, _pane("api:p2"))
 	_eq(_floor_point(office, resting.actor()), resting.position + resting.rest_position(), "p2 on its spot")
@@ -788,10 +816,11 @@ func test_a_pass_after_a_layout_problem_places_the_pantry() -> void:
 		var station := _station(office, _pane(pane_id))
 		_eq(station.rest, OfficeRests.Rest.PANTRY, pane_id + " rests in the pantry")
 		stood.append(_floor_point(office, station.actor()))
-	stood.sort()
-	var wanted: Array = [spots[0], spots[1]]
-	wanted.sort()
-	_eq(stood, wanted, "both placed on the pantry's two spots")
+	for at: Vector2 in stood:
+		_check(spots.has(at), "placed on a spot of the pantry: %s" % at)
+	var first: Vector2 = stood[0]
+	var second: Vector2 = stood[1]
+	_check(first != second, "each on a spot of their own")
 	_done(office)
 
 
@@ -823,66 +852,34 @@ func test_revealing_a_pantry_worker_shows_them() -> void:
 	_done(office)
 
 
-## Local and a second machine, `bee`, on a socket nobody answers: both clients
-## stopped, fed by hand.
-func _two_machine_office() -> OfficeDouble:
-	var office := OfficeDouble.new()
-	_live_offices.append(office)
-	# The suite's floors are planned 488 wide (PLAN_SCREEN, walking_test_base.gd).
-	office.test_screen = PLAN_SCREEN
-	office.test_args = AppArgs.parse(
-		PackedStringArray(
-			[
-				"--read-only",
-				"--socket=" + args.socket,
-				"--machine-socket=bee=" + args.work.path_join("bee-nowhere.sock")
-			]
-		)
+## Every zone of a map shares its one pantry: idle agents of different zones
+## take its spots in the order they went idle (OfficeRests, the `N` key's
+## order), and whoever finds none left sits at their desk.
+func test_the_pantry_is_shared_by_the_zones_in_wait_order() -> void:
+	var working: Dictionary = whole.duplicate(true)
+	for pane: Dictionary in _list(working, "panes"):
+		if pane.get("agent") != null:
+			pane.agent_status = "working"
+	var office := await _live_office(working)
+	var spots := office.layout_plan().pantry.capacity()
+	_eq(spots, 5, "one pantry of five spots for the map's five zones")
+	var order: Array[String] = ["web:p1", "api:p1", "infra:p1", "api:p2", "web:p2", "data:p1"]
+	var snapshot := working
+	for pane_id in order:
+		OS.delay_msec(5)
+		snapshot = _with(snapshot, pane_id, {"agent_status": "idle"})
+		_feed(office, snapshot)
+	office.settle()
+	var rests: Array = []
+	for pane_id in order:
+		rests.append(_station(office, _pane(pane_id)).rest)
+	var pantry := OfficeRests.Rest.PANTRY
+	_eq(
+		rests,
+		[pantry, pantry, pantry, pantry, pantry, OfficeRests.Rest.SEAT],
+		"the first five to go idle, from four zones, share it; the sixth sits"
 	)
-	office.manifest_path = MANIFESTS[0]
-	office.remember_theme = false
-	root.add_child(office)
-	_local(office).stop()
-	office.fleet._roster.stop()
-	_feed(office, fixture)
-	_feed_bee(office, _bee_snapshot("blocked"))
-	await _frames(2)
-	return office
-
-
-func _bee(office: OfficeDouble) -> HerdrClient:
-	return office.fleet._sites[1].client
-
-
-## Feed `bee` a fresh snapshot, live.
-func _feed_bee(office: OfficeDouble, snapshot: Dictionary) -> void:
-	var client := _bee(office)
-	client.stop()
-	client.online = true
-	client._apply_snapshot(snapshot.duplicate(true))
-	office.fleet.liveness_changed.emit()
-
-
-## bee's one floor, `hive`, with one agent in `status`.
-static func _bee_snapshot(status: String) -> Dictionary:
-	return {
-		"focused_pane_id": "hive:p1",
-		"workspaces": [{"workspace_id": "hive", "number": 1, "label": "hive"}],
-		"tabs": [{"tab_id": "hive:t1", "workspace_id": "hive", "number": 1, "label": "hive"}],
-		"panes":
-		[
-			{
-				"pane_id": "hive:p1",
-				"workspace_id": "hive",
-				"tab_id": "hive:t1",
-				"agent": "claude",
-				"agent_status": status,
-				"terminal_id": "term-hive-p1"
-			}
-		],
-		"agents": [],
-		"layouts": []
-	}
+	_done(office)
 
 
 ## The pane key of every seat whose stack of paper shows, in seat order.
@@ -904,7 +901,7 @@ func test_the_papers_and_the_minimap_count_unread_alike() -> void:
 	var api := HerdrFleet.pane_key(LOCAL, "api")
 	var done := _with(fixture, "api:p1", {"agent_status": "done"})
 	_feed(office, done)
-	var row := office.frame.find_floor(api).floor_model
+	var row := office.frame.find_zone(api).zone_model
 	_eq(row.done, 1, "one UNREAD on the minimap's row")
 	_eq(_shown_papers(office).size(), row.done, "and one stack of paper")
 	var malformed := _with(done, "api:p2", {"agent_status": "done"})
@@ -912,7 +909,7 @@ func test_the_papers_and_the_minimap_count_unread_alike() -> void:
 	_list(malformed, "panes").append(repeated.duplicate(true))
 	_feed(office, malformed)
 	_check(not office.layout_problems().is_empty(), "the repeated pane cannot be laid out")
-	row = office.frame.find_floor(api).floor_model
+	row = office.frame.find_zone(api).zone_model
 	_eq(row.done, 1, "the minimap's row counts the repeated pane not at all")
 	_eq(_shown_papers(office), [_pane("api:p1")], "the floor keeps its last valid paper")
 	_done(office)
@@ -920,8 +917,8 @@ func test_the_papers_and_the_minimap_count_unread_alike() -> void:
 
 ## Blocked comes first: a shell whose start asks at once. herdr launches claude
 ## in api:p1 and it blocks before the launch is over: the desk drawn in place
-## is the one a rebuild draws (hand up, bubble, pulsing blocked badge), the
-## plate says the kind, and the bubble says how long it has waited, from the
+## is the one a rebuild draws (hand up, chip, pulsing blocked badge), the
+## plate says the kind, and the chip says how long it has waited, from the
 ## moment the office saw it block, and keeps it when the launch is over.
 func test_a_start_that_asks_at_once_matches_a_rebuild() -> void:
 	var start := _with(fixture, "api:p1", {"agent": null})
@@ -935,7 +932,7 @@ func test_a_start_that_asks_at_once_matches_a_rebuild() -> void:
 	_check(office.frame.pane(_pane("api:p1")).starting, "herdr still launches it")
 	var station := _station(office, _pane("api:p1"))
 	_eq(station.rest, OfficeRests.Rest.SEAT, "at its seat")
-	_check(station.bubble().visible, "with the bubble over its head")
+	_check(station.chip().visible, "with the bubble over its head")
 	_eq(station.actor().track, &"desk_blocked", "and its hand up")
 	_eq(_plate(station).text, "CLAUDE", "the plate says the kind")
 	await _text_tick()
@@ -944,7 +941,7 @@ func test_a_start_that_asks_at_once_matches_a_rebuild() -> void:
 		"the bubble says how long: " + _wait_text(office, _pane("api:p1"))
 	)
 	# herdr finishing the launch while it still asks is no change at the desk: it
-	# is not seated again, which would blank the bubble's wait until the next beat.
+	# is not seated again, which would blank the chip's wait until the next beat.
 	_feed(office, asking)
 	_check(not office.frame.pane(_pane("api:p1")).starting, "the launch is over")
 	_check(not _wait_text(office, _pane("api:p1")).is_empty(), "the bubble keeps its wait: the desk is not redrawn")

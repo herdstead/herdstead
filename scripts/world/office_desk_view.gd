@@ -5,8 +5,8 @@ extends RefCounted
 var table: OfficeTable
 var background: Node2D
 var title: Label
-## The lens's wash over the rug (OfficeFloorView.show_lens()): hidden until `L`
-## is held, then the table's most urgent state. Made with the background, so a
+## The lens's wash over the pod's floor (OfficeFloorView.show_lens()): hidden
+## until `L` is held, then the pod's most urgent state. Made with the background, so a
 ## zoom or a lens change never makes another; only its `visible` and `color` change.
 var wash: ColorRect
 var stations: Array[OfficeStation] = []
@@ -18,18 +18,24 @@ var _sorted: Node2D
 var _name := ""
 
 
-## Node upper bound for a measured table and everything this view owns, even
+## Node upper bound for a measured pod and everything this view owns, even
 ## when every retained slot gains a person. Measured on the dressed prefabs
-## (the geometry suite's count): 33 fixed nodes (27 of the table, 6 of the
-## background: itself, the rug, the lens's rug wash, the contact holder, the
-## sign and the title) and 79 per column (24 of the table's equipment, decor and
-## trinkets, 1 contact shadow, two 17-node stations and two 10-node people).
-## The bound decides which floors fit FloorLayoutPolicy.max_desk_nodes. Geometry tests
-## count real dressed prefabs so changes to the scenes cannot silently
-## invalidate this allocation contract. This bounds the settled live group, not
-## temporary queue_free replacements.
+## (the geometry suite's count, test_desk_node_budget_bounds_real_prefabs_and_retained_empty_slots,
+## at 2, 4, 18 and 250 columns: 168, 310, 1304 and 17776 nodes with everybody
+## seated): 26 fixed nodes (21 of the pod: its body, 12 holders, the footprint,
+## the overlay, the frame and its 4 bars, and the 2 short legs; 5 of the
+## background: itself, the lens's wash, the contact holder, the tab label, and
+## the row-wall sign's, spare since lane B2a took the sign off: the counts above
+## were taken with it) and 71 per column (20 of the pod's: a desk, an apron and a screen
+## module, a bracket, 2 laptops, 2 three-node grommets, 2 lamps, 2 papers, 2
+## seat and 2 standing markers; 1 contact shadow; two 15-node stations and two
+## 10-node people). The bound decides which maps fit
+## FloorLayoutPolicy.max_desk_nodes. Geometry tests count real dressed prefabs
+## so changes to the scenes cannot silently invalidate this allocation
+## contract. This bounds the settled live group, not temporary queue_free
+## replacements.
 static func node_budget(capacity: int) -> int:
-	return 33 + 79 * capacity
+	return 26 + 71 * capacity
 
 
 func setup(drawing: OfficeDraw, ground: Node2D, sorted: Node2D, tab_key: String) -> void:
@@ -43,7 +49,7 @@ func setup(drawing: OfficeDraw, ground: Node2D, sorted: Node2D, tab_key: String)
 ## placement (FloorPlanCache.prepare()), which is unchanged by definition: only
 ## a different one is compared by its geometry. The title follows the room's
 ## label either way; labels never change a plan.
-func reconcile(room: RoomModel, next: DeskPlacement, wall_y: float) -> void:
+func reconcile(room: RoomModel, next: DeskPlacement) -> void:
 	var changed := (
 		placement == null or (placement != next and placement.geometry_signature() != next.geometry_signature())
 	)
@@ -57,7 +63,7 @@ func reconcile(room: RoomModel, next: DeskPlacement, wall_y: float) -> void:
 		table.relocate(next.origin)
 	if changed:
 		_sync_stations(next)
-		_draw_background(next, wall_y)
+		_draw_background(next)
 	placement = next
 	title.text = room.label.to_upper()
 
@@ -128,7 +134,7 @@ static func _slot(column: int, side: String) -> int:
 	return column * 2 + (1 if side == "near" else 0)
 
 
-func _draw_background(next: DeskPlacement, wall_y: float) -> void:
+func _draw_background(next: DeskPlacement) -> void:
 	# The table owns SeatContacts. Move that holder to the new background before
 	# deleting the old one; reparenting a queued-for-deletion node cannot save it.
 	var previous := background
@@ -136,24 +142,21 @@ func _draw_background(next: DeskPlacement, wall_y: float) -> void:
 	background = Node2D.new()
 	background.name = _name + "Ground"
 	_ground.add_child(background)
+	# No rug: the pod stands on the floor itself. The lens's wash covers the
+	# cells under the pod's drawing, under the contact shadows, the sign and the title.
 	var visual := next.measure.render_rect
 	var grid := float(FloorLayoutPolicy.GRID)
 	var start := (visual.position / grid).floor()
 	var end := (visual.end / grid).ceil()
-	_pen.rug(background, next.origin + start * grid, int(end.x - start.x), int(end.y - start.y))
-	# Right over the rug, under the contact shadows, the sign and the title.
 	wash = _pen.box(background, Rect2(next.origin + start * grid, (end - start) * grid), ArtContract.SLATE)
 	wash.name = "LensWash"
 	wash.visible = false
 	table.contact_shadows(background)
 	previous.queue_free()
-	var middle := next.origin.x + next.measure.table_width / 2.0
-	_pen.prop(background, ArtContract.PROP_SIGN, Vector2(middle, wall_y + OfficeShell.SIGN_FOOT))
-	var bounds := OfficeShell.title_bounds(next, wall_y, _pen)
-	title = _pen.clipped(background, "", bounds.position, bounds.size, 12, ArtContract.INK, HORIZONTAL_ALIGNMENT_CENTER)
-	# Even a narrow sign must signal truncation. Godot's ordinary ellipsis mode
-	# suppresses that mark when fewer than six characters fit.
-	title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS_FORCE
+	# The tab's name, small, on the floor right under the table's drawing and
+	# no wider than the table (OfficeDraw.tab_label()).
+	var under := Vector2(next.origin.x, next.origin.y + next.measure.render_rect.end.y)
+	title = _pen.tab_label(background, under, next.measure.table_width)
 
 
 func release() -> void:

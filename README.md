@@ -2,12 +2,12 @@
 
 **A pixel home for your coding agents.**
 
-Herdstead is a [Godot](https://godotengine.org) 4.7 app that draws a [herdr](https://herdr.dev) session as a pixel office
-building. Each herdr machine is a building, each workspace a floor, each tab a long table, each pane a seat, and each
+Herdstead is a [Godot](https://godotengine.org) 4.7 app that draws a [herdr](https://herdr.dev) session as a pixel
+open-plan office. Each herdr machine is one office map, each workspace a zone of it, each tab a pod of desks, each pane a seat, and each
 coding agent the person sitting in it. Blocked agents raise their hands, finished ones leave a stack of paper on the desk,
 idle ones walk over to the pantry. You can see who needs you at a glance, and answer them from the office.
 
-![Answering a blocked agent from the staff panel](docs/preview.png)
+![A blocked agent in the staff panel: its question on screen, Answer one key away](docs/preview.png)
 
 ## Requirements
 
@@ -39,8 +39,8 @@ connects to herdr.
   lift when an agent starts and walk out when it goes. Disconnected machines dim and freeze; offline is never shown as idle.
 - **Top bar counters** in herdr's words (`MACHINES`, `BLOCKED 2 max 12m`, `DONE`, `WORKING`, `IDLE`, `PANES`); click to
   jump to whoever waited longest or filter the list.
-- **FLOORS minimap** on the left, with worktree mezzanines under their source floor, and signposts pointing to blocked
-  agents on other floors.
+- **SPACES rail** on the left: every machine's spaces, worktree mezzanines after their source, a mark on the ones in
+  view; and arrows on the edges of the world pointing to blocked agents out of view.
 - **Agent list** drawer (`A`), flat by urgency or as a tree, plus an **EVENTS** tab and a **NEWS** line of state changes
   observed this session.
 - **Staff panel** at the bottom with a live terminal preview, **NEXT** (`N`: the next agent that needs you), and
@@ -49,12 +49,12 @@ connects to herdr.
 - **Start agent**, **New pane**, **Close**, **New space** and **Worktree** from the staff panel, by mouse click only.
 - **Terminal monitor** (`M`): a full-screen pixel view of a pane's screen with live keyboard pass-through.
 - **OVERVIEW** (`O`): one row per pane with timelines. **Lens** (hold `L`): how long everyone has been in their state.
-  **Strategic view** (`S`): a diagram of the whole floor.
+  **Strategic view** (`S`): a diagram of the whole map.
 - **Background alerts**: `(N)` in the window title, a Dock bounce, and an optional chime.
 - **Day and night**: one pack, Studio, lit by the local clock: by night the office is darker and cooler, the desk lamps burn harder and the windows show the city at night; `T` turns the light over for a while.
-- **Several machines**: every SSH machine herdr has saved becomes its own building, reached over `ssh -L`.
+- **Several machines**: every SSH machine herdr has saved becomes its own map, reached over `ssh -L`.
 
-![The showroom: every agent state on two mock floors](docs/showroom.png)
+![The showroom: every agent state in two mock zones](docs/showroom.png)
 
 The [manual](docs/MANUAL.md) covers every screen, key and option.
 
@@ -97,7 +97,7 @@ changing the code (invariants, what to keep in sync, how to test) are in [AGENTS
 | [docs/MANUAL.md](docs/MANUAL.md) | The full user manual: every feature, key, option, theme tooling, export and CI |
 | [docs/WRITE_BOUNDARY.md](docs/WRITE_BOUNDARY.md) | What Herdstead may send to herdr, when, and how each write is checked |
 | [docs/VISUAL_LANGUAGE.md](docs/VISUAL_LANGUAGE.md) | What every thing on screen stands for in herdr |
-| [docs/WORLD_MODEL.md](docs/WORLD_MODEL.md) | Depth, collision, table geometry, stable floors and walking |
+| [docs/WORLD_MODEL.md](docs/WORLD_MODEL.md) | Depth, collision, pod geometry, stable maps and walking |
 | [docs/ASSET_SPEC.md](docs/ASSET_SPEC.md) | Art pack format: sizes, pivots, density, palettes, pixel people |
 | [docs/ARTIST_BRIEF.md](docs/ARTIST_BRIEF.md) | A brief for pixel artists who do not write code |
 | [docs/MACHINES.md](docs/MACHINES.md) | herdr machines over SSH: forwarding, cleanup, validation |

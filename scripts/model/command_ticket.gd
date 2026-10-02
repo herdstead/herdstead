@@ -70,7 +70,7 @@ var screen: ScreenReadResult
 ## An accepted SPLIT's result: the new pane's ids; null for everything else.
 var split: PaneSplitResult
 ## An accepted SPACE's or WORKTREE's result: the new workspace's and its
-## shell's ids; null for everything else. Used to name and pick the new floor,
+## shell's ids; null for everything else. Used to name and pick the new space,
 ## never to write to it.
 var space: SpaceCreateResult
 ## An accepted START's result: herdr's name for the agent and its launch flag;

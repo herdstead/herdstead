@@ -1,7 +1,7 @@
 extends "res://tools/command_test_base.gd"
 ## Answer mode: the approval keys and the one-line reply the agent
 ## card sends through the write boundary, against two fake herdrs of this
-## suite's own whose pane ids collide. The bubbles' reads and the clicks that
+## suite's own whose pane ids collide. The chips' reads and the clicks that
 ## open answer mode from the world are tools/test_bubbles.gd's. Run through
 ## tools/run_tests.sh.
 ##
@@ -787,7 +787,7 @@ func test_the_reply_box_and_the_office_keep_their_keys() -> void:
 	var card := _card(office)
 	var night := office.night
 	var picked := office.picked_key
-	var shown := office.navigator.shown_key
+	var shown := [office.navigator.shown_key, office.navigator.current_zone(office.frame)]
 	await _open_answer(office)
 	var box := _reply_box(office)
 	await _click_control(box)
@@ -796,7 +796,12 @@ func test_the_reply_box_and_the_office_keep_their_keys() -> void:
 	await _tap(KEY_PAGEDOWN)
 	_eq(box.text, "tna1y", "every key typed")
 	_eq(
-		[office.night, office.picked_key, office.navigator.shown_key, office.hud.holds_keyboard()],
+		[
+			office.night,
+			office.picked_key,
+			[office.navigator.shown_key, office.navigator.current_zone(office.frame)],
+			office.hud.holds_keyboard()
+		],
 		[night, picked, shown, false],
 		"no light, no next, no floor, no agent list"
 	)
@@ -1321,7 +1326,7 @@ func test_answer_mode_fits_the_smallest_screen() -> void:
 	_eq(office.hud.world_rect().size, Vector2(216, 112), "the world above it keeps a desk's room, the drawer open")
 	_fits(card, "answer mode")
 	# The minimap keeps to the room between the bar and the panel, and scrolls.
-	var floors := office.hud.floors
+	var floors := office.hud.spaces
 	_eq(floors.get_global_rect(), Rect2(16, 40, 72, 120), "the rail stands left 40..160, grown neither way")
 	var rows: ScrollContainer = floors.get_node("%Scroll")
 	_check(rows.get_v_scroll_bar().max_value > rows.size.y, "and scrolls the rows it has no room for")

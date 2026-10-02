@@ -141,10 +141,10 @@ func _after_office(office: OfficeDouble) -> void:
 func _open(office: OfficeDouble) -> void:
 	await _frames(4)
 	var key := HerdrFleet.pane_key(HerdrFleet.LOCAL, PANE)
-	await _until(func() -> bool: return not office.frame.floor_of(key).is_empty(), "the pane's floor is known")
-	var floor_key := office.frame.floor_of(key)
-	if office.navigator.shown_key != floor_key:
-		await _floor_pick(office, floor_key)
+	await _until(func() -> bool: return not office.frame.zone_of(key).is_empty(), "the pane's zone is known")
+	var zone_key := office.frame.zone_of(key)
+	if office.navigator.shown_key != HerdrFleet.split_key(zone_key)[0]:
+		await _zone_pick(office, zone_key)
 	await _click_visible_pane(office, key)
 	var name := "%CompactMonitor" if office.hud.card_compact() else "%MonitorButton"
 	var button: Button = office.hud.inspector.get_node(name)

@@ -3,9 +3,10 @@ extends Node
 ## The info lens: while `L` is held (the `office_lens`
 ## action), the world is a data view. Every agent's desk gets one line saying how
 ## long it has been in its state (text_for(): the OVERVIEW's FOR, from
-## StateLog.wait_of(), in OfficeAttention.wait_text()), the blocked bubble draws
-## nothing meanwhile (the wait is said once), every table's rug is washed in its
-## most urgent state (tone_for(), on the FLOORS windows' scale) and the
+## StateLog.wait_of(), in the in-world form OfficeAttention.compact_duration()),
+## every seat's name plate shows, the blocked chip draws nothing meanwhile (the
+## wait is said once), every pod's floor is washed in its
+## most urgent state (tone_for(), on the SPACES windows' scale) and the
 ## furnishing dims. Let go, all of it is as it was. The office draws it
 ## (OfficeScene._show_lens()); this node only knows whether the lens is held and
 ## when its lines are due again.
@@ -67,8 +68,8 @@ static func text_for(pane: PaneModel, track: StateLog.Track, stale: bool, now: i
 	return OfficeAttention.wait_text(StateLog.wait_of(track, now))
 
 
-## The palette key `room`'s rug is washed in: its most urgent pane's, on the
-## FLOORS windows' own scale (OfficeFloorRow.window_look(), HudTheme.SECTION_PANELS):
+## The palette key `room`'s pod floor is washed in: its most urgent pane's, on the
+## SPACES windows' own scale (OfficeSpaceRow.window_look(), HudTheme.SECTION_PANELS):
 ## an agent that asks (blocked, even while starting), then done, working, idle
 ## or starting, unknown; a table of shells only, and every table of a machine
 ## that dropped (`stale`), dark.
@@ -77,8 +78,8 @@ static func tone_for(room: RoomModel, stale: bool) -> StringName:
 	var best := 5
 	if not stale:
 		for pane in room.panes:
-			# The FLOORS window's own look: a shell's is dark, and never wins.
-			var pane_look := OfficeFloorRow.window_look(pane, true)
+			# The SPACES window's own look: a shell's is dark, and never wins.
+			var pane_look := OfficeSpaceRow.window_look(pane, true)
 			if pane_look == &"WindowDark":
 				continue
 			var rank: int = RANKS.get(pane_look, 4)

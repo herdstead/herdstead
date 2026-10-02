@@ -1,8 +1,8 @@
 class_name OfficePresentation
 extends RefCounted
-## What the shown floor's people do between one observation of it and the next:
+## What the shown map's people do between one observation of it and the next:
 ## who walks in at the lift door, who walks out, who goes to the pantry or back
-## to the seat, and who walks to a new seat. An observation (a FloorModel laid out on a
+## to the seat, and who walks to a new seat. An observation (a MapModel laid out on a
 ## FloorPlan) says where everyone belongs, at once: the plate, the badge and the
 ## click target of a seat follow it the moment it arrives (OfficeStation). This
 ## only brings the bodies there, by the routes the floor's walk graph allows
@@ -45,7 +45,7 @@ extends RefCounted
 ## placed where they belong.
 ##
 ## Placed, not walked (everyone is where they belong at once, and ghosts are
-## gone): every observation of a new floor view (a new floor, a theme), the
+## gone): every observation of a new floor view (another machine's map, a theme), the
 ## first one after the shown machine was stale, the first after a refresh whose
 ## input could not be laid out (lose_track()); and one person at a time,
 ## whoever has no clear way there, stands inside an obstacle when the floor
@@ -262,7 +262,7 @@ static func places(plan: FloorPlan) -> Dictionary[String, Place]:
 ## nobody; a pane the model carries twice is the rebuild's to draw. A pane seen
 ## the same as last time keeps its sighting, so a refresh that changes nothing
 ## on the floor makes nothing new.
-func sightings(plan: FloorPlan, model: FloorModel) -> Dictionary[String, Sighting]:
+func sightings(plan: FloorPlan, model: MapModel) -> Dictionary[String, Sighting]:
 	if plan != _places_plan:
 		_places = places(plan)
 		_places_plan = plan
@@ -404,7 +404,7 @@ func speed_of(body: PixelPerson) -> float:
 
 ## Before the floor view reconciles `next` for `model`: take every departing
 ## worker out as a ghost, and hold every worker who will walk where they are.
-func before(view: OfficeFloorView, next: FloorPlan, model: FloorModel, frozen: bool) -> void:
+func before(view: OfficeFloorView, next: FloorPlan, model: MapModel, frozen: bool) -> void:
 	if frozen:
 		freeze(true)
 	else:

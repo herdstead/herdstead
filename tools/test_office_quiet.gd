@@ -169,6 +169,38 @@ func test_a_quiet_refresh_builds_no_signature_and_keeps_every_node() -> void:
 	_done(office)
 
 
+## Every zone of the machine is one map: an unchanged refresh of it lays out no
+## structure however many zones it holds, and moving the view (a real drag, a
+## real PageDown to another zone) is a pan: the pan itself refreshes nothing, and
+## the refresh PageDown asks for is a quiet one on the same plan. The edge arrows
+## follow the view in _process without a refresh.
+func test_an_unchanged_map_is_quiet_and_a_pan_refreshes_nothing() -> void:
+	var office := await _live_office()
+	_eq(office.layout_plan().zones.size(), 5, "one map of the machine's five zones")
+	office.refresh()
+	await _frames(1)
+	var structures := office.floor_view.structures
+	var nodes := _floor_nodes(office)
+	var plan := office.floor_view.plan
+	office.refresh()
+	_eq(office.floor_view.structures - structures, 0, "an unchanged map: no structural pass")
+	_eq(_floor_nodes(office), nodes, "every node kept")
+	office.refreshes = 0
+	var middle := office.hud.world_rect().get_center()
+	var pan := office.camera.pan
+	await _drag(middle, middle + Vector2(-40, -120))
+	await _frames(3)
+	_check(office.camera.pan != pan, "a real drag pans the map")
+	_eq(office.refreshes, 0, "and refreshes nothing, frame after frame")
+	await _office_key(office, KEY_PAGEDOWN)
+	await _frames(3)
+	_eq(office.refreshes, 1, "PageDown: the one refresh the key asks for")
+	_eq(office.floor_view.structures - structures, 0, "a quiet one: no structural pass")
+	_eq(office.floor_view.plan, plan, "the same plan")
+	_eq(_floor_nodes(office), nodes, "and every node kept")
+	_done(office)
+
+
 ## A table that grows is laid out again (a new plan): its structure and the
 ## lamps of the seats it rebuilt are drawn, and the plan after that is quiet again.
 func test_a_new_plan_is_laid_out_and_the_next_refresh_is_quiet() -> void:

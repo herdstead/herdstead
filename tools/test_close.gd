@@ -334,22 +334,22 @@ func test_the_line_names_the_table_floor_or_mezzanine_and_they_go() -> void:
 	var closer := _close_button(office)
 	var hs := HerdrFleet.pane_key(HerdrFleet.LOCAL, "hs")
 	var p4 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "hs:p4")
-	await _floor_pick(office, hs)
+	await _zone_pick(office, hs)
 	await _click_visible_pane(office, p4)
 	await _open_panel(office)
 	await _until(func() -> bool: return closer.is_visible_in_tree() and not closer.disabled, "hs:p4: Close offered")
 	await _click_control(closer)
 	await _frames(2)
-	_eq(_line(office), "Closes hs:p4 (shell) and its table hs:t2 (last pane of the tab).", "the last pane of a tab")
+	_eq(_line(office), "Closes hs:p4 (shell) and its tab hs:t2 (last pane of the tab).", "the last pane of a tab")
 	await _click_control(closer)
 	await _until(func() -> bool: return office.frame.pane(p4) == null, "closed")
 	await _until(
-		func() -> bool: return office.frame.find_floor(hs) != null and _tables_of(office, hs) == 1, "its table went"
+		func() -> bool: return office.frame.find_zone(hs) != null and _tables_of(office, hs) == 1, "its table went"
 	)
 	# The last pane of a plain floor.
 	var notes := HerdrFleet.pane_key(HerdrFleet.LOCAL, "notes")
 	var notes_p1 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "notes:p1")
-	await _floor_pick(office, notes)
+	await _zone_pick(office, notes)
 	await _click_visible_pane(office, notes_p1)
 	await _open_panel(office)
 	await _until(func() -> bool: return closer.is_visible_in_tree() and not closer.disabled, "notes:p1: Close offered")
@@ -357,15 +357,15 @@ func test_the_line_names_the_table_floor_or_mezzanine_and_they_go() -> void:
 	await _frames(2)
 	_eq(
 		_line(office),
-		'Closes notes:p1 (shell) and floor 4 "notes" (last pane of the space).',
+		'Closes notes:p1 (shell) and space 4 "notes" (last pane of the space).',
 		"the last pane of a floor"
 	)
 	await _click_control(closer)
-	await _until(func() -> bool: return office.frame.find_floor(notes) == null, "the floor went")
+	await _until(func() -> bool: return office.frame.find_zone(notes) == null, "the floor went")
 	# The last pane of a mezzanine, its agent blocked: heavier words.
 	var hud := HerdrFleet.pane_key(HerdrFleet.LOCAL, "hud")
 	var hud_p1 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "hud:p1")
-	await _floor_pick(office, hud)
+	await _zone_pick(office, hud)
 	await _click_visible_pane(office, hud_p1)
 	await _open_panel(office)
 	if card.answering():
@@ -381,7 +381,7 @@ func test_the_line_names_the_table_floor_or_mezzanine_and_they_go() -> void:
 	_eq(_note(office), "Kills CLAUDE mid-question.", "a blocked agent dies with its question")
 	_eq(closer.text, "Close · kills", "the button says so")
 	await _click_control(closer)
-	await _until(func() -> bool: return office.frame.find_floor(hud) == null, "the mezzanine went")
+	await _until(func() -> bool: return office.frame.find_zone(hud) == null, "the mezzanine went")
 	_eq(
 		_writes_seen("control-a"),
 		PackedStringArray(["pane.close hs:p4", "pane.close notes:p1", "pane.close hud:p1"]),
@@ -390,7 +390,7 @@ func test_the_line_names_the_table_floor_or_mezzanine_and_they_go() -> void:
 	var closes := _list(_ctl("control-a", "stats"), "closes")
 	var cascade := func(record: Dictionary) -> Array: return [record.get("last_of_tab"), record.get("last_of_space")]
 	_eq(closes.map(cascade), [[true, false], [true, true], [true, true]], "as the fake cascaded")
-	_check(office.frame.find_floor(hs) != null, "the repo's own floor stays")
+	_check(office.frame.find_zone(hs) != null, "the repo's own floor stays")
 
 
 ## The last pane of the repo's own floor while its mezzanines are open is
@@ -403,14 +403,14 @@ func test_the_repos_own_floor_with_mezzanines_open_never_closes() -> void:
 	var office := await _office_with(false, false)
 	var closer := _close_button(office)
 	var hs_p3 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "hs:p3")
-	await _floor_pick(office, HerdrFleet.pane_key(HerdrFleet.LOCAL, "hs"))
+	await _zone_pick(office, HerdrFleet.pane_key(HerdrFleet.LOCAL, "hs"))
 	await _click_visible_pane(office, hs_p3)
 	await _open_panel(office)
 	await _until(closer.is_visible_in_tree, "the manage rows")
 	await _frames(3)
 	_check(closer.disabled, "Close is off")
 	_check(
-		"mezzanines" in closer.tooltip_text and "floor 1" in closer.tooltip_text,
+		"mezzanines" in closer.tooltip_text and "space 1" in closer.tooltip_text,
 		"the tooltip says why: " + closer.tooltip_text
 	)
 	await _click_control(closer)
@@ -455,7 +455,7 @@ func test_a_working_or_blocked_agent_is_said_to_be_killed() -> void:
 	_eq(_note(office), "Kills PI mid-question.", "a blocked agent")
 	_eq(
 		_line(office),
-		'Closes PI\'s pane bravo:p1 and floor 2 "bravo desk" (last pane of the space).',
+		'Closes PI\'s pane bravo:p1 and space 2 "bravo desk" (last pane of the space).',
 		"alone on its floor"
 	)
 	await _click_control(closer)
@@ -871,7 +871,7 @@ func _close_button(office: OfficeDouble) -> Button:
 ## open the panel with Enter (answer mode, for a blocked agent) and leave
 ## answer mode with Escape: the block shows.
 func _pick_bee_bravo(office: OfficeDouble) -> void:
-	await _floor_pick(office, HerdrFleet.pane_key(BEE, "bravo"))
+	await _zone_pick(office, HerdrFleet.pane_key(BEE, "bravo"))
 	await _click_visible_pane(office, bee_p1)
 	await _open_panel(office)
 	if _card(office).answering():
@@ -894,5 +894,5 @@ func _line(office: OfficeDouble) -> String:
 
 ## How many tables the frame lays on floor `floor_key`.
 func _tables_of(office: OfficeDouble, floor_key: String) -> int:
-	var found := office.frame.find_floor(floor_key)
-	return 0 if found == null else found.floor_model.rooms.size()
+	var found := office.frame.find_zone(floor_key)
+	return 0 if found == null else found.zone_model.rooms.size()

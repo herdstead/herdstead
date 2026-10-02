@@ -5,34 +5,6 @@
   "id": "daylight-shared-table",
   "name": "Studio shared table",
   "modules": {
-    "surface_left": {
-      "path": "surface_left.png",
-      "size": [
-        32,
-        80
-      ]
-    },
-    "surface_mid_a": {
-      "path": "surface_mid_a.png",
-      "size": [
-        32,
-        80
-      ]
-    },
-    "surface_mid_b": {
-      "path": "surface_mid_b.png",
-      "size": [
-        32,
-        80
-      ]
-    },
-    "surface_right": {
-      "path": "surface_right.png",
-      "size": [
-        32,
-        80
-      ]
-    },
     "apron_left": {
       "path": "apron_left.png",
       "size": [
@@ -52,34 +24,6 @@
       "size": [
         32,
         3
-      ]
-    },
-    "divider_left": {
-      "path": "divider_left.png",
-      "size": [
-        32,
-        24
-      ]
-    },
-    "divider_mid": {
-      "path": "divider_mid.png",
-      "size": [
-        32,
-        24
-      ]
-    },
-    "divider_right": {
-      "path": "divider_right.png",
-      "size": [
-        32,
-        24
-      ]
-    },
-    "leg": {
-      "path": "leg.png",
-      "size": [
-        20,
-        40
       ]
     },
     "bracket": {
@@ -129,6 +73,62 @@
       "size": [
         32,
         32
+      ]
+    },
+    "desk_left": {
+      "path": "desk_left.png",
+      "size": [
+        32,
+        48
+      ]
+    },
+    "desk_mid_a": {
+      "path": "desk_mid_a.png",
+      "size": [
+        32,
+        48
+      ]
+    },
+    "desk_mid_b": {
+      "path": "desk_mid_b.png",
+      "size": [
+        32,
+        48
+      ]
+    },
+    "desk_right": {
+      "path": "desk_right.png",
+      "size": [
+        32,
+        48
+      ]
+    },
+    "screen_left": {
+      "path": "screen_left.png",
+      "size": [
+        32,
+        6
+      ]
+    },
+    "screen_mid": {
+      "path": "screen_mid.png",
+      "size": [
+        32,
+        6
+      ]
+    },
+    "screen_right": {
+      "path": "screen_right.png",
+      "size": [
+        32,
+        6
+      ]
+    },
+    "leg_short": {
+      "path": "leg_short.png",
+      "size": [
+        6,
+        22
       ]
     }
   },

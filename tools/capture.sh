@@ -18,15 +18,15 @@
 # clipped, not sent, unknown result, a refused line; START AGENT on a shell and
 # NEW PANE BESIDE on an agent; Close armed on a working agent and a branch typed
 # for a worktree) at 2x and 4x
-# and at the 480x320 minimum; and the left column's FLOORS minimap with the signposts on the
+# and at the 480x320 minimum; and the left column's SPACES rail with the edge arrows on the
 # worktrees fixture (mezzanines shown), beside a machine that drops mid-run and
-# one that never answers, at 2x, 4x and the minimum; and the
+# one that never answers, at 2x, 4x and the minimum (spaces-*, spaces-arrows-*); and the
 # OVERVIEW (`--overview=open`): the showroom's two-hour mock, and
 # the live office's while a run of state changes lands, at 2x, 4x and the minimum.
 # The lens held (`--lens=held`, office-lens-*: 2x, 4x and the minimum) and the
-# hover mark on a desk and on another floor's FLOORS row (`--point=`, office-point-*).
+# hover mark on a desk and on another machine's SPACES row (`--point=`, office-point-*).
 # The strategic view (`--strategic=open`, office-strategic-*): the 80-pane stress
-# floor at 2x, 4x and the minimum, and the lens's stage at 2x.
+# map at 2x, 4x and the minimum, and the lens's stage at 2x.
 #
 # Zoom is even only (OfficeScene.content_scale_for): the default 1920x960
 # window holds 2x and nothing more, so every 4x picture runs in a 1920x1280
@@ -116,12 +116,12 @@ GODOT="$GODOT" bash "$ROOT/tools/import_if_stale.sh" || {
 # Unix socket paths stop at ~104 bytes on macOS: keep them short, under /tmp.
 WORK="$(mktemp -d /tmp/herdstead-capture.XXXXXX)"
 SERVER_PID=""
-# The second fake herdr of the floors pictures: a machine that drops.
+# The second fake herdr of the SPACES pictures: a machine that drops.
 BEE_PID=""
 # The agent list's two extra machines (see below).
 LANES_PID=""
 FAR_PID=""
-# The fake herdr serving the 80-pane stress floor (the drawer's scroll bar).
+# The fake herdr serving the 80-pane stress map (the drawer's scroll bar).
 STRESS_PID=""
 # The Godot step running now and its watchdog; empty between steps.
 GODOT_PID=""
@@ -265,7 +265,7 @@ SHOTS="$SHOTS office-night-zoom2.png office-night-zoom4.png office-night-min.png
 SHOTS="$SHOTS office-events-zoom2.png office-events-min.png"
 # An agent starting in the shell api:p3: walking in from the door under the hourglass, 2x, 4x and the minimum.
 SHOTS="$SHOTS office-starting-zoom2.png office-starting-zoom4.png office-starting-min.png"
-# A start that asks at once: hand up, bubble with its wait, the blocked badge, 2x, 4x and the minimum.
+# A start that asks at once: hand up, chip with its wait, the blocked badge, 2x, 4x and the minimum.
 SHOTS="$SHOTS office-blocked-start-zoom2.png office-blocked-start-zoom4.png office-blocked-start-min.png"
 # The agent list's History unfolded after that run of changes, and the drawer's
 # two pages with few rows and with more than they hold: 2x, 4x and the minimum.
@@ -296,11 +296,11 @@ for tag in $CARD_TAGS; do
 		SHOTS="$SHOTS monitor-$state-$tag.png"
 	done
 done
-# The minimap on the mezzanine 1A, and on 1F with the signpost down to 1A:
-# per pack, 2x, 4x and the 480x320 minimum.
+# The SPACES rail panned to the mezzanine 1A, and to 1 with the edge arrow down
+# to 1A: per pack, 2x, 4x and the 480x320 minimum.
 for pack in daylight; do
 	for scale in zoom2 zoom4 min; do
-		SHOTS="$SHOTS floors-$pack-$scale.png floors-signposts-$pack-$scale.png"
+		SHOTS="$SHOTS spaces-$pack-$scale.png spaces-arrows-$pack-$scale.png"
 	done
 done
 # The pixel people showroom at 2x and 4x. Listed here so an old picture is
@@ -311,14 +311,14 @@ SHOTS="$SHOTS preview-overview-daylight.png"
 SHOTS="$SHOTS office-overview-zoom2.png office-overview-zoom4.png office-overview-min.png"
 # The lens held (`--lens=held`) over a stage with blocked and done since
 # before the office watched, working, idle in the pantry and a shell: 2x, 4x, the
-# minimum; and the hover mark (`--point=`) on a desk and on another
-# floor's FLOORS row, 2x.
+# minimum; and the hover mark (`--point=`) on a desk and on a desk in another
+# zone of the same map, 2x.
 SHOTS="$SHOTS office-lens-zoom2.png office-lens-zoom4.png office-lens-min.png"
-SHOTS="$SHOTS office-point-zoom2.png office-point-floor-zoom2.png"
-# The strategic view (`--strategic=open`) on the 80-pane stress floor at 2x,
+SHOTS="$SHOTS office-point-zoom2.png office-point-zone-zoom2.png"
+# The strategic view (`--strategic=open`) on the 80-pane stress map at 2x,
 # 4x and the minimum, and on the lens's stage (a `+` wait, idle, done, a shell).
 SHOTS="$SHOTS office-strategic-zoom2.png office-strategic-zoom4.png office-strategic-min.png"
-SHOTS="$SHOTS office-strategic-floors-zoom2.png"
+SHOTS="$SHOTS office-strategic-zones-zoom2.png"
 if [ "$CAPTURE_SET" = ci ]; then
 	SHOTS="preview-daylight.png people-zoom2.png people-zoom4.png office-zoom2.png office-zoom4.png office-night-zoom2.png"
 fi
@@ -417,7 +417,7 @@ for view in "zoom2 2" "zoom4 4 --resolution 1920x1280" "min 2 --resolution 960x6
 done
 [ "$CAPTURE_SET" = ci ] && finish
 # The agent list's drawer open (every run starts with it closed to its tab):
-# the world gives the column its room, the floor keeps the plan it has for the tab.
+# the world gives the column its room, the map keeps the plan it has for the tab.
 godot_run --path "$ROOT" -- --socket="$WORK/herdr.sock" --read-only \
 	--pack=res://assets/daylight/manifest.json --zoom=2 --drawer=open \
 	--wait="$DWELL" --capture="$OUT/office-drawer-open-zoom2.png"
@@ -639,7 +639,7 @@ for scale in zoom2 zoom4 min; do
 		--wait="$DWELL" --capture="$OUT/drawer-few-events-$scale.png"
 done
 ctl reset '{"fixture": "snapshot_floors"}'
-# More than they hold: the 80-pane stress floor on AGENTS (its own fake), and a
+# More than they hold: the 80-pane stress map on AGENTS (its own fake), and a
 # run of eighteen changes on EVENTS. The thin bar shows at the pages' right.
 "$PYTHON" "$ROOT/tools/gen_stress_fixture.py" --output "$WORK/stress" >/dev/null || exit 2
 "$PYTHON" "$ROOT/tools/fake_herdr.py" \
@@ -673,7 +673,7 @@ for scale in zoom2 zoom4 min; do
 	wait "$EVENTS_PID" 2>/dev/null
 	EVENTS_PID=""
 done
-# The strategic view over the same stress floor: every one of the 80 squares.
+# The strategic view over the same stress map: every one of the 80 squares.
 for view in "zoom2 2 daylight" "zoom4 4 daylight --resolution 1920x1280" "min 2 daylight --resolution 960x640"; do
 	read -r shot zoom pack window <<<"$view"
 	# shellcheck disable=SC2086
@@ -829,13 +829,13 @@ for pack in daylight; do
 		--pack=res://assets/$pack/manifest.json --zoom=2 --out="$OUT" --tag="$pack-min"
 done
 
-echo "== the minimap and the signposts: mezzanines, a machine that drops and one that never answers"
-# Local serves the worktrees fixture. floors-* show floor 2, the mezzanine 1A
-# (its plate names the checkout and its source); floors-signposts-* show floor
-# 1, herdstead, with 1A and 1B hung below it, and since 1A has a blocked agent
-# a signpost points down to it. bee serves the floors fixture and vanishes a few seconds in, while the office
+echo "== the SPACES rail and the edge arrows: mezzanines, a machine that drops and one that never answers"
+# Local serves the worktrees fixture. spaces-* pan to space 2, the mezzanine 1A
+# (its sign names the checkout); spaces-arrows-* pan to space 1, herdstead, with
+# 1A and 1B after it in the rail, and where 1A's blocked desk is out of view an
+# edge arrow points to it. bee serves the floors fixture and vanishes a few seconds in, while the office
 # still waits for gone (a socket nobody listens on, so it waits its whole
-# READY_TIMEOUT): the picture shows bee's last floors dimmed and frozen.
+# READY_TIMEOUT): the picture shows bee's section of the rail dimmed and frozen.
 ctl reset '{"fixture": "snapshot_worktrees"}'
 "$PYTHON" "$ROOT/tools/fake_herdr.py" \
 	--socket="$WORK/bee.sock" --control="$WORK/bee-ctl.sock" \
@@ -857,23 +857,23 @@ stage_bee() {
 	(sleep 5 && ctl_at "$WORK/bee-ctl.sock" vanish '{}') &
 	DROPPER=$!
 }
-floors() {
-	local shot="$1" floor="$2" pack="$3" scale="$4" zoom=2
+spaces() {
+	local shot="$1" space="$2" pack="$3" scale="$4" zoom=2
 	shift 4
 	[ "$scale" = zoom4 ] && zoom=4
 	CAPTURE_PREPARE=stage_bee godot_run --path "$ROOT" "$@" -- --socket="$WORK/herdr.sock" --read-only \
 		--machine-socket=bee="$WORK/bee.sock" --machine-socket=gone="$WORK/nobody.sock" \
-		--pack=res://assets/$pack/manifest.json --zoom="$zoom" --floor="$floor" \
+		--pack=res://assets/$pack/manifest.json --zoom="$zoom" --space="$space" \
 		--wait=1.5 --capture="$OUT/$shot-$pack-$scale.png"
 	wait "$DROPPER"
 	DROPPER=""
 }
 for pack in daylight; do
-	for view in "floors 2" "floors-signposts 1"; do
-		read -r shot floor <<<"$view"
-		floors "$shot" "$floor" "$pack" zoom2
-		floors "$shot" "$floor" "$pack" zoom4 --resolution 1920x1280
-		floors "$shot" "$floor" "$pack" min --resolution 960x640
+	for view in "spaces 2" "spaces-arrows 1"; do
+		read -r shot space <<<"$view"
+		spaces "$shot" "$space" "$pack" zoom2
+		spaces "$shot" "$space" "$pack" zoom4 --resolution 1920x1280
+		spaces "$shot" "$space" "$pack" min --resolution 960x640
 	done
 done
 
@@ -892,9 +892,9 @@ for view in "zoom2 2" "zoom4 4 --resolution 1920x1280" "min 2 --resolution 960x6
 done
 
 echo "== the lens (hold L) and the hover mark, against the same fake herdr"
-# Local's floor api as the office first sees it: api:p1 blocked and api:p4 done
+# Local's zone api as the office first sees it: api:p1 blocked and api:p4 done
 # before it watched (their lines say `+`), a new api:p5 working at api:p4's
-# table, api:p2 idle (in the pantry), api:p3 a shell.
+# pod, api:p2 idle (in the pantry), api:p3 a shell.
 stage_lens() {
 	ctl reset '{"fixture": "snapshot_floors"}'
 	"$PYTHON" - "$WORK/herdr-ctl.sock" "$ROOT/tools/fixtures/snapshot_floors.json" <<'PY' || exit 2
@@ -926,16 +926,16 @@ for view in "zoom2 2 daylight" "zoom4 4 daylight --resolution 1920x1280" "min 2 
 		--pack=res://assets/$pack/manifest.json --zoom="$zoom" --lens=held \
 		--wait="$DWELL" --capture="$OUT/office-lens-$shot.png"
 done
-# The hover mark on api:p4's desk; web:p1, on another floor, marks web's FLOORS row.
-for view in "point api:p4" "point-floor web:p1"; do
+# The hover mark on api:p4's desk, and on web:p1's, a desk in another zone of the same map.
+for view in "point api:p4" "point-zone web:p1"; do
 	read -r shot key <<<"$view"
 	CAPTURE_PREPARE=stage_lens godot_run --path "$ROOT" -- --socket="$WORK/herdr.sock" --read-only \
 		--pack=res://assets/daylight/manifest.json --zoom=2 --point="$key" \
 		--wait="$DWELL" --capture="$OUT/office-$shot-zoom2.png"
 done
-# The strategic view over that stage: api's two tables, a `+` wait, idle, done and a shell.
+# The strategic view over that stage: api's two pods, a `+` wait, idle, done and a shell.
 CAPTURE_PREPARE=stage_lens godot_run --path "$ROOT" -- --socket="$WORK/herdr.sock" --read-only \
 	--pack=res://assets/daylight/manifest.json --zoom=2 --strategic=open \
-	--wait="$DWELL" --capture="$OUT/office-strategic-floors-zoom2.png"
+	--wait="$DWELL" --capture="$OUT/office-strategic-zones-zoom2.png"
 ctl reset '{"fixture": "snapshot_floors"}'
 finish

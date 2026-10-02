@@ -89,69 +89,6 @@
         0
       ]
     },
-    "rug.top_left": {
-      "path": "tiles/rug.top_left.png",
-      "cell": [
-        4,
-        0
-      ]
-    },
-    "rug.top_center": {
-      "path": "tiles/rug.top_center.png",
-      "cell": [
-        5,
-        0
-      ]
-    },
-    "rug.top_right": {
-      "path": "tiles/rug.top_right.png",
-      "cell": [
-        6,
-        0
-      ]
-    },
-    "rug.middle_left": {
-      "path": "tiles/rug.middle_left.png",
-      "cell": [
-        7,
-        0
-      ]
-    },
-    "rug.middle_center": {
-      "path": "tiles/rug.middle_center.png",
-      "cell": [
-        0,
-        1
-      ]
-    },
-    "rug.middle_right": {
-      "path": "tiles/rug.middle_right.png",
-      "cell": [
-        1,
-        1
-      ]
-    },
-    "rug.bottom_left": {
-      "path": "tiles/rug.bottom_left.png",
-      "cell": [
-        2,
-        1
-      ]
-    },
-    "rug.bottom_center": {
-      "path": "tiles/rug.bottom_center.png",
-      "cell": [
-        3,
-        1
-      ]
-    },
-    "rug.bottom_right": {
-      "path": "tiles/rug.bottom_right.png",
-      "cell": [
-        4,
-        1
-      ]
-    },
     "wall.cap_left": {
       "path": "walls/wall.cap_left.png",
       "cell": [
@@ -235,49 +172,9 @@
         0,
         3
       ]
-    },
-    "wall.cap_t_left": {
-      "path": "walls/wall.cap_t_left.png",
-      "cell": [
-        1,
-        3
-      ]
-    },
-    "wall.face_t_left": {
-      "path": "walls/wall.face_t_left.png",
-      "cell": [
-        2,
-        3
-      ]
-    },
-    "wall.cap_end_right": {
-      "path": "walls/wall.cap_end_right.png",
-      "cell": [
-        3,
-        3
-      ]
-    },
-    "wall.face_end_right": {
-      "path": "walls/wall.face_end_right.png",
-      "cell": [
-        4,
-        3
-      ]
     }
   },
   "props": {
-    "cabinet": {
-      "path": "props/cabinet.png",
-      "size": [
-        48,
-        64
-      ],
-      "pivot": [
-        24,
-        60
-      ],
-      "item": {"place": "floor", "footprint": [40, 12]}
-    },
     "window": {
       "path": "props/window.png",
       "size": [
@@ -347,17 +244,6 @@
       ],
       "item": {"place": "wall"}
     },
-    "sign": {
-      "path": "props/sign.png",
-      "size": [
-        64,
-        24
-      ],
-      "pivot": [
-        32,
-        22
-      ]
-    },
     "desk_mug": {
       "path": "props/desk_mug.png",
       "size": [24, 24],
@@ -406,23 +292,48 @@
       "pivot": [12, 22],
       "item": {"place": "desk", "footprint": [9, 4], "group": "cat"}
     },
-    "done_stack": {
-      "path": "props/done_stack.png",
+    "done_stack_small": {
+      "path": "props/done_stack_small.png",
       "size": [24, 24],
       "pivot": [12, 22],
-      "item": {"place": "desk", "footprint": [11, 4]}
-    },
-    "reception": {
-      "path": "props/reception.png",
-      "size": [48, 32],
-      "pivot": [24, 30],
-      "item": {"place": "floor", "footprint": [48, 14]}
+      "item": {"place": "desk", "footprint": [6, 3]}
     },
     "pantry": {
       "path": "props/pantry.png",
       "size": [64, 48],
       "pivot": [32, 46],
       "item": {"place": "floor", "footprint": [64, 14]}
+    },
+    "side_table": {
+      "path": "props/side_table.png",
+      "size": [32, 32],
+      "pivot": [16, 30],
+      "item": {"place": "floor", "footprint": [28, 10]}
+    },
+    "partition_h": {
+      "path": "props/partition_h.png",
+      "size": [32, 10],
+      "pivot": [16, 10]
+    },
+    "partition_v": {
+      "path": "props/partition_v.png",
+      "size": [6, 32],
+      "pivot": [3, 32]
+    },
+    "partition_corner_bl": {
+      "path": "props/partition_corner_bl.png",
+      "size": [32, 32],
+      "pivot": [16, 32]
+    },
+    "partition_corner_br": {
+      "path": "props/partition_corner_br.png",
+      "size": [32, 32],
+      "pivot": [16, 32]
+    },
+    "partition_post": {
+      "path": "props/partition_post.png",
+      "size": [6, 12],
+      "pivot": [3, 12]
     }
   },
   "ui": {
@@ -559,16 +470,10 @@
         4
       ]
     },
-    "selection": {
-      "path": "ui/selection.png",
-      "size": [
-        64,
-        64
-      ],
-      "pivot": [
-        32,
-        60
-      ]
+    "selection_seat": {
+      "path": "ui/selection_seat.png",
+      "size": [32, 48],
+      "pivot": [16, 46]
     }
   },
   "states": {

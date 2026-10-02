@@ -1,7 +1,8 @@
 class_name OfficeFloorValidation
 extends RefCounted
-## Whether a floor plan can be drawn and walked: its bounds, budgets, rows,
-## tables and furniture, then cell-centre connectivity against physical
+## Whether a map plan can be drawn and walked: its bounds, budgets, zones in
+## their lanes, pod rows, tables and furniture, then cell-centre connectivity
+## against physical
 ## obstacles, not the reservation rectangles that also contain walkable space
 ## around each desk. The connectivity is OfficeWalkGraph's, the graph the
 ## office's people walk, so what passes here is what they can walk.
@@ -19,27 +20,29 @@ static func problems(value: FloorPlan, rules: FloorLayoutPolicy) -> PackedString
 		return found
 	var size := value.floor_cells.size
 	if value.floor_cells.position != Vector2i.ZERO or size.x <= 0 or size.y <= 0:
-		found.append("floor must be a positive rectangle at the fixed origin")
+		found.append("map must be a positive rectangle at the fixed origin")
 	if size.x > rules.max_width_cells or size.y > rules.max_height_cells or size.x * size.y > rules.max_floor_cells:
-		found.append("floor exceeds width, height or cell budget")
+		found.append("map exceeds width, height or cell budget")
 	if not found.is_empty():
 		return found
 	# Previous plans are inputs too. Reject before copying rows, enumerating
 	# historical columns or allocating measurements for any of their desks.
 	if value.desks.size() > rules.max_tables:
-		return PackedStringArray(["layout exceeds table budget"])
+		return PackedStringArray(["layout exceeds tab budget"])
 	var remaining_nodes := rules.max_desk_nodes
 	var remaining_panes := rules.max_panes
 	for placed in value.desks:
 		if placed.capacity < 2 or placed.capacity % 2 != 0 or placed.capacity > rules.max_width_cells:
-			return PackedStringArray(["table capacity must be at least two and grow in pairs"])
+			return PackedStringArray(["tab capacity must be at least two and grow in pairs"])
 		remaining_nodes -= OfficeDeskView.node_budget(placed.capacity)
 		if remaining_nodes < 0:
-			return PackedStringArray(["floor exceeds desk node budget"])
+			return PackedStringArray(["map exceeds desk node budget"])
 		remaining_panes -= placed.seats.size()
 		if remaining_panes < 0:
 			return PackedStringArray(["layout exceeds pane budget"])
 	var grid := FloorLayoutPolicy.GRID
+	if value.lanes < 1 or size.x != rules.map_width(value.lanes):
+		found.append("map width is not its lanes' width")
 	var inside_width := size.x - 2 * rules.outer_side_cells
 	var expected_entry := Rect2i(rules.outer_side_cells, rules.wall_cells, inside_width, rules.entry_cells)
 	var expected_main := Rect2i(
@@ -49,74 +52,63 @@ static func problems(value: FloorPlan, rules: FloorLayoutPolicy) -> PackedString
 		size.y - rules.wall_cells
 	)
 	if value.entry_cells != expected_entry or value.main_corridor_cells != expected_main:
-		found.append("floor does not contain its declared entrance and main corridor")
-	if not value.corridors.has(expected_entry) or not value.corridors.has(expected_main):
-		found.append("entrance or main corridor is missing from the walkways")
+		found.append("map does not contain its declared entrance and main corridor")
+	if value.corridors.size() != 2 or value.corridors[0] != expected_entry or value.corridors[1] != expected_main:
+		found.append("walkways are not the entrance and the main corridor")
 	if not value.render_bounds.encloses(Rect2(value.floor_cells.position * grid, size * grid)):
-		found.append("drawing bounds do not contain the complete floor")
+		found.append("drawing bounds do not contain the complete map")
+	found.append_array(_zone_problems(value, rules))
 	var keys: Dictionary[String, bool] = {}
 	var panes: Dictionary[String, bool] = {}
-	for index in value.rows.size():
-		var row := value.rows[index]
-		if row.index != index or not value.floor_cells.encloses(row.band_cells):
-			found.append("invalid row index or bounds")
-		var y := rules.wall_cells + rules.entry_cells + index * rules.row_height_cells
-		if row.band_cells != Rect2i(0, y, size.x, rules.row_height_cells):
-			found.append("row does not match the fixed row policy")
-		if row.wall_cells != Rect2i(0, y, expected_main.position.x, rules.wall_cells):
-			found.append("row wall does not end before the main corridor")
-		var expected_cross := Rect2i(
-			rules.outer_side_cells,
-			y + rules.row_height_cells - rules.cross_corridor_cells,
-			inside_width,
-			rules.cross_corridor_cells
-		)
-		if row.corridor_cells != expected_cross or not value.corridors.has(expected_cross):
-			found.append("row cross corridor is missing or incorrectly measured")
-		if not row.exclusive_tab_key.is_empty():
-			if row.desks.size() != 1 or row.desks[0].tab_key != row.exclusive_tab_key:
-				found.append("oversized row ownership is not exclusive")
+	var keep_out: Array[Rect2i] = value.corridors.duplicate()
+	keep_out.append_array(value.aisles)
 	for placed in value.desks:
 		if placed.tab_key.is_empty() or keys.has(placed.tab_key):
-			found.append("duplicate or missing table identity")
+			found.append("duplicate or missing tab identity")
 		keys[placed.tab_key] = true
-		if placed.row < 0 or placed.row >= value.rows.size() or placed.measure == null:
-			found.append("table has no valid row or measurement")
+		var zone := value.zone(placed.zone_key)
+		if zone == null or placed.row < 0 or placed.row >= zone.rows.size() or placed.measure == null:
+			found.append("tab has no valid zone, row or measurement")
 			continue
-		if not value.rows[placed.row].desks.has(placed):
-			found.append("table missing from its row")
+		if not zone.rows[placed.row].desks.has(placed):
+			found.append("tab missing from its row")
 		var measurement := placed.measure
 		if measurement.capacity != placed.capacity or measurement.columns.size() != placed.capacity:
-			found.append("table capacity and measurement disagree")
+			found.append("tab capacity and measurement disagree")
 		# The renderer uses table_width to allocate modules. A stale/tampered
 		# measure must not buy an arbitrarily wide table with a small capacity.
 		var expected := OfficeTable.measure(placed.capacity)
 		if measurement.table_width != expected.table_width or measurement.columns != expected.columns:
-			found.append("table width or columns disagree with measured capacity")
+			found.append("tab width or columns disagree with measured capacity")
 		for positions: Array[Vector2] in [measurement.far_approaches, measurement.near_approaches]:
 			if positions.size() != placed.capacity:
-				found.append("table is missing measured approaches")
+				found.append("tab is missing measured approaches")
 		if not placed.origin.is_finite():
-			found.append("table origin is not finite")
+			found.append("tab origin is not finite")
 		var reserved := Rect2(placed.reserved_cells.position * grid, placed.reserved_cells.size * grid)
 		for bounds: Rect2 in [measurement.reserved_rect, measurement.render_rect, measurement.physical_rect]:
 			if not bounds.position.is_finite() or not bounds.size.is_finite() or not bounds.has_area():
-				found.append("invalid table measurement")
+				found.append("invalid tab measurement")
 			bounds.position += placed.origin
 			if not reserved.encloses(bounds):
-				found.append("table measurement leaves its reservation")
+				found.append("tab measurement leaves its reservation")
 		var drawing := measurement.render_rect
 		drawing.position += placed.origin
 		if not value.render_bounds.encloses(drawing):
-			found.append("drawing bounds omit part of a table")
-		if not value.floor_cells.encloses(placed.reserved_cells):
-			found.append("table reservation leaves the floor")
-		for corridor in value.corridors:
-			if placed.reserved_cells.intersects(corridor):
-				found.append("table reservation intersects a corridor")
-		for row in value.rows:
-			if placed.reserved_cells.intersects(row.wall_cells):
-				found.append("table reservation intersects a wall")
+			found.append("drawing bounds omit part of a tab")
+		var inner := Rect2i(
+			zone.cells.position.x + rules.zone_pad_left_cells,
+			zone.cells.position.y,
+			zone.cells.size.x - rules.zone_pad_left_cells,
+			zone.cells.size.y
+		)
+		if not inner.encloses(placed.reserved_cells):
+			found.append("tab reservation leaves its zone")
+		if not zone.rows[placed.row].band_cells.encloses(placed.reserved_cells):
+			found.append("tab reservation leaves its row")
+		for walkway in keep_out:
+			if placed.reserved_cells.intersects(walkway):
+				found.append("tab reservation intersects a corridor or aisle")
 		var occupied: Dictionary[String, bool] = {}
 		for seat in placed.seats:
 			var seat_key := "%d:%s" % [seat.column, seat.side]
@@ -130,19 +122,88 @@ static func problems(value: FloorPlan, rules: FloorLayoutPolicy) -> PackedString
 				or seat.column >= placed.capacity
 				or seat.side not in ["far", "near"]
 			):
-				found.append("seat does not belong to the measured table")
+				found.append("seat does not belong to the measured tab")
 	for index in value.desks.size():
 		for later in range(index + 1, value.desks.size()):
 			if value.desks[index].reserved_cells.intersects(value.desks[later].reserved_cells):
-				found.append("table reservations overlap")
-	for corridor in value.corridors:
-		if not value.floor_cells.encloses(corridor):
-			found.append("corridor leaves the floor")
+				found.append("tab reservations overlap")
+	for walkway in keep_out:
+		if not value.floor_cells.encloses(walkway):
+			found.append("corridor or aisle leaves the map")
 	found.append_array(_decor_problems(value))
 	found.append_array(_fixture_problems(value))
 	if not found.is_empty():
 		return found
 	found.append_array(_route_problems(value, rules))
+	return found
+
+
+## Whether the zones are where the map planner puts them: each in whole lanes
+## (its x its first lane's, 10k - 1 wide), from row 6 down, its height whole
+## pod rows; the slots (aisle row and rectangle) disjoint and on the floor left
+## of the main corridor; each zone's rows its bands, top to bottom, an oversized
+## table alone in its row; the aisles exactly what the zones leave
+## (OfficeFloorLayout.aisles_of()), and no zone over a corridor or an aisle.
+static func _zone_problems(value: FloorPlan, rules: FloorLayoutPolicy) -> PackedStringArray:
+	var found := PackedStringArray()
+	var pod := OfficeZoneLayout.pod_row_cells()
+	var bay := Rect2i(
+		rules.outer_side_cells,
+		rules.wall_cells + rules.entry_cells,
+		rules.zone_width(value.lanes),
+		value.floor_cells.size.y - rules.wall_cells - rules.entry_cells
+	)
+	var keys: Dictionary[String, bool] = {}
+	var desks := 0
+	for zone in value.zones:
+		if zone.zone_key.is_empty() or keys.has(zone.zone_key):
+			found.append("duplicate or missing zone identity")
+		keys[zone.zone_key] = true
+		var area := zone.cells
+		if (
+			zone.lanes < 1
+			or zone.aisle_cells != rules.zone_aisle_cells
+			or area.position.x != rules.lane_x(zone.first_lane)
+			or area.size.x != rules.zone_width(zone.lanes)
+			or zone.first_lane < 0
+			or zone.first_lane + zone.lanes > value.lanes
+		):
+			found.append("zone %s is not in whole lanes" % zone.zone_key)
+		if area.position.y < rules.zones_top_cells() or area.size.y <= 0 or area.size.y % pod != 0:
+			found.append("zone %s is not whole pod rows under the top aisle" % zone.zone_key)
+		if not bay.encloses(zone.slot()):
+			found.append("zone %s leaves the map" % zone.zone_key)
+		if zone.rows.size() * pod != area.size.y:
+			found.append("zone %s rows do not fill it" % zone.zone_key)
+		for index in zone.rows.size():
+			var row := zone.rows[index]
+			if (
+				row.index != index
+				or row.band_cells != Rect2i(area.position.x, area.position.y + index * pod, area.size.x, pod)
+			):
+				found.append("zone %s row %d does not match the pod row" % [zone.zone_key, index])
+			if not row.exclusive_tab_key.is_empty():
+				if row.desks.size() != 1 or row.desks[0].tab_key != row.exclusive_tab_key:
+					found.append("oversized row ownership is not exclusive")
+			for placed in row.desks:
+				desks += 1
+				if placed.zone_key != zone.zone_key or placed.row != index or not value.desks.has(placed):
+					found.append("zone %s row %d holds a tab not placed there" % [zone.zone_key, index])
+		for corridor in value.corridors:
+			if area.intersects(corridor):
+				found.append("zone %s stands on a corridor" % zone.zone_key)
+	if desks != value.desks.size():
+		found.append("a tab stands in no zone row")
+	for index in value.zones.size():
+		for later in range(index + 1, value.zones.size()):
+			if value.zones[index].slot().intersects(value.zones[later].slot()):
+				found.append("zones %s and %s overlap" % [value.zones[index].zone_key, value.zones[later].zone_key])
+	if value.aisles != OfficeFloorLayout.aisles_of(value, rules):
+		found.append("aisles are not what the zones leave")
+	for zone in value.zones:
+		for aisle in value.aisles:
+			if zone.cells.intersects(aisle):
+				found.append("zone %s stands on an aisle" % zone.zone_key)
 	return found
 
 
@@ -155,9 +216,8 @@ static func problems(value: FloorPlan, rules: FloorLayoutPolicy) -> PackedString
 ## side, round the chair on the near side). The only obstacle a leg may enter
 ## is its own table, along that leg: the far seat is inside the footprint (the
 ## graph's entries). A leg from an approach nobody reaches is not looked at.
-## The fixtures the same way: every queue slot's and pantry spot's approach is
-## reached from the threshold's end, its leg up to the fixture row is clear, and
-## so is each step of the queue towards its head.
+## The pantry the same way: every spot's approach is reached from the
+## threshold's end, and its leg up to the fixture row is clear.
 static func _route_problems(value: FloorPlan, rules: FloorLayoutPolicy) -> PackedStringArray:
 	var found := PackedStringArray()
 	var graph := OfficeWalkGraph.build(value, rules.actor_footprint, rules.actor_draw_rect)
@@ -181,34 +241,28 @@ static func _route_problems(value: FloorPlan, rules: FloorLayoutPolicy) -> Packe
 				if not graph.clear_route(OfficeWalkGraph.leg_to_seat(approach, seat, standing, near)):
 					found.append("blocked seat leg: " + where)
 	for fixture in value.fixtures():
-		var what := "queue" if fixture.kind == FixturePlacement.Kind.RECEPTION else "pantry"
 		for index in fixture.spots.size():
 			var approach := fixture.approaches[index]
 			var cell := OfficeWalkGraph.cell_of(approach)
 			if not graph.reaches(cell) or not graph.clear(OfficeWalkGraph.centre(cell), approach):
-				found.append("unreachable %s approach: %d" % [what, index])
+				found.append("unreachable %s approach: %d" % [fixture.key, index])
 			elif not graph.clear_route(OfficeWalkGraph.leg_to_fixture(approach, fixture.spots[index])):
-				found.append("blocked %s leg: %d" % [what, index])
-			if fixture.kind == FixturePlacement.Kind.RECEPTION and index > 0:
-				if not graph.clear(fixture.spots[index], fixture.spots[index - 1]):
-					found.append("blocked queue step: %d" % index)
+				found.append("blocked %s leg: %d" % [fixture.key, index])
 	return found
 
 
-## Whether the fixtures are where the fixture planner puts them: only on a floor
-## with rows, the pantry only beside a reception; each counter inside the entry
-## band, left of the main corridor, its drawing on the floor; every spot on the
-## fixture row with its approach straight below it on the walking lane, inside
-## the bay, the queue's slots leftwards from its head and the pantry's
-## rightwards, a pitch apart; no more of them than a queue or a pantry may hold.
+## Whether the pantry is where the fixture planner puts it: only on a map with
+## desks; its counter inside the entry band, left of the main corridor, its
+## drawing on the floor; its spots on the fixture row from the left wall on, a
+## pitch apart, ending FIXTURE_GAP at least before the main corridor, each
+## approach straight below its spot on the walking lane; 1 to MAX_PANTRY spots.
 static func _fixture_problems(value: FloorPlan) -> PackedStringArray:
 	var found := PackedStringArray()
-	if value.reception == null:
-		if value.pantry != null:
-			found.append("fixture: a pantry without a reception")
+	var pantry := value.pantry
+	if pantry == null:
 		return found
-	if value.rows.is_empty():
-		found.append("fixture: fixtures on a floor without tables")
+	if value.desks.is_empty():
+		found.append("fixture: a pantry on a map without desks")
 	var grid := float(FloorLayoutPolicy.GRID)
 	var band := Rect2(value.entry_cells.position * grid, value.entry_cells.size * grid)
 	if band.size.y < OfficeShell.WALKING_LANE + grid / 2.0:
@@ -217,45 +271,46 @@ static func _fixture_problems(value: FloorPlan) -> PackedStringArray:
 	var row_y := band.position.y + OfficeShell.FIXTURE_ROW
 	var lane_y := band.position.y + OfficeShell.WALKING_LANE
 	var half := OfficeShell.SPOT_PITCH / 2.0
-	for fixture in value.fixtures():
-		var what := fixture.key
-		var reception := fixture.kind == FixturePlacement.Kind.RECEPTION
-		if fixture.key != ("reception" if reception else "pantry") or fixture.piece == &"":
-			found.append("fixture: %s has no identity" % what)
-		if (fixture == value.reception) != reception:
-			found.append("fixture: %s is in the other fixture's place" % what)
-		for bounds: Rect2 in [fixture.footprint, fixture.draw_rect]:
-			if not bounds.position.is_finite() or not bounds.size.is_finite() or not bounds.has_area():
-				found.append("fixture: invalid %s measurement" % what)
-		if not band.encloses(fixture.footprint) or fixture.footprint.end.x > bay_end:
-			found.append("fixture: %s stands outside the entry band's bay" % what)
-		if not value.render_bounds.encloses(fixture.draw_rect):
-			found.append("drawing bounds omit the %s" % what)
-		var most := OfficeShell.MAX_QUEUE if reception else OfficeShell.MAX_PANTRY
-		var least := OfficeShell.MIN_QUEUE if reception else 1
-		if fixture.spots.size() < least or fixture.spots.size() > most:
-			found.append("fixture: %s holds %d" % [what, fixture.spots.size()])
-		if fixture.approaches.size() != fixture.spots.size():
-			found.append("fixture: %s spots and approaches disagree" % what)
-			continue
-		var step := -OfficeShell.SPOT_PITCH if reception else OfficeShell.SPOT_PITCH
-		for index in fixture.spots.size():
-			var spot := fixture.spots[index]
-			if (
-				spot.y != row_y
-				or fixture.approaches[index] != Vector2(spot.x, lane_y)
-				or spot.x - half < band.position.x
-				or spot.x + half > bay_end
-				or (index > 0 and not is_equal_approx(spot.x - fixture.spots[index - 1].x, step))
-			):
-				found.append("fixture: %s spot %d is off its row" % [what, index])
-	if value.pantry != null and not value.pantry.spots.is_empty() and not value.reception.spots.is_empty():
-		var pantry_end := value.pantry.spots[value.pantry.spots.size() - 1].x + half
-		var queue_tail := value.reception.spots[value.reception.spots.size() - 1].x - half
-		if pantry_end + OfficeShell.FIXTURE_GAP > queue_tail + 0.001:
-			found.append("fixture: the pantry runs into the queue")
-		if value.pantry.footprint.intersects(value.reception.footprint):
-			found.append("fixture: the counters overlap")
+	if pantry.key != "pantry" or pantry.kind != FixturePlacement.Kind.PANTRY or pantry.piece == &"":
+		found.append("fixture: the pantry has no identity")
+	for bounds: Rect2 in [pantry.footprint, pantry.draw_rect]:
+		if not bounds.position.is_finite() or not bounds.size.is_finite() or not bounds.has_area():
+			found.append("fixture: invalid pantry measurement")
+	if not band.encloses(pantry.footprint) or pantry.footprint.end.x > bay_end:
+		found.append("fixture: pantry stands outside the entry band's bay")
+	if not value.render_bounds.encloses(pantry.draw_rect):
+		found.append("drawing bounds omit the pantry")
+	if pantry.spots.size() < 1 or pantry.spots.size() > OfficeShell.MAX_PANTRY:
+		found.append("fixture: pantry holds %d" % pantry.spots.size())
+	if pantry.approaches.size() != pantry.spots.size():
+		found.append("fixture: pantry spots and approaches disagree")
+		return found
+	for index in pantry.spots.size():
+		var spot := pantry.spots[index]
+		if (
+			spot.y != row_y
+			or pantry.approaches[index] != Vector2(spot.x, lane_y)
+			or not is_equal_approx(spot.x, band.position.x + half + index * OfficeShell.SPOT_PITCH)
+			or spot.x + half + OfficeShell.FIXTURE_GAP > bay_end + 0.001
+		):
+			found.append("fixture: pantry spot %d is off its row" % index)
+	return found
+
+
+## Where no standing piece may stand, in map units: the entry band but its
+## first row (the top wall's drawing clearance, where nobody walks and the
+## top-wall run stands at the wall's foot), the main corridor and every aisle.
+## The decor planner keeps to the same rule.
+static func walkways(value: FloorPlan) -> Array[Rect2]:
+	var grid := float(FloorLayoutPolicy.GRID)
+	var band := value.entry_cells
+	var found: Array[Rect2] = [
+		Rect2(Vector2(band.position.x, band.position.y + 1) * grid, Vector2(band.size.x, band.size.y - 1) * grid)
+	]
+	var cells: Array[Rect2i] = [value.main_corridor_cells]
+	cells.append_array(value.aisles)
+	for walkway in cells:
+		found.append(Rect2(walkway.position * grid, walkway.size * grid))
 	return found
 
 
@@ -274,11 +329,11 @@ static func _decor_problems(value: FloorPlan) -> PackedStringArray:
 			if not bounds.position.is_finite() or not bounds.size.is_finite() or not bounds.has_area():
 				found.append("invalid decoration measurement")
 		if not floor_rect.encloses(decoration.footprint):
-			found.append("decoration footprint leaves the floor")
+			found.append("decoration footprint leaves the map")
 		if not value.render_bounds.encloses(decoration.draw_rect):
 			found.append("drawing bounds omit a decoration")
-		for corridor in value.corridors:
-			if decoration.footprint.intersects(Rect2(corridor.position * grid, corridor.size * grid)):
+		for walkway in walkways(value):
+			if decoration.footprint.intersects(walkway):
 				found.append("decoration blocks a corridor")
 		for placed in value.desks:
 			if placed.measure == null:
@@ -288,7 +343,7 @@ static func _decor_problems(value: FloorPlan) -> PackedStringArray:
 			var drawing := placed.measure.render_rect
 			drawing.position += placed.origin
 			if decoration.footprint.intersects(physical):
-				found.append("decoration overlaps a table footprint")
+				found.append("decoration overlaps a tab footprint")
 			if decoration.draw_rect.intersects(drawing):
 				found.append("decoration drawing overlaps a workstation")
 	for index in value.decorations.size():

@@ -30,7 +30,8 @@ from PIL import Image
 
 import check_build_clean
 import draw_pixel_sources
-from build_assets import ROOT, build, contract_size, packs, people_animations, save_if_pixels_moved, validate
+from build_assets import (ROOT, build, contract_size, packs, people_animations, resolve_density_filter,
+                          save_if_pixels_moved, validate)
 from build_table_assets import build_pack as build_table
 from recolour import remap_table, repaint
 from upscale_pack import upgrade
@@ -56,6 +57,27 @@ def take_source_argument():
             del sys.argv[index:index + 2]
             return Path(value)
     return None
+
+
+def as_schema_one(source: Path) -> dict:
+    """Turn the pack copied to `source` into a schema-1 source, in place, and return its manifest.
+
+    A schema-1 fixture needs actual 1x PNGs, not just a changed manifest
+    declaration: a denser pack under test (--source) is brought down to 1x.
+    """
+    pack = json.loads((source / "pack.json").read_text())
+    for category in ("tiles", "props", "ui"):
+        for info in pack[category].values():
+            path = source / info["path"]
+            with Image.open(path) as opened:
+                size = contract_size(pack, category, info)
+                if opened.size != size:
+                    opened.resize(size, Image.Resampling.NEAREST).save(path)
+    pack["schema_version"] = 1
+    pack.pop("density", None)
+    pack.pop("filter", None)
+    (source / "pack.json").write_text(json.dumps(pack, indent=2) + "\n")
+    return pack
 
 
 class ArtContractTests(unittest.TestCase):
@@ -109,8 +131,29 @@ class ArtContractTests(unittest.TestCase):
         self.assertEqual(atlas.getpixel((x + 17 * factor, y + 9 * factor)), mark)
         self.assertEqual(path.read_bytes(), before)
 
+    ## The retired row walls' T joint and free end, for the cases about those
+    ## pieces: the shipped pack has neither, the builder still checks a pack
+    ## that declares them. The copy becomes a synthetic pack: the four joints
+    ## declared in free atlas cells, and the whole cap / face / side family drawn
+    ## again from the wall templates, so it is one consistent family.
+    def with_row_wall_joints(self):
+        size = self.pack["tile_size"]
+        columns, rows = (value // size for value in self.pack["atlas_size"])
+        used = {tuple(tile["cell"]) for tile in self.pack["tiles"].values()}
+        free = [[x, y] for y in range(rows) for x in range(columns) if (x, y) not in used]
+        for name in ("wall.cap_t_left", "wall.face_t_left", "wall.cap_end_right", "wall.face_end_right"):
+            if name not in self.pack["tiles"]:
+                self.pack["tiles"][name] = {"path": f"walls/{name}.png", "cell": free.pop(0)}
+        (self.source / "pack.json").write_text(json.dumps(self.pack))
+        # The builder's own resolver: a schema-1 pack declares no density and is 1x.
+        density = resolve_density_filter(self.pack)[0]
+        for path in wall_templates(self.source / "pack.json", self.root / "joints", density):
+            shutil.copyfile(path, self.source / self.pack["tiles"][path.stem]["path"])
+        # The synthetic family is a pack `make art` accepts before a case breaks it.
+        validate(self.source, self.pack)
+
     def test_rejects_wrong_export_dimensions(self):
-        path = self.source / self.pack["props"]["cabinet"]["path"]
+        path = self.source / self.pack["props"]["window"]["path"]
         Image.open(path).crop((0, 0, 47, 64)).save(path)
         with self.assertRaisesRegex(ValueError, "size mismatch"):
             validate(self.source, self.pack)
@@ -153,6 +196,7 @@ class ArtContractTests(unittest.TestCase):
             validate(self.source, self.pack)
 
     def test_t_junction_preserves_its_side_connection_above(self):
+        self.with_row_wall_joints()
         path = self.source / self.pack["tiles"]["wall.cap_t_left"]["path"]
         with Image.open(path) as opened:
             changed = opened.convert("RGBA")
@@ -162,6 +206,7 @@ class ArtContractTests(unittest.TestCase):
             validate(self.source, self.pack)
 
     def test_t_junction_preserves_its_side_connection_below(self):
+        self.with_row_wall_joints()
         path = self.source / self.pack["tiles"]["wall.face_t_left"]["path"]
         with Image.open(path) as opened:
             changed = opened.convert("RGBA")
@@ -171,6 +216,11 @@ class ArtContractTests(unittest.TestCase):
             validate(self.source, self.pack)
 
     def test_side_wall_does_not_bleed_outside_its_declared_strip(self):
+        # Held for every family with side walls, whether or not it declares the
+        # retired row walls' joints (the check was once opted into by the T joint).
+        for name in ("wall.cap_t_left", "wall.face_t_left", "wall.cap_end_right", "wall.face_end_right"):
+            self.pack["tiles"].pop(name, None)
+        validate(self.source, self.pack)
         path = self.source / self.pack["tiles"]["wall.side_right"]["path"]
         with Image.open(path) as opened:
             changed = opened.convert("RGBA")
@@ -180,6 +230,7 @@ class ArtContractTests(unittest.TestCase):
             validate(self.source, self.pack)
 
     def test_open_end_keeps_its_horizontal_connection_to_the_wall(self):
+        self.with_row_wall_joints()
         path = self.source / self.pack["tiles"]["wall.cap_end_right"]["path"]
         with Image.open(path) as opened:
             changed = opened.convert("RGBA")
@@ -235,13 +286,13 @@ class ArtContractTests(unittest.TestCase):
         # The pivot is the manifest's to choose; what it may not do is point off
         # the picture, because then nothing can be placed by its footing.
         changed = copy.deepcopy(self.pack)
-        width, height = changed["props"]["cabinet"]["size"]
-        changed["props"]["cabinet"]["pivot"] = [width // 2, height + 1]
-        with self.assertRaisesRegex(ValueError, "Pivot outside the canvas: props/cabinet"):
+        width, height = changed["props"]["window"]["size"]
+        changed["props"]["window"]["pivot"] = [width // 2, height + 1]
+        with self.assertRaisesRegex(ValueError, "Pivot outside the canvas: props/window"):
             validate(self.source, changed)
         changed = copy.deepcopy(self.pack)
-        changed["props"]["cabinet"]["pivot"] = [-1, 0]
-        with self.assertRaisesRegex(ValueError, "Pivot outside the canvas: props/cabinet"):
+        changed["props"]["window"]["pivot"] = [-1, 0]
+        with self.assertRaisesRegex(ValueError, "Pivot outside the canvas: props/window"):
             validate(self.source, changed)
         changed = copy.deepcopy(self.pack)
         changed["states"]["done"]["badge"] = "working"
@@ -267,7 +318,7 @@ class ArtContractTests(unittest.TestCase):
         # The whole point of the manifest being the list: an artist adds a PNG
         # and a pack.json entry, and `make art` accepts it. Nothing here names
         # the eight props the pack happens to ship today.
-        donor = self.pack["props"]["sign"]
+        donor = self.pack["props"]["window"]
         with Image.open(self.source / donor["path"]) as opened:
             opened.copy().save(self.source / "props/notice.png")
         self.pack["props"]["notice"] = {"path": "props/notice.png",
@@ -281,7 +332,7 @@ class ArtContractTests(unittest.TestCase):
     def test_a_manifest_entry_whose_png_is_the_wrong_size_is_refused(self):
         # The other half of the same rule: the manifest is believed, so the PNG
         # behind every entry has to be what the entry promises.
-        donor = self.pack["props"]["sign"]
+        donor = self.pack["props"]["window"]
         with Image.open(self.source / donor["path"]) as opened:
             opened.copy().save(self.source / "props/notice.png")
         self.pack["props"]["notice"] = {"path": "props/notice.png",
@@ -314,20 +365,20 @@ class ArtContractTests(unittest.TestCase):
         output = self.root / "out"
         with contextlib.redirect_stdout(io.StringIO()):
             build(self.source, output)
-        ghost = output / self.pack["props"]["cabinet"]["path"]
+        ghost = output / self.pack["props"]["window_night"]["path"]
         sidecar = ghost.with_name(ghost.name + ".import")
         sidecar.write_text("[remap]\n")  # Godot keeps one beside every shipped PNG
         self.assertTrue(ghost.is_file())
-        del self.pack["props"]["cabinet"]
+        del self.pack["props"]["window_night"]
         (self.source / "pack.json").write_text(json.dumps(self.pack))
         with contextlib.redirect_stdout(io.StringIO()) as said:
             build(self.source, output)
         self.assertFalse(ghost.exists(), "the built PNG outlived its manifest entry")
         self.assertFalse(sidecar.exists(), "the Godot import outlived its image")
         self.assertIn("PRUNED:", said.getvalue())
-        self.assertIn("props/cabinet.png", said.getvalue())
+        self.assertIn("props/window_night.png", said.getvalue())
         # Everything still declared is untouched, and a rerun prunes nothing.
-        kept = output / self.pack["props"]["sign"]["path"]
+        kept = output / self.pack["props"]["window"]["path"]
         self.assertTrue(kept.is_file())
         with contextlib.redirect_stdout(io.StringIO()) as quiet:
             build(self.source, output)
@@ -343,12 +394,12 @@ class ArtContractTests(unittest.TestCase):
         companion = output / "table"
         companion.mkdir()
         (companion / "manifest.json").write_text("{}")
-        (companion / "surface_left.png").write_bytes(b"not this builder's")
+        (companion / "desk_left.png").write_bytes(b"not this builder's")
         stray = output / "fonts/NOTES.txt"
         stray.write_text("not a picture")
         with contextlib.redirect_stdout(io.StringIO()):
             build(self.source, output)
-        self.assertTrue((companion / "surface_left.png").is_file(), "the shared table was pruned by the wrong builder")
+        self.assertTrue((companion / "desk_left.png").is_file(), "the shared table was pruned by the wrong builder")
         self.assertTrue(stray.is_file(), "pruning removed something that is not a picture")
 
     def test_every_editable_pack_in_the_tree_is_found_by_its_manifest(self):
@@ -366,8 +417,8 @@ class ArtContractTests(unittest.TestCase):
                 validate(self.source, changed)
 
     def test_rejects_a_pack_whose_listed_file_is_absent(self):
-        (self.source / self.pack["ui"]["selection"]["path"]).unlink()
-        with self.assertRaisesRegex(ValueError, "lists a file that is not in the pack: ui/selection.png"):
+        (self.source / self.pack["ui"]["selection_seat"]["path"]).unlink()
+        with self.assertRaisesRegex(ValueError, "lists a file that is not in the pack: ui/selection_seat.png"):
             validate(self.source, self.pack)
         shutil.copytree(SOURCE, self.source, dirs_exist_ok=True)
         (self.source / self.pack["font"]["license"]).unlink()
@@ -420,6 +471,33 @@ class ArtContractTests(unittest.TestCase):
             validate(self.source, changed)
 
 
+class SchemaOneRowWallJointTests(unittest.TestCase):
+    """The row walls' joint cases on a schema-1 source, which declares no density.
+
+    `--source` takes any compliant pack, and a schema-1 pack may not carry the
+    `density` key at all (build_assets.resolve_density_filter()): the cases
+    that draw the synthetic joint family must reach their seam assertions on
+    one, as they do on the shipped schema-2 pack. The same case bodies as
+    ArtContractTests', on the pack under test brought down to schema 1.
+    """
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.source = self.root / "source"
+        shutil.copytree(SOURCE, self.source)
+        self.pack = as_schema_one(self.source)
+        self.assertNotIn("density", self.pack)
+        self.assertEqual(validate(self.source, self.pack).density, 1, "a pack `make art` accepts, at 1x")
+
+    paint = ArtContractTests.paint
+    with_row_wall_joints = ArtContractTests.with_row_wall_joints
+    test_t_junction_preserves_its_side_connection_above = ArtContractTests.test_t_junction_preserves_its_side_connection_above
+    test_t_junction_preserves_its_side_connection_below = ArtContractTests.test_t_junction_preserves_its_side_connection_below
+    test_open_end_keeps_its_horizontal_connection_to_the_wall = ArtContractTests.test_open_end_keeps_its_horizontal_connection_to_the_wall
+
+
 class DensityContractTests(unittest.TestCase):
     """schema v2: one density per pack, lower-density sources filled in by the build.
 
@@ -436,20 +514,7 @@ class DensityContractTests(unittest.TestCase):
         # 1x pack; the product source and runtime assets remain untouched.
         self.base_source = self.root / "base"
         shutil.copytree(SOURCE, self.base_source)
-        base_pack = json.loads((self.base_source / "pack.json").read_text())
-        # A schema-1 fixture needs actual 1x PNGs, not just a changed manifest
-        # declaration: a denser pack under test (--source) is brought down to 1x.
-        for category in ("tiles", "props", "ui"):
-            for info in base_pack[category].values():
-                path = self.base_source / info["path"]
-                with Image.open(path) as opened:
-                    size = contract_size(base_pack, category, info)
-                    if opened.size != size:
-                        opened.resize(size, Image.Resampling.NEAREST).save(path)
-        base_pack["schema_version"] = 1
-        base_pack.pop("density", None)
-        base_pack.pop("filter", None)
-        (self.base_source / "pack.json").write_text(json.dumps(base_pack, indent=2) + "\n")
+        as_schema_one(self.base_source)
 
     ## --- fixtures -------------------------------------------------------------
 
@@ -553,7 +618,7 @@ class DensityContractTests(unittest.TestCase):
                 # Geometry in the manifest stays in density-1 units at every density.
                 self.assertEqual(manifest["tile_size"], 32)
                 self.assertEqual(manifest["atlas_size"], self.read_pack(SOURCE)["atlas_size"])
-                self.assertEqual(manifest["props"]["cabinet"]["size"], self.read_pack(SOURCE)["props"]["cabinet"]["size"])
+                self.assertEqual(manifest["props"]["window"]["size"], self.read_pack(SOURCE)["props"]["window"]["size"])
                 self.assert_built_at(source, output, density)
 
     def test_manifest_only_pack_is_filled_in_to_the_same_pixels(self):
@@ -576,7 +641,7 @@ class DensityContractTests(unittest.TestCase):
         pack = self.read_pack(mixed)
         # One tile, one prop and one icon repainted at 2x inside a 4x pack; the
         # wood seam check has to compare floor.wood_a (1x) with wood_b (2x).
-        for relative in (pack["tiles"]["floor.wood_b"]["path"], pack["props"]["cabinet"]["path"],
+        for relative in (pack["tiles"]["floor.wood_b"]["path"], pack["props"]["door"]["path"],
                          pack["ui"]["panel"]["path"]):
             self.rescale(mixed / relative, 2)
         mixed_out, painted_out = self.root / "mixed-out", self.root / "painted-out"
@@ -588,7 +653,7 @@ class DensityContractTests(unittest.TestCase):
     def test_rejects_a_source_png_denser_than_the_pack(self):
         source = self.upgraded(2, "two")
         pack = self.read_pack(source)
-        self.rescale(source / pack["props"]["cabinet"]["path"], 2)
+        self.rescale(source / pack["props"]["door"]["path"], 2)
         with self.assertRaisesRegex(ValueError, "Raise the pack density to 4"):
             validate(source, pack)
 
@@ -811,8 +876,9 @@ class PixelSourceTests(unittest.TestCase):
         files = sorted(path.relative_to(first) for path in first.rglob("*") if path.is_file())
         self.assertEqual(
             len(files),
-            len(draw_pixel_sources.DESK_PIECES) + len(draw_pixel_sources.FIXTURE_SIZES) + 19,
-            "8 desk props, 2 fixture props, 18 modules, 1 manifest",
+            len(draw_pixel_sources.DESK_PIECES) + len(draw_pixel_sources.FIXTURE_SIZES)
+            + len(draw_pixel_sources.DENSE_SIZES) + len(draw_pixel_sources.PARTITION_SIZES) + 19,
+            "8 desk props, 2 fixture props, 2 density-2 pieces, 7 partition pieces, the pod family's 18 images, 1 manifest",
         )
         self.assertEqual(files, sorted(path.relative_to(second) for path in second.rglob("*") if path.is_file()))
         for relative in files:
@@ -821,17 +887,26 @@ class PixelSourceTests(unittest.TestCase):
     def test_the_fixtures_are_drawn_as_the_pack_declares_them(self):
         drawn = self.draw("drawn")
         manifest = json.loads((ROOT / "art/daylight/pack.json").read_text())
+        # The drawings are held to the drawing tool's own sizes and feet, every
+        # one of them (the reception's template too, which no pack ships any
+        # more); what the pack declares is held to the same numbers, and the
+        # pantry, the entry band's one counter, is always declared.
+        self.assertIn("pantry", manifest["props"], "the pack ships the entry band's counter")
         for name, size in draw_pixel_sources.FIXTURE_SIZES.items():
-            declared = manifest["props"][name]
-            self.assertEqual(tuple(declared["size"]), size, f"{name}: the size pack.json declares")
-            self.assertEqual(tuple(declared["pivot"]), draw_pixel_sources.FIXTURE_PIVOTS[name], f"{name}: its foot")
+            pivot = draw_pixel_sources.FIXTURE_PIVOTS[name]
+            declared = manifest["props"].get(name)
+            if declared is not None:
+                self.assertEqual(tuple(declared["size"]), size, f"{name}: the size pack.json declares")
+                self.assertEqual(tuple(declared["pivot"]), pivot, f"{name}: its foot")
             with Image.open(drawn / f"props/{name}.png") as piece:
                 self.assertEqual(piece.size, size, f"{name}: drawn at its size")
                 box = piece.getchannel("A").getbbox()
                 # Nothing on or below the foot, the bottom outline right above it.
-                self.assertEqual(box[3], declared["pivot"][1], f"{name}: stands on its foot")
+                self.assertEqual(box[3], pivot[1], f"{name}: stands on its foot")
                 if name in ("reception", "pantry"):
                     self.assertEqual((box[0], box[2]), (0, size[0]), f"{name}: stands on its whole width")
+            if declared is None:
+                continue
             # What ships in art/daylight is painted (the drawing here was its
             # first draft), so it is held to the same footprint at its own
             # density k, not to these bytes: the canvas is the declared size
@@ -845,6 +920,182 @@ class PixelSourceTests(unittest.TestCase):
                 self.assertIsNotNone(box, f"{name}: shipped empty")
                 self.assertEqual(box[3], declared["pivot"][1] * k, f"{name}: the shipped piece stands on its foot")
                 self.assertEqual((box[0], box[2]), (0, shipped.width), f"{name}: the shipped piece stands on its whole width")
+
+    def test_the_density_two_pieces_keep_their_contract_and_make_art_accepts_them(self):
+        drawn = self.draw("drawn")
+        pack = self.root / "pack"
+        shutil.copytree(ROOT / "art/daylight", pack)
+        shutil.copytree(drawn, pack, dirs_exist_ok=True)
+        manifest = json.loads((pack / "pack.json").read_text())
+        # Declared the way art/daylight/pack.json declares them (or will).
+        manifest["props"]["done_stack_small"] = {
+            "path": "props/done_stack_small.png", "size": [24, 24], "pivot": [12, 22],
+            "item": {"place": "desk", "footprint": [6, 3]},
+        }
+        manifest["ui"]["selection_seat"] = {"path": "ui/selection_seat.png", "size": [32, 48], "pivot": [16, 46]}
+        compiled = validate(pack, manifest)
+        self.assertEqual(compiled.factors[("props", "done_stack_small")], 2, "drawn at the pack's density")
+        self.assertEqual(compiled.factors[("ui", "selection_seat")], 2, "drawn at the pack's density")
+        d = draw_pixel_sources.DENSE
+        with Image.open(drawn / "props/done_stack_small.png") as stack:
+            self.assertEqual(stack.size, (24 * d, 24 * d))
+            alpha = stack.getchannel("A")
+            self.assertEqual({value for _, value in alpha.getcolors()}, {0, 255}, "hard alpha")
+            # 6 wide by 9 tall, x -3..3 and y -9..0 about the pivot [12, 22].
+            self.assertEqual(alpha.getbbox(), (9 * d, 13 * d, 15 * d, 22 * d))
+        # The paper's colours are the shipped small stack's (which took them
+        # from the long table's painted stack, retired since): nothing new.
+        with Image.open(ROOT / "art/daylight/props/done_stack_small.png") as shipped_stack, \
+                Image.open(drawn / "props/done_stack_small.png") as small:
+            self.assertLessEqual({colour for _, colour in small.getcolors()} - {(0, 0, 0, 0)},
+                                 {colour for _, colour in shipped_stack.convert("RGBA").getcolors()},
+                                 "the shipped small stack's colours, nothing new")
+        # The mark is one colour, the selection's (`blocked`: the badge and the
+        # selection frame share it), as the shipped seat mark is.
+        blocked = tuple(bytes.fromhex(manifest["palette"]["blocked"])) + (255,)
+        with Image.open(drawn / "ui/selection_seat.png") as mark, \
+                Image.open(ROOT / "art/daylight/ui/selection_seat.png") as opened:
+            selection = opened.convert("RGBA")
+            self.assertEqual(mark.size, (32 * d, 48 * d))
+            colours = {colour for _, colour in mark.getcolors()}
+            self.assertEqual(colours - {(0, 0, 0, 0)}, {blocked}, "the selection's one colour")
+            self.assertEqual({colour for _, colour in selection.getcolors()} - {(0, 0, 0, 0)}, {blocked},
+                             "and the shipped seat mark's")
+            alpha = mark.getchannel("A")
+            line, arm = draw_pixel_sources.SEAT_LINE * d, draw_pixel_sources.SEAT_ARM * d
+            # The top arms stay clear of a raised fist (x -8..+12 about the foot,
+            # the pivot's x 16): nothing opaque in canvas x 8..28 on the top rows.
+            self.assertIsNone(mark.getchannel("A").crop((8 * d, 0, 28 * d, line)).getbbox(),
+                              "the top arms leave x -8..+12 about the foot clear for a raised fist")
+            self.assertEqual(alpha.getbbox(), (0, 0, mark.width, mark.height), "the corners reach the canvas edges")
+            self.assertEqual(alpha.crop((line, line, mark.width - line, mark.height - line)).getextrema(), (0, 0),
+                             "the middle stays clear for the seated person")
+            for x0, y0 in ((0, 0), (mark.width - arm, 0), (0, mark.height - line), (mark.width - arm, mark.height - line)):
+                self.assertEqual(alpha.crop((x0, y0, x0 + arm, y0 + line)).getextrema(), (255, 255), "a corner's arm")
+            self.assertEqual(alpha.crop((arm, 0, mark.width - arm, mark.height)).getbbox(), None,
+                             "nothing between the corners along the top and bottom")
+            self.assertEqual(alpha.crop((0, arm, mark.width, mark.height - arm)).getbbox(), None,
+                             "nothing between the corners along the sides")
+            # The mark's line weight: the left stroke, a row under the top
+            # stroke, is as wide on the drawing and on the shipped seat mark.
+            def weight(image):
+                row = image.getchannel("A").crop((0, 3 * d, image.width // 2, 3 * d + 1))
+                return row.getbbox()
+            self.assertEqual(weight(mark), (0, 0, line, 1))
+            self.assertEqual(weight(selection), (0, 0, line, 1), "the same weight as the shipped seat mark")
+
+    ## The open bottom run's two ends: drawn by the tool, shipped by no pack the office needs them in.
+    PARTITION_ENDS = ("partition_h_end_l", "partition_h_end_r")
+
+    def check_partition_kit(self, label, folder, palette, ends_wanted=False):
+        """The partition kit's contract (draw_pixel_sources.py's docstring) on one set of PNGs.
+        `ends_wanted`: the tree must hold the open run's ends (the drawings always do)."""
+        d = draw_pixel_sources.DENSE
+        named = {tuple(bytes.fromhex(palette[key])) + (255,)
+                 for key in ("cream", "cream_shadow", "plaster", "wood_light", "wood", "wood_dark", "ink")}
+        pieces = {}
+        for name, size in draw_pixel_sources.PARTITION_SIZES.items():
+            # The open run's two ends are a drawing's: a pack ships them only
+            # if a zone ever ends its bottom run without a corner.
+            if name in self.PARTITION_ENDS and not (folder / f"{name}.png").is_file():
+                continue
+            with Image.open(folder / f"{name}.png") as opened:
+                piece = pieces[name] = opened.convert("RGBA")
+            with self.subTest(tree=label, piece=name):
+                self.assertEqual(piece.size, (size[0] * d, size[1] * d))
+                colours = {colour for _, colour in piece.getcolors()}
+                self.assertLessEqual(colours - {(0, 0, 0, 0)}, named, "only the kit's seven palette colours")
+                self.assertLessEqual({colour[3] for colour in colours}, {0, 255}, "hard alpha")
+                box = piece.getchannel("A").getbbox()
+                pivot = draw_pixel_sources.PARTITION_PIVOTS[name]
+                self.assertEqual(box[3], pivot[1] * d, "stands on its foot")
+                self.assertEqual(box[0] + box[2], 2 * pivot[0] * d, "centred on its foot")
+                if name.startswith("partition_h"):
+                    self.assertLessEqual(box[3] - box[1], draw_pixel_sources.PARTITION_WALL * d, "at most 10 units tall")
+                if name in ("partition_v", "partition_post"):
+                    self.assertLessEqual(box[2] - box[0], draw_pixel_sources.PARTITION_BAND * d, "no wider than its band")
+
+        def column(image, x, top=0):
+            return image.crop((x, top, x + 1, image.height)).tobytes()
+
+        def row(image, y, left=0, width=None):
+            return image.crop((left, y, left + (width or image.width), y + 1)).tobytes()
+
+        run = pieces["partition_h"]
+        wall = run.height
+        with self.subTest(tree=label, join="run"):
+            # Every column of a run is the same, so runs of any length tile.
+            self.assertEqual({column(run, x) for x in range(run.width)}, {column(run, 0)})
+        with self.subTest(tree=label, join="ends"):
+            self.assertIn(set(self.PARTITION_ENDS) & set(pieces), (set(), set(self.PARTITION_ENDS)), "both ends or neither")
+            if ends_wanted:
+                self.assertLessEqual(set(self.PARTITION_ENDS), set(pieces), "this tree has the open run's ends")
+        if set(self.PARTITION_ENDS) <= set(pieces):
+            with self.subTest(tree=label, join="ends"):
+                # An end closes only its own end: the other edge meets a run.
+                self.assertEqual(column(pieces["partition_h_end_l"], run.width - 1), column(run, 0))
+                self.assertEqual(column(pieces["partition_h_end_r"], 0), column(run, 0))
+                self.assertNotEqual(column(pieces["partition_h_end_l"], 0), column(run, 0), "the left end is closed")
+                self.assertNotEqual(column(pieces["partition_h_end_r"], run.width - 1), column(run, 0), "the right end is closed")
+        side = pieces["partition_v"]
+        with self.subTest(tree=label, join="side"):
+            self.assertEqual({row(side, y) for y in range(side.height)}, {row(side, 0)}, "a side run tiles top-bottom")
+        for corner, inner in (("partition_corner_bl", -1), ("partition_corner_br", 0)):
+            piece = pieces[corner]
+            with self.subTest(tree=label, join=corner):
+                edge = piece.width - 1 if inner == -1 else 0
+                top = piece.height - wall
+                self.assertEqual(column(piece, edge, top), column(run, 0), "meets the bottom run without a seam")
+                self.assertEqual(piece.getchannel("A").crop((0, 0, piece.width, top)).getbbox()[2]
+                                 - piece.getchannel("A").crop((0, 0, piece.width, top)).getbbox()[0],
+                                 side.width, "above the run only the side strip")
+                strip = 0 if corner.endswith("_bl") else piece.width - side.width
+                self.assertEqual(row(piece, 0, strip, side.width), row(side, 0), "meets the side run without a seam")
+
+    def test_the_partition_kit_tiles_and_stands_on_its_feet(self):
+        drawn = self.draw("drawn")
+        palette = draw_pixel_sources.palette_of(ROOT / "art/daylight/pack.json")
+        self.check_partition_kit("drawn", drawn / "props", palette, ends_wanted=True)
+        manifest = json.loads((ROOT / "art/daylight/pack.json").read_text())
+        # The shipped kit: the pieces the office draws are always there, each
+        # as pack.json declares it; the open run's ends only if the pack has them.
+        for name, size in draw_pixel_sources.PARTITION_SIZES.items():
+            declared = manifest["props"].get(name)
+            if declared is None:
+                self.assertIn(name, self.PARTITION_ENDS, f"{name}: the pack ships every piece the office draws")
+                self.assertFalse((ROOT / f"art/daylight/props/{name}.png").exists(), f"{name}: no stray image")
+                continue
+            self.assertEqual((tuple(declared["size"]), tuple(declared["pivot"])),
+                             (size, draw_pixel_sources.PARTITION_PIVOTS[name]), f"{name}: as pack.json declares it")
+            self.assertNotIn("item", declared, f"{name}: placed by code by id; the walk graph owns its band")
+        self.check_partition_kit("shipped", ROOT / "art/daylight/props", palette)
+
+    def test_the_side_table_stands_on_its_legs_under_its_footprint(self):
+        manifest = json.loads((ROOT / "art/daylight/pack.json").read_text())
+        if "side_table" not in manifest["props"]:
+            self.skipTest("the side table is not shipped yet")
+        declared = manifest["props"]["side_table"]
+        self.assertEqual((declared["size"], declared["pivot"]), ([32, 32], [16, 30]))
+        self.assertEqual(declared["item"], {"place": "floor", "footprint": [28, 10]})
+        d = 2
+        with Image.open(ROOT / "art/daylight/props/side_table.png") as table:
+            alpha = table.getchannel("A")
+            left, top, right, bottom = alpha.getbbox()
+            self.assertEqual(bottom, 30 * d, "the legs stand on its foot")
+            width = declared["item"]["footprint"][0] * d
+            centre = 16 * d
+            self.assertLessEqual(centre - width // 2, left, "the footprint covers the whole drawing")
+            self.assertGreaterEqual(centre + width // 2, right)
+            # The top plane OfficeDecor.TOP_Y will stand an item on: y -23.5..-19
+            # about the foot (texel rows 13..21) is the top's wood, not outline,
+            # across its middle 16 units.
+            palette = json.loads((ROOT / "art/daylight/pack.json").read_text())["palette"]
+            outline = {tuple(bytes.fromhex(palette[key])) for key in ("ink", "deep")}
+            for y in range(13, 22):
+                for x in range(centre - 8 * d, centre + 8 * d):
+                    pixel = table.getpixel((x, y))
+                    self.assertEqual(pixel[3], 255, f"the top plane is solid at {(x, y)}")
+                    self.assertNotIn(pixel[:3], outline, f"the top plane is wood at {(x, y)}")
 
     def test_refuses_an_occupied_output_and_writes_nothing(self):
         occupied = self.root / "occupied"

@@ -8,7 +8,7 @@ extends RefCounted
 ## and none of it is terminal text.
 ##
 ## It keeps no clock of its own. When a state began is HerdrClient's StateClock
-## (the one the top bar's `max`, the card and the bubbles read too); the fleet
+## (the one the top bar's `max`, the card and the chips read too); the fleet
 ## hands it in with every pane as a Sighting, and a segment whose start that
 ## clock knows starts there. One whose start it does not know (the first
 ## snapshot of a connection) starts when this log first saw it and reads `+`:

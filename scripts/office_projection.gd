@@ -14,7 +14,7 @@ extends RefCounted
 
 
 ## One refresh's whole projection: every machine as a building, Local first, and
-## the lookups the office, the minimap, the inspector, attention and the `N`
+## the lookups the office, the SPACES rail, the inspector, attention and the `N`
 ## queue make, so nothing is projected twice. `states` are the states the art
 ## pack has a badge for.
 static func frame(machines: Array[MachineView], states: PackedStringArray) -> OfficeFrame:
@@ -35,29 +35,32 @@ static func frame(machines: Array[MachineView], states: PackedStringArray) -> Of
 	return result
 
 
-## The buildings with their floors and seated panes indexed: a frame without
-## panes or focus, which is all the floor lookups below need.
+## The buildings with their zones and seated panes indexed: a frame without
+## panes or focus, which is all the zone lookups below need.
 static func frame_of(buildings: Array[BuildingModel]) -> OfficeFrame:
 	var result := OfficeFrame.new()
 	result.buildings = buildings
 	for building_model in buildings:
-		for floor_model in building_model.floors:
-			if not result.floor_by_key.has(floor_model.key):
-				result.floor_by_key[floor_model.key] = FloorRef.new(building_model, floor_model)
-			result.floor_order.append(floor_model.key)
-			for room in floor_model.rooms:
+		if not result.building_by_key.has(building_model.key):
+			result.building_by_key[building_model.key] = building_model
+		for zone in building_model.zones:
+			if not result.zone_by_key.has(zone.key):
+				result.zone_by_key[zone.key] = ZoneRef.new(building_model, zone)
+			for room in zone.rooms:
 				for pane in room.panes:
-					if not result.floor_of_pane.has(pane.key):
-						result.floor_of_pane[pane.key] = floor_model.key
+					if not result.zone_of_pane.has(pane.key):
+						result.zone_of_pane[pane.key] = zone.key
+		for zone in OfficeNavigator.section(building_model.zones):
+			result.zone_order.append(zone.key)
 	return result
 
 
 # --- buildings ----------------------------------------------------------------
 
 
-## A machine as a building: its key, label, counts and floors. A building
-## without floors (offline, never loaded, or an empty session) gets a lobby, so
-## its state and SSH complaint stay readable.
+## A machine as a building: its key, label, counts, zones and its one map. A
+## machine without workspaces (offline, never loaded, or an empty session) has
+## no zone and an empty map; its plate keeps its state and SSH complaint readable.
 static func building(
 	key: String, label: String, snapshot: HerdrSnapshot, states: PackedStringArray, is_stale: bool
 ) -> BuildingModel:
@@ -69,33 +72,21 @@ static func building(
 	model.tabs = snapshot.tabs.size()
 	model.panes = snapshot.panes.size()
 	model.all_panes = panes_of(snapshot, states, key)
-	model.floors = project(snapshot, states, key, is_stale)
-	if model.floors.is_empty():
-		model.floors.append(lobby(key))
-	model.floor_tree = floor_tree(model.floors)
+	model.zones = project(snapshot, states, key, is_stale)
+	model.zone_tree = floor_tree(model.zones)
+	model.map = MapModel.of_zones(key, model.zones)
 	return model
 
 
-## The lobby's key has a second separator after the machine key: a cleaned
-## workspace id holds no control character, so no real floor can be the lobby,
-## not even a workspace whose id reads as empty.
-static func lobby(machine: String) -> FloorModel:
-	var model := FloorModel.new()
-	model.key = HerdrFleet.pane_key(machine, "") + HerdrFleet.KEY_SEPARATOR
-	model.label = "LOBBY"
-	model.lobby = true
-	return model
-
-
-## Snapshot into the smallest description a floor can be drawn from: one floor
+## Snapshot into the smallest description a map can be drawn from: one zone
 ## per workspace by herdr's number, one room per tab by its number, desks by
 ## terminal rect, linked worktrees as mezzanines (group_worktrees()).
-## `blocked`/`done` follow OfficeAttention.count() on the floor's own panes, and
+## `blocked`/`done` follow OfficeAttention.count() on the zone's own panes, and
 ## a stale machine reports none: a lost connection is not a live signal.
 ## `states` are the states the art pack has a badge for.
 static func project(
 	snapshot: HerdrSnapshot, states: PackedStringArray, machine := HerdrFleet.LOCAL, is_stale := false
-) -> Array[FloorModel]:
+) -> Array[ZoneModel]:
 	var ranks := layout_ranks(snapshot)
 	var sides := layout_sides(snapshot)
 	var table_x := layout_x(snapshot)
@@ -127,18 +118,18 @@ static func project(
 	for workspace in snapshot.workspaces:
 		workspaces.append([workspace.number, workspace.workspace_id, workspace])
 	workspaces.sort_custom(by_number)
-	var floors: Array[FloorModel] = []
+	var floors: Array[ZoneModel] = []
 	var trees: Dictionary[String, HerdrSnapshot.Worktree] = {}
 	var seen := {}
 	for entry: Array in workspaces:
 		var workspace: HerdrSnapshot.Workspace = entry[2]
 		var workspace_id := workspace.workspace_id
 		var key := HerdrFleet.pane_key(machine, workspace_id)
-		# Two workspaces claiming one id would be one floor twice; the first wins.
+		# Two workspaces claiming one id would be one zone twice; the first wins.
 		if seen.has(key):
 			continue
 		seen[key] = true
-		var floor_model := FloorModel.new()
+		var floor_model := ZoneModel.new()
 		floor_model.key = key
 		floor_model.number = workspace.number
 		floor_model.level_label = str(workspace.number)
@@ -199,16 +190,16 @@ static func project(
 ## herdr hangs a linked worktree under the space it was made from, and says so
 ## only through the repository key both checkouts share. Among one machine's
 ## `floors` (in herdr's number order, as project() lists them; `trees` holds the
-## worktree of each floor that has one, by floor key), a group is every floor
+## worktree of each zone that has one, by zone key), a group is every zone
 ## with the same non-empty repository key. Its parent is the one that is not a
 ## linked worktree, the lowest number when there are several; its children are
 ## its linked worktrees, which become mezzanines in herdr's workspace order: the
 ## parent's number and a letter, A to Z, then AA, AB and on (mezzanine_letters()).
-## Without an open parent a group has none, and its worktrees stay floors of
+## Without an open parent a group has none, and its worktrees stay zones of
 ## their own; so do any other non-linked checkouts of the repository. Only the
 ## display fields change: key, number and rooms stay as they were.
-static func group_worktrees(floors: Array[FloorModel], trees: Dictionary[String, HerdrSnapshot.Worktree]) -> void:
-	var parents: Dictionary[String, FloorModel] = {}
+static func group_worktrees(floors: Array[ZoneModel], trees: Dictionary[String, HerdrSnapshot.Worktree]) -> void:
+	var parents: Dictionary[String, ZoneModel] = {}
 	for floor_model in floors:
 		var tree: HerdrSnapshot.Worktree = trees.get(floor_model.key)
 		if tree != null and not tree.repo_key.is_empty() and not tree.is_linked_worktree:
@@ -227,7 +218,7 @@ static func group_worktrees(floors: Array[FloorModel], trees: Dictionary[String,
 		floor_model.level_label = parent.level_label + mezzanine_letters(index)
 
 
-## The letters of the mezzanine at `index` (0-based) under its floor, counted the
+## The letters of the mezzanine at `index` (0-based) under its source zone, counted the
 ## way spreadsheet columns are: 0 is A, 25 is Z, 26 is AA, 27 AB, 701 ZZ, 702 AAA.
 static func mezzanine_letters(index: int) -> String:
 	var letters := ""
@@ -238,10 +229,10 @@ static func mezzanine_letters(index: int) -> String:
 	return letters
 
 
-## `floors` in tree order, the order the building section lists them in: every
-## floor that is no mezzanine in the order given, each followed by its mezzanines
+## `floors` in tree order, the order the SPACES rail lists them in: every
+## zone that is no mezzanine in the order given, each followed by its mezzanines
 ## in theirs. A mezzanine whose parent is not among `floors` stands on its own.
-static func floor_tree(floors: Array[FloorModel]) -> Array[FloorModel]:
+static func floor_tree(floors: Array[ZoneModel]) -> Array[ZoneModel]:
 	var keys: Dictionary[String, bool] = {}
 	for floor_model in floors:
 		keys[floor_model.key] = true
@@ -251,22 +242,22 @@ static func floor_tree(floors: Array[FloorModel]) -> Array[FloorModel]:
 			if not hanging.has(floor_model.mezzanine_of):
 				hanging[floor_model.mezzanine_of] = []
 			hanging[floor_model.mezzanine_of].append(floor_model)
-	var tree: Array[FloorModel] = []
+	var tree: Array[ZoneModel] = []
 	for floor_model in floors:
 		if keys.has(floor_model.mezzanine_of):
 			continue
 		tree.append(floor_model)
-		for child: FloorModel in hanging.get(floor_model.key, []):
+		for child: ZoneModel in hanging.get(floor_model.key, []):
 			tree.append(child)
 	return tree
 
 
-## A floor's own counts of the agents that need a human (OfficeAttention.count()
-## over its seated panes), each pane key once, and a key the floor carries twice,
-## which it cannot seat, not at all. The one count the minimap's floor row
+## A zone's own counts of the agents that need a human (OfficeAttention.count()
+## over its seated panes), each pane key once, and a key the zone carries twice,
+## which it cannot seat, not at all. The one count the SPACES row
 ## reads; the world draws the same done panes one by one, as the paper on
 ## their desks.
-static func floor_counts(floor_model: FloorModel) -> Dictionary:
+static func floor_counts(floor_model: ZoneModel) -> Dictionary:
 	var repeated := floor_model.repeated_keys()
 	var counted: Array[PaneModel] = []
 	for room in floor_model.rooms:
@@ -306,9 +297,9 @@ static func pane_model(pane: HerdrSnapshot.Pane, states: PackedStringArray, mach
 
 ## Every pane of one machine, in snapshot order, whether or not its tab and
 ## workspace are there to seat it: how many panes a machine has and who needs a
-## human are about the machine, not about what could be placed on a floor. Each
+## human are about the machine, not about what could be seated in a zone. Each
 ## carries the label of the first workspace and tab with the ids it names, the
-## same first-wins rule project() seats a floor by.
+## same first-wins rule project() seats a zone by.
 static func panes_of(
 	snapshot: HerdrSnapshot, states: PackedStringArray, machine := HerdrFleet.LOCAL
 ) -> Array[PaneModel]:
@@ -426,28 +417,29 @@ static func effective_selection(buildings: Array[BuildingModel], picked_key: Str
 	return indexed.effective_selection(picked_key)
 
 
-## Key of the floor a desk sits on, or empty.
-static func floor_of(buildings: Array[BuildingModel], pane_key: String) -> String:
-	return frame_of(buildings).floor_of(pane_key)
+## Key of the zone a desk sits in, or empty.
+static func zone_of(buildings: Array[BuildingModel], pane_key: String) -> String:
+	return frame_of(buildings).zone_of(pane_key)
 
 
-## The floor with this key and the building it stands in, or null.
-static func find_floor(buildings: Array[BuildingModel], key: String) -> FloorRef:
-	return frame_of(buildings).find_floor(key)
+## The zone with this key and the building it stands in, or null.
+static func find_zone(buildings: Array[BuildingModel], key: String) -> ZoneRef:
+	return frame_of(buildings).find_zone(key)
 
 
-## See OfficeFrame.choose_floor.
-static func choose_floor(buildings: Array[BuildingModel], picked_floor: String, active_key: String) -> String:
-	return frame_of(buildings).choose_floor(picked_floor, active_key)
+## See OfficeFrame.choose_machine.
+static func choose_machine(buildings: Array[BuildingModel], picked_machine: String, active_key: String) -> String:
+	return frame_of(buildings).choose_machine(picked_machine, active_key)
 
 
-## Every floor bottom to top, building after building: the PageUp/PageDown order.
-static func floor_order(buildings: Array[BuildingModel]) -> Array[String]:
-	return frame_of(buildings).floor_order
+## Every zone as the SPACES rail draws it, machine after machine: the
+## PageUp/PageDown order (see OfficeFrame.zone_order).
+static func zone_order(buildings: Array[BuildingModel]) -> Array[String]:
+	return frame_of(buildings).zone_order
 
 
-## Desks whose agent needs a human, across every live building: blocked first,
-## then UNREAD, each in the order wait_order() gives, which is the order a floor's
+## Desks whose agent needs a human, across every live machine: blocked first,
+## then UNREAD, each in the order wait_order() gives, which is the order a map's
 ## pantry is shared out in (OfficeRests): an unknown start first, as the one waiting
 ## longest, then the earliest start; the projection order breaks every tie.
 static func attention_queue(buildings: Array[BuildingModel]) -> Array[String]:
@@ -456,7 +448,7 @@ static func attention_queue(buildings: Array[BuildingModel]) -> Array[String]:
 	for building_model in buildings:
 		if building_model.stale:
 			continue
-		for floor_model in building_model.floors:
+		for floor_model in building_model.zones:
 			for room in floor_model.rooms:
 				for pane in room.panes:
 					# Same rule as OfficeAttention.count: an agent, not still launching.
@@ -478,7 +470,7 @@ static func attention_queue(buildings: Array[BuildingModel]) -> Array[String]:
 ## (PaneModel.state_since < 0) first, as having waited longest, then the
 ## earliest start first; ties, and the unknown among themselves, keep the order
 ## `panes` lists them in, which is the projection's. The one ranking of the
-## `N` key, a floor's queue and its pantry.
+## `N` key, the BLOCKED counter's queue and a map's pantry.
 static func wait_order(panes: Array[PaneModel]) -> Array[PaneModel]:
 	var entries: Array = []
 	for index in panes.size():

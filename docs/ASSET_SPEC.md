@@ -6,7 +6,7 @@ that meets the contract is never resampled. Sizes written "per 32 px tile" are d
 them by the density.
 
 The shipped pack, `daylight`, is **schema 2 / density 2 / nearest**: 1 world unit = 2 texture
-pixels, with layout still in 32-unit tiles. Their long tables (`<pack>/table/`) and the pixel people are density
+pixels, with layout still in 32-unit tiles. Its pod family (`<pack>/table/`, the shared table) and the pixel people are density
 2, nearest too. Display scales are even only (2×–8×), so every texel lands on whole screen pixels. A source not
 yet repainted at 2x is a 1x source the build fills in with NEAREST 2×2 blocks.
 
@@ -15,8 +15,8 @@ fallback for CJK and missing glyphs.
 
 ## Scope
 
-Assets for a wide, observational office in the "studio light" style: a floor is an open wooden floor, a tab is
-one shared long table, a pane is a seat at it. This spec covers the art pack only: source PNGs, the runtime
+Assets for a wide, observational office in the "studio light" style: a machine is one open-plan map on a wooden floor, a workspace
+a zone of it inside low partitions, a tab a pod of single desks, a pane a seat at it. This spec covers the art pack only: source PNGs, the runtime
 pack, TileSet / SpriteFrames and the asset showroom (`scenes/preview.tscn`). The live office
 (`scenes/office.tscn`) consumes the pack; see [the manual](MANUAL.md).
 
@@ -87,12 +87,12 @@ draw time. Which IDs the office uses, and whether a companion table exists, is `
 
 ### Canvases per density
 
-| density | tile | 16×16 icon | `panel` | `selection` | atlas |
+| density | tile | 16×16 icon | `panel` | `selection_seat` | atlas |
 |---:|---:|---:|---:|---:|---:|
-| 1 | 32×32 | 16×16 | 32×32 | 64×64 | 256×128 |
-| 2 | 64×64 | 32×32 | 64×64 | 128×128 | 512×256 |
-| 4 | 128×128 | 64×64 | 128×128 | 256×256 | 1024×512 |
-| 8 | 256×256 | 128×128 | 256×256 | 512×512 | 2048×1024 |
+| 1 | 32×32 | 16×16 | 32×32 | 32×48 | 256×128 |
+| 2 | 64×64 | 32×32 | 64×64 | 64×96 | 512×256 |
+| 4 | 128×128 | 64×64 | 128×128 | 128×192 | 1024×512 |
+| 8 | 256×256 | 128×128 | 256×256 | 256×384 | 2048×1024 |
 
 Furniture scales the same way; each image's contract size is its own `size` in `pack.json`.
 
@@ -114,7 +114,7 @@ atlas is `atlas_size × d` with `32·d` cells. From schema 2 on, `manifest.json`
 3. **Minification belongs to GPU mipmaps; `density` only means pixels per unit** (like PPU). Textures load as
    built, never resampled on the CPU, and nodes always scale by 1/density. A density > 1 pack shown below its
    density picks a mip level through `LINEAR_WITH_MIPMAPS`, so its import must generate mipmaps. Filtering is
-   per family: the pack's `filter` governs its own images; the long table samples by its own manifest (density 1
+   per family: the pack's `filter` governs its own images; the pod family samples by its own manifest (density 1
    is NEAREST; denser without a `filter` is `LINEAR_WITH_MIPMAPS`); the pixel people stay density 2 `nearest`,
    crisp even beside a density 4 `linear` pack.
    A `nearest` family is **never minified** at a supported scale: the floor is 2, where a density-2 texel is one
@@ -134,7 +134,7 @@ atlas is `atlas_size × d` with `32·d` cells. From schema 2 on, `manifest.json`
 | Family | Directory | Sampling | `mipmaps/generate` |
 |---|---|---|---|
 | A theme pack's own images (tile atlas, props, UI) | `assets/<id>/` | density 2, NEAREST | `false` |
-| A theme pack's long table | `assets/<id>/table/` | density 2, NEAREST | `false` |
+| A theme pack's pod family (the shared table) | `assets/<id>/table/` | density 2, NEAREST | `false` |
 | Pixel people | `assets/pixel_people/` | density 2, NEAREST | `false` |
 | Agent logos (Avatar Studio shows them minified by `size/64`) | `assets/agent_badges/` | LINEAR_WITH_MIPMAPS | `true` |
 
@@ -159,7 +159,7 @@ atlas is `atlas_size × d` with `32·d` cells. From schema 2 on, `manifest.json`
 | Pixel colours | each opaque pixel exactly a palette colour | free |
 | Palette keys | each value 6-digit lowercase hex | identical (the pack decides which keys exist; scenes' needs are step 9 of "Replace and iterate protocol") |
 | `floor.wood_*` outer band | after scaling to the pack density, all four 3 px (×d) edges pixel-identical | identical: interchangeable variants' edges are structural |
-| Wall connecting edges | cap/face boundary and straight-wall horizontal edges pixel-identical; a family with a T joint also checks the 6-unit side section and the joint's ports | identical; only meeting ports are compared |
+| Wall connecting edges | cap/face boundary and straight-wall horizontal edges pixel-identical; a family with side walls also checks their 6-unit section (the corner's port, the repeat down the map, nothing outside the strip); one that still declares a row wall's T joint, the joint's ports too | identical; only meeting ports are compared |
 | Everything else | RGBA, size rules, not empty, no holes in `floor.*` and `wall.cap_*` / `wall.face_*`, pivot inside the canvas, `nine_patch` leaves a middle, atlas cells unique and in range, font files | identical |
 
 Per-pixel checks multiply by each image's own `k`, not the pack's `d`, so a half-repainted pack is checked at the
@@ -168,25 +168,23 @@ size each image is actually painted.
 `daylight` declares `nearest`, so the build holds every source pixel to its palette. (A second pack derived from it
 by recolouring, Dusk Shift, was retired on 2026-09-29: night is to be a light over the one pack.)
 
-## Tiles (29)
+## Tiles
 
 `art/daylight/tiles/` and `art/daylight/walls/` hold the per-tile sources, compiled into
-`assets/daylight/terrain.png`: 256×128 units, 8 columns × 4 rows, 29 cells in use and 3 transparent reserved;
-region 32×32, margin 0, separation 0, padding on. `pack.json` is the authority on paths.
+`assets/daylight/terrain.png`: 256×128 units, 8 columns × 4 rows; region 32×32, margin 0, separation 0, padding
+on. `pack.json` is the authority on paths and on which cells are in use.
 
 - `floor.wood_a/b/c`: three wood variants with identical outer 3 px, so seams never change with the variant.
-- `floor.walkway`: corridor floor.
-- `rug.{top,middle,bottom}_{left,center,right}`: a 9-slice rug, at least 3×3, grown by repeating the middle row
-  and column, never by stretching.
+- `floor.walkway`: corridor floor (the entry band and the main aisle).
 - `wall.{cap,face,front}_{left,center,right}`: wall cap, back wall face and low front wall.
 - `wall.side_left/right`: side walls.
-- `wall.cap_t_left` / `wall.face_t_left`: the T joint where an inner cross wall meets the left shell.
-- `wall.cap_end_right` / `wall.face_end_right`: a cross wall's free end before the right main aisle.
 - `wall.threshold`: the front-wall threshold.
 
-The back wall is cap + face, 64 units tall. The front wall and threshold are not used in the open office. There
-are no Terrain auto-connect rules: only a rectangular shell, a left T joint and a right free end are promised —
-no arbitrary inner corners, crossings or doorways.
+The top wall is cap + face, 64 units tall. The front wall and threshold are not laid in the open office (see
+[the world model](WORLD_MODEL.md)). There are no rugs: a pod stands on the floor itself. There are no row walls
+and no wall joints (the T joint and the free end of the retired row walls are gone with them): a zone is bounded
+by the partition kit (props, below), and only a rectangular shell is promised — no inner corners, crossings or
+doorways. There are no Terrain auto-connect rules.
 
 ### Wall modules
 
@@ -202,35 +200,40 @@ density). The normal build never calls it or overwrites painted sources. The wal
 | Cap / face | cap line y 0–12, face y 12–57, skirting y 57–64. Ends change only the outer 6 units |
 | Side wall | left x 0–6 only, right x 26–32 only; outer 4 units ink + inner 2 units `cream_shadow`, alpha 0 elsewhere |
 | Outer corner | the face's bottom 6-unit port equals the matching side's top; the cap closes into the corner with no port above |
-| T-left | cap top and face bottom each have a 6-unit left port joining the through side wall; the right joins center |
-| End-right | joins center on the left; the right 6 units close at y 60–64 over the whole wall, with no port below |
 
-Each structural cell belongs to one module: a corner or T joint replaces the side-wall cells of its cap / face
-pair, with no side wall drawn underneath. An inner cross wall is T-left, center…, End-right; the right main aisle
-has no cross wall. Walls stay on Ground, cut open at the front; walkable space is validated by the FloorPlan,
-never inferred from transparent pixels. The build checks port pixels and coverage; still look at seams, corners,
-T joints and free ends at 2× and 4×.
+Each structural cell belongs to one module: a corner replaces the side-wall cell of its cap / face
+pair, with no side wall drawn underneath. The template tool can still draw the retired row walls' T joint and free
+end (`t_left`, `end_right`); the pack ships neither. Walls stay on Ground, cut open at the front; walkable space is
+validated by the FloorPlan, never inferred from transparent pixels. The build checks port pixels and coverage;
+still look at seams and corners at 2× and 4×.
 
-## Open floor and long tables
+## Open floor and pods
 
-A tab is one `OfficeTable` prefab (`scenes/world/table.tscn`) assembled from the `table/` companion pack:
-`surface_left/mid_a/mid_b/right` (top and grain), `apron_*` (near edge), `divider_*` (raised privacy divider),
-`leg` and `bracket`. Occlusion is Y-sort by position; there is no occlusion module. Modules repeat at their
-native 32 units, never stretched. The table is 80 units deep so the two rows of laptops never overlap. It is not a
-pack prop ID, because its length comes from the tab's pane count: seats sit 64 units apart, tables stand side by
-side on a wide floor and wrap into rows with a walkway between.
+A tab is one `OfficeTable` prefab (`scenes/world/table.tscn`), a **pod of single desks**, assembled from the
+`table/` companion pack: `desk_left/mid_a/mid_b/right` (the desktop and its grain, one module per column),
+`screen_left/mid/right` (the low screen between the two rows), `apron_*` (near edge), `leg_short` and `bracket`.
+Occlusion is Y-sort by position; there is no occlusion module. Modules repeat at their native 32 units, never
+stretched. The pod is 48 units deep, one 32-unit desk per column with a seat on each side. It is not a pack prop
+ID, because its length comes from the tab's pane count: pods stand in rows inside their zone
+([the world model](WORLD_MODEL.md)).
 
-The top is warm pixel-art oak: planks along the table, one dark seam row, sparse light grain (no dithering), a
+The top is warm pixel-art oak: planks along the pod, one dark seam row, sparse light grain (no dithering), a
 far edge of one outline row and one lit row, a near lip of one highlight over two shadow rows; lit from the
 top-left. The family is **density 2**, sampled NEAREST; canvases, rows, columns and probe points below are units,
-× `DENSITY` in the PNG (`tools/build_table_assets.py`). All 18 sources are painted at density 2.
+× `DENSITY` in the PNG (`tools/build_table_assets.py`). The pod set is **18 images** (`POD_ONLY` in the builder):
+the 12 modules the runtime lays (`ArtContract.TABLE_MODULES`: four desks, three screens, three aprons, the short
+leg and the bracket) and the 6 furniture views (two chairs, two laptops, two shell marks); a test holds the two
+lists together (`test_the_pod_only_set_is_exactly_what_the_office_draws`).
 
-- Near thickness is **3 + 3 = 6** (three lip rows in the surface, three apron rows). The surface canvas is 32×80
-  with rows 75–79 transparent; the apron is 32×3, attached at y −5. The outer three columns of each module are
-  one uniform column and grain falls only in columns 3–28, so modules join in any order; the divider's panels
-  repeat every 8 units, which divides 32.
-- Legs are solid wood narrowing twice, a dark mount above and a small glide below. `leg` is 20×40 with its last
-  opaque row at 38, hung at y −2, so the foot stands on y 37; `bracket` is 12×10 at y −11.
+- `desk_*` 32×48: opaque rows 0..42, transparent 43..47. Rows 0..39 are the working top (pod y −48..−8), 40..42
+  the lip the three-row apron continues (near thickness **3 + 3 = 6**: the apron is 32×3, attached at y −5); rows
+  16..21 lie under the low screen. The far working plane is rows 2..15, the near one 23..39. The outer three
+  columns of each module are one uniform column and grain falls only in columns 3–28, so modules join in any order.
+- `screen_*` 32×6: fully opaque, a wooden rail over a sage panel; its panel lines repeat every 8 units, which
+  divides 32, so modules in any order continue them.
+- `leg_short` 6×22: the pod's end leg, hung at y −2 with its last opaque row at 20, so the foot ends at pod y 19,
+  hidden behind the near chair of an end column; every row attached, the ankle and glide narrower than the
+  shoulder. `bracket` is 12×10 at y −11.
 - Chairs are charcoal (`jacket` ramp, `ink` shadow, `deep` outline), not teal, so teal clothes against a chair
   back never merge. Both are the same office chair at a person's scale, 17 wide over rows 24–45 (22 units, about
   60% of a standing person), with armrests, a gas-lift column and a five-star base: the far one (`chair_front`,
@@ -240,31 +243,36 @@ top-left. The family is **density 2**, sampled NEAREST; canvases, rows, columns 
 
 ### Table sources and templates
 
-- **`art/daylight/table/` is the source**: 18 PNGs and `manifest.json`. The build only reads it: no repainting,
+- **`art/daylight/table/` is the source**: the pod set's 18 PNGs and `manifest.json`. The build only reads it: no repainting,
   no saving back, no deleting unlisted drafts.
 - **`assets/<id>/table/` is the runtime copy**: `build_table_assets.py` validates the whole set, then copies PNGs
   and manifest byte for byte. It refuses missing, broken, non-RGBA or fully transparent images, sizes other than
   contract × `DENSITY`, and a mismatched manifest; a failed validation writes nothing. It prunes only stale
   PNGs / `.import` files in the runtime directory.
 - **Procedural drawing is authoring only**: `make table-templates` (and `make pixel-sources`, with the desk
-  library) exports into the empty directory `OUT` names; `make art` never runs it. To redo geometry, change the
-  drawing functions, export, review and copy chosen files into `art/daylight/table/`. Drawings are made in units
-  on a 1x canvas and scaled by `DENSITY` with NEAREST as written, except the laptop, which `laptop()` draws texel
-  by texel at `DENSITY`. `shell_*` is derived from the written `monitor_*` by `shell_mark()` (covers the lid mark
+  library) exports the pod set's 18 images and its manifest into the empty directory `OUT` names; `make art` never
+  runs it. To redo geometry, change the drawing functions, export, review and copy chosen files into
+  `art/daylight/table/`. The apron, the bracket and the chairs are drawn in units on a 1x canvas and scaled by
+  `DENSITY` with NEAREST as written; the desks, the screens, the short leg and the laptop are drawn texel by texel
+  at `DENSITY`. `shell_*` is derived from the written `monitor_*` by `shell_mark()` (covers the lid mark
   on the rear, clears two output rows on the front, then draws a texel `$_` with its cursor at `CURSOR_AT`);
-  derive it again after redrawing a monitor, because the probe points are contract. The pixel contract of every image (transparent surface rows, the leg's last row,
+  derive it again after redrawing a monitor, because the probe points are contract. The pixel contract of every image (the desk's rows, the screen, the leg's last row,
   chair and laptop probe points) is in the docstring of `tools/build_table_assets.py`, and
   `tools/test_table_assets.py` checks each item.
 
-The table contract is fixed (schema 2, density 2, `filter: nearest`, 18 modules, one set of size / pivot / views /
-assembly) and `manifest.json` must match the builder's; the build never repairs it. Changing table geometry
+The table contract is fixed (schema 2, density 2, `filter: nearest`, the modules of the accepted set, one set of
+size / pivot / views / assembly) and `manifest.json` must match the builder's; the build never repairs it. The
+builder accepts one module set, `pod` (the 18 above, what the office draws): a source manifest declares exactly
+those names, and one that declares fewer, more or others (the long table's `surface_*`, `divider_*` and `leg`,
+which the builder took until the office drew the pod alone) is refused with what is missing and what is unknown,
+before anything is written. Changing table geometry
 means updating the contract and the world model together; changing pixels needs no code or manifest change. `make
 art` copies the table, then compares against the committed products.
 
-The table sorts as one piece by its near edge. Each pane is an `OfficeStation` (chair, occupant, badge, click
+The pod sorts as one piece by its near edge. Each pane is an `OfficeStation` (chair, occupant, badge, click
 area, incremental-update boundary). Near and far panes in the same layout x column face each other; a pane with
-no layout x takes a stable fallback column. The far worker's seat lies inside the table's footprint, so the table
-hides their lower body; the near worker sorts before the table and the near chair back before them. The task
+no layout x takes a stable fallback column. The far worker's seat lies inside the pod's footprint, so the pod
+hides their lower body; the near worker sorts before the pod and the near chair back before them. The task
 light is a child of the table and falls only on its top; the contact shadow is on the ground layer; neither
 darkens the floor. Full depth, collision and geometry rules: [the world model](WORLD_MODEL.md).
 
@@ -286,54 +294,65 @@ margins are part of the spec. Values are units (as in `pack.json`); a density-2 
 
 | ID | Canvas | pivot |
 |---|---:|---:|
-| `cabinet` | 48×64 | 24,60 |
 | `window` | 64×48 | 32,44 |
 | `window_night` | 64×48 | 32,44 |
 | `door` | 48×80 | 24,76 |
 | `plant`, `plant_b` | 32×48 | 16,46 |
-| `sign` | 64×24 | 32,22 |
 | `wall_frame` | 40×32 | 20,30 |
+| `pantry` | 64×48 | 32,46 |
+| `side_table` | 32×32 | 16,30 |
+| `partition_v` | 6×32 | 3,32 |
+| `partition_post` | 6×12 | 3,12 |
+| `partition_corner_bl`, `partition_corner_br` | 32×32 | 16,32 |
+| `partition_h` | 32×10 | 16,10 |
 | `desk_mug`, `desk_notebook`, `desk_papers`, `desk_plant`, `desk_headphones` | 24×24 | 12,22 |
 | `cat_loaf`, `cat_sleep`, `cat_sit` | 24×24 | 12,22 |
-| `reception` | 48×32 | 24,30 |
-| `pantry` | 64×48 | 32,46 |
-| `done_stack` | 24×24 | 12,22 |
+| `done_stack_small` | 24×24 | 12,22 |
 
 This copies what `art/daylight/pack.json` lists; `pack.json` is the only source, and adding furniture needs no
-code change outside it (step 0 of "Replace and iterate protocol"). Scenes use the sign, the window and lift door
-on the outer wall, the standing plants and cabinet, and desk items and white cats picked by a random choice fixed
-per table group (see [the visual language](VISUAL_LANGUAGE.md)).
+code change outside it (step 0 of "Replace and iterate protocol"). Scenes use the window, the lift door and the
+framed pictures on the top wall, the pantry counter in the entry band, the partition kit round every zone, the
+standing plants and side tables, and desk items and white cats, one on each side table, picked by a random choice
+fixed by where the side table stands (see [the visual language](VISUAL_LANGUAGE.md)).
 
 - `plant` and `plant_b` are two pots of one fixture: same canvas, pivot and footprint (their `item` block, 20×10,
-  [ITEMS](ITEMS.md)). `OfficeDecorPlanner.plant_at()` takes the `plant` pool's members in turn by position (a row's first pot is cell 0, a
-  wall-foot row uses its grid step, an empty bay's pot its grid column), never by state, tab or time.
-- `wall_frame` hangs on a row's back wall: no footprint, drawn in the shell, foot at row top + 48
-  (`OfficeShell.FRAME_FOOT`), the sign's band; its position depends only on the wall grid and the sign's bounds
-  (`OfficeShell.frame_xs()`).
-- `done_stack` is a signal, not a fixture: while a done agent sits at their seat, the table shows a stack of
-  paper right of that seat's laptop (`OfficeTable.PAPERS_ASIDE`); only `visible` changes.
+  [ITEMS](ITEMS.md)). `OfficeDecorPlanner.plant_at()` takes the `plant` pool's members in turn by position (a
+  top-wall step, a lane gap's piece number), never by state, tab or time.
+- `wall_frame` hangs on the top wall: no footprint, drawn in the shell, foot at `OfficeShell.FRAME_FOOT` (48);
+  its position depends only on the windows (`OfficeShell.frames()`).
+- **The partition kit** bounds a zone, a U open at the top (`OfficeShell.partition_pieces()`): `partition_v` down
+  each side (one per cell row, foot at the row's bottom), `partition_corner_bl / _br` at the bottom corners,
+  `partition_h` along the bottom between them, and a `partition_post` at each top corner (the zone's sign hangs
+  from the left one). The horizontal pieces draw no taller than 10 units over their foot, the vertical ones are 6
+  wide with no overhang; they are sorted sprites with no collider and no `item` block (the walk graph's partitions
+  are the obstacle).
+- `side_table` stands on the floor (`item`: `place: floor`, footprint 28×10) and carries one desk or cat piece on
+  its top, whose foot sits at `OfficeDecor.TOP_Y` (−20 over the table's foot; [ITEMS](ITEMS.md)).
+- `done_stack_small` is a signal, not a fixture: while a done agent sits at their seat, the pod shows a small
+  stack of paper right of that seat's laptop (`OfficeTable.PAPERS_ASIDE` 13); only `visible` changes. Its opaque
+  pixels are 6 wide and 9 tall over its foot (x −3..3, rows 13..21 of the 24 canvas), so it fits between the
+  laptop and the column's edge on a 32-unit desk, the last column's included.
 
 **Desk library**: five items (mug, notebook with pencil, clipped printout, potted plant, headphones) and three
 white-cat poses (loaf, sitting, asleep), each a 24×24-unit RGBA image under the pixel people's rules: a 1-unit
 `deep` outline where things separate, three-tone ramps lit from the top-left, alpha 0 / 255, palette colours only.
 Sources are in `art/daylight/props/` (2x, by the AI painter); `tools/draw_pixel_sources.py` drew the first
-versions (`make pixel-sources OUT=<empty dir>`, never run by `make art`). The table puts their foot point on the
-work surface (`OfficeTable.DECOR_*`), so opaque pixels may only fall in rows 3–21 (units; 6–43 in the 48×48 PNG):
-they fit the near surface, clear the divider and lip, and leave two rows under the foot point. The generator
-checks this, and `tools/test_office_geometry.gd` checks it on a real table. They are static, never posed by herdr
+versions (`make pixel-sources OUT=<empty dir>`, never run by `make art`). A side table carries one on its top, its foot point at
+`OfficeDecor.TOP_Y`, so opaque pixels may only fall in rows 3–21 (units; 6–43 in the 48×48 PNG):
+they stand on a working plane and leave two rows under the foot point. The generator
+checks this, and `tools/test_office_geometry.gd` checks it on a real side table. They are static, never posed by herdr
 state; a new variant is declared as a prop with an `item` block in the `desk` (or `cat`) pool ([ITEMS](ITEMS.md)):
-`make art` checks the rows rule on its pixels, and the table draws it by weight.
+`make art` checks the rows rule on its pixels, and the side tables draw it by weight.
 
-**Entry-band fixtures**: `reception` (wooden top, brass bell on the right, a paper name strip on a teal front,
-dark skirting) and `pantry` (two cups, a coffee machine on the right, two cabinet doors). `draw_pixel_sources.py`
-draws first drafts; the committed pair is 2x AI-painter art, and the tests check the footprint contract on the
-committed files at their own density. A counter's opaque width is its whole canvas, which is its footprint width
-(its `item` footprint: 48 and 64); its bottom outline sits one row above the foot point, and the foot point and
-below are transparent. The planner lays out queue and pantry spots by that width.
+**Entry-band fixture**: `pantry` (two cups, a coffee machine on the right, two cabinet doors). There is no
+reception. `draw_pixel_sources.py` draws a first draft; the committed counter is 2x AI-painter art, and the tests
+check the footprint contract on the committed file at its own density. The counter's opaque width is its whole
+canvas, which is its footprint width (its `item` footprint, 64); its bottom outline sits one row above the foot
+point, and the foot point and below are transparent. The planner lays out the pantry's spots by that width.
 
 A station is not one composite image: chair and worker sort by their own foot points, the laptop belongs to the
-table, badge and selection float above the world, and cabinet branch labels and dynamic text are separate nodes.
-Seat, laptop, divider and chair offsets live only in `scripts/world/table.gd` (0 = the table's near edge); plate
+pod, badge, chip and seat mark float above the world, and signs, tab labels and dynamic text are separate nodes.
+Seat, laptop, screen and chair offsets live only in `scripts/world/table.gd` (0 = the pod's near edge); plate
 and badge offsets in `scripts/world/station.gd`. Those were measured on every frame of the pixel people: seated
 head top −31; standing head −37..−25; width −8..8; a raised hand reaches −38 with the straight arm (side out to
 9) and −36 with the bent arm (side out to 12; see `raised_hand` in "Pixel people"). If figures change height or
@@ -381,11 +400,12 @@ sparse default outfit (top, legs, headwear and colours). The user's fixed slots 
 by slot (`PixelPeople.look_for()`). The logos in `assets/agent_badges/` (downloaded or generated monograms; sources
 and licences in `assets/agent_badges/ATTRIBUTIONS.md`) appear only in Avatar Studio's agent list.
 
-## UI assets (11) and state semantics
+## UI assets (12) and state semantics
 
 - 16×16 icons: working, blocked, unread, idle, unknown, offline, starting, branch, connected.
-- `panel`: 32×32 NinePatch, margin 4 on each side, for detail boxes and label backgrounds.
-- `selection`: 64×64 transparent corner marks, pivot 32,60.
+- `panel`: 32×32 NinePatch, margin 4 on each side, for the world's light panels (the chip, the zone signs, the
+  showroom's notes); `hud_panel`: the same shape for the dark HUD's panels.
+- `selection_seat`: 32×48 transparent corner marks round a seated figure, pivot 16,46.
 
 | herdr state | Animation | Icon / meaning |
 |---|---|---|
@@ -412,7 +432,7 @@ positions, pauses motion, dims the picture and says STALE; idle never stands in 
 1. **Change one image**: replace the same-named PNG in `art/daylight/` (or `art/daylight/table/`), keeping canvas,
    pivot, transparency and palette, then `make art`. The table builder alone only validates and copies one
    theme; it never redraws a missing source. `make test-art` checks
-   canvases (contract × density), source / runtime byte equality, surface / divider seams, and that sources are
+   canvases (contract × density), source / runtime byte equality, desk / screen seams, and that sources are
    kept and rebuilds are identical.
 2. **Reskin a pack**: copy `art/daylight/`, keep semantic IDs and geometry, change palette and PNGs, build with
    `--source` / `--output`. Built into `assets/<id>/`, a pack is discovered at startup: choose it with
@@ -448,7 +468,7 @@ positions, pauses motion, dims the picture and says STALE; idle never stands in 
    `ArtPack.task_lights`.
    `scripts/world/table.gd` looks only at this key, **never at the pack's name**.
    **Optional display face**: top-level `"display_font": {"path", "license"}`, like `font`, names a pixel face
-   for the HUD's few fixed ASCII headings (the wordmark, FLOORS, NEWS, NEXT). Read through
+   for the HUD's few fixed ASCII headings (the wordmark, SPACES, NEWS, NEXT). Read through
    `ArtPack.display_font` with antialiasing, hinting and subpixel positioning off; `HudTheme` draws it only at
    sizes on its 8-pixel grid (`DISPLAY_SIZES`) and falls back to the main font when a pack names none.
 9. **Scene dependency list**: the palette keys, props, UI, tiles, states and animations scenes use, plus the table
@@ -511,7 +531,7 @@ Key and fixed colours are all distinct, since recolouring is a table lookup; the
 | `desk_idle` | front, back | 2 | seated idle / done / unknown |
 | `desk_work` | front, back | 4 | typing: hands rise 1 unit in turn |
 | `desk_blocked` | front, back | 2 | seated, a hand raised above the head |
-| `stand_blocked` | front, side | 2 | the reception queue (side, facing the reception on the right); from the side the far hand reaches up behind the head, never covering the face |
+| `stand_blocked` | front, side | 2 | standing with a hand raised (drawn for the retired reception queue; nobody stands blocked in the office now); from the side the far hand reaches up behind the head, never covering the face |
 | `desk_start` / `stand_start` | front, back | 2 | launch pending: hands on the lap / together in front, a nod on frame 2 |
 | `carry_walk` | front, back, side | 4 | walking with papers |
 | `drink` | front, side | 3 | pantry coffee: cup at chest, chin, mouth (played by name; `ArtContract.TRACK_DRINK` requires the front) |
@@ -796,12 +816,13 @@ rule the builder checks). The output directory must be empty; painted work is ne
   `NunitoSans-OFL.txt`, which must be distributed with it. `OfficeDraw` uses the pack's font as its base, with CJK
   and missing glyphs falling back to the platform CJK font; `HudTheme` overrides only the weight of large titles.
 - Tiny5 from [Google Fonts](https://github.com/google/fonts/tree/main/ofl/tiny5) is kept with its `OFL.txt`; it is
-  the pack's `display_font`, for the HUD's fixed ASCII headings only (not in the fallback chain: workspace and agent
-  names can be CJK, and Tiny5 has no CJK).
-- The environment's density-2 art (furniture, desk library, UI, walls, tiles, long table) is drawn by the AI painter
+  the pack's `display_font`, for the HUD's fixed ASCII headings and the world's small labels (plates, chips, tab
+  labels, zone signs). It has no CJK: where a name may be anything (the world's labels, the strategic captions) it is
+  drawn over the system fallbacks (`OfficeDraw.display`), never alone.
+- The environment's density-2 art (furniture, desk library, UI, walls, tiles, the pod family) is drawn by the AI painter
   (`.claude/skills/painter`, GPT Image 2.5 Sunburst): `pixelize.py` fixes canvas, pivot, palette and outline, and
   `tilefix.py` pins the connecting pixels (wood floor outer band, wall boundary rows and ports, tileable edges, the
-  nine-patch middle, the table's outer columns) back onto the contract. `done_stack`, `plant_b` and `wall_frame`
+  nine-patch middle, the table's outer columns) back onto the contract. `plant_b` and `wall_frame`
   were painted new and committed exactly as `pixelize.py` wrote them (`--check` clean, no hand edits). Requests and
   candidates are not kept in the repository.
 - The white model and first versions of tiles and icons come from this project's drawing scripts; every source PNG

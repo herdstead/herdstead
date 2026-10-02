@@ -723,7 +723,7 @@ mouse_filter = 2
 unique_name_in_owner = true
 layout_mode = 2
 tooltip_text = "Switches the shared view of herdr to this pane: every terminal attached to it follows.
-It also clears UNREAD for every pane on this table, not just this one."
+It also clears UNREAD for every pane on this tab, not just this one."
 focus_mode = 0
 theme_type_variation = &"CardAction"
 disabled = true
@@ -732,10 +732,10 @@ text = "Switch herdr here"
 [node name="FocusNote" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Actions"]
 unique_name_in_owner = true
 layout_mode = 2
-tooltip_text = "herdr's focus is shared, and it marks the whole tab seen: switching here clears UNREAD for every pane on this table."
+tooltip_text = "herdr's focus is shared, and it marks the whole tab seen: switching here clears UNREAD for every pane on this tab."
 mouse_filter = 1
 theme_type_variation = &"LabelSlate"
-text = "Clears table's UNREAD"
+text = "Clears tab's UNREAD"
 
 [node name="Outcome" type="Label" parent="Frame/Row/CardFrame/Stack/Detail/Actions"]
 unique_name_in_owner = true

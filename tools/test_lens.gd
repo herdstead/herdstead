@@ -1,11 +1,12 @@
 extends "res://tools/office_test_base.gd"
 ## The info lens and the hover mark.
 ## Holding `L` adds one time line per agent (the OVERVIEW's FOR, from
-## StateLog.wait_of()), hides the blocked bubble's parts, washes every rug in
-## its table's most urgent state on the FLOORS windows' scale and dims the
-## furnishing; letting go puts everything back. Hovering a NEWS item, a list
-## row, an EVENTS row or a signpost points at the desk it names (a dashed frame
-## of its own) or, on another floor, at that floor's FLOORS row, and never
+## StateLog.wait_of(), in the in-world compact form), shows every seat's name
+## plate, hides the blocked chip's parts, washes every pod's floor in its most
+## urgent state on the FLOORS windows' scale and dims the furnishing; letting
+## go puts everything back. Hovering a NEWS item, a list
+## row, an EVENTS row or an edge arrow points at the desk it names (a dashed frame
+## of its own) or, on another machine or for an arrow, at that zone's SPACES row, and never
 ## selects, pans, reads or writes. Keys and the pointer go through real input.
 ## Run through run_tests.sh.
 ##
@@ -15,7 +16,9 @@ extends "res://tools/office_test_base.gd"
 ## No herdr at all: the fleet's Local client is stopped and snapshots are handed
 ## to it directly, as the NEWS / EVENTS suite does.
 
-const BUBBLE_PARTS: Array[String] = ["%Frame", "%Wait", "%Track", "%Fill"]
+const BUBBLE_PARTS: Array[String] = ["%Frame", "%Wait"]
+## The HUD on its own, for the cases about the edge arrows' pointing.
+const HUD_SCENE := preload("res://scenes/ui/hud.tscn")
 
 
 func _initialize() -> void:
@@ -63,11 +66,13 @@ func _after_case() -> void:
 # --- the lens -----------------------------------------------------------------
 
 
-## Held, every agent's desk says how long it has been in its state, in the
-## OVERVIEW's own words at the same moment; a shell says nothing. The plates
-## and badges do not change, and the top bar's theme line says the lens is on.
-## Let go, every line hides, the furnishing is as bright as before, the rugs
-## plain again and the theme line the pack's.
+## Held, every agent's desk says how long it has been in its state, the
+## OVERVIEW's own wait at the same moment in the in-world compact form; a shell
+## says nothing. Every seat at its desk shows its name plate (which, without
+## the lens, only a hovered or selected seat does); the plates' words and the
+## badges do not change, and the top bar's theme line says the lens is on.
+## Let go, every line and plate hides, the furnishing is as bright as before,
+## the pods' floors plain again and the theme line the pack's.
 func test_holding_l_adds_the_wait_line_and_letting_go_restores_everything() -> void:
 	var office := await _live_office()
 	var one := _with(fixture, "api:p1", {"agent_status": "blocked"})
@@ -77,8 +82,12 @@ func test_holding_l_adds_the_wait_line_and_letting_go_restores_everything() -> v
 	await _frames(2)
 	var signals := _signals(office)
 	var theme := office.hud.bar.theme_line()
+	var plates := {}
 	for station in _seats(office):
 		_check(not _lens(station).visible, "no lens line before L: " + station.pane_key)
+		# Only the selected seat's plate shows before L (nothing is hovered).
+		plates[station.pane_key] = _plate(station).visible
+	_check(plates.values().count(false) > 1, "most plates are hidden before L")
 	await _hold()
 	_check(office.lens.held, "L held is the lens")
 	# One read of the clock and the lines, with no frame between them.
@@ -95,48 +104,55 @@ func test_holding_l_adds_the_wait_line_and_letting_go_restores_everything() -> v
 		if pane.provider.is_empty() and not pane.launching():
 			_eq(texts[row.key], "", "a shell has no line: " + row.key)
 			continue
-		_eq(texts[row.key], OverviewLine.for_text(row), "the OVERVIEW's FOR: " + row.key)
+		var wait := StateLog.wait_of(office.fleet.state_log().track(row.key), now)
+		_eq(texts[row.key], OfficeAttention.compact_duration(wait.msec / 1000.0, wait.plus), "compact: " + row.key)
+		_eq(OverviewLine.for_text(row), OfficeAttention.wait_text(wait), "the OVERVIEW's FOR, same wait: " + row.key)
 		agents += 1
-	_eq(agents, 3, "api:p1, api:p2 and api:p4 each say how long")
-	_eq(_signals(office), signals, "the plates and badges are as they were")
+	# Every agent of the map says how long: api's three (p1, p2, p4), web's two,
+	# infra's three and data's two, every zone being drawn now.
+	_eq(agents, 10, "every agent of the map says how long")
+	_eq(_signals(office), signals, "the plates' words and the badges are as they were")
+	for station in _seats(office):
+		_eq(_plate(station).visible, not station.away(), "held, the plate shows at the desk: " + station.pane_key)
 	_eq(office.hud.bar.theme_line(), "LENS · hold L", "the top bar says the lens is on")
 	await _let_go()
 	_check(not office.lens.held, "let go: no lens")
 	for station in _seats(office):
 		_check(not _lens(station).visible, "no lens line after L: " + station.pane_key)
+		_eq(_plate(station).visible, plates[station.pane_key], "let go, the plate as before: " + station.pane_key)
 	for node in _furnishing(office):
 		_eq(node.modulate, Color.WHITE, "furnishing as bright as before: " + str(node.name))
 	for tab: String in office.floor_view.desks:
-		_check(not office.floor_view.desks[tab].wash.visible, "the rug is plain again: " + tab)
-	_eq(_signals(office), signals, "the plates and badges still as they were")
+		_check(not office.floor_view.desks[tab].wash.visible, "the pod's floor is plain again: " + tab)
+	_eq(_signals(office), signals, "the plates' words and the badges still as they were")
 	_eq(office.hud.bar.theme_line(), theme, "the theme line is the pack's again")
 	_done(office)
 
 
 ## Under the lens the wait is the lens line's: the blocked seat keeps its
-## bubble (its click and hover rectangle, and the question reader's
+## chip (its click and hover rectangle, and the question reader's
 ## `visible`), but nothing of it is drawn, and no question tooltip comes up
 ## over it. An agent blocked in the first snapshot began before this office
-## watched: the bubble has no wait to tell, but its line says `Ns+`.
+## watched: the chip has no wait to tell, but its line says `Ns+`.
 func test_the_lens_hides_the_bubble_parts_but_not_the_blocked_seat() -> void:
 	var first := _with(fixture, "api:p1", {"agent_status": "blocked"})
 	var office := await _live_office(first)
-	# api:p4 is seen going blocked, so its bubble has a wait to draw.
+	# api:p4 is seen going blocked, so its chip has a wait to draw.
 	_feed(office, _with(first, "api:p4", {"agent_status": "blocked"}))
 	var key := _pk("api:p4")
 	office.settle()
 	await _text_tick()
 	var station := _station(office, key)
-	var bubble := station.bubble()
+	var bubble := station.chip()
 	for part in BUBBLE_PARTS:
 		_check(_part(bubble, part).is_visible_in_tree(), "without the lens the bubble draws " + part)
 	var at := await _bubble_at(office, key)
 	await _hover(at)
-	_check(office.hud.bubble_tip_shown(), "without the lens its tooltip comes up")
+	_check(office.hud.world_tip_shown(), "without the lens its tooltip comes up")
 	await _hold()
-	_check(not office.hud.bubble_tip_shown(), "the lens takes the tooltip down")
+	_check(not office.hud.world_tip_shown(), "the lens takes the tooltip down")
 	_check(bubble.visible, "the seat is still a blocked one")
-	_check(station.bubble_rect().has_area(), "and its bubble rectangle is where it was")
+	_check(station.chip_rect().has_area(), "and its bubble rectangle is where it was")
 	for part in BUBBLE_PARTS:
 		_check(not _part(bubble, part).is_visible_in_tree(), "under the lens the bubble draws no " + part)
 	var line := _lens(station)
@@ -148,7 +164,7 @@ func test_the_lens_hides_the_bubble_parts_but_not_the_blocked_seat() -> void:
 	_check(plus.search(early.text) != null, "blocked since before this office watched: " + early.text)
 	await _hover(office.hud.world_rect().position + Vector2(4, 4))
 	await _hover(at)
-	_check(not office.hud.bubble_tip_shown(), "no tooltip over the bubble while L is held")
+	_check(not office.hud.world_tip_shown(), "no tooltip over the bubble while L is held")
 	await _let_go()
 	await _text_tick()
 	for part in BUBBLE_PARTS:
@@ -158,8 +174,10 @@ func test_the_lens_hides_the_bubble_parts_but_not_the_blocked_seat() -> void:
 
 ## A shell has nobody to time: no line, held or not. A pane the state log has
 ## no track of says `?`; a machine that dropped says nothing (invariant 4); an
-## agent says StateLog.wait_of() in OfficeAttention.wait_text(), the one
-## formatter the OVERVIEW's FOR uses too.
+## agent says StateLog.wait_of() in OfficeAttention.compact_duration(), the
+## in-world form of the wait the OVERVIEW's FOR writes in wait_text(): one wait,
+## two spellings. (The line used to be wait_text() itself; `1h 05m+` does not
+## fit a 30-unit lens row, and `99h 59m+` would not either.)
 func test_shells_have_no_wait_line_and_unknown_tracks_say_question_mark() -> void:
 	var office := await _live_office()
 	await _hold()
@@ -174,21 +192,31 @@ func test_shells_have_no_wait_line_and_unknown_tracks_say_question_mark() -> voi
 	_eq(OfficeLens.text_for(agent, track, true, now), "", "a dropped machine: nothing")
 	_eq(OfficeLens.text_for(office.frame.pane(_pk("api:p3")), track, false, now), "", "a shell: nothing")
 	var wait := StateLog.wait_of(track, now)
-	_eq(OfficeLens.text_for(agent, track, false, now), OfficeAttention.wait_text(wait), "the one formatter")
+	_eq(
+		OfficeLens.text_for(agent, track, false, now),
+		OfficeAttention.compact_duration(wait.msec / 1000.0, wait.plus),
+		"the in-world form"
+	)
 	_eq(OverviewLine.duration_text(wait.msec, wait.plus), OfficeAttention.wait_text(wait), "FOR says the same")
 	var unwatched := StateLog.Wait.new()
 	unwatched.msec = 65000
 	unwatched.plus = true
 	_eq(OfficeAttention.wait_text(unwatched), "1m+", "at least a minute")
+	_eq(OfficeAttention.compact_duration(unwatched.msec / 1000.0, unwatched.plus), "1m+", "in the world too")
+	unwatched.msec = 3900000
+	_eq(OfficeAttention.wait_text(unwatched), "1h 05m+", "the HUD's hours and minutes")
+	_eq(OfficeAttention.compact_duration(unwatched.msec / 1000.0, unwatched.plus), "65m+", "the world's minutes")
 	await _let_go()
 	_done(office)
 
 
-## Held, each table's rug is washed in its most urgent pane's state, on the
+## Held, each pod's floor is washed in its most urgent pane's state, on the
 ## FLOORS windows' own scale (HudTheme.SECTION_PANELS through
-## OfficeFloorRow.WINDOW_LOOKS): blocked, then done (UNREAD), working, idle or
+## OfficeSpaceRow.WINDOW_LOOKS): blocked, then done (UNREAD), working, idle or
 ## starting (cream), unknown (muted); a table of shells only is slate. The wash
-## covers the rug exactly and lies right over it.
+## covers the cells under the pod's drawing and lies first in its background,
+## under the shadows, the sign and the title. (It used to lie over a rug; the
+## pods stand on the floor itself.)
 func test_each_rug_washes_in_its_tables_most_urgent_state_on_the_floors_scale() -> void:
 	var scale := {
 		&"WindowBlocked": ArtContract.BLOCKED,
@@ -207,14 +235,14 @@ func test_each_rug_washes_in_its_tables_most_urgent_state_on_the_floors_scale() 
 	_eq(_wash_tone(office, main), ArtContract.WORKING, "main: api:p1 works, p2 idles, p3 is a shell")
 	_eq(_wash_tone(office, tests), ArtContract.WORKING, "tests: api:p4 works")
 	var desk := office.floor_view.desks[main]
-	var rug := desk.background.get_child(0) as TileMapLayer
-	_check(rug != null, "the rug is the background's first child")
-	if rug != null:
-		var cells := rug.get_used_rect()
-		var grid := float(FloorLayoutPolicy.GRID)
-		var drawn := Rect2(rug.position + Vector2(cells.position) * grid, Vector2(cells.size) * grid)
-		_eq(Rect2(desk.wash.position, desk.wash.size), drawn, "the wash covers the rug exactly")
-	_eq(desk.wash.get_index(), 1, "right over the rug, under the shadows, sign and title")
+	_eq(desk.background.find_children("*", "TileMapLayer", true, false), [], "no rug")
+	var grid := float(FloorLayoutPolicy.GRID)
+	var visual := desk.placement.measure.render_rect
+	var start := (visual.position / grid).floor() * grid
+	var end := (visual.end / grid).ceil() * grid
+	var cells := Rect2(desk.placement.origin + start, end - start)
+	_eq(Rect2(desk.wash.position, desk.wash.size), cells, "the wash covers the cells under the pod's drawing")
+	_eq(desk.wash.get_index(), 0, "first, under the shadows, sign and title")
 	var steps: Array = [
 		[_with(fixture, "api:p2", {"agent_status": "blocked"}), main, ArtContract.BLOCKED, "blocked beats working"],
 		[_with(fixture, "api:p4", {"agent_status": "done"}), tests, ArtContract.UNREAD, "done"],
@@ -255,32 +283,32 @@ func test_each_rug_washes_in_its_tables_most_urgent_state_on_the_floors_scale() 
 
 
 ## Held, only the furnishing steps back: the floor, walkways, walls, door,
-## windows and framed pictures (the shell), every plant and cabinet, the counters and each table's
-## own trinkets, all by LENS_DIM. The tables, their laptops, lamps and paper,
-## the people, what floats over them, the rugs and their washes, the signs and
-## titles stay as bright as they were.
+## windows and framed pictures (the shell), every plant and side table (and
+## what it carries), the pantry counter, the zones' partitions and signs, all
+## by LENS_DIM. The pods, their laptops, lamps and paper, the people, what
+## floats over them, the washes and the tab labels stay as bright as they were.
 func test_only_furnishing_dims_while_held() -> void:
-	# Wide enough that the row wall hangs framed pictures beside its two signs.
+	# Wide enough that the top wall hangs framed pictures between its windows.
 	var office := await _live_office(_with(fixture, "api:p4", {"agent_status": "done"}), Vector2(1600, 800))
 	office.settle()
 	await _frames(2)
 	var furnishing := _furnishing(office)
-	_check(furnishing.size() > 3, "the shell, decor and trinkets are there: %d" % furnishing.size())
-	_check(not _decor(office).is_empty(), "the floor has plants or cabinets")
-	# The wall-foot run and the spare bay's plant are among them: every
+	_check(furnishing.size() > 3, "the shell, decor and partitions are there: %d" % furnishing.size())
+	_check(not _decor(office).is_empty(), "the floor has plants or side tables")
+	# The top-wall run and the lane gaps' pieces are among them: every
 	# planned piece is drawn, and every drawn one is in what dims.
 	var planned := office.layout_plan().decorations
 	var new_pieces := planned.filter(
-		func(piece: DecorPlacement) -> bool: return "/wall/" in piece.key or piece.key.ends_with("/bay")
+		func(piece: DecorPlacement) -> bool: return piece.key.begins_with("top/") or "/gap/" in piece.key
 	)
-	_check(not new_pieces.is_empty(), "the floor stands a wall-foot run or a spare bay's plant")
+	_check(not new_pieces.is_empty(), "the floor stands a top-wall run or a lane gap's pieces")
 	_eq(_decor(office).size(), planned.size(), "every planned piece is drawn")
 	var dimmed_at: Array[Vector2] = []
 	for piece in _decor(office):
 		dimmed_at.append(piece.position)
 	for piece: DecorPlacement in new_pieces:
 		_check(piece.position in dimmed_at, "%s is drawn among what dims" % piece.key)
-	# The framed pictures on the row walls hang in the shell, so they dim
+	# The framed pictures on the top wall hang in the shell, so they dim
 	# with it: each is the shell's own child and adds no tint of its own.
 	var shell := office.floor_view.ground.get_node_or_null("Shell") as CanvasItem
 	var picture := office.art.sprite_texture(office.art.prop_sprite(ArtContract.PROP_WALL_FRAME))
@@ -313,7 +341,9 @@ func test_only_furnishing_dims_while_held() -> void:
 ## keep every piece's key, kind, place and picture; and under the lens both
 ## kinds dim as every piece does.
 func test_both_plants_are_drawn_where_planned_and_ignore_herdr() -> void:
-	var office := await _live_office()
+	# Two lanes (a first plan 23 cells wide): the top wall's run and the free
+	# lane's gap stand plants; one lane has room for none.
+	var office := await _live_office(fixture, Vector2(880, 480))
 	office.settle()
 	await _frames(2)
 	var planned: Dictionary[Vector2, StringName] = {}
@@ -327,7 +357,7 @@ func test_both_plants_are_drawn_where_planned_and_ignore_herdr() -> void:
 	for at: Vector2 in drawn:
 		var piece: OfficeDecor = drawn[at]
 		_eq(piece.piece, planned.get(at, &""), "the piece drawn at %s is the planned one" % at)
-		if piece.piece != ArtContract.PROP_CABINET:
+		if piece.piece != ArtContract.PROP_SIDE_TABLE:
 			_check(piece.piece in [&"plant", &"plant_b"], "a plant is one of the two: %s" % piece.piece)
 			kinds[piece.piece] = (piece.get_node("Body") as Sprite2D).texture
 	_eq(kinds.size(), 2, "the floor shows both plants: %s" % [kinds.keys()])
@@ -556,7 +586,7 @@ func test_hovering_a_news_item_points_at_its_desk_without_selecting() -> void:
 	_check(pointer.rect.encloses(target), "around its click area: %s holds %s" % [pointer.rect, target])
 	_eq(office.navigator.active_key, active, "nothing selected")
 	_eq(office.picked_key, "", "nothing picked")
-	_eq(office.navigator.shown_key, shown, "the same floor")
+	_eq(office.navigator.shown_key, shown, "the same map")
 	_eq(office.camera.pan, pan, "no pan")
 	_eq(_marks(office), marks, "no selection mark moved")
 	_eq(office.world.get_instance_id(), world, "nothing rebuilt")
@@ -568,49 +598,59 @@ func test_hovering_a_news_item_points_at_its_desk_without_selecting() -> void:
 	_done(office)
 
 
-## A list row for a pane on another floor marks that floor's FLOORS row (a
-## 1-unit ink border, FloorRowPointed), never the current one, and draws
-## nothing in the world; leaving puts the row back.
+## A list row for a pane on another machine outlines its zone's SPACES row (a
+## 1-unit paper edge, SpaceRowPointed) and draws nothing in the world; the rows
+## marked as in view keep their marks, and leaving puts the row back. A row for
+## a pane in another zone of the shown map points at its desk, as for any desk
+## of the map.
 func test_hovering_a_row_for_another_floor_marks_its_floors_row() -> void:
-	var office := await _live_office()
-	var key := _pk("web:p1")
+	var office := await _two_machine_office()
+	var key := HerdrFleet.pane_key(BEE, "hive:p1")
 	var strip: Control = office.hud.get_node("%DrawerTab")
 	await _press(strip)
 	await _frames(3)
 	var row := office.hud.agent_list.row_for(key)
-	_check(row != null and row.is_visible_in_tree(), "web:p1 has a row in the open list")
+	_check(row != null and row.is_visible_in_tree(), "hive:p1 has a row in the open list")
 	if row == null:
 		_done(office)
 		return
-	var web := office.frame.floor_of(key)
-	_check(web != office.navigator.shown_key, "web is another floor")
-	var floor_row := office.hud.floors.row_for(web)
-	var shown_row := office.hud.floors.row_for(office.navigator.shown_key)
-	_eq(floor_row.theme_type_variation, &"FloorRow", "web's row as usual")
+	var hive := office.frame.zone_of(key)
+	_check(office.frame.find_zone(hive).building.key != office.navigator.shown_key, "hive is on another machine")
+	var floor_row := office.hud.spaces.row_for(hive)
+	var in_view := Array(office.hud.spaces.in_view())
+	_check(not in_view.is_empty() and not in_view.has(hive), "Local's zones in view are marked, hive is not")
+	_eq(floor_row.theme_type_variation, &"SpaceRow", "hive's row as usual")
 	await _hover(row.get_global_rect().get_center())
-	_eq(floor_row.theme_type_variation, &"FloorRowPointed", "web's FLOORS row is marked")
-	_eq(shown_row.theme_type_variation, &"FloorRowCurrent", "the current floor's row keeps its look")
+	_eq(floor_row.theme_type_variation, &"SpaceRowPointed", "hive's SPACES row is outlined")
+	_eq(Array(office.hud.spaces.in_view()), in_view, "the rows in view keep their marks")
 	_check(not office.floor_view.pointer.visible, "nothing is pointed at in the world")
-	_eq(office.navigator.shown_key, office.frame.floor_of(_pk("api:p1")), "no floor change")
+	_eq(office.navigator.shown_key, LOCAL, "no map change")
 	await _hover(office.hud.world_rect().position + Vector2(4, 4))
-	_eq(floor_row.theme_type_variation, &"FloorRow", "leaving restores it")
+	_eq(floor_row.theme_type_variation, &"SpaceRow", "leaving restores it")
+	var web := office.hud.agent_list.row_for(_pk("web:p1"))
+	var web_row := office.hud.spaces.row_for(office.frame.zone_of(_pk("web:p1")))
+	await _hover(web.get_global_rect().get_center())
+	_check(office.floor_view.pointer.visible, "a row for web:p1, another zone of this map: its desk is pointed at")
+	_eq(office.floor_view.pointer.key, _pk("web:p1"), "that desk")
+	_eq(web_row.theme_type_variation, &"SpaceRow", "and web's SPACES row is not outlined")
 	_done(office)
 
 
-## An EVENTS row points like a NEWS item, and a signpost marks its floor's
-## FLOORS row.
+## An EVENTS row points like a NEWS item, and an edge arrow outlines its
+## zone's SPACES row.
 func test_events_rows_and_signposts_point_too() -> void:
 	var office := await _live_office()
-	var posts := office.hud.signposts.shown()
-	_check(not posts.is_empty(), "web and infra wait: signposts")
-	if not posts.is_empty():
-		var post := posts[0]
-		var floor_row := office.hud.floors.row_for(post.key())
-		await _hover(post.get_global_rect().get_center())
-		_eq(floor_row.theme_type_variation, &"FloorRowPointed", "the signpost marks its floor's row")
+	await _frames(2)
+	var arrows := office.hud.edge_arrows.shown()
+	_check(not arrows.is_empty(), "web and infra wait off screen: edge arrows")
+	if not arrows.is_empty():
+		var arrow := arrows[0]
+		var floor_row := office.hud.spaces.row_for(arrow.zone_key())
+		await _hover(arrow.get_global_rect().get_center())
+		_eq(floor_row.theme_type_variation, &"SpaceRowPointed", "the arrow outlines its zone's row")
 		_check(not office.floor_view.pointer.visible, "and nothing in the world")
 		await _hover(office.hud.world_rect().get_center())
-		_eq(floor_row.theme_type_variation, &"FloorRow", "leaving restores it")
+		_eq(floor_row.theme_type_variation, &"SpaceRow", "leaving restores it")
 	var key := _pk("api:p4")
 	_feed(office, _with(fixture, "api:p4", {"agent_status": "done"}))
 	await _press_tab(office, OfficeHud.DrawerTab.EVENTS)
@@ -670,9 +710,9 @@ func test_a_pointed_pane_that_goes_drops_the_mark() -> void:
 	_feed(office, _without(done, "api:p4"))
 	await _frames(2)
 	_check(not office.floor_view.pointer.visible, "the pane went, and the mark with it")
-	for key: Variant in office.hud.floors.row_keys():
-		var row := office.hud.floors.row_for(str(key))
-		_check(row.theme_type_variation != &"FloorRowPointed", "no FLOORS row marked: " + str(key))
+	for key: Variant in office.hud.spaces.row_keys():
+		var row := office.hud.spaces.row_for(str(key))
+		_check(row.theme_type_variation != &"SpaceRowPointed", "no SPACES row outlined: " + str(key))
 	await _hover(office.hud.world_rect().get_center())
 	for index in OfficeNews.ITEMS:
 		var gone := office.hud.news.item(index)
@@ -683,11 +723,198 @@ func test_a_pointed_pane_that_goes_drops_the_mark() -> void:
 	_done(office)
 
 
+## A HUD's staff panel that says it is in answer mode: OfficeHud.fit() then
+## floats it over the world, as the office's does.
+class AnsweringInspector:
+	extends OfficePaneInspector
+
+	func answering() -> bool:
+		return true
+
+
+## An edge arrow under the staff panel is not pointed at. In answer mode the
+## panel floats over the world, here over the bottom edge's arrow, and the
+## pointer rests on the panel where it covers that arrow: no zone is said when
+## the pointer comes there, and none when a refresh hands the arrow under it
+## another zone (the arrows are arranged again, the pointer has not moved). At
+## the 480x320 minimum and at 800x480.
+func test_an_arrow_under_the_answer_panel_is_not_pointed_at() -> void:
+	# The case before's office is gone before the window changes size.
+	await _frames(2)
+	for screen: Vector2 in [Vector2(480, 320), Vector2(800, 480)]:
+		var size := "%dx%d" % [screen.x, screen.y]
+		root.size = Vector2i(screen)
+		await _hover(Vector2(4, 4))
+		var art := ArtPack.from_manifest(MANIFESTS[0])
+		var hud: OfficeHud = HUD_SCENE.instantiate()
+		var staff: Control = hud.get_node("%Staff")
+		staff.set_script(AnsweringInspector)
+		root.add_child(hud)
+		hud.dress(art, OfficeDraw.new(art).font)
+		hud.fit(screen)
+		await _frames(3)
+		hud.show_edge_arrows([_arrow_below("z0")] as Array[EdgeArrowModel])
+		await _frames(3)
+		_check(
+			hud.inspector.answering() and hud.edge_arrows.is_visible_in_tree(), size + ": answer mode, an arrow shown"
+		)
+		var arrow := hud.edge_arrows.shown()[0]
+		var at := arrow.get_global_rect().get_center()
+		_check(staff.get_global_rect().has_point(at), size + ": the floating panel covers the arrow's middle")
+		var said: Array[String] = []
+		hud.zone_pointed.connect(func(key: String) -> void: said.append(key))
+		await _hover(at)
+		var over := root.gui_get_hovered_control()
+		_check(over == staff or staff.is_ancestor_of(over), size + ": the pointer is on the panel: %s" % over)
+		_eq(said, [] as Array[String], size + ": coming onto the panel over the arrow points at no zone")
+		hud.show_edge_arrows([_arrow_below("z1")] as Array[EdgeArrowModel])
+		await _frames(3)
+		_eq(hud.edge_arrows.shown()[0].zone_key(), "z1", size + ": the arrow was handed another zone")
+		_check(
+			hud.edge_arrows.shown()[0].get_global_rect().has_point(at), size + ": still under the pointer and the panel"
+		)
+		_eq(said, [] as Array[String], size + ": and no zone is pointed at through the panel")
+		hud.free()
+		await _frames(2)
+	root.size = SCREEN
+
+
+## The zone under a resting pointer is said once. Two arrows change places in
+## the pool without moving on screen: nothing is said (the same zone is still
+## under the pointer); and when the pointer then moves a pixel within that
+## arrow, the viewport's exit from the node that was hovered and its enter of
+## the node that stands there now say nothing again.
+func test_arrows_changing_pool_places_say_the_zone_under_the_pointer_once() -> void:
+	await _frames(2)
+	await _hover(Vector2(4, 4))
+	var art := ArtPack.from_manifest(MANIFESTS[0])
+	var hud: OfficeHud = HUD_SCENE.instantiate()
+	root.add_child(hud)
+	hud.dress(art, OfficeDraw.new(art).font)
+	hud.fit(Vector2(SCREEN))
+	var below := _arrow_below("z0")
+	var above := _arrow_below("z1")
+	above.edge = EdgeArrowModel.Edge.TOP
+	hud.show_edge_arrows([below, above] as Array[EdgeArrowModel])
+	await _frames(2)
+	var at := hud.edge_arrows.shown()[0].get_global_rect().get_center()
+	var said: Array[String] = []
+	hud.zone_pointed.connect(func(key: String) -> void: said.append(key))
+	await _hover(at)
+	_eq(said, ["z0"] as Array[String], "the pointer on the bottom arrow points at its zone")
+	hud.show_edge_arrows([above, below] as Array[EdgeArrowModel])
+	await _frames(2)
+	var shown := hud.edge_arrows.shown()
+	_eq([shown[0].zone_key(), shown[1].zone_key()], ["z1", "z0"], "the two changed pool places")
+	_check(shown[1].get_global_rect().has_point(at), "z0's arrow is where it was, under the pointer")
+	_eq(said, ["z0"] as Array[String], "nothing more is said: the same zone is under the pointer")
+	await _hover(at + Vector2(1, 0))
+	_eq(said, ["z0"] as Array[String], "nor when the pointer moves a pixel within that arrow")
+	await _hover(Vector2(4, 4))
+	_eq(said, ["z0", ""] as Array[String], "off the arrows: no zone, said once")
+	hud.free()
+	await _frames(2)
+
+
+## Leaving an arrow straight for another HUD row leaves that row's mark
+## standing. The arrows say "no zone any more" a frame after the pointer left
+## one (another arrow may be entered in the same motion), by when the row has
+## already pointed at its pane: that late word takes back only what an arrow
+## pointed at. So a row for a pane on another machine keeps its zone's SPACES
+## row outlined, and a row for a pane of the shown map keeps its desk's dashed
+## frame, through the frames after and through a refresh. The reverse, from a
+## row straight onto an arrow, outlines the arrow's zone and nothing else; one
+## arrow to the next says the next zone and never "none" between; and off
+## everything, nothing is pointed at.
+func test_leaving_an_arrow_for_a_list_row_keeps_the_rows_mark() -> void:
+	var office := await _two_machine_office()
+	var strip: Control = office.hud.get_node("%DrawerTab")
+	await _press(strip)
+	await _frames(3)
+	var key := HerdrFleet.pane_key(BEE, "hive:p1")
+	var row := office.hud.agent_list.row_for(key)
+	var near := office.hud.agent_list.row_for(_pk("web:p1"))
+	# The arrows as they stand beside the open drawer.
+	var arrows := office.hud.edge_arrows.shown()
+	_check(row != null and row.is_visible_in_tree(), "hive:p1 has a row in the open list")
+	_check(near != null and near.is_visible_in_tree(), "and web:p1, on the shown map")
+	_check(not arrows.is_empty(), "blocked desks wait off screen: edge arrows")
+	if row == null or near == null or arrows.is_empty():
+		_done(office)
+		return
+	var hive := office.frame.zone_of(key)
+	var zone := arrows[0].zone_key()
+	_check(zone != hive, "the arrow is for a zone of the shown map, the row for hive")
+	var on_arrow := arrows[0].get_global_rect().get_center()
+	var on_row := row.get_global_rect().get_center()
+	var off := office.hud.world_rect().position + Vector2(4, 4)
+	await _hover(off)
+	var active := office.navigator.active_key
+	var said: Array[String] = []
+	office.hud.zone_pointed.connect(func(zone_key: String) -> void: said.append(zone_key))
+	await _hover(on_arrow)
+	_eq(_outlined(office), [zone], "on the arrow: its zone's SPACES row is outlined")
+	# Arrow, then straight onto the row of another zone.
+	await _hover(on_row)
+	_eq(said, [zone, ""] as Array[String], "the arrows said their zone, then none, once each")
+	_eq(_outlined(office), [hive], "straight onto hive's row: hive's SPACES row is outlined")
+	await _frames(3)
+	_eq(_outlined(office), [hive], "and stays outlined once the arrow's late word has come")
+	office.refresh()
+	await _frames(2)
+	_eq(_outlined(office), [hive], "and through a refresh")
+	# The reverse: the row, then straight onto the arrow.
+	await _hover(on_arrow)
+	_eq(_outlined(office), [zone], "from the row straight onto the arrow: the arrow's zone, and only it")
+	_check(not office.floor_view.pointer.visible, "and nothing in the world")
+	# Arrow, then straight onto a row for a desk of the shown map.
+	await _hover(near.get_global_rect().get_center())
+	await _frames(3)
+	_check(office.floor_view.pointer.visible, "straight onto web:p1's row: its desk keeps the dashed frame")
+	_eq(office.floor_view.pointer.key, _pk("web:p1"), "that desk")
+	_eq(_outlined(office), [], "and no SPACES row is outlined")
+	await _hover(on_arrow)
+	_eq(_outlined(office), [zone], "back on the arrow: its zone")
+	_check(not office.floor_view.pointer.visible, "and the desk's frame is gone")
+	# One arrow to the next: the next zone, never "none" between.
+	_check(arrows.size() > 1 and arrows[1].zone_key() != zone, "web and infra both wait off screen: two arrows")
+	if arrows.size() > 1:
+		said.clear()
+		await _hover(arrows[1].get_global_rect().get_center())
+		_eq(said, [arrows[1].zone_key()] as Array[String], "arrow to arrow: one word, the next zone")
+		_eq(_outlined(office), [arrows[1].zone_key()], "and that zone is the one outlined")
+	await _hover(off)
+	_eq(_outlined(office), [], "off everything: nothing is outlined")
+	_check(not office.floor_view.pointer.visible, "and nothing is pointed at in the world")
+	_eq(office.navigator.active_key, active, "nothing was selected on the way")
+	_eq(office.navigator.shown_key, LOCAL, "and the map is the same")
+	_done(office)
+
+
 # --- helpers ------------------------------------------------------------------
+
+
+## An edge arrow for zone `zone`, one blocked desk below the view's middle.
+func _arrow_below(zone: String) -> EdgeArrowModel:
+	var arrow := EdgeArrowModel.new()
+	arrow.zone_key = zone
+	arrow.pane_key = zone + ":p0"
+	arrow.machine = LOCAL
+	arrow.number = "3"
+	arrow.blocked = 1
+	arrow.edge = EdgeArrowModel.Edge.BOTTOM
+	arrow.along = 0.5
+	return arrow
 
 
 func _pk(pane_id: String) -> String:
 	return HerdrFleet.pane_key(LOCAL, pane_id)
+
+
+## The zones whose SPACES rows are outlined as pointed at.
+func _outlined(office: OfficeDouble) -> Array:
+	var rail := office.hud.spaces
+	return rail.row_keys().filter(func(key: String) -> bool: return rail.row_for(key).pointed())
 
 
 func _l_key(down: bool) -> InputEventKey:
@@ -748,7 +975,7 @@ func _wait_seconds(seconds: float) -> void:
 		await process_frame
 
 
-func _part(bubble: OfficeBubble, part: String) -> CanvasItem:
+func _part(bubble: OfficeChip, part: String) -> CanvasItem:
 	return bubble.get_node(part)
 
 
@@ -788,13 +1015,14 @@ func _lens_ids(office: OfficeDouble) -> Array:
 	return ids
 
 
-## What each seat signals besides the lens: its plate and its badge.
+## What each seat signals besides the lens: its plate's words and its badge.
+## (Whether the plate shows is the lens's too: held, every seat's does.)
 func _signals(office: OfficeDouble) -> Dictionary:
 	var shown := {}
 	for station in _seats(office):
 		var plate := _plate(station)
 		var badge: Sprite2D = station.get_node("Overlay/Badge")
-		shown[station.pane_key] = [plate.text, plate.visible, badge.visible, badge.texture]
+		shown[station.pane_key] = [plate.text, badge.visible, badge.texture]
 	return shown
 
 
@@ -806,8 +1034,7 @@ func _marks(office: OfficeDouble) -> Dictionary:
 	return shown
 
 
-## The furnishing the lens dims: the shell, the decor, the counters and each
-## table's trinkets.
+## The furnishing the lens dims: the shell, the decor and the counters.
 func _furnishing(office: OfficeDouble) -> Array[CanvasItem]:
 	var found: Array[CanvasItem] = []
 	var shell := office.floor_view.ground.get_node_or_null("Shell") as CanvasItem
@@ -817,21 +1044,21 @@ func _furnishing(office: OfficeDouble) -> Array[CanvasItem]:
 		found.append(decor)
 	for fixture_node in _fixtures(office):
 		found.append(fixture_node)
-	for table in office.floor_view.tables:
-		found.append(table.get_node("%Decorations") as CanvasItem)
+	for node: Node in office.floor_view.sorted.get_children():
+		if node is OfficeZoneSign or node.name.begins_with("Partitions_"):
+			found.append(node as CanvasItem)
 	return found
 
 
-## What the lens leaves as bright as it was: tables and everything on them but
-## their trinkets, the seats, the people, the backgrounds (rugs, washes,
-## shadows, signs, titles) and the pointer.
+## What the lens leaves as bright as it was: pods and everything on them, the
+## seats, the people, the backgrounds (washes, shadows, tab labels) and the
+## pointer.
 func _signal_nodes(office: OfficeDouble) -> Array[CanvasItem]:
 	var found: Array[CanvasItem] = [office.floor_view.pointer]
 	for table in office.floor_view.tables:
 		found.append(table)
-		var trinkets := table.get_node("%Decorations")
 		for child in table.get_children():
-			if child != trinkets and child is CanvasItem:
+			if child is CanvasItem:
 				found.append(child as CanvasItem)
 	for station in _seats(office):
 		found.append(station)
@@ -846,10 +1073,10 @@ func _signal_nodes(office: OfficeDouble) -> Array[CanvasItem]:
 	return found
 
 
-## The tab key of the room pane `key` sits in on the shown floor.
+## The tab key of the room pane `key` sits in on the shown map.
 func _room_of(office: OfficeDouble, key: String) -> String:
-	var found := office.frame.find_floor(office.navigator.shown_key)
-	for room in found.floor_model.rooms:
+	var found := office.frame.map_of(office.navigator.shown_key)
+	for room in found.rooms:
 		for pane in room.panes:
 			if pane.key == key:
 				return room.key
@@ -876,11 +1103,11 @@ func _in_floor(office: OfficeDouble, rect: Rect2) -> Rect2:
 	return office.floor_view.root.get_global_transform().affine_inverse() * rect
 
 
-## The bubble over pane `key` on screen, its middle, once revealed.
+## The chip over pane `key` on screen, its middle, once revealed.
 func _bubble_at(office: OfficeDouble, key: String) -> Vector2:
 	office.reveal(key)
 	await _frames(2)
-	return _station(office, key).bubble_rect().get_center() - office.camera.position
+	return _station(office, key).chip_rect().get_center() - office.camera.position
 
 
 ## `snapshot` without pane `pane_id`, in its panes, agents and layouts.

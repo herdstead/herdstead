@@ -105,22 +105,23 @@ func test_news_shows_the_newest_first_in_herdr_words() -> void:
 
 
 ## A click on an entry picks its pane the way a row of the agent list does:
-## the pane is selected, its floor shown, its desk in the world's room, and
-## the card is not answering anything.
+## the pane is selected, its machine's map shown and panned to its zone, its
+## desk in the world's room, and the card is not answering anything.
 func test_a_news_click_picks_the_pane_like_the_list() -> void:
 	var office := await _live_office()
 	var key := _pk("web:p2")
 	_feed(office, _with(fixture, "web:p2", {"agent_status": "working"}))
 	await _frames(2)
-	var start_floor := office.navigator.shown_key
+	var start_zone := office.navigator.current_zone(office.frame)
 	var item := office.hud.news.item(0)
 	_check(item.visible and not item.disabled, "the newest entry can be clicked")
 	_eq(item.tooltip_text, NewsItem.TIP_PICK, "and says what a click does")
 	await _press(item)
 	await _frames(3)
 	_eq(office.picked_key, key, "the click picks web:p2")
-	_eq(office.navigator.shown_key, office.frame.floor_of(key), "its floor is shown")
-	_check(office.navigator.shown_key != start_floor, "another floor than the one before")
+	_eq(office.navigator.shown_key, LOCAL, "its machine's map is shown")
+	_eq(office.navigator.current_zone(office.frame), office.frame.zone_of(key), "its zone the current one")
+	_check(office.navigator.current_zone(office.frame) != start_zone, "another zone than the one before")
 	_check(office.hud.world_rect().has_point(_desk_point(office, key)), "its desk is in the world's room")
 	_check(not office.hud.inspector.answering(), "and nothing is being answered")
 	_done(office)
@@ -364,7 +365,8 @@ func test_an_events_row_click_picks_and_a_gone_one_is_disabled() -> void:
 	await _press(row)
 	await _frames(3)
 	_eq(office.picked_key, _pk("infra:p3"), "the click picks infra:p3")
-	_eq(office.navigator.shown_key, office.frame.floor_of(_pk("infra:p3")), "and shows its floor")
+	_eq(office.navigator.shown_key, LOCAL, "and shows its machine's map")
+	_eq(office.navigator.current_zone(office.frame), office.frame.zone_of(_pk("infra:p3")), "its zone the current one")
 	_eq(row.theme_type_variation, &"ListRowCurrent", "its row is the current one")
 	_feed(office, _without(blocked, "web:p2"))
 	_feed(office, _without(blocked, "web:p2"))
@@ -376,6 +378,46 @@ func test_an_events_row_click_picks_and_a_gone_one_is_disabled() -> void:
 	await _press(gone)
 	await _frames(2)
 	_eq(office.picked_key, _pk("infra:p3"), "a click on it picks nothing")
+	_done(office)
+
+
+## Every locate counts one navigation (what a pick waiting for a new pane
+## records), however it is asked for: `N`, a top-bar counter, `›` and `‹` on
+## the staff panel's line, a NEWS entry, an EVENTS row and a row of the agent
+## list, each a real click or key.
+func test_every_locate_counts_one_navigation() -> void:
+	var office := await _live_office()
+	var navigator := office.navigator
+	_feed(office, _with(fixture, "web:p2", {"agent_status": "working"}))
+	await _frames(2)
+	var revision := navigator.nav_revision
+	await _office_key(office, KEY_N)
+	_eq(navigator.nav_revision, revision + 1, "`N`: one")
+	await _press(office.hud.bar.counter(&"blocked"))
+	await _frames(2)
+	_eq(navigator.nav_revision, revision + 2, "BLOCKED: one")
+	var on: Button = office.hud.inspector.get_node("%StepOn")
+	var back: Button = office.hud.inspector.get_node("%StepBack")
+	_check(on.is_visible_in_tree() and not on.disabled and not back.disabled, "`‹ ›` are on the line")
+	await _press(on)
+	await _frames(2)
+	_eq(navigator.nav_revision, revision + 3, "`›`: one")
+	await _press(back)
+	await _frames(2)
+	_eq(navigator.nav_revision, revision + 4, "`‹`: one")
+	await _press(office.hud.news.item(0))
+	await _frames(2)
+	_eq([office.picked_key, navigator.nav_revision], [_pk("web:p2"), revision + 5], "a NEWS entry: one")
+	await _press_tab(office, OfficeHud.DrawerTab.EVENTS)
+	var events := office.fleet.state_log().events()
+	await _press(office.hud.event_list.row_for(events[events.size() - 1].id))
+	await _frames(2)
+	_eq(navigator.nav_revision, revision + 6, "an EVENTS row: one")
+	await _press_tab(office, OfficeHud.DrawerTab.AGENTS)
+	var key := _pk("infra:p1")
+	await _press(office.hud.agent_list.row_for(key))
+	await _frames(2)
+	_eq([office.picked_key, navigator.nav_revision], [key, revision + 7], "an agent-list row: one")
 	_done(office)
 
 
@@ -452,10 +494,10 @@ func test_the_smallest_screen_keeps_news_staff_and_columns_apart() -> void:
 	var hud := office.hud
 	_eq(hud.placed(hud.news), Rect2(16, 296, 448, 20), "NEWS along the bottom")
 	_eq(hud.placed(hud.staff), Rect2(16, 264, 448, 28), "the compact staff panel above it")
-	_eq(hud.placed(hud.floors).end.y, 248.0, "the minimap stops above the panel")
+	_eq(hud.placed(hud.spaces).end.y, 248.0, "the minimap stops above the panel")
 	_eq(hud.placed(hud.right_column).end.y, 248.0, "so does the drawer")
 	var panels: Array[Rect2] = [
-		hud.placed(hud.news), hud.placed(hud.staff), hud.placed(hud.floors), hud.placed(hud.right_column)
+		hud.placed(hud.news), hud.placed(hud.staff), hud.placed(hud.spaces), hud.placed(hud.right_column)
 	]
 	for i in panels.size():
 		for j in range(i + 1, panels.size()):

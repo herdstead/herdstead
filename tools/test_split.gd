@@ -322,10 +322,10 @@ func test_the_new_pane_is_not_picked_after_another_pick_or_a_new_connection() ->
 
 
 ## The office leaves the viewer where they went while the new pane was on
-## its way: another floor (by a real click on the minimap), or answer mode on
-## the pane split. When the new pane shows it is not picked, the floor and the
-## answer mode stay, and the footer names the new pane and says it was not
-## picked. Nothing is split again.
+## its way: another zone (by a real click on the minimap: a pan on the same map
+## now, where it was another floor), or answer mode on the pane split. When the
+## new pane shows it is not picked, the zone and the answer mode stay, and the
+## footer names the new pane and says it was not picked. Nothing is split again.
 func test_the_new_pane_is_not_picked_after_the_viewer_moved_floor_or_into_answer_mode() -> void:
 	var office := await _agent_card(["pane.read", "pane.split"])
 	var card := _card(office)
@@ -334,12 +334,13 @@ func test_the_new_pane_is_not_picked_after_the_viewer_moved_floor_or_into_answer
 	_ctl("control-a", "next", {"action": "delay", "method": "session.snapshot", "seconds": 2.5})
 	await _click_control(_split_button(office))
 	await _until(func() -> bool: return card.outcome_text() == "New pane alpha:p4", "herdr made alpha:p4")
-	await _floor_pick(office, bravo)
-	await _until(func() -> bool: return office.navigator.shown_key == bravo, "the viewer went to bravo")
+	await _zone_pick(office, bravo)
+	var zone := func() -> String: return office.navigator.current_zone(office.frame)
+	await _until(func() -> bool: return zone.call() == bravo, "the viewer went to bravo")
 	_check(office.frame.pane(p4) == null, "before any snapshot showed the new pane")
 	await _until(func() -> bool: return office.frame.pane(p4) != null, "a snapshot shows the new pane")
 	await _wait(1.0)
-	_eq([office.picked_key, office.navigator.shown_key], [p3, bravo], "not picked: the pick and the floor stay")
+	_eq([office.picked_key, zone.call()], [p3, bravo], "not picked: the pick and the zone stay")
 	_eq(card.outcome_text(), "New pane alpha:p4: not picked", "the footer says so")
 	await _pick_local(office, "alpha:p3")
 	var split := _split_button(office)
@@ -357,6 +358,54 @@ func test_the_new_pane_is_not_picked_after_the_viewer_moved_floor_or_into_answer
 	await _wait(1.0)
 	_check(card.answering(), "answer mode stays")
 	_eq(office.picked_key, p3, "alpha:p5 not picked")
+	_eq(_count("control-a", "pane.split"), 2, "one split per click")
+
+
+## The viewer moving to another zone of the same map while a split's new pane
+## is on its way is moving on (codex #5): a real click on bravo's FLOORS row,
+## which only pans (the same map, the same world), and the new pane is not
+## picked when a snapshot shows it; the footer says so; one split was sent.
+## And moving away and back before it shows (PageDown then PageUp, alpha
+## current again) is moving on too: the navigations count, not where the view
+## ends up (before one map per machine, coming back to the same floor picked it).
+func test_the_new_pane_is_not_picked_after_the_viewer_moved_to_another_zone() -> void:
+	var office := await _agent_card(["pane.read", "pane.split"])
+	var card := _card(office)
+	var bravo := HerdrFleet.pane_key(HerdrFleet.LOCAL, "bravo")
+	var zone := func() -> String: return office.navigator.current_zone(office.frame)
+	var world := office.world.get_instance_id()
+	await _after_a_poll("control-a")
+	_ctl("control-a", "next", {"action": "delay", "method": "session.snapshot", "seconds": 2.5})
+	await _click_control(_split_button(office))
+	await _until(func() -> bool: return card.outcome_text() == "New pane alpha:p4", "herdr made alpha:p4")
+	await _zone_pick(office, bravo)
+	_eq([office.navigator.shown_key, zone.call()], [HerdrFleet.LOCAL, bravo], "a pan to bravo, on Local's map")
+	_eq(office.world.get_instance_id(), world, "the same world")
+	_check(office.frame.pane(p4) == null, "before any snapshot showed the new pane")
+	await _until(func() -> bool: return office.frame.pane(p4) != null, "a snapshot shows the new pane")
+	await _wait(1.0)
+	_eq([office.picked_key, zone.call()], [p3, bravo], "not picked: the pick and the zone stay")
+	_eq(card.outcome_text(), "New pane alpha:p4: not picked", "the footer says so")
+	_eq(_count("control-a", "pane.split"), 1, "one split sent")
+	await _pick_local(office, "alpha:p3")
+	var split := _split_button(office)
+	await _until(func() -> bool: return split.is_visible_in_tree() and not split.disabled, "alpha:p3 may split again")
+	await _after_a_poll("control-a")
+	_ctl("control-a", "next", {"action": "delay", "method": "session.snapshot", "seconds": 2.5})
+	await _click_control(split)
+	await _until(func() -> bool: return card.outcome_text() == "New pane alpha:p5", "herdr made alpha:p5")
+	var alpha: String = zone.call()
+	# The rail is ascending: PageDown leaves alpha (1) for bravo, PageUp comes back.
+	await _navigate_key(office, KEY_PAGEDOWN)
+	var away: String = zone.call()
+	_check(away != alpha, "PageDown: away from alpha")
+	await _navigate_key(office, KEY_PAGEUP)
+	_eq(zone.call(), alpha, "away and back: alpha current again")
+	var p5 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "alpha:p5")
+	await _until(func() -> bool: return office.frame.pane(p5) != null, "a snapshot shows alpha:p5")
+	await _wait(1.0)
+	_eq(office.picked_key, p3, "not picked: the viewer navigated meanwhile")
+	_eq(card.outcome_text(), "New pane alpha:p5: not picked", "and the footer says so")
 	_eq(_count("control-a", "pane.split"), 2, "one split per click")
 
 

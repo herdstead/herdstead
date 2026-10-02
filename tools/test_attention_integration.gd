@@ -76,20 +76,25 @@ func test_a_takes_and_gives_back_the_keyboard() -> void:
 	_done(office)
 
 
+## PageDown pans zone to zone on the same map (the rail is ascending: on to
+## the higher number), with the list holding the keyboard or not: the list
+## keeps the keyboard and its cursor, and the SPACES rows stay enabled.
 func test_list_keeps_the_keyboard_across_a_floor_switch() -> void:
 	var office := await _listed_office()
-	await _key_cycle(KEY_PAGEUP)
-	_eq(office.layout_plan().floor_key, HerdrFleet.pane_key(LOCAL, "web"), "PageUp switches floor at once")
+	var zone := func() -> String: return office.navigator.current_zone(office.frame)
+	await _key_cycle(KEY_PAGEDOWN)
+	_eq(zone.call(), HerdrFleet.pane_key(LOCAL, "web"), "PageDown pans to the next zone at once")
 	await _key_cycle(KEY_A)
 	var list := office.hud.agent_list
-	_check(list.has_keyboard(), "A reaches the list on the new floor")
+	_check(list.has_keyboard(), "A reaches the list there")
 	var cursor := list.cursor()
-	await _key_cycle(KEY_PAGEUP)
-	_eq(office.layout_plan().floor_key, HerdrFleet.pane_key(LOCAL, "infra"), "PageUp switches again, list or not")
-	_check(list.has_keyboard(), "the switch and its refresh keep the list's keyboard")
+	await _key_cycle(KEY_PAGEDOWN)
+	_eq(zone.call(), HerdrFleet.pane_key(LOCAL, "infra"), "PageDown pans again, list or not")
+	_eq(office.navigator.shown_key, LOCAL, "on the same map")
+	_check(list.has_keyboard(), "the pan and its refresh keep the list's keyboard")
 	_eq(list.cursor(), cursor, "and its cursor")
-	var row := office.hud.floors.row_for(HerdrFleet.pane_key(LOCAL, "infra"))
-	_check(not row.disabled, "the floor rows stay enabled")
+	var row := office.hud.spaces.row_for(HerdrFleet.pane_key(LOCAL, "infra"))
+	_check(not row.disabled, "the zone rows stay enabled")
 	_done(office)
 
 
@@ -126,9 +131,9 @@ func test_office_keys_still_work_while_the_list_has_the_keyboard() -> void:
 	var night := office.night
 	await _key_cycle(KEY_T)
 	_check(office.night != night, "T still turns the light over")
-	var shown := office.navigator.shown_key
+	var shown := office.navigator.current_zone(office.frame)
 	await _key_cycle(KEY_PAGEDOWN)
-	_check(office.navigator.shown_key != shown, "PageDown still changes floor")
+	_check(office.navigator.current_zone(office.frame) != shown, "PageDown still pans to another zone")
 	_done(office)
 
 
@@ -137,7 +142,11 @@ func test_row_click_locates_another_floor() -> void:
 	var key := HerdrFleet.pane_key(LOCAL, "web:p1")
 	await _click_row(office, key)
 	_eq(office.picked_key, key, "a click selects that exact machine and pane")
-	_eq(office.layout_plan().floor_key, HerdrFleet.pane_key(LOCAL, "web"), "and shows its floor at once")
+	_eq(
+		[office.navigator.shown_key, office.navigator.current_zone(office.frame)],
+		[LOCAL, HerdrFleet.pane_key(LOCAL, "web")],
+		"and pans to its zone at once"
+	)
 	var pane_id: Label = office.hud.inspector.get_node("%PaneId")
 	_eq(pane_id.text, "web:p1", "the card shows it")
 	_eq(office.hud.agent_list.row_for(key).theme_type_variation, &"ListRowCurrent", "and the row is highlighted")
@@ -182,10 +191,10 @@ func test_unplaced_pane_is_listed_and_can_show_details() -> void:
 	)
 	var item := _for_pane(office, "orphan")
 	_check(item != null and item.available, "with details")
-	var shown := office.layout_plan().floor_key
+	var shown := [office.layout_plan().floor_key, office.camera.pan]
 	await _click_row(office, key)
 	_eq(office.picked_key, key, "a click keeps the unplaced selection")
-	_eq(office.layout_plan().floor_key, shown, "and goes nowhere: the floor stays")
+	_eq([office.layout_plan().floor_key, office.camera.pan], shown, "and goes nowhere: the map and its pan stay")
 	var pane_label: Label = office.hud.inspector.get_node("%PaneId")
 	_eq(pane_label.text, "orphan", "the card does not fall back to the focused desk")
 	office.hud.agent_list.set_view(AgentListModel.View.TREE)
@@ -200,12 +209,12 @@ func test_conflicting_workspace_keeps_details_without_false_navigation() -> void
 	_check(item != null and item.available, "conflicting ownership keeps its details")
 	_eq(office.attention_store.current(Time.get_ticks_msec()).size(), 4, "conflict is counted once with live attention")
 	_eq(office.hud.bar.counter(&"blocked").value_text(), "2", "global blocked count still includes the conflict")
-	var shown_floor := office.layout_plan().floor_key
+	var pan := office.camera.pan
 	await _click_row(office, key)
 	_eq(
-		office.layout_plan().floor_key,
-		shown_floor,
-		"a click goes to neither contradictory workspace: the viewed floor stays"
+		[office.navigator.shown_key, office.navigator.current_zone(office.frame), office.camera.pan],
+		[LOCAL, "", pan],
+		"a click goes to neither contradictory workspace: the map and its pan stay, no zone current"
 	)
 	_eq(office.picked_key, key, "the unplaced pane is selected")
 	var seat: Label = office.hud.inspector.get_node("%Seat")
@@ -225,7 +234,11 @@ func test_conflicting_workspace_keeps_details_without_false_navigation() -> void
 	await _frames(2)
 	await _click_row(office, HerdrFleet.pane_key(LOCAL, "api:p1"))
 	await _click_row(office, key)
-	_eq(office.layout_plan().floor_key, HerdrFleet.pane_key(LOCAL, "web"), "once repaired, a click reaches its floor")
+	_eq(
+		office.navigator.current_zone(office.frame),
+		HerdrFleet.pane_key(LOCAL, "web"),
+		"once repaired, a click reaches it"
+	)
 	_eq(seat.text, "web / ui", "world, list and card agree")
 	_done(office)
 

@@ -66,6 +66,6 @@ unique_name_in_owner = true
 visible = false
 layout_mode = 2
 size_flags_vertical = 3
-text = "No desks on this floor"
+text = "No desks on this machine"
 horizontal_alignment = 1
 vertical_alignment = 1

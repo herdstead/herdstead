@@ -233,7 +233,7 @@ func test_office_keys_do_not_fire_while_it_is_open() -> void:
 	var office := await _live()
 	var theme := office.art.id
 	var zoom := office.zoom
-	var shown := office.navigator.shown_key
+	var shown := [office.navigator.shown_key, office.navigator.current_zone(office.frame)]
 	var picked := office.picked_key
 	await _press_key(KEY_T, 0x74)
 	await _press_key(KEY_EQUAL, 0x3D)
@@ -244,7 +244,12 @@ func test_office_keys_do_not_fire_while_it_is_open() -> void:
 	await _press_key(KEY_ENTER)
 	await _until(func() -> bool: return _inputs("control-b").size() == 6, "six sent to the terminal")
 	_eq(
-		[office.art.id, office.zoom, office.navigator.shown_key, office.picked_key],
+		[
+			office.art.id,
+			office.zoom,
+			[office.navigator.shown_key, office.navigator.current_zone(office.frame)],
+			office.picked_key
+		],
 		[theme, zoom, shown, picked],
 		"unchanged"
 	)

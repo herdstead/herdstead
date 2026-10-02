@@ -1,13 +1,13 @@
 class_name OfficeQuestionReader
 extends Node
-## What a blocked agent asks, for the tooltip over its bubble: one line of each
+## What a blocked agent asks, for the tooltip over its chip: one line of each
 ## pane's terminal, read through the fleet's typed read (HerdrFleet.context_for()
 ## and read_pane(), the same `pane.read` of the `detection` text the agent
 ## card's blocked preview asks for). herdr has no "question" field, so the line
 ## is an excerpt (excerpt()), never the question itself: that is on the card.
 ##
 ## Reading is not a gesture and never writes. Only the panes the office hands
-## in are read: blocked ones on the shown floor whose bubble is on screen, on a
+## in are read: blocked ones on the shown map whose chip is on screen, on a
 ## machine that is live with a current snapshot; none while the terminal
 ## monitor or the OVERVIEW covers the world (office.gd then says none is live).
 ## One read at a time for the whole office (the card's own preview read is
@@ -16,7 +16,7 @@ extends Node
 ## is read again until REFRESH_SECONDS after its last read began, whatever that
 ## read brought: when a read began is forgotten only once that time has passed,
 ## never because the pane stopped being blocked, changed terminal or left the
-## floor shown, so a state that flaps or a floor visited twice is not read
+## map shown, so a state that flaps or a map visited twice is not read
 ## again sooner. Nothing is read while the window is minimized, nor at all in
 ## read-only mode (the office then says so in the tooltip). A read here is never
 ## a look: nothing here tells the fleet a preview was shown, so it never turns
@@ -24,7 +24,7 @@ extends Node
 ##
 ## Only the last excerpt of each pane is kept, with the terminal identity it
 ## was read for (PaneModel.identity_key()); a pane that stops being blocked,
-## holds another terminal or session, or leaves the shown floor loses it: a new
+## holds another terminal or session, or leaves the shown map loses it: a new
 ## block never shows the old question. Blocked again within REFRESH_SECONDS,
 ## it has no text until its next read is due.
 
@@ -77,10 +77,10 @@ func _init(fleet: HerdrFleet, minimized: Callable) -> void:
 	name = "QuestionReader"
 
 
-## The shown floor as the office sees it now: every blocked pane on it, key to
-## identity (`blocked`, which keeps their excerpts), the ones whose bubble is on
+## The shown map as the office sees it now: every blocked pane on it, key to
+## identity (`blocked`, which keeps their excerpts), the ones whose chip is on
 ## screen in wait order (`on_screen`, the only ones read), and whether the
-## floor's machine may be read (`live`: online, with a current snapshot). Starts
+## map's machine may be read (`live`: online, with a current snapshot). Starts
 ## a read when one is due.
 func watch(blocked: Dictionary[String, String], on_screen: PackedStringArray, live: bool) -> void:
 	_blocked = blocked.duplicate()
@@ -180,7 +180,7 @@ func _on_read_finished(ticket: CommandTicket, key: String, identity: String) -> 
 		question_changed.emit(key)
 
 
-## Whether pane `key` is still blocked on the shown floor with terminal `identity`.
+## Whether pane `key` is still blocked on the shown map with terminal `identity`.
 func _still(key: String, identity: String) -> bool:
 	return _blocked.has(key) and _blocked[key] == identity
 

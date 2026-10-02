@@ -6,27 +6,29 @@
 #   tools/perf.sh [--runs=3] [--figures] [--walks] [--hold=8] [--warmup=6]
 #   GODOT=/path/to/godot tools/perf.sh --runs=5
 #
-# Scenarios: medium (3 floors, 36 panes), stress (1 floor, 10 tabs x 8 panes)
-# and overview (the stress floor in a 3200x1600 window at 2x, zoomed out: the
-# whole floor on screen, in a window a 3456-pixel-wide laptop display still
+# Scenarios: medium (3 zones on one map, 36 panes), stress (1 zone, 10 tabs x 8
+# panes), spaces30 (30 zones of one tab on one map, 189 panes, ten of them
+# mezzanines: many signs, partitions and SPACES rows) and overview (the stress
+# map in a 3200x1600 window at 2x, zoomed out: the
+# whole map on screen, in a window a 3456-pixel-wide laptop display still
 # holds; a display too small for it is said
-# on a PERF_SHRUNK line under the summary); stress+overview (the stress floor
+# on a PERF_SHRUNK line under the summary); stress+overview (the stress map
 # with the OVERVIEW open over it, `--overview=open`: 80 rows and timelines;
-# the `overview` scenario above is the zoomed-out floor, not this); stress+lens
-# (the stress floor with the lens held, `--lens=held`: 80 lines, 10 washes,
+# the `overview` scenario above is the zoomed-out map, not this); stress+lens
+# (the stress map with the lens held, `--lens=held`: 80 lines, 10 washes,
 # the furnishing dimmed, the lines rewritten every 0.25 s); stress+strategic
-# (the stress floor under the strategic view, `--strategic=open`: 80 squares
+# (the stress map under the strategic view, `--strategic=open`: 80 squares
 # and 10 captions in one CanvasItem, drawn again each second while a wait
-# shows); stress400, stress400+drawer and stress400+strategic (1 floor, 50 tabs
+# shows); stress400, stress400+drawer and stress400+strategic (1 zone, 50 tabs
 # x 8 panes: the world, the world with the agent list's drawer open,
 # `--drawer=open`, so its 400 rows stay on the measured path while a closed
 # drawer skips them, and the view over it);
 # --figures adds 80 seated pixel people on their own, every one on screen; --walks
-# adds the stress floor's people walking (tools/perf_probe.gd --walk=): 80 walk
-# in at once, 40 are done at once (seated, with paper), a table grows
+# adds the stress map's people walking (tools/perf_probe.gd --walk=): 80 walk
+# in at once, 40 are done at once (seated, with paper), a pod grows
 # under 80 walking in, and the window is minimized and restored mid-walk, and
-# 40 go blocked (seated under bubbles) or idle at once, one
-# of 40 blocked is answered again and again, and a table grows under 40
+# 40 go blocked (seated under chips) or idle at once, one
+# of 40 blocked is answered again and again, and a pod grows under 40
 # blocked, each timed frame by frame from the
 # snapshot that starts it, which the probe sets through the fake herdr's
 # control socket. Every round
@@ -161,8 +163,8 @@ measure() {
 		# drawer renders no rows, so this is where their cost is measured).
 		args+=(--mode=office --drawer=open)
 	elif [ "$mode" = "overview" ]; then
-		# The stress floor in a big window at the lowest zoom (2x): the whole
-		# floor on screen, as zoom 1 showed it before.
+		# The stress map in a big window at the lowest zoom (2x): the whole
+		# map on screen, as zoom 1 showed it before.
 		engine+=(--resolution 3200x1600)
 		args+=(--mode=office --zoom=2)
 	else
@@ -242,14 +244,15 @@ median() {
 }
 
 # name, mode, fixture, then what it is
-SCENARIOS=("medium office snapshot_medium 3 floors, 36 panes" "stress office snapshot_stress80 1 floor, 80 panes"
+SCENARIOS=("medium office snapshot_medium 3 zones, 36 panes" "stress office snapshot_stress80 1 zone, 80 panes"
+	"spaces30 office snapshot_floors30 30 zones, 189 panes"
 	"overview overview snapshot_stress80 the same, 3200x1600"
-	"stress+overview office-overview snapshot_stress80 1 floor, 80 panes, OVERVIEW open"
-	"stress+lens office-lens snapshot_stress80 1 floor, 80 panes, the lens held"
-	"stress+strategic office-strategic snapshot_stress80 1 floor, 80 panes, the strategic view open"
-	"stress400 office snapshot_stress400 1 floor, 400 panes"
-	"stress400+drawer office-drawer snapshot_stress400 1 floor, 400 panes, the agent list's drawer open"
-	"stress400+strategic office-strategic snapshot_stress400 1 floor, 400 panes, the strategic view open")
+	"stress+overview office-overview snapshot_stress80 1 zone, 80 panes, OVERVIEW open"
+	"stress+lens office-lens snapshot_stress80 1 zone, 80 panes, the lens held"
+	"stress+strategic office-strategic snapshot_stress80 1 zone, 80 panes, the strategic view open"
+	"stress400 office snapshot_stress400 1 zone, 400 panes"
+	"stress400+drawer office-drawer snapshot_stress400 1 zone, 400 panes, the agent list's drawer open"
+	"stress400+strategic office-strategic snapshot_stress400 1 zone, 400 panes, the strategic view open")
 if [ "$FIGURES" -eq 1 ]; then
 	SCENARIOS+=("actors80 actors - 80 pixel people")
 fi
@@ -259,7 +262,7 @@ if [ "$WALKS" -eq 1 ]; then
 		"done40 walks snapshot_stress80_working 40 of 80 done at once, seated with paper"
 		"growth walks snapshot_stress80_shells tab 0 grows under 80 walking in"
 		"minimize walks snapshot_stress80_shells 80 walking in, minimized 2 s"
-		"blocked40 walks snapshot_stress80_working 40 of 80 go blocked at once, 40 bubbles"
+		"blocked40 walks snapshot_stress80_working 40 of 80 go blocked at once, 40 chips"
 		"idle40 walks snapshot_stress80_working 40 of 80 go idle at once"
 		"approve walks snapshot_stress80_working one of 40 blocked answered 8 times"
 		"queuegrow walks snapshot_stress80_working tab 0 grows under 40 blocked"

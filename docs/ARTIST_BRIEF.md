@@ -1,7 +1,7 @@
 # Artist brief: Herdstead theme packs
 
-For a pixel artist who does not write code. The job is **a whole new theme**: the same 76 PNGs
-(29 tiles, 18 props, 12 UI images, 18 long-table pieces) in a new style. When you are done, run
+For a pixel artist who does not write code. The job is **a whole new theme**: the same 68 PNGs
+(16 tiles, 22 props, 12 UI images, 18 pod-family pieces) in a new style. When you are done, run
 the self-check commands and hand in one folder. The program loads your pack without a single code change.
 
 Sizes, sources and the reasons behind them are in [ASSET_SPEC.md](ASSET_SPEC.md); this brief covers
@@ -18,10 +18,10 @@ any file name:
 ```text
 art/<id>/
   pack.json               <- change id / name / palette values; keep the structure
-  tiles/ walls/  29       32×32 units = 64×64 PNG (walls in walls/, other tiles in tiles/; pack.json's path decides)
-  props/         18       see below
-  ui/            11       see below
-  table/         18 + manifest.json   the long-table family, see below
+  tiles/ walls/  16       32×32 units = 64×64 PNG (walls in walls/, other tiles in tiles/; pack.json's path decides)
+  props/         22       see below
+  ui/            12       see below
+  table/         18 + manifest.json   the pod family, see below
   fonts/                  copy as is; do not replace
 ```
 
@@ -34,45 +34,58 @@ large floor areas. An image not yet repainted may stay at 1x; the build fills it
 2×2 blocks (it plainly looks "not painted yet", see §9). The pixel people are density 2 as well
 (their sizes and choreography are also in units, see [ASSET_SPEC.md](ASSET_SPEC.md), "Pixel people").
 
-**29 tiles** (all 32×32 units = 64×64 PNG, no pivot, laid on the grid as they are):
-`floor.wood_a/b/c`, `floor.walkway`, the 9 `rug.{top,middle,bottom}_{left,center,right}`,
-the 9 `wall.{cap,face,front}_{left,center,right}`, `wall.side_left/right`, `wall.threshold`,
-the inner-wall T joints `wall.cap_t_left` / `wall.face_t_left` and the free ends
-`wall.cap_end_right` / `wall.face_end_right`.
+**16 tiles** (all 32×32 units = 64×64 PNG, no pivot, laid on the grid as they are):
+`floor.wood_a/b/c`, `floor.walkway`,
+the 9 `wall.{cap,face,front}_{left,center,right}`, `wall.side_left/right` and `wall.threshold`.
+There are no rugs and no inner-wall joints: a pod stands on the floor itself, and a workspace's zone is bounded
+by the partition kit below, not by walls.
 
-**Furniture** (canvas and pivot are hard constraints; the desks, chairs and monitors belong to the
-long-table family, not here):
+**Furniture** (canvas and pivot are hard constraints; the desks, chairs and laptops belong to the
+pod family, not here):
 
 | Semantic ID | Canvas (units) | Pivot (foot point) | 2x canvas (PNG) | 2x pivot |
 |---|---:|---:|---:|---:|
-| `cabinet` | 48×64 | 24,60 | 96×128 | 48,120 |
-| `window` | 64×48 | 32,44 | 128×96 | 64,88 |
+| `window`, `window_night` | 64×48 each | 32,44 | 128×96 | 64,88 |
 | `door` | 48×80 | 24,76 | 96×160 | 48,152 |
 | `plant`, `plant_b` | 32×48 each | 16,46 | 64×96 | 32,92 |
-| `sign` | 64×24 | 32,22 | 128×48 | 64,44 |
 | `wall_frame` | 40×32 | 20,30 | 80×64 | 40,60 |
-| `reception` | 48×32 | 24,30 | 96×64 | 48,60 |
 | `pantry` | 64×48 | 32,46 | 128×96 | 64,92 |
+| `side_table` | 32×32 | 16,30 | 64×64 | 32,60 |
+| `partition_v` | 6×32 | 3,32 | 12×64 | 6,64 |
+| `partition_post` | 6×12 | 3,12 | 12×24 | 6,24 |
+| `partition_corner_bl`, `partition_corner_br` | 32×32 each | 16,32 | 64×64 | 32,64 |
+| `partition_h` | 32×10 | 16,10 | 64×20 | 32,20 |
 
-`plant` and `plant_b` are two pots of the same fixture. `reception` and `pantry` stand in the entry
-band: their opaque width is the whole canvas (it is their footprint), the bottom outline sits one
+`plant` and `plant_b` are two pots of the same fixture; `window_night` is `window` with the view dark, its
+frame pixel for pixel the same. `pantry` stands in the entry
+band: its opaque width is the whole canvas (it is its footprint), the bottom outline sits one
 row above the foot point, and the foot point row and below stay transparent.
 
-**Desk items**: 5 everyday objects `desk_mug`, `desk_notebook`, `desk_papers`, `desk_plant`,
-`desk_headphones`, 3 white-cat poses `cat_loaf`, `cat_sleep`, `cat_sit`, and `done_stack`, each
-24×24 units, pivot 12,22 (2x: 48×48, pivot 24,44). The long table puts their foot point on the desk
-top, so **opaque pixels may only fall on rows 3–21** (the top three rows and the two rows below the
-foot point stay empty; rows 6–43 in the 2x PNG), or they overlap the divider or the desk edge.
-`done_stack` is a signal, not decoration: it is the paper stack beside a done agent's laptop (§5).
+**The partition kit** is the low wall round a workspace's zone, a U open at the top: `partition_v` runs down
+each side (one per 32-unit row, so its top and bottom rows must join), `partition_h` along the bottom
+(joining left and right), `partition_corner_bl` / `_br` turn the two bottom corners, and `partition_post`
+caps each side run's top end (the zone's sign hangs from the left one). Keep the horizontal pieces no taller
+than 10 units and the vertical ones 6 wide with nothing overhanging: they must never hide a seated person.
+`side_table` is a small table that stands on the floor and carries one desk item on its top: keep the top's
+middle 16 units flat and solid about 20 units above the foot point, where the item's foot lands.
 
-**The long-table family** (`table/`): desk surface, apron, dividers, leg, chair front and back,
-laptop front and back and the `$_` marker view, 18 images, also density 2 (canvas = units ×2;
+**Desk items**: 5 everyday objects `desk_mug`, `desk_notebook`, `desk_papers`, `desk_plant`,
+`desk_headphones`, 3 white-cat poses `cat_loaf`, `cat_sleep`, `cat_sit`, and `done_stack_small`, each
+24×24 units, pivot 12,22 (2x: 48×48, pivot 24,44). A side table puts an item's foot point on its
+top, so **opaque pixels may only fall on rows 3–21** (the top three rows and the two rows below the
+foot point stay empty; rows 6–43 in the 2x PNG).
+`done_stack_small` is a signal, not decoration: it is the small paper stack beside a done agent's laptop (§5),
+6 units wide and 9 tall over its foot point, so it fits between the laptop and the edge of a 32-unit desk.
+
+**The pod family** (`table/`): four desk modules, the low screen (three), the apron (three), the short leg,
+the bracket, chair front and back,
+laptop front and back and the `$_` marker views, 18 images, also density 2 (canvas = units ×2;
 `shell_*` are derived from `monitor_*` by the build, do not paint them). Each image's canvas and the
-pixels it must keep (which desk-top rows are transparent, the leg's last row, the chair and laptop
-probe points) are in the long-table section of [ASSET_SPEC.md](ASSET_SPEC.md) and in the notes of
+pixels it must keep (which desk rows are transparent, the leg's last row, the chair and laptop
+probe points) are in "Open floor and pods" of [ASSET_SPEC.md](ASSET_SPEC.md) and in the notes of
 `tools/build_table_assets.py`; `make test-art` checks every one.
 
-The first versions of the desk items and the long table were drawn by a program
+The first versions of the desk items and the pod family were drawn by a program
 (`make pixel-sources OUT=<empty dir>`); you can repaint the same-named PNGs directly over them.
 
 **The people in the office are not in this pack.** They are the pixel people shared by every theme
@@ -81,10 +94,10 @@ uses in `pack.json`'s `states` (§4).
 
 **12 UI images**: 9 icons of 16×16 (`working`, `blocked`, `unread`, `idle`, `unknown`, `offline`,
 `starting`, `branch`, `connected`), pivot 8,16, except `connected` at 8,8; `panel` and `hud_panel`
-32×32, pivot 0,0, nine-patch margins `[4,4,4,4]` (`panel` light, for the world's bubble and the tools;
-`hud_panel` dark, for every HUD panel); `selection` 64×64, pivot 32,60.
+32×32, pivot 0,0, nine-patch margins `[4,4,4,4]` (`panel` light, for the world's chips and signs and the tools;
+`hud_panel` dark, for every HUD panel); `selection_seat` 32×48, pivot 16,46 (four corner marks round a seat).
 (All in units; 2x PNG: icons 32×32, `panel` and `hud_panel` 64×64 (margins of 8 texels; the middle is
-stretched, so it must be one flat colour), `selection` 128×128.)
+stretched, so it must be one flat colour), `selection_seat` 64×96.)
 
 ---
 
@@ -178,7 +191,7 @@ This section matters more than style. **Wrong meaning is worse than ugly art.**
 
 `starting` (launching) and `offline` (connection lost) are presentation overlays, not herdr states.
 `offline` must read at a glance as "this data is old" and **must never look like idle**.
-The same goes for `done_stack`: it sits beside a done agent, so it means UNREAD, not success.
+The same goes for `done_stack_small`: it sits beside a done agent, so it means UNREAD, not success.
 
 ---
 
@@ -262,12 +275,12 @@ Every size above is in **units** (the density-1 values; one tile is 32). The shi
 **density 2** (second row below), and so are the pixel people (their own asset family, see
 [ASSET_SPEC.md](ASSET_SPEC.md), "Pixel people"). Each pack picks one density for all its images:
 
-| Density | One tile | 16×16 icon | `panel` | `selection` |
+| Density | One tile | 16×16 icon | `panel` | `selection_seat` |
 |---:|---:|---:|---:|---:|
-| 1 | 32×32 | 16×16 | 32×32 | 64×64 |
-| 2 (the shipped packs; pixel people) | 64×64 | 32×32 | 64×64 | 128×128 |
-| 4 | 128×128 | 64×64 | 128×128 | 256×256 |
-| 8 (maximum) | 256×256 | 128×128 | 256×256 | 512×512 |
+| 1 | 32×32 | 16×16 | 32×32 | 32×48 |
+| 2 (the shipped packs; pixel people) | 64×64 | 32×32 | 64×64 | 64×96 |
+| 4 | 128×128 | 64×64 | 128×128 | 128×192 |
+| 8 (maximum) | 256×256 | 128×128 | 256×256 | 256×384 |
 
 **Your canvas = the numbers in §1 × density.** Furniture too: `door` at density 4 is 192×320.
 

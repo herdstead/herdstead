@@ -1,7 +1,7 @@
 class_name StatusBadge
 extends Sprite2D
 ## The mark that says a pane needs a human: the badge over a seat, the two icons
-## on a minimap row, a signpost's and the inspector's portrait badge are all this node.
+## on a SPACES row, an edge arrow's and the inspector's portrait badge are all this node.
 ##
 ## What OfficeAttention has to know to step a badge — whose machine, which pane,
 ## which state — are typed fields here, and the pulse itself is one call: the
@@ -15,8 +15,8 @@ const GROUP := &"office_badges"
 ## The machine whose connection freezes this badge. Empty while it pulses for
 ## nobody, which is also when it is out of GROUP.
 var machine := ""
-## The pane this badge sits over; empty on a minimap icon, which stands for a
-## whole floor rather than one seat.
+## The pane this badge sits over; empty on a SPACES row's or an edge arrow's icon,
+## which stands for a whole zone rather than one seat.
 var pane_id := ""
 ## The herdr state being waited on, `&""` while the badge pulses for nobody.
 var state := &""
@@ -26,12 +26,12 @@ var state := &""
 var rest_offset := Vector2.ZERO
 ## The label beside this badge saying how long its agent has been waiting (an
 ## agent list row's tail); the attention clock writes it on the same beat as
-## the inspector's. A minimap icon stands for a whole floor, which nobody is
+## the inspector's. A SPACES row's icon stands for a whole zone, which nobody is
 ## waiting on, so not every badge has one, and every writer checks.
 var wait: Label
-## A seat's badge says the same in the bubble over its blocked agent
-## (OfficeBubble: the wait and the patience bar), on the same beat.
-var bubble: OfficeBubble
+## A seat's badge says the same in the chip on its blocked agent's tag row
+## (OfficeChip: the wait, in the compact form), on the same beat.
+var chip: OfficeChip
 
 
 ## Draw `art`'s `id` sprite and take the pivot it declares as this badge's rest.
@@ -51,8 +51,8 @@ func clear(art: ArtPack) -> void:
 	visible = false
 
 
-## Pulse for `for_pane` on `for_machine`, in `for_state`. A minimap icon
-## stands for a floor rather than a seat and passes an empty pane.
+## Pulse for `for_pane` on `for_machine`, in `for_state`. A SPACES row's or an
+## edge arrow's icon stands for a zone rather than a seat and passes an empty pane.
 func pulse_for(for_machine: String, for_pane: String, for_state: StringName) -> void:
 	machine = for_machine
 	pane_id = for_pane
@@ -79,13 +79,13 @@ func stop_pulsing() -> void:
 ## number at all (OfficeAttention.format_duration() writes nothing for it).
 ## The label only ever changes its text, never its visibility: an empty label
 ## draws nothing, and a node that came and went would make an in-place update
-## differ from a rebuild of the same data. The bubble hides its bar the same way.
+## differ from a rebuild of the same data. The chip hides its frame the same way.
 func show_wait(seconds: float) -> void:
 	var text := OfficeAttention.format_duration(seconds)
 	if is_instance_valid(wait) and wait.text != text:
 		wait.text = text
-	if is_instance_valid(bubble):
-		bubble.show_wait(seconds)
+	if is_instance_valid(chip):
+		chip.show_wait(seconds)
 
 
 ## Raise the badge `units` density-1 units above its rest. Offset is applied

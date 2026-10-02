@@ -40,21 +40,28 @@ PYTHON="${PYTHON:-$DEFAULT_PYTHON}"
 # Cases discover themselves (tools/test_base.gd), so nothing lists them.
 # These floors are what each file runs today: a file that silently loses
 # its cases fails here instead of staying green. Raise them as cases are added.
-MIN_CASES_ART=23
+MIN_CASES_ART=25
 MIN_CASES_CLIENT=52
-MIN_CASES_MACHINE=33
+MIN_CASES_MACHINE=34
 MIN_CASES_INCREMENTAL=54
-MIN_CASES_OFFICE_LAYOUT=50
-MIN_CASES_OFFICE_SERVICE=14
-MIN_CASES_OFFICE_GEOMETRY=22
+MIN_CASES_OFFICE_LAYOUT=51
+MIN_CASES_OFFICE_MAP=23
+MIN_CASES_OFFICE_SERVICE=16
+# GEOMETRY 27 -> 25: its two row-wall sign and title cases went with the row
+# walls (lane B2a); MAP's test_top_run_and_lane_gap_pieces_clear_... covers
+# the furniture's clearance on the map now.
+MIN_CASES_OFFICE_GEOMETRY=25
 MIN_CASES_OFFICE_FRAMES=5
-MIN_CASES_OFFICE_QUIET=7
+MIN_CASES_OFFICE_QUIET=8
 MIN_CASES_DAY_LIGHT=8
-MIN_CASES_OFFICE_RECONCILE=18
-MIN_CASES_OFFICE_WALKING=31
-MIN_CASES_OFFICE_RESTS=27
-MIN_CASES_OFFICE_NAVIGATOR=18
-MIN_CASES_FLOORS=17
+MIN_CASES_OFFICE_RECONCILE=22
+MIN_CASES_OFFICE_WALKING=33
+MIN_CASES_OFFICE_RESTS=28
+MIN_CASES_OFFICE_NAVIGATOR=26
+# FLOORS (22 cases, tools/test_floors.gd) was retired with the FLOORS minimap and
+# its signposts (lane B3): SPACE RAIL covers every one of its cases on the
+# SPACES rail and the edge arrows, and adds ten.
+MIN_CASES_SPACE_RAIL=40
 MIN_CASES_ATTENTION_STORE=28
 MIN_CASES_AGENT_LIST=35
 MIN_CASES_ATTENTION_INTEGRATION=19
@@ -65,20 +72,20 @@ MIN_CASES_SAVED_LOOKS=16
 MIN_CASES_COMMANDS=37
 MIN_CASES_RAW_INPUT=14
 MIN_CASES_ANSWERS=42
-MIN_CASES_BUBBLES=23
+MIN_CASES_BUBBLES=24
 MIN_CASES_MONITOR=36
-MIN_CASES_TOP_BAR=26
+MIN_CASES_TOP_BAR=27
 MIN_CASES_STATE_LOG=21
-MIN_CASES_NEWS_EVENTS=14
-MIN_CASES_LENS=17
-MIN_CASES_STRATEGIC=22
+MIN_CASES_NEWS_EVENTS=15
+MIN_CASES_LENS=20
+MIN_CASES_STRATEGIC=28
 MIN_CASES_ALERTS=19
 MIN_CASES_OVERVIEW=21
 MIN_CASES_LAUNCH=40
 MIN_CASES_PROMPT=12
-MIN_CASES_SPLIT=14
+MIN_CASES_SPLIT=15
 MIN_CASES_CLOSE=15
-MIN_CASES_SPACES=15
+MIN_CASES_SPACES=16
 
 # Unix socket paths stop at ~104 bytes on macOS: keep them short, under /tmp.
 WORK="$(mktemp -d /tmp/herdstead-test.XXXXXX)"
@@ -345,6 +352,8 @@ run_scene_suite() {
 }
 
 run_scene_suite test_office_layout "OFFICE LAYOUT TESTS" "$MIN_CASES_OFFICE_LAYOUT"
+# The map planner: zones in lanes, the atomic plan cache, partitions, the map's furniture.
+run_scene_suite test_office_map "OFFICE MAP TESTS" "$MIN_CASES_OFFICE_MAP"
 # The entry band's fixtures and who rests where: pure, no office.
 run_scene_suite test_office_service "OFFICE SERVICE TESTS" "$MIN_CASES_OFFICE_SERVICE"
 run_scene_suite test_office_navigator "OFFICE NAVIGATOR TESTS" "$MIN_CASES_OFFICE_NAVIGATOR"
@@ -366,12 +375,13 @@ run_scene_suite test_office_reconcile "RECONCILE TESTS" "$MIN_CASES_OFFICE_RECON
 # passes, freezing, re-routing; offices fed like the incremental suite's.
 run_scene_suite test_office_walking "WALKING TESTS" "$MIN_CASES_OFFICE_WALKING" -- --read-only \
 	--socket="$WORK/walking-nowhere.sock" --work="$WORK"
-# Who rests where: the seat with its bubble and its paper, the pantry.
+# Who rests where: the seat with its chip and its paper, the pantry.
 run_scene_suite test_office_rests "RESTS TESTS" "$MIN_CASES_OFFICE_RESTS" -- --read-only \
 	--socket="$WORK/rests-nowhere.sock" --work="$WORK"
-# The left column's minimap and the signposts, and a mezzanine's plate, by real input.
-run_scene_suite test_floors "FLOORS TESTS" "$MIN_CASES_FLOORS" -- --read-only \
-	--socket="$WORK/floors-nowhere.sock" --work="$WORK"
+# The left column's SPACES rail (rows, headings, in-view marks), the edge arrows,
+# the zone signs and the plate's problem line, by real input.
+run_scene_suite test_space_rail "SPACE RAIL TESTS" "$MIN_CASES_SPACE_RAIL" -- --read-only \
+	--socket="$WORK/space-rail-nowhere.sock" --work="$WORK"
 
 run_scene_suite test_attention_store "ATTENTION STORE TESTS" "$MIN_CASES_ATTENTION_STORE"
 run_scene_suite test_agent_list "AGENT LIST TESTS" "$MIN_CASES_AGENT_LIST" -- --work="$WORK"
@@ -428,7 +438,7 @@ run_scene_suite test_answers "ANSWER TESTS" "$MIN_CASES_ANSWERS" -- \
 	--socket-a="$WORK/answer-a.sock" --control-a="$WORK/answer-a-ctl.sock" \
 	--socket-b="$WORK/answer-b.sock" --control-b="$WORK/answer-b-ctl.sock" --work="$WORK" --ssh="$WORK/ssh"
 
-# The bubbles over blocked agents, and the clicks in the world and on the
+# The chips over blocked agents, and the clicks in the world and on the
 # bar that open answer mode, against two more.
 start_fake bubble-a
 SERVER_S_PID=$FAKE_PID

@@ -40,7 +40,7 @@ var font_path := ""
 ## The font's licence, which ships beside it and may not be dropped.
 var font_license_path := ""
 ## The optional pixel face for the HUD's few fixed ASCII headings (the
-## wordmark, FLOORS, NEWS, NEXT); null when the manifest names none. Drawn with
+## wordmark, SPACES, NEWS, NEXT); null when the manifest names none. Drawn with
 ## no antialiasing, at sizes on its own grid (HudTheme.DISPLAY_SIZES).
 var display_font: Font
 var stale_tint := STALE_DEFAULT
@@ -120,7 +120,7 @@ func color(key: StringName) -> Color:
 	return palette[key]
 
 
-## The cell of a semantic tile id, e.g. "floor.wood_a" or "rug.top_left".
+## The cell of a semantic tile id, e.g. "floor.wood_a" or "wall.cap_left".
 func cell(tile: StringName) -> Vector2i:
 	if not tiles.has(tile):
 		push_error('Art pack %s: no tile named "%s"' % [id, tile])
@@ -169,7 +169,7 @@ static func pick(items: Array[ArtSprite], rng: RandomNumberGenerator) -> ArtSpri
 
 
 ## The light nine-patch the world's and the tools' panels are drawn from (the
-## blocked bubble, the Avatar Studio). Never null in a valid pack.
+## blocked chip, the Avatar Studio). Never null in a valid pack.
 func panel() -> ArtSprite:
 	return ui_sprite(ArtContract.UI_PANEL)
 
@@ -182,7 +182,7 @@ func hud_panel() -> ArtSprite:
 
 ## The frame drawn around the selected seat. Never null in a valid pack.
 func selection_mark() -> ArtSprite:
-	return ui_sprite(ArtContract.UI_SELECTION)
+	return ui_sprite(ArtContract.UI_SELECTION_SEAT)
 
 
 ## What one herdr state looks like here, or null when the pack does not draw it

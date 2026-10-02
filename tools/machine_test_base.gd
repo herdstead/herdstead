@@ -138,7 +138,7 @@ func _actors_playing(office: OfficeDouble) -> Array:
 
 func _floors_text(office: OfficeDouble) -> String:
 	var texts := PackedStringArray()
-	for label: Label in office.hud.floors.find_children("*", "Label", true, false):
+	for label: Label in office.hud.spaces.find_children("*", "Label", true, false):
 		if label.is_visible_in_tree():
 			texts.append(label.text)
 	return " | ".join(texts)
@@ -149,7 +149,7 @@ func _floors_text(office: OfficeDouble) -> String:
 func _floor_badges(office: OfficeDouble) -> Array:
 	# A building heading's mark is a plain sprite, not a badge: it stands for a
 	# machine answering, which nobody is waiting on, so it never pulses.
-	var icons: Array = office.hud.floors.find_children("*", "StatusBadge", true, false)
+	var icons: Array = office.hud.spaces.find_children("*", "StatusBadge", true, false)
 	return (
 		icons
 		. filter(func(b: StatusBadge) -> bool: return b.is_visible_in_tree())
@@ -158,12 +158,12 @@ func _floor_badges(office: OfficeDouble) -> Array:
 
 
 ## Click through real GUI input, including scrolling tall panels into view.
-func _floor_pick(office: OfficeDouble, key: String) -> void:
-	var row: OfficeFloorRow = office.hud.floors.row_for(key)
+func _zone_pick(office: OfficeDouble, key: String) -> void:
+	var row: OfficeSpaceRow = office.hud.spaces.row_for(key)
 	if row == null:
 		_fail("no minimap row for " + key)
 		return
-	var scroll: ScrollContainer = office.hud.floors.get_node("%Scroll")
+	var scroll: ScrollContainer = office.hud.spaces.get_node("%Scroll")
 	scroll.ensure_control_visible(row)
 	await process_frame
 	await process_frame
@@ -235,7 +235,7 @@ func _desk_point(office: OfficeDouble, key: String) -> Vector2:
 func _pane_keys(office: OfficeDouble) -> Array:
 	var keys: Array = []
 	for building: BuildingModel in office.frame.buildings:
-		for floor_model in building.floors:
+		for floor_model in building.zones:
 			for room in floor_model.rooms:
 				for pane in room.panes:
 					keys.append(pane.key)
@@ -244,12 +244,27 @@ func _pane_keys(office: OfficeDouble) -> Array:
 
 func _pane_state(office: OfficeDouble, key: String) -> String:
 	for building: BuildingModel in office.frame.buildings:
-		for floor_model in building.floors:
+		for floor_model in building.zones:
 			for room in floor_model.rooms:
 				for pane in room.panes:
 					if pane.key == key:
 						return pane.state
 	return ""
+
+
+## A real click on machine `key`'s SPACES heading, through the GUI.
+func _heading_pick(office: OfficeDouble, key: String) -> void:
+	var heading := office.hud.spaces.heading_for(key)
+	if heading == null:
+		_fail("no SPACES heading for " + key)
+		return
+	var scroll: ScrollContainer = office.hud.spaces.get_node("%Scroll")
+	scroll.ensure_control_visible(heading)
+	await process_frame
+	await process_frame
+	_press(heading.button().get_global_rect().get_center(), MOUSE_BUTTON_LEFT)
+	await process_frame
+	await process_frame
 
 
 ## A pane's status as the fleet holds that machine's snapshot.
@@ -262,7 +277,7 @@ func _held_status(office: OfficeDouble, machine: String, pane_id: String) -> Str
 
 ## Where a floor's row sits in the viewport.
 func _row_position(office: OfficeDouble, key: String) -> Vector2:
-	var row: OfficeFloorRow = office.hud.floors.row_for(key)
+	var row: OfficeSpaceRow = office.hud.spaces.row_for(key)
 	if row == null:
 		_fail("no minimap row for " + key)
 		return Vector2.ZERO
@@ -503,9 +518,13 @@ func _click_visible_pane(office: OfficeDouble, key: String) -> void:
 		elif point.x >= visible.end.x:
 			wheel = MOUSE_BUTTON_WHEEL_RIGHT
 		else:
-			# Under a signpost: bring it down from under them, or left when the
-			# pan cannot go that way any further.
-			wheel = MOUSE_BUTTON_WHEEL_RIGHT if stuck else MOUSE_BUTTON_WHEEL_UP
+			# Under an edge arrow (they stand along the world's edges): bring the
+			# desk toward the middle of the room, or sideways when the pan cannot
+			# go that way any further.
+			var lower := point.y > visible.get_center().y
+			wheel = MOUSE_BUTTON_WHEEL_DOWN if lower else MOUSE_BUTTON_WHEEL_UP
+			if stuck:
+				wheel = MOUSE_BUTTON_WHEEL_RIGHT if point.x > visible.get_center().x else MOUSE_BUTTON_WHEEL_LEFT
 		_press(_wheel_point(office, visible), wheel)
 		await process_frame
 		await process_frame
@@ -515,14 +534,15 @@ func _click_visible_pane(office: OfficeDouble, key: String) -> void:
 		attempts += 1
 	var ready := _clickable(office, visible, point)
 	_check(
-		ready, "pane target is visible and clear of the signposts before click: %s at %s in %s" % [key, point, visible]
+		ready,
+		"pane target is visible and clear of the edge arrows before click: %s at %s in %s" % [key, point, visible]
 	)
 	if ready:
 		await _click(point)
 
 
 ## Whether a viewer could click `at`: inside the world's visible room and not
-## under a signpost, which stands over the world's top-right corner and takes
+## under an edge arrow, which stands over the world along its edge and takes
 ## a click there, or under the drawer (open over the desks a plan made for it
 ## closed puts to its right, or its closed tab) or the NEWS strip (counted so
 ## one moved over the world cannot swallow a test's click unseen), or under
@@ -532,7 +552,9 @@ func _clickable(office: OfficeDouble, visible: Rect2, at: Vector2) -> bool:
 		return false
 	var tab: Control = office.hud.get_node("%DrawerTab")
 	var holder: Control = office.hud.get_node("%ListHolder")
-	for cover: Control in [office.hud.signposts, tab, holder, office.hud.news, office.hud.staff]:
+	var covers: Array[Control] = [tab, holder, office.hud.news, office.hud.staff]
+	covers.append_array(office.hud.edge_arrows.shown())
+	for cover in covers:
 		if cover.is_visible_in_tree() and cover.get_global_rect().has_point(at):
 			return false
 	return true
@@ -551,8 +573,8 @@ func _wheel_point(office: OfficeDouble, visible: Rect2) -> Vector2:
 
 
 ## Read the actual rendered plate, not an internal world rebuild signature.
-func _floor_plate_text(office: OfficeDouble) -> String:
-	var plate := office.world.get_node("FloorPlate")
+func _machine_plate_text(office: OfficeDouble) -> String:
+	var plate := office.world.get_node("MachinePlate")
 	var texts := PackedStringArray()
 	for label: Label in plate.find_children("*", "Label", true, false):
 		if label.is_visible_in_tree():
@@ -688,3 +710,96 @@ func _loop_clean_text(value: Variant) -> String:
 ## The second pack the pack-switching cases switch to (test_base.gd).
 func _second_pack() -> String:
 	return _second_pack_at(args.work.path_join("machines-pack-second"))
+
+
+func _attention_identity_fixture() -> Dictionary:
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://tools/fixtures/snapshot_basic.json"))
+	var data: Dictionary = parsed
+	var snapshot := _dict(data, "snapshot")
+	snapshot.agents = []
+	for pane: Dictionary in _list(snapshot, "panes"):
+		pane.erase("terminal_id")
+		pane.erase("agent_session")
+		pane.agent_status = "blocked" if pane.pane_id in ["alpha:p1", "alpha:p3"] else "idle"
+	return snapshot
+
+
+func _attention_machine(label: String, target: String, session := "") -> Dictionary:
+	return {"id": "attention", "label": label, "target": target, "session": session, "enabled": true}
+
+
+func _machine_attention(office: OfficeDouble, machine: String) -> Array[AttentionItem]:
+	var items: Array[AttentionItem] = []
+	for item in office.attention_store.current(Time.get_ticks_msec()):
+		if item.machine_key == machine:
+			items.append(item)
+	return items
+
+
+## Whether the chip over pane `key`'s desk is inside the world on screen.
+func _bubble_on_screen(office: OfficeDouble, key: String) -> bool:
+	var seat := office.floor_view.seat(key)
+	if seat == null:
+		return false
+	var screen := office.get_viewport().get_canvas_transform() * seat.node.chip_rect()
+	return screen.has_area() and office.hud.world_rect().intersects(screen)
+
+
+## A real key the staff panel reads by its position (Enter, Escape): keycode
+## and physical keycode both, pressed and released.
+func _card_key(code: Key) -> void:
+	for down: bool in [true, false]:
+		var event := InputEventKey.new()
+		event.keycode = code
+		event.physical_keycode = code
+		event.pressed = down
+		Input.parse_input_event(event)
+		Input.flush_buffered_events()
+		await physics_frame
+		await process_frame
+
+
+## char(), made at run time: `char(0)` with a constant argument is folded while
+## the script compiles, and loading the folded constant made the engine warn
+## "Unexpected NUL character" (make check-scripts).
+static func _char(code: int) -> String:
+	return char(code)
+
+
+## One layout slot carrying `rect` (none at all when null), as from_wire() reads
+## it: [x, y, width, height].
+func _rect_read(rect: Variant) -> Array:
+	var slot := {"pane_id": "p"} if rect == null else {"pane_id": "p", "rect": rect}
+	var read := HerdrSnapshot.from_wire({"layouts": [{"tab_id": "t", "panes": [slot]}]})
+	return _drawn_slot(read.layouts[0].panes[0]).slice(1)
+
+
+## A real drag in the world, from `from` by `by`, through the viewport.
+func _drag_world(from: Vector2, by: Vector2) -> void:
+	_button(from, MOUSE_BUTTON_LEFT, true)
+	var motion := InputEventMouseMotion.new()
+	motion.position = from + by
+	motion.global_position = from + by
+	motion.relative = by
+	motion.button_mask = MOUSE_BUTTON_MASK_LEFT
+	root.push_input(motion, true)
+	await process_frame
+	_button(from + by, MOUSE_BUTTON_LEFT, false)
+	await process_frame
+	await process_frame
+
+
+## One workspace `a` whose one tab holds `count` working claude agents, focus on the first.
+func _one_tab_of(count: int) -> Dictionary:
+	var big := {
+		"workspaces": [{"workspace_id": "a", "number": 1}],
+		"tabs": [{"workspace_id": "a", "tab_id": "a:t", "number": 1}],
+		"panes": [],
+		"layouts": [],
+		"focused_pane_id": "a:p0"
+	}
+	for index in count:
+		var pane := {"pane_id": "a:p%d" % index, "tab_id": "a:t", "workspace_id": "a", "agent": "claude"}
+		pane.merge({"agent_status": "working", "terminal_id": "term-a-%d" % index})
+		_list(big, "panes").append(pane)
+	return big

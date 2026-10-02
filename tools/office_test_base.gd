@@ -8,6 +8,8 @@ extends "res://tools/test_base.gd"
 const AGENT_RECORD_ONLY: Array[String] = ["launch_pending", "name", "interactive_ready"]
 const MANIFESTS := ["res://assets/daylight/manifest.json"]
 const LOCAL := HerdrFleet.LOCAL
+## The second machine of the cases that need one (_two_machine_office()).
+const BEE := "socket:bee"
 ## The live office with a viewport size this suite decides; see the file.
 const OfficeDouble := preload("res://tools/office_double.gd")
 ## The window every case gives the office, and the one _live_office() tells it
@@ -136,10 +138,13 @@ func _open_tab_of(snapshot: Dictionary, workspace_id: String, tab_id: String) ->
 	return result
 
 
-## The task-lamp level of every seat with a pane on the shown floor, by pane id.
-func _lamps(office: OfficeDouble) -> Dictionary:
+## The task-lamp level of every seat with a pane on the shown map, by pane id;
+## only workspace `zone`'s (the fixture's pane ids begin with it) when given.
+func _lamps(office: OfficeDouble, zone := "") -> Dictionary:
 	var result := {}
 	for station in _seats(office):
+		if not zone.is_empty() and not HerdrFleet.split_key(station.pane_key)[1].begins_with(zone + ":"):
+			continue
 		result[HerdrFleet.split_key(station.pane_key)[1]] = _lamp_level(station.table, station.column, station.side)
 	return result
 
@@ -220,6 +225,10 @@ func _walked(office: OfficeDouble, when: String) -> void:
 ## Compare the world after in-place updates with a rebuild from the same data.
 func _same_as_rebuild(office: OfficeDouble, when: String) -> void:
 	await _frames(2)
+	# A seat under the pointer shows its plate, and physics picking finds what
+	# is under a still pointer again every physics frame: sample both worlds
+	# after it has run, so both are hovered alike.
+	await _physics_frames(2)
 	# Text normally updates on a 250ms beat. Sample both worlds after that same
 	# text evaluation, not one before its first wait label tick and one after it.
 	office.attention._update_waits()
@@ -232,6 +241,7 @@ func _same_as_rebuild(office: OfficeDouble, when: String) -> void:
 	office.rebuild_world()
 	_check(office.world.get_instance_id() != world_id, "the rebuild really rebuilt " + when)
 	await _frames(2)
+	await _physics_frames(2)
 	office.attention._update_waits()
 	var rebuilt := _fingerprint(office.world)
 	_eq(updated.size(), rebuilt.size(), "node count " + when)
@@ -630,9 +640,25 @@ func _frames(count: int) -> void:
 		await process_frame
 
 
-func _visit_floor(office: OfficeScene, key: String) -> void:
-	var row := office.hud.floors.row_for(key)
-	var scroll: ScrollContainer = office.hud.floors.get_node("%Scroll")
+func _physics_frames(count: int) -> void:
+	for i in count:
+		await physics_frame
+
+
+## Whether an edge arrow stands over viewport point `at`, where it would take a click.
+func _under_arrow(office: OfficeScene, at: Vector2) -> bool:
+	if not office.hud.edge_arrows.is_visible_in_tree():
+		return false
+	for arrow in office.hud.edge_arrows.shown():
+		if arrow.get_global_rect().has_point(at):
+			return true
+	return false
+
+
+## A real click on the SPACES row of zone `key`, scrolled into the rail first.
+func _visit_zone(office: OfficeScene, key: String) -> void:
+	var row := office.hud.spaces.row_for(key)
+	var scroll: ScrollContainer = office.hud.spaces.get_node("%Scroll")
 	scroll.ensure_control_visible(row)
 	await _frames(2)
 	var at := row.get_global_rect().get_center()
@@ -656,24 +682,45 @@ func _text_tick() -> void:
 		OS.delay_msec(10)
 
 
-## Every piece of standing furniture on the shown floor, in tree order: the
-## rows' plants and cabinets, not the entry band's counters (_fixtures()), which
-## stand in its walkway on purpose.
+## `snapshot` with `count` more agents, idle, in a tab of the api floor of
+## their own that is projected before the others (number 0): residents that
+## went idle first (their starts unknown, from the first snapshot they are in),
+## so they hold that many pantry spots before anyone a case watches. The
+## narrowest map's pantry holds five; three residents leave the two a case
+## fills and overfills.
+func _with_residents(snapshot: Dictionary, count := 3) -> Dictionary:
+	var result: Dictionary = snapshot.duplicate(true)
+	_list(result, "tabs").append({"tab_id": "api:t0", "workspace_id": "api", "number": 0, "label": "residents"})
+	var source: Dictionary = _list(result, "panes")[1]
+	for index in count:
+		var pane := source.duplicate(true)
+		pane.pane_id = "api:r%d" % index
+		pane.tab_id = "api:t0"
+		pane.terminal_id = "term-api-r%d" % index
+		pane.agent = "claude"
+		pane.agent_status = "idle"
+		_list(result, "panes").append(pane)
+	return result
+
+
+## Every piece of standing furniture on the shown map, in tree order: the
+## top-wall run's plants and the lane gaps' plants and side tables, not the
+## entry band's pantry counter (_fixtures()), which stands in its walkway on purpose.
 func _decor(office: OfficeDouble) -> Array[OfficeDecor]:
 	var found: Array[OfficeDecor] = []
 	for node: Node in office.world.find_children("*", "OfficeDecor", true, false):
 		var piece: OfficeDecor = node
-		if piece.piece != ArtContract.PROP_RECEPTION and piece.piece != ArtContract.PROP_PANTRY:
+		if piece.piece != ArtContract.PROP_PANTRY:
 			found.append(piece)
 	return found
 
 
-## The entry band's counters on the shown floor, in tree order.
+## The entry band's counter (the pantry) on the shown map, in tree order.
 func _fixtures(office: OfficeDouble) -> Array[OfficeDecor]:
 	var found: Array[OfficeDecor] = []
 	for node: Node in office.world.find_children("*", "OfficeDecor", true, false):
 		var piece: OfficeDecor = node
-		if piece.piece == ArtContract.PROP_RECEPTION or piece.piece == ArtContract.PROP_PANTRY:
+		if piece.piece == ArtContract.PROP_PANTRY:
 			found.append(piece)
 	return found
 
@@ -699,15 +746,15 @@ func _table_rect(table: OfficeTable) -> Rect2:
 ## and sits above its rooms.
 func _plate_lines(office: OfficeDouble) -> Array:
 	var found: Array = []
-	for label: Label in office.world.get_node("FloorPlate").find_children("*", "Label", true, false):
+	for label: Label in office.world.get_node("MachinePlate").find_children("*", "Label", true, false):
 		found.append(label.text)
 	return found
 
 
-## What the bubble over the seat drawn for `key` says about how long its agent
+## What the chip over the seat drawn for `key` says about how long its agent
 ## has waited.
 func _wait_text(office: OfficeDouble, key: String) -> String:
-	return _label(office.floor_view.seats[key].node.bubble(), "%Wait").text
+	return _label(office.floor_view.seats[key].node.chip(), "%Wait").text
 
 
 ## --- typed node lookups -------------------------------------------------------
@@ -803,3 +850,108 @@ func _feet_size() -> Vector2:
 ## its first table: api:p1 far, api:p3 near.
 func _both_sides() -> Dictionary:
 	return _with(fixture, "api:p3", {"agent": "pi"})
+
+
+## Local and a second machine, `bee`, on a socket nobody answers: both clients
+## stopped, fed by hand.
+## `screen` is the window (the walking suites plan 488 wide: PLAN_SCREEN).
+func _two_machine_office(first := fixture, screen := Vector2(SCREEN)) -> OfficeDouble:
+	var office := OfficeDouble.new()
+	_live_offices.append(office)
+	office.test_screen = screen
+	office.test_args = AppArgs.parse(
+		PackedStringArray(
+			[
+				"--read-only",
+				"--socket=" + args.socket,
+				"--machine-socket=bee=" + args.work.path_join("bee-nowhere.sock")
+			]
+		)
+	)
+	office.manifest_path = MANIFESTS[0]
+	office.remember_theme = false
+	root.add_child(office)
+	_local(office).stop()
+	office.fleet._roster.stop()
+	_feed(office, first)
+	_feed_bee(office, _bee_snapshot("blocked"))
+	await _frames(2)
+	return office
+
+
+func _bee(office: OfficeDouble) -> HerdrClient:
+	return office.fleet._sites[1].client
+
+
+## Feed `bee` a fresh snapshot, live.
+func _feed_bee(office: OfficeDouble, snapshot: Dictionary) -> void:
+	var client := _bee(office)
+	client.stop()
+	client.online = true
+	client._apply_snapshot(snapshot.duplicate(true))
+	office.fleet.liveness_changed.emit()
+
+
+## bee's one workspace, `hive`, with one agent in `status`.
+static func _bee_snapshot(status: String) -> Dictionary:
+	return {
+		"focused_pane_id": "hive:p1",
+		"workspaces": [{"workspace_id": "hive", "number": 1, "label": "hive"}],
+		"tabs": [{"tab_id": "hive:t1", "workspace_id": "hive", "number": 1, "label": "hive"}],
+		"panes":
+		[
+			{
+				"pane_id": "hive:p1",
+				"workspace_id": "hive",
+				"tab_id": "hive:t1",
+				"agent": "claude",
+				"agent_status": status,
+				"terminal_id": "term-hive-p1"
+			}
+		],
+		"agents": [],
+		"layouts": []
+	}
+
+
+func _decor_signatures(plan: FloorPlan) -> PackedStringArray:
+	var found := PackedStringArray()
+	for placed in plan.decorations:
+		found.append(placed.geometry_signature())
+	found.sort()
+	return found
+
+
+func _decor_places(office: OfficeDouble) -> Array:
+	var found := _decor(office).map(func(piece: OfficeDecor) -> String: return "%s@%s" % [piece.piece, piece.position])
+	found.sort()
+	return found
+
+
+func _planned_places(plan: FloorPlan) -> Array:
+	var found := plan.decorations.map(
+		func(piece: DecorPlacement) -> String: return "%s@%s" % [piece.piece, piece.position]
+	)
+	found.sort()
+	return found
+
+
+## The instance id of `node` and of everything under it, in tree order.
+func _subtree_ids(node: Node) -> Array:
+	return (
+		[node.get_instance_id()]
+		+ node.find_children("*", "", true, false).map(func(each: Node) -> int: return each.get_instance_id())
+	)
+
+
+## Whether strip column `frame` is one of `track`'s frames.
+func _within(track: PixelPeople.Track, frame: Variant) -> bool:
+	var column: int = frame
+	return column >= track.start and column < track.start + track.frame_count()
+
+
+## Each partition sprite of `zone` on the shown map, as "texture@position".
+func _partitions_drawn(office: OfficeDouble, zone: String) -> Array:
+	return office.floor_view.partition_sprites(zone).map(
+		func(sprite: Sprite2D) -> String: return "%s@%s" % [sprite.texture.resource_path, sprite.position]
+	)

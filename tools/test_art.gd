@@ -86,6 +86,40 @@ func test_a_fallback_never_makes_a_row_taller() -> void:
 		)
 
 
+## The world's small labels (name plates, the lens line, the chip's wait, zone
+## signs) wear the pack's pixel face over the same system fallbacks, and a
+## fallback taller than the pixel face must not make their rows taller either:
+## on CI (Linux, Noto Sans CJK: 13 tall at 8 where the pixel face is 9) the
+## plate and the lens row grew to 13 and a sign's words out of its board. The
+## rows given up are below the baseline, so the text stays where the pixel face
+## alone puts it (a top spacing would lift it by as much).
+func test_a_fallback_never_makes_a_world_label_taller_or_moves_its_baseline() -> void:
+	var pack := ArtPack.from_manifest(MANIFEST)
+	var own := pack.display_font
+	var pixels := OfficeDraw.DISPLAY_PIXELS
+	var pen := OfficeDraw.new(pack)
+	_check(
+		pen.display.get_height(pixels) <= own.get_height(pixels),
+		"the pen's display face: %s, no taller than the pixel face" % pen.display.get_height(pixels)
+	)
+	# A chain that is taller on every machine: the pack's text face as fallback.
+	var chain := FontVariation.new()
+	chain.base_font = own
+	chain.fallbacks = [pack.font]
+	_check(
+		chain.get_height(pixels) > own.get_height(pixels),
+		"the text face makes the chain taller: the case has a subject"
+	)
+	var fitted := OfficeDraw.no_taller(chain, own, pixels)
+	_eq(fitted.get_height(pixels), own.get_height(pixels), "cut to the pixel face's own height")
+	var alone := TextLine.new()
+	alone.add_string("DATA 12m", own, pixels)
+	var line := TextLine.new()
+	line.add_string("DATA 12m", fitted, pixels)
+	_eq(line.get_line_ascent(), alone.get_line_ascent(), "and the baseline is where the pixel face alone puts it")
+	_check(OfficeDraw.no_taller(fitted, own, pixels) == fitted, "a chain that already fits is handed back as it is")
+
+
 ## The set of semantic IDs the scenes draw with lives in GDScript, next to the
 ## code that draws, and every pack is held to it. A pack that lacks one is
 ## named, not quietly missing a texture at runtime.
@@ -93,15 +127,20 @@ func test_art_contract_names_every_id_a_pack_lacks() -> void:
 	_check(ArtContract.problems(ArtPack.from_manifest(MANIFEST)).is_empty(), "the shipped pack dresses the scenes")
 	var missing := {
 		"a palette colour": func(m: Dictionary) -> void: _drop(m, ["palette", "task_light"]),
-		"a tile": func(m: Dictionary) -> void: _drop(m, ["tiles", "rug.middle_center"]),
-		"a prop": func(m: Dictionary) -> void: _drop(m, ["props", "sign"]),
+		"a tile": func(m: Dictionary) -> void: _drop(m, ["tiles", "floor.walkway"]),
+		"a prop": func(m: Dictionary) -> void: _drop(m, ["props", "window"]),
+		# The office and the showroom (scripts/preview.gd) both stand these.
+		"the lift door": func(m: Dictionary) -> void: _drop(m, ["props", "door"]),
+		"the side table": func(m: Dictionary) -> void: _drop(m, ["props", "side_table"]),
 		"a UI image": func(m: Dictionary) -> void: _drop(m, ["ui", "branch"]),
 		"a state": func(m: Dictionary) -> void: _drop(m, ["states", "blocked"]),
 	}
 	var named := {
 		"a palette colour": "task_light",
-		"a tile": "rug.middle_center",
-		"a prop": "sign",
+		"a tile": "floor.walkway",
+		"a prop": "window",
+		"the lift door": "door",
+		"the side table": "side_table",
 		"a UI image": "branch",
 		"a state": "blocked",
 	}
@@ -154,7 +193,7 @@ func test_art_pack_refuses_a_manifest_it_cannot_draw() -> void:
 		"no atlas": func(m: Dictionary) -> void: m.erase("atlas"),
 		"a palette colour that is not hex": func(m: Dictionary) -> void: m.palette.ink = "not-a-colour",
 		"a tile with no cell": func(m: Dictionary) -> void: m.tiles["floor.walkway"] = {},
-		"a prop with no pivot": func(m: Dictionary) -> void: _drop(m, ["props", "sign", "pivot"]),
+		"a prop with no pivot": func(m: Dictionary) -> void: _drop(m, ["props", "window", "pivot"]),
 		"a UI image with no path": func(m: Dictionary) -> void: _drop(m, ["ui", "panel", "path"]),
 		"a state with no badge": func(m: Dictionary) -> void: _drop(m, ["states", "idle", "badge"]),
 		"no font": func(m: Dictionary) -> void: m.erase("font"),
@@ -188,7 +227,7 @@ func test_an_item_block_reads_into_typed_fields() -> void:
 		"a floor item blocks"
 	)
 	_eq(art.prop_sprite(&"wall_frame").item.place, &"wall", "a wall item needs no footprint")
-	_eq(art.prop_sprite(&"done_stack").item.group, &"", "a signal is in no pool")
+	_eq(art.prop_sprite(&"done_stack_small").item.group, &"", "a signal is in no pool")
 	_check(art.prop_sprite(&"door").item == null, "the door is placed by code, by its id")
 	var desk: Array[StringName] = []
 	for member in art.items_in(&"desk"):
@@ -253,6 +292,30 @@ func test_the_display_font_is_optional_and_drawn_hard() -> void:
 	)
 
 
+## The `+N` note on the world's edge is a disabled EdgeArrow button, and it
+## stands on the floor like the arrows do: its box is the filled dark one they
+## wear, not the hollow frame other switched-off dark buttons take, so its
+## count reads like a zone's number on an arrow.
+func test_the_edge_arrows_note_wears_the_filled_box() -> void:
+	var pack := ArtPack.from_manifest(MANIFEST)
+	var theme := HudTheme.build(pack, OfficeDraw.new(pack).font)
+	var arrow := theme.get_stylebox("normal", "EdgeArrow") as StyleBoxFlat
+	var note := theme.get_stylebox("disabled", "EdgeArrow") as StyleBoxFlat
+	_check(arrow != null and note != null, "both are flat boxes of the theme")
+	if arrow == null or note == null:
+		return
+	_eq(arrow.bg_color, pack.color(ArtContract.DEEP), "an arrow is filled deep")
+	_eq(note.bg_color, arrow.bg_color, "the note has the arrow's fill")
+	_eq(note.bg_color.a, 1.0, "opaque: the floor does not show through it")
+	_eq(note.border_color, arrow.border_color, "and the arrow's edge")
+	_eq(note.get_border_width(SIDE_LEFT), arrow.get_border_width(SIDE_LEFT), "as thick")
+	for side: Side in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM]:
+		_eq(note.get_margin(side), arrow.get_margin(side), "the same room inside (side %d)" % side)
+	# Other dark buttons keep the hollow look when switched off: it is the note's alone.
+	var off := theme.get_stylebox("disabled", "CardAction") as StyleBoxFlat
+	_check(off != null and off.bg_color.a == 0.0, "a switched-off card action stays hollow")
+
+
 ## A broken item block refuses the whole pack, like any other contract error:
 ## a misspelt key must not read as an absent one.
 func test_a_broken_item_block_refuses_the_pack() -> void:
@@ -266,7 +329,7 @@ func test_a_broken_item_block_refuses_the_pack() -> void:
 		"blocks on a desk item": func(m: Dictionary) -> void: m.props.desk_mug.item.blocks = true,
 		"a floor item that does not block": func(m: Dictionary) -> void: m.props.plant.item.blocks = false,
 		"a group that is not an id": func(m: Dictionary) -> void: m.props.desk_mug.item.group = "Desk!",
-		"a weight with no group": func(m: Dictionary) -> void: m.props.done_stack.item.weight = 2,
+		"a weight with no group": func(m: Dictionary) -> void: m.props.done_stack_small.item.weight = 2,
 		"a negative weight": func(m: Dictionary) -> void: m.props.desk_mug.item.weight = -1,
 		"an item on a UI image": func(m: Dictionary) -> void: m.ui.panel.item = {"place": "wall"},
 	}
@@ -277,7 +340,7 @@ func test_a_broken_item_block_refuses_the_pack() -> void:
 
 
 ## Every pool a scene draws from has members, and each stands where its pool
-## is drawn; the done paper stack, a signal, is never in one.
+## is drawn; the done paper stack (the pod's small one), a signal, is never in one.
 func test_the_contract_names_an_empty_or_misplaced_pool() -> void:
 	var catless := func(m: Dictionary) -> void:
 		for cat: String in ["cat_loaf", "cat_sleep", "cat_sit"]:
@@ -290,9 +353,9 @@ func test_the_contract_names_an_empty_or_misplaced_pool() -> void:
 	_check(
 		problems.has("props: plant_b is in the plant pool but stands on the desk"), "a misplaced member: %s" % problems
 	)
-	var pooled := func(m: Dictionary) -> void: m.props.done_stack.item.group = "desk"
+	var pooled := func(m: Dictionary) -> void: m.props.done_stack_small.item.group = "desk"
 	problems = ArtContract.problems(ArtPack.from_manifest(_mutated_pack("pool-signal", pooled)))
-	_check(problems.has("props: done_stack is a signal, never in a pool"), "a signal in a pool: %s" % problems)
+	_check(problems.has("props: done_stack_small is a signal, never in a pool"), "a signal in a pool: %s" % problems)
 
 
 func test_art_pack_rejects_wrong_json_containers() -> void:
@@ -321,13 +384,13 @@ func test_art_pack_rejects_invalid_geometry_before_drawing() -> void:
 		"far outside atlas": func(m: Dictionary) -> void: m.tiles["floor.walkway"].cell = [999, 999],
 		"wrapping cell": func(m: Dictionary) -> void: m.tiles["floor.walkway"].cell = [4294967299, 0],
 		"negative cell y": func(m: Dictionary) -> void: m.tiles["floor.walkway"].cell = [3, -1],
-		"empty width": func(m: Dictionary) -> void: m.props.sign.size = [0, 24],
-		"negative height": func(m: Dictionary) -> void: m.props.sign.size = [64, -1],
-		"fractional size": func(m: Dictionary) -> void: m.props.sign.size = [64, 24.5],
-		"negative pivot y": func(m: Dictionary) -> void: m.props.sign.pivot = [32, -1],
-		"past pivot x": func(m: Dictionary) -> void: m.props.sign.pivot = [65, 22],
-		"past pivot y": func(m: Dictionary) -> void: m.props.sign.pivot = [32, 25],
-		"fractional pivot": func(m: Dictionary) -> void: m.props.sign.pivot = [32, 22.5],
+		"empty width": func(m: Dictionary) -> void: m.props.window.size = [0, 48],
+		"negative height": func(m: Dictionary) -> void: m.props.window.size = [64, -1],
+		"fractional size": func(m: Dictionary) -> void: m.props.window.size = [64, 48.5],
+		"negative pivot y": func(m: Dictionary) -> void: m.props.window.pivot = [32, -1],
+		"past pivot x": func(m: Dictionary) -> void: m.props.window.pivot = [65, 44],
+		"past pivot y": func(m: Dictionary) -> void: m.props.window.pivot = [32, 49],
+		"fractional pivot": func(m: Dictionary) -> void: m.props.window.pivot = [32, 44.5],
 		"patch object": func(m: Dictionary) -> void: m.ui.panel.nine_patch = {},
 		"patch wrong length": func(m: Dictionary) -> void: m.ui.panel.nine_patch = [4, 4, 4],
 		"patch negative": func(m: Dictionary) -> void: m.ui.panel.nine_patch = [4, -1, 4, 4],
@@ -340,13 +403,13 @@ func test_art_pack_rejects_invalid_geometry_before_drawing() -> void:
 		_check(ArtPack.from_manifest(_mutated_pack(what, change)) == null, "rejects " + what + " at the JSON boundary")
 	var edges := func(m: Dictionary) -> void:
 		m.tiles["floor.walkway"].cell = [7, 3]
-		m.props.sign.pivot = [64, 24]
+		m.props.window.pivot = [64, 48]
 		m.ui.panel.nine_patch = [3, 5, 28, 26]
 	var valid := ArtPack.from_manifest(_mutated_pack("geometry-edges", edges))
 	_check(valid != null, "last atlas cell, inclusive foot pivot and one-unit patch middle remain legal")
 	if valid == null:
 		return
-	_eq(valid.prop_sprite(&"sign").pivot, Vector2(64, 24), "both pivot edges survive parsing")
+	_eq(valid.prop_sprite(&"window").pivot, Vector2(64, 48), "both pivot edges survive parsing")
 	_eq([valid.panel().patch_right, valid.panel().patch_bottom], [28, 26], "asymmetric margins are preserved")
 	var built := valid.tileset()
 	_check(built != null, "accepted edge geometry really builds a TileSet")
@@ -364,10 +427,10 @@ func test_art_pack_requires_decodable_images_at_declared_density() -> void:
 	var broken := {
 		"atlas missing": func(m: Dictionary) -> void: m.atlas = "missing.png",
 		"atlas path type": func(m: Dictionary) -> void: m.atlas = [],
-		"prop missing": func(m: Dictionary) -> void: m.props.sign.path = "missing.png",
+		"prop missing": func(m: Dictionary) -> void: m.props.window.path = "missing.png",
 		"UI path type": func(m: Dictionary) -> void: m.ui.panel.path = 42,
 		"atlas width mismatch": func(m: Dictionary) -> void: m.atlas_size = [288, 128],
-		"prop height mismatch": func(m: Dictionary) -> void: m.props.sign.size = [64, 25],
+		"prop height mismatch": func(m: Dictionary) -> void: m.props.window.size = [64, 49],
 		"UI width mismatch": func(m: Dictionary) -> void: m.ui.panel.size = [33, 32],
 		"wrong image density": other_density,
 		"no density": func(m: Dictionary) -> void: m.erase("density"),
@@ -376,7 +439,7 @@ func test_art_pack_requires_decodable_images_at_declared_density() -> void:
 	for what: String in broken:
 		var change: Callable = broken[what]
 		_check(ArtPack.from_manifest(_mutated_pack(what, change)) == null, "rejects " + what)
-	for image_path: String in ["terrain.png", "props/sign.png", "ui/panel.png"]:
+	for image_path: String in ["terrain.png", "props/window.png", "ui/panel.png"]:
 		var path := _mutated_pack("corrupt-" + image_path.replace("/", "-"), func(_m: Dictionary) -> void: pass)
 		_check(ArtPack.from_manifest(path) != null, "the copied pack is valid before corrupting " + image_path)
 		var file := FileAccess.open(path.get_base_dir().path_join(image_path), FileAccess.WRITE)
@@ -590,9 +653,13 @@ func test_art_contract_names_ids_no_scene_asks_for() -> void:
 	_eq(
 		Array(unused[&"tiles"]),
 		["wall.front_center", "wall.front_left", "wall.front_right", "wall.threshold"],
-		"the front wall nothing lays: it would cover the near seats (docs/WORLD_MODEL.md)"
+		"only the front wall, which nothing lays: it would cover the near seats (docs/WORLD_MODEL.md)"
 	)
-	_eq(Array(unused[&"props"]), [], "every prop is placed somewhere")
+	# Everything else the pack ships is drawn: the long table's art, the rug, the
+	# row walls' joints, the reception, the row room's sign and cabinet, the big
+	# paper stack, the old selection frame and the open run's two ends were
+	# pruned from the pack when the office went open-plan. Exactly nothing.
+	_eq(Array(unused[&"props"]), [], "every prop is in the contract or in a pool")
 	_eq(Array(unused[&"ui"]), [], "every UI image is drawn somewhere")
 	_eq(Array(unused[&"table"]), [], "every shared-table module is laid or is a furniture view")
 	for id in ArtContract.tile_ids():
@@ -620,7 +687,7 @@ func test_art_textures_as_built() -> void:
 	var art := ArtPack.from_manifest(MANIFEST)
 	var base := MANIFEST.get_base_dir()
 	_check(
-		art.sprite_texture(art.prop_sprite(&"cabinet")) == load(base.path_join(art.props[&"cabinet"].path)),
+		art.sprite_texture(art.prop_sprite(&"window")) == load(base.path_join(art.props[&"window"].path)),
 		"a prop is the imported resource itself"
 	)
 	var shipped_atlas: TileSetAtlasSource = art.tileset().get_source(0)
@@ -797,8 +864,8 @@ func test_art_nodes() -> void:
 		var density: int = art.density
 		var pen := OfficeDraw.new(art)
 		var parent := Control.new()
-		var desk := pen.prop(parent, &"cabinet", Vector2(100, 200))
-		var spec := art.prop_sprite(&"cabinet")
+		var desk := pen.prop(parent, &"window", Vector2(100, 200))
+		var spec := art.prop_sprite(&"window")
 		var size := Vector2(spec.size)
 		var pivot := spec.pivot
 		_eq(desk.texture.get_size(), size * density, name + ": desk texture")
@@ -966,8 +1033,8 @@ func test_avatar_layers_and_tracks() -> void:
 	)
 	_check(not body is ImageTexture, "handed out as imported, not resampled into a new one")
 	_eq(
-		art.table.module_texture(&"surface_left").get_size(),
-		Vector2(32, 80) * art.table.density,
+		art.table.module_texture(&"desk_left").get_size(),
+		Vector2(32, 48) * art.table.density,
 		"a table module is its size in units at the table's density"
 	)
 	_check(art.table.module_texture(&"no_such_module") == null, "an unknown module is null, not a crash")

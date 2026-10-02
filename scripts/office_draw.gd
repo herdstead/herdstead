@@ -7,11 +7,28 @@ const TABLE_SCENE := preload("res://scenes/world/table.tscn")
 const DECOR_SCENE := preload("res://scenes/world/decor.tscn")
 const STATION_SCENE := preload("res://scenes/world/station.tscn")
 const PERSON_SCENE := preload("res://scenes/people/pixel_person.tscn")
+## A tab's name on the floor under its table (tab_label()): the display face's
+## own size, and the band it stands in.
+const TAB_LABEL_PIXELS := 8
+const TAB_LABEL_HEIGHT := 8.0
+## The size the world's small labels draw the display face at (style_display()).
+const DISPLAY_PIXELS := 8
 
 var art: ArtPack
 ## The bundled face keeps Latin text consistent across platforms. System CJK
 ## fonts fill missing glyphs without replacing the pack's Latin typography.
 var font: Font
+## The pack's display face (ArtPack.display_font, a pixel font drawn at its
+## native 8) for the small world labels: the name plates, the chip's wait, the
+## lens line and the zone signs. The same system fallbacks fill glyphs it lacks
+## (an agent's name may be anything), and never make a row taller than the
+## pixel face's own (no_taller()). A pack without one uses `font`.
+var display: Font
+## `display` for the tab labels: its line cut to TAB_LABEL_HEIGHT at
+## TAB_LABEL_PIXELS by giving up descent rows below it (Tiny5 at 8 is 9 tall:
+## ascent 7, descent 2), so a label's box ends where its band says. A tab label
+## is upper case: the rows given up are empty.
+var tab_face: Font
 
 
 func _init(pack: ArtPack) -> void:
@@ -34,6 +51,34 @@ func _init(pack: ArtPack) -> void:
 	readable.variation_opentype = {text_server.name_to_tag("wght"): 500.0, text_server.name_to_tag("opsz"): 10.0}
 	readable.fallbacks = [system]
 	font = readable
+	display = readable
+	var chain: Font = readable
+	if art.display_font != null:
+		var small := FontVariation.new()
+		small.base_font = art.display_font
+		small.fallbacks = [system]
+		chain = small
+		display = no_taller(small, art.display_font, DISPLAY_PIXELS)
+	var cut := FontVariation.new()
+	cut.base_font = chain
+	cut.spacing_bottom = mini(0, int(TAB_LABEL_HEIGHT) - ceili(chain.get_height(TAB_LABEL_PIXELS)))
+	tab_face = cut
+
+
+## `face` (a face and its fallbacks) at `pixels`, its row no taller than `own`'s
+## (the face without its fallbacks). Godot sizes a row by the tallest font in
+## the chain, used or not: Linux's Noto Sans CJK is 13 tall at 8 where the pixel
+## face is 9 (macOS's Hiragino is not taller, so it never shows there), and a
+## name plate or a zone sign grew out of its box. The rows given up are below
+## the baseline, so the baseline stays where the face's own puts it; a top
+## spacing would lift the text by as much.
+static func no_taller(face: FontVariation, own: Font, pixels: int) -> FontVariation:
+	var extra := ceili(face.get_height(pixels)) - ceili(own.get_height(pixels))
+	if extra <= 0:
+		return face
+	var fitted: FontVariation = face.duplicate()
+	fitted.spacing_bottom -= extra
+	return fitted
 
 
 func box(parent: Node, bounds: Rect2, color_key: StringName) -> ColorRect:
@@ -59,6 +104,17 @@ func style(
 	target.add_theme_font_size_override("font_size", pixels)
 	target.add_theme_color_override("font_color", art.color(color_key))
 	target.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+
+## The same, in the display face (`display`): the world's small labels.
+func style_display(
+	target: Label,
+	pixels: int = DISPLAY_PIXELS,
+	color_key: StringName = ArtContract.INK,
+	align: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT
+) -> void:
+	style(target, pixels, color_key, align)
+	target.add_theme_font_override("font", display)
 
 
 func label(
@@ -99,6 +155,21 @@ func clipped(
 	return result
 
 
+## A tab's name under its table: the pack's display face (a pixel font) at
+## TAB_LABEL_PIXELS, its line cut to TAB_LABEL_HEIGHT (tab_face), centred in `width` from `at` (the left end of the line it
+## stands on, on the floor), TAB_LABEL_HEIGHT deep, cut with a forced ellipsis:
+## even a narrow table signals truncation (Godot's ordinary ellipsis mode
+## suppresses the mark when fewer than six characters fit).
+func tab_label(parent: Node, at: Vector2, width: float) -> Label:
+	var result := clipped(
+		parent, "", at, Vector2(width, TAB_LABEL_HEIGHT), TAB_LABEL_PIXELS, ArtContract.INK, HORIZONTAL_ALIGNMENT_CENTER
+	)
+	result.add_theme_font_override("font", tab_face)
+	result.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS_FORCE
+	result.size = Vector2(width, TAB_LABEL_HEIGHT)
+	return result
+
+
 ## A prop of the pack, placed by its own foot.
 func prop(parent: Node, id: StringName, at: Vector2) -> Sprite2D:
 	return _place(parent, art.prop_sprite(id), at)
@@ -126,7 +197,7 @@ func panel(parent: Node, bounds: Rect2) -> void:
 
 
 ## Dress `target` as the pack's panel, `size` units big, the same way panel()
-## draws a new one: for a panel a scene already has (the bubble's frame).
+## draws a new one: for a panel a scene already has (the chip's frame).
 func dress_panel(target: NinePatchRect, size: Vector2) -> void:
 	var spec := art.panel()
 	target.texture = art.sprite_texture(spec)
@@ -151,17 +222,8 @@ func layer(parent: Node, at: Vector2) -> TileMapLayer:
 	return result
 
 
-func rug(parent: Node, at: Vector2, columns: int, rows: int) -> void:
-	var tiles := layer(parent, at)
-	for y in rows:
-		for x in columns:
-			var row := ArtContract.RUG_ROWS[0 if y == 0 else 2 if y == rows - 1 else 1]
-			var column := ArtContract.RUG_COLUMNS[0 if x == 0 else 2 if x == columns - 1 else 1]
-			tiles.set_cell(Vector2i(x, y), 0, art.cell(ArtContract.rug_cell(row, column)))
-
-
-## A shared table in `sorted` (a floor's y-sorted root) with the left end of
-## its near edge at `near_left`, seat columns at `columns` along that edge, and
+## A pod of desks (OfficeTable) in `sorted` (a floor's y-sorted root) with the
+## left end of its near edge at `near_left`, seat columns at `columns` along that edge, and
 ## its seats' contact shadows in `ground`. Null when the width is refused.
 ## `id` names the table node, and its stations after it.
 func table(sorted: Node2D, ground: Node2D, id: String, near_left: Vector2, width: float, columns: Array) -> OfficeTable:
@@ -170,7 +232,6 @@ func table(sorted: Node2D, ground: Node2D, id: String, near_left: Vector2, width
 		result.free()
 		return null
 	result.name = id
-	result.decorate(id)
 	result.position = near_left
 	sorted.add_child(result)
 	result.contact_shadows(ground)

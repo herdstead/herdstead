@@ -38,7 +38,7 @@ class Line:
 	## The track's agent (the row writes it in capitals).
 	var provider := ""
 	## herdr's workspace and tab labels. The row shows the tab: the space is the
-	## floor it stands on, which the tooltip names.
+	## zone it stands in, which the tooltip names.
 	var space := ""
 	var tab := ""
 	## ENDED, OFFLINE or GONE.

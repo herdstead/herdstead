@@ -85,60 +85,6 @@
         0
       ]
     },
-    "rug.top_left": {
-      "cell": [
-        4,
-        0
-      ]
-    },
-    "rug.top_center": {
-      "cell": [
-        5,
-        0
-      ]
-    },
-    "rug.top_right": {
-      "cell": [
-        6,
-        0
-      ]
-    },
-    "rug.middle_left": {
-      "cell": [
-        7,
-        0
-      ]
-    },
-    "rug.middle_center": {
-      "cell": [
-        0,
-        1
-      ]
-    },
-    "rug.middle_right": {
-      "cell": [
-        1,
-        1
-      ]
-    },
-    "rug.bottom_left": {
-      "cell": [
-        2,
-        1
-      ]
-    },
-    "rug.bottom_center": {
-      "cell": [
-        3,
-        1
-      ]
-    },
-    "rug.bottom_right": {
-      "cell": [
-        4,
-        1
-      ]
-    },
     "wall.cap_left": {
       "cell": [
         5,
@@ -210,51 +156,9 @@
         0,
         3
       ]
-    },
-    "wall.cap_t_left": {
-      "cell": [
-        1,
-        3
-      ]
-    },
-    "wall.face_t_left": {
-      "cell": [
-        2,
-        3
-      ]
-    },
-    "wall.cap_end_right": {
-      "cell": [
-        3,
-        3
-      ]
-    },
-    "wall.face_end_right": {
-      "cell": [
-        4,
-        3
-      ]
     }
   },
   "props": {
-    "cabinet": {
-      "path": "props/cabinet.png",
-      "size": [
-        48,
-        64
-      ],
-      "pivot": [
-        24,
-        60
-      ],
-      "item": {
-        "place": "floor",
-        "footprint": [
-          40,
-          12
-        ]
-      }
-    },
     "window": {
       "path": "props/window.png",
       "size": [
@@ -339,17 +243,6 @@
       "item": {
         "place": "wall"
       }
-    },
-    "sign": {
-      "path": "props/sign.png",
-      "size": [
-        64,
-        24
-      ],
-      "pivot": [
-        32,
-        22
-      ]
     },
     "desk_mug": {
       "path": "props/desk_mug.png",
@@ -503,8 +396,8 @@
         "group": "cat"
       }
     },
-    "done_stack": {
-      "path": "props/done_stack.png",
+    "done_stack_small": {
+      "path": "props/done_stack_small.png",
       "size": [
         24,
         24
@@ -516,26 +409,8 @@
       "item": {
         "place": "desk",
         "footprint": [
-          11,
-          4
-        ]
-      }
-    },
-    "reception": {
-      "path": "props/reception.png",
-      "size": [
-        48,
-        32
-      ],
-      "pivot": [
-        24,
-        30
-      ],
-      "item": {
-        "place": "floor",
-        "footprint": [
-          48,
-          14
+          6,
+          3
         ]
       }
     },
@@ -556,6 +431,79 @@
           14
         ]
       }
+    },
+    "side_table": {
+      "path": "props/side_table.png",
+      "size": [
+        32,
+        32
+      ],
+      "pivot": [
+        16,
+        30
+      ],
+      "item": {
+        "place": "floor",
+        "footprint": [
+          28,
+          10
+        ]
+      }
+    },
+    "partition_h": {
+      "path": "props/partition_h.png",
+      "size": [
+        32,
+        10
+      ],
+      "pivot": [
+        16,
+        10
+      ]
+    },
+    "partition_v": {
+      "path": "props/partition_v.png",
+      "size": [
+        6,
+        32
+      ],
+      "pivot": [
+        3,
+        32
+      ]
+    },
+    "partition_corner_bl": {
+      "path": "props/partition_corner_bl.png",
+      "size": [
+        32,
+        32
+      ],
+      "pivot": [
+        16,
+        32
+      ]
+    },
+    "partition_corner_br": {
+      "path": "props/partition_corner_br.png",
+      "size": [
+        32,
+        32
+      ],
+      "pivot": [
+        16,
+        32
+      ]
+    },
+    "partition_post": {
+      "path": "props/partition_post.png",
+      "size": [
+        6,
+        12
+      ],
+      "pivot": [
+        3,
+        12
+      ]
     }
   },
   "ui": {
@@ -692,15 +640,15 @@
         4
       ]
     },
-    "selection": {
-      "path": "ui/selection.png",
+    "selection_seat": {
+      "path": "ui/selection_seat.png",
       "size": [
-        64,
-        64
+        32,
+        48
       ],
       "pivot": [
-        32,
-        60
+        16,
+        46
       ]
     }
   },

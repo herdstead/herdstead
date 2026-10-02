@@ -1,8 +1,8 @@
 class_name OfficeHud
 extends CanvasLayer
-## The office's screen-space furniture: the top bar, the FLOORS minimap on the
-## left with the signposts to other floors over the world's right edge, the
-## agent list in a drawer on the right, and the staff panel along the bottom
+## The office's screen-space furniture: the top bar, the SPACES rail on the
+## left with the arrows on the world's edges toward blocked desks off screen,
+## the agent list in a drawer on the right, and the staff panel along the bottom
 ## (the agent card, `inspector`, with NEXT at its right end) over the NEWS
 ## strip, the strategic view over the world rect and the OVERVIEW over the
 ## world when they are open; laid out by the scene and styled by one Theme.
@@ -13,9 +13,15 @@ extends CanvasLayer
 ## never tells a panel where to stand. Moving a panel in `hud.tscn` moves the
 ## world with it.
 
-## A row in the minimap or a signpost was pressed; `key` is that floor's key.
-## The office shows that floor at once: there is no transition.
-signal floor_picked(key: String)
+## A row of the SPACES rail was pressed; `key` is that zone's key. The office
+## pans to that zone at once: there is no transition.
+signal zone_picked(key: String)
+## A heading of the SPACES rail was pressed; `key` is that machine's key. The
+## office shows that machine's map.
+signal machine_picked(key: String)
+## An edge arrow was pressed: the office pans to the desk of pane `pane_key`,
+## and selects nothing.
+signal arrow_picked(pane_key: String)
 ## A pane was chosen in the agent list: pick it, as a click on its desk does.
 signal agent_picked(key: String)
 ## The viewer asked for the terminal monitor on pane `pane_key`: a pane opened
@@ -38,7 +44,7 @@ signal step_requested(direction: int)
 ## OfficePaneInspector.pane_split): the office picks it once it shows.
 signal pane_split(target_key: String, pane_id: String, terminal_id: String, generation: int)
 ## The card made a new space or worktree from pane `from_key` (OfficePaneInspector.space_created):
-## the office picks its root pane, on its new floor, once it shows.
+## the office picks its root pane, in its new zone, once it shows.
 signal space_created(from_key: String, workspace_id: String, pane_id: String, terminal_id: String, generation: int)
 ## A panel's placement changed without the window changing: the office lays the
 ## world out again (see _fit_room()).
@@ -55,8 +61,9 @@ signal event_picked(key: String)
 ## The mouse came onto a NEWS item, a row of the agent list or of EVENTS about
 ## pane `key`, or left it (`""`): the office points at that desk, and only points.
 signal pane_pointed(key: String)
-## The same for a signpost and its floor `key`.
-signal floor_pointed(key: String)
+## The same for an edge arrow and its zone `key`: the office outlines that
+## zone's SPACES row.
+signal zone_pointed(key: String)
 ## The EVENTS page has just come into sight by its tab: the office lays it
 ## out now rather than on its next refresh. (The drawer opening on it moves
 ## the world's room, which refreshes the office anyway.)
@@ -78,11 +85,11 @@ signal strategic_picked(key: String)
 ## The drawer's two pages, in the order of their tabs.
 enum DrawerTab { AGENTS, EVENTS }
 
-## What the world keeps clear of the panels: to the side of the minimap and
+## What the world keeps clear of the panels: to the side of the SPACES rail and
 ## the right column, and above the staff panel and below the bar. The rest of
 ## the geometry is the scene's.
 @export var world_gap := Vector2(8, 16)
-## Where the tooltip over a blocked agent's bubble stands from the pointer. Set in the scene.
+## Where the world tooltip (over a blocked agent's chip, over a zone's sign) stands from the pointer. Set in the scene.
 @export var tip_gap := Vector2.ZERO
 ## The right-hand drawer's left edge, open and closed, from the screen's right
 ## (see _fit_drawer()). Set in the scene.
@@ -116,18 +123,15 @@ enum DrawerTab { AGENTS, EVENTS }
 ## where it says `NEXT:`, whom and the wait in a row (see _fit_staff()). Set in the scene.
 @export var next_width := 0.0
 @export var next_wide_width := 0.0
-## The FLOORS column's right edge as a narrow rail (number, windows, blocked)
-## and with the floors' names, and the logical screen width from which it has
-## the names (see _fit_floors()). Set in the scene.
-@export var floors_rail_right := 0.0
-@export var floors_named_right := 0.0
-@export var floors_named_from := 0.0
-## How far the signposts stand inside the world's top-right corner. Set in the scene.
-@export var signpost_inset := Vector2.ZERO
-## The signposts' width, and the world width from which they show at all (see
-## _fit_signposts()). Set in the scene.
-@export var signpost_full_width := 0.0
-@export var signposts_from := 0.0
+## The SPACES column's right edge as a narrow rail (number, windows, blocked)
+## and with the zones' names, and the logical screen width from which it has
+## the names (see _fit_spaces()). Set in the scene.
+@export var spaces_rail_right := 0.0
+@export var spaces_named_right := 0.0
+@export var spaces_named_from := 0.0
+## The world width below which the edge arrows leave their zone's number to the
+## tooltip (see _fit_edge_arrows()). Set in the scene.
+@export var edge_arrows_compact_from := 0.0
 ## The logical screen width from which the bar shows its counters' titles. Set in the scene.
 @export var bar_titles_from := 0.0
 ## The NEWS strip's top edge from the screen's bottom, and the gap the staff
@@ -148,11 +152,11 @@ var bar: OfficeBar:
 			_bar = $Screen/Bar
 		return _bar
 
-var floors: OfficeFloors:
+var spaces: OfficeSpaces:
 	get:
-		if _floors == null:
-			_floors = %Floors
-		return _floors
+		if _spaces == null:
+			_spaces = %Spaces
+		return _spaces
 
 ## The agent card, which is the staff panel along the bottom (card = the staff panel).
 var inspector: OfficePaneInspector:
@@ -179,10 +183,10 @@ var staff: Control:
 	get:
 		return %Staff
 
-## The signposts over the world's top-right corner; they take no room.
-var signposts: OfficeSignposts:
+## The arrows on the world's edges; they stand over the world and take no room.
+var edge_arrows: OfficeEdgeArrows:
 	get:
-		return %Signposts
+		return %EdgeArrows
 
 ## The NEWS strip along the screen's bottom: it takes room from the world's
 ## bottom while it is visible (the showroom hides it).
@@ -222,7 +226,7 @@ var monitor: TerminalMonitor:
 ## Logical screen the panels are laid out on; the office sets it with fit().
 var _screen := Vector2(800, 480)
 var _bar: OfficeBar
-var _floors: OfficeFloors
+var _spaces: OfficeSpaces
 var _inspector: OfficePaneInspector
 var _agent_list: AgentList
 ## The staff panel is down to its compact line; see _fit_staff().
@@ -232,11 +236,11 @@ var _compact := false
 var _drawer_open := false
 ## The staff panel was opened up from its line (expand_card(), or answer mode).
 var _expanded := false
-## The FLOORS column says the floors' names (see _fit_floors()).
-var _floors_named := false
-## The signposts last handed over (show_signposts()), kept so a change of the
-## world's width shows or hides them without a refresh.
-var _posts: Array[SignpostModel] = []
+## The SPACES column says the zones' names (see _fit_spaces()).
+var _spaces_named := false
+## Whether the edge arrows were last handed any (show_edge_arrows()): an
+## overlay closing shows the same arrows again without a refresh.
+var _arrows_shown := false
 ## What _process() last saw of the card: answering, and the pane it shows
 ## (the panel was opened for that pane; another one folds it).
 var _was_answering := false
@@ -253,9 +257,10 @@ var _attention_count := 0
 
 
 func _ready() -> void:
-	floors.floor_picked.connect(func(key: String) -> void: floor_picked.emit(key))
-	signposts.floor_picked.connect(func(key: String) -> void: floor_picked.emit(key))
-	signposts.resized.connect(_fit_signposts)
+	spaces.zone_picked.connect(func(key: String) -> void: zone_picked.emit(key))
+	spaces.machine_picked.connect(func(key: String) -> void: machine_picked.emit(key))
+	edge_arrows.arrow_picked.connect(func(key: String) -> void: arrow_picked.emit(key))
+	edge_arrows.zone_pointed.connect(func(key: String) -> void: zone_pointed.emit(key))
 	bar.counter_pressed.connect(func(id: StringName) -> void: counter_pressed.emit(id))
 	bar.chime_toggled.connect(func(on: bool) -> void: chime_toggled.emit(on))
 	agent_list.pane_picked.connect(_on_list_pick)
@@ -285,12 +290,11 @@ func _ready() -> void:
 	inspector.fold_requested.connect(compact_card)
 	inspector.pane_split.connect(pane_split.emit)
 	inspector.space_created.connect(space_created.emit)
-	monitor.closed.connect(func() -> void: monitor_closed.emit())
+	monitor.closed.connect(_on_monitor_closed)
 	news.picked.connect(func(key: String) -> void: news_picked.emit(key))
 	news.pointed.connect(func(key: String) -> void: pane_pointed.emit(key))
 	agent_list.pane_pointed.connect(func(key: String) -> void: pane_pointed.emit(key))
 	event_list.pointed.connect(func(key: String) -> void: pane_pointed.emit(key))
-	signposts.floor_pointed.connect(func(key: String) -> void: floor_pointed.emit(key))
 	overview.closed.connect(_on_overview_closed)
 	overview.picked.connect(func(key: String) -> void: overview_picked.emit(key))
 	overview.sort_changed.connect(func(_by: OverviewModel.Sort, _reversed: bool) -> void: overview_changed.emit())
@@ -305,8 +309,8 @@ func dress(art: ArtPack, font: Font) -> void:
 	var screen: Control = $Screen
 	screen.theme = HudTheme.build(art, font)
 	bar.dress(art)
-	floors.dress(art)
-	signposts.dress(art)
+	spaces.dress(art)
+	edge_arrows.dress(art)
 	inspector.dress(art)
 	agent_list.dress(art)
 	monitor.dress(art)
@@ -314,16 +318,16 @@ func dress(art: ArtPack, font: Font) -> void:
 	event_list.dress(art)
 	overview.dress(art)
 	strategic.dress(art)
-	var tip: HdPanel = %BubbleTip
+	var tip: HdPanel = %WorldTip
 	tip.dress(art)
 
 
-## The tooltip over a blocked agent's bubble: `text` (the question's excerpt,
-## or why there is none), near the pointer at `at` (viewport pixels), kept
+## The world tooltip, over a blocked agent's chip or a zone's sign: `text` (the question's excerpt
+## or why there is none; the sign's repository and checkout), near the pointer at `at` (viewport pixels), kept
 ## inside world_rect(). The office says what and where; nothing here reads herdr.
-func show_bubble_tip(text: String, at: Vector2) -> void:
-	var tip: Control = %BubbleTip
-	var label: Label = %BubbleTipText
+func show_world_tip(text: String, at: Vector2) -> void:
+	var tip: Control = %WorldTip
+	var label: Label = %WorldTipText
 	if label.text != text:
 		label.text = text
 	tip.reset_size()
@@ -333,24 +337,24 @@ func show_bubble_tip(text: String, at: Vector2) -> void:
 	tip.visible = true
 
 
-func hide_bubble_tip() -> void:
-	var tip: Control = %BubbleTip
+func hide_world_tip() -> void:
+	var tip: Control = %WorldTip
 	tip.visible = false
 
 
-## Whether the bubble tooltip is up, and what it says.
-func bubble_tip_shown() -> bool:
-	var tip: Control = %BubbleTip
+## Whether the world tooltip is up, and what it says.
+func world_tip_shown() -> bool:
+	var tip: Control = %WorldTip
 	return tip.visible
 
 
-func bubble_tip_text() -> String:
-	var label: Label = %BubbleTipText
+func world_tip_text() -> String:
+	var label: Label = %WorldTipText
 	return label.text
 
 
 ## The Theme dress() built, for furniture in the world that reads like the HUD
-## (the floor plate): the same pack, the same variations, built once.
+## (the machine plate): the same pack, the same variations, built once.
 func screen_theme() -> Theme:
 	var screen: Control = $Screen
 	return screen.theme
@@ -472,9 +476,9 @@ func overview_open() -> bool:
 func open_overview() -> void:
 	if agent_list.has_keyboard():
 		agent_list.release_keyboard()
-	hide_bubble_tip()
+	hide_world_tip()
 	overview.open()
-	_fit_signposts()
+	_fit_edge_arrows()
 	bar.set_overview(true)
 	bar.set_filter(_chip_counter(overview.filter()))
 
@@ -491,6 +495,7 @@ func show_overview(model: OverviewModel, art: ArtPack) -> void:
 ## However it closed: PANES is released and WORKING and IDLE say the list's
 ## filter again.
 func _on_overview_closed() -> void:
+	_fit_edge_arrows()
 	bar.set_overview(false)
 	bar.set_filter(_list_counter())
 	overview_closed.emit()
@@ -529,13 +534,13 @@ func strategic_open() -> bool:
 
 
 ## Open the strategic view over the world rect (the office shows it a model
-## right after). The bubble tooltip and the signposts go; the list keeps the
+## right after). The world tooltip and the edge arrows go; the list keeps the
 ## keyboard it has, and the staff panel stays as it is. The top bar's theme
 ## line says `STRATEGIC · S`.
 func open_strategic() -> void:
-	hide_bubble_tip()
+	hide_world_tip()
 	strategic.open()
-	_fit_signposts()
+	_fit_edge_arrows()
 	bar.show_strategic(true)
 
 
@@ -544,7 +549,7 @@ func close_strategic() -> void:
 
 
 ## The strategic view's schematic, from the office's model, over the world
-## rect as it is now (world_rect(), as the signposts stand in it).
+## rect as it is now (world_rect(), as the edge arrows stand in it).
 func show_strategic(model: StrategicModel) -> void:
 	var room := world_rect()
 	if strategic.position != room.position:
@@ -560,8 +565,15 @@ func point_strategic(key: String) -> void:
 	strategic.point(key)
 
 
+## Scroll the open strategic view to the section of zone `key`: a SPACES row of
+## the shown machine was picked under it.
+func reveal_strategic_section(key: String) -> void:
+	strategic.reveal_section(key)
+
+
 ## However it closed: the theme line says the pack again.
 func _on_strategic_closed() -> void:
+	_fit_edge_arrows()
 	bar.show_strategic(false)
 	strategic_closed.emit()
 
@@ -656,25 +668,25 @@ func _process(_delta: float) -> void:
 ## Every entry that can move a panel (fit(), the card opening or folding, the
 ## list taking the keyboard, answer mode, the drawer) comes through here, so the
 ## office hears room_changed whenever the world's room moved without the window.
-## Each panel's own fit is called from here: the drawer and the FLOORS column's
+## Each panel's own fit is called from here: the drawer and the SPACES column's
 ## width (rail or named) first, then the NEWS strip and the staff panel above
 ## it, then the side columns, which stop above the staff panel while it is
 ## shown (above the strip while only that is, at the screen's bottom gap while
-## neither is), the overview on that same bottom edge, and the signposts last
-## (they stand in world_rect(), which reads all of those). Every edge is one of
+## neither is), the overview on that same bottom edge, and the edge arrows last
+## (they stand over world_rect(), which reads all of those). Every edge is one of
 ## the scene's values. The order is final: no panel adds a step of its own.
 func _fit_room() -> void:
 	var moved := _fit_drawer()
-	moved = _fit_floors() or moved
+	moved = _fit_spaces() or moved
 	moved = _fit_news() or moved
 	moved = _fit_staff() or moved
 	var bottom := _column_bottom()
-	for column: Control in [floors, right_column]:
+	for column: Control in [spaces, right_column]:
 		if column.offset_bottom != bottom:
 			column.offset_bottom = bottom
 			moved = true
 	moved = _fit_overview() or moved
-	_fit_signposts()
+	_fit_edge_arrows()
 	if moved:
 		room_changed.emit()
 
@@ -719,26 +731,26 @@ func _fit_drawer() -> bool:
 	return true
 
 
-## The FLOORS column is a narrow rail (`floors_rail_right`: each floor's number,
+## The SPACES column is a narrow rail (`spaces_rail_right`: each zone's number,
 ## its windows under it and its blocked count, the rest in the row's tooltip)
-## on a screen narrower than `floors_named_from`, and says the floors' names
-## from there (`floors_named_right`). Only the rows' `visible` and tooltips
+## on a screen narrower than `spaces_named_from`, and says the zones' names
+## from there (`spaces_named_right`). Only the rows' `visible` and tooltips
 ## change with it. True when its edge moved.
-func _fit_floors() -> bool:
-	var named := _screen.x >= floors_named_from
-	if named != _floors_named:
-		_floors_named = named
-		floors.set_named(named)
-	var right := floors_named_right if named else floors_rail_right
-	if floors.offset_right == right:
+func _fit_spaces() -> bool:
+	var named := _screen.x >= spaces_named_from
+	if named != _spaces_named:
+		_spaces_named = named
+		spaces.set_named(named)
+	var right := spaces_named_right if named else spaces_rail_right
+	if spaces.offset_right == right:
 		return false
-	floors.offset_right = right
+	spaces.offset_right = right
 	return true
 
 
-## Whether the FLOORS column says the floors' names (see _fit_floors()).
-func floors_named() -> bool:
-	return _floors_named
+## Whether the SPACES column says the zones' names (see _fit_spaces()).
+func spaces_named() -> bool:
+	return _spaces_named
 
 
 ## The drawer's tab says how many agents need a human (attention_count()), a
@@ -769,7 +781,7 @@ func _label_tab() -> void:
 ## card itself; its slot along the bottom stays where it was and the world keeps
 ## clear of it, so leaving answer mode drops the panel back into it and lays
 ## nothing out again. The dim only darkens: a click goes through it, so a click
-## on another desk or bubble picks that pane, which leaves answer mode as it
+## on another desk or chip picks that pane, which leaves answer mode as it
 ## always has (a new binding), and the next agent can be answered from there.
 func _fit_staff() -> bool:
 	var answering := inspector.answering()
@@ -830,36 +842,39 @@ func _fit_overview() -> bool:
 	return true
 
 
-## The signposts to other floors with agents blocked on them (SignpostModel,
-## the office's); hidden when there are none. Kept, so a change of the world's
-## width shows or hides the same posts without a refresh (_fit_signposts()).
-func show_signposts(posts: Array[SignpostModel]) -> void:
-	_posts = posts
-	signposts.show_posts(posts)
-	_fit_signposts()
+## The arrows on the world's edges toward the zones of the shown map with
+## blocked desks off screen (EdgeArrowModel, the office's); none hides them.
+## Kept by the arrows themselves, so an overlay closing or the world's room
+## changing shows or places the same arrows without a refresh
+## (_fit_edge_arrows()): an edge too short for its arrows folds the last of
+## them into a `+N` note, and unfolds them when it has the room again.
+func show_edge_arrows(arrows: Array[EdgeArrowModel]) -> void:
+	_arrows_shown = not arrows.is_empty()
+	edge_arrows.show_arrows(arrows)
+	_fit_edge_arrows()
 
 
-## Whether the signposts step aside for a world narrower than `signposts_from`
-## (the 480x320 minimum, 4x): there the FLOORS rail's blocked badge on that
-## floor's row is the same click to the same floor, and NEXT names it.
-func signposts_yield() -> bool:
-	return world_rect().size.x < signposts_from
+## Whether the arrows leave their zone's number to the tooltip: a world
+## narrower than `edge_arrows_compact_from` (the 480x320 minimum, 4x), where a
+## full arrow would cover too much of it. The SPACES rail's row for that zone
+## says the same count, and NEXT names who waits.
+func edge_arrows_compact() -> bool:
+	return world_rect().size.x < edge_arrows_compact_from
 
 
-## The signposts stand inside the world's top-right corner, `signpost_inset`
-## in, as tall as the posts shown, `signpost_full_width` wide (the scene's).
-## They cover the world there: a bubble under one cannot be clicked or hovered.
-## Shown while a floor waits, the world is wide enough and neither the
-## OVERVIEW nor the strategic view covers the world.
-func _fit_signposts() -> void:
-	signposts.visible = (
-		not _posts.is_empty() and not signposts_yield() and not overview_open() and not strategic_open()
-	)
-	if signposts.custom_minimum_size.x != signpost_full_width:
-		signposts.custom_minimum_size = Vector2(signpost_full_width, 0)
-	signposts.reset_size()
+## The edge arrows stand over the world rect, inside its edges (OfficeEdgeArrows
+## places each on its own edge). Shown while there are any and nothing covers
+## the world: not under the OVERVIEW, the strategic view or the terminal
+## monitor. They cover the world where they stand: a chip under one cannot be
+## clicked or hovered.
+func _fit_edge_arrows() -> void:
+	edge_arrows.visible = _arrows_shown and not overview_open() and not strategic_open() and not monitor_open()
+	edge_arrows.set_compact(edge_arrows_compact())
 	var room := world_rect()
-	signposts.position = Vector2(room.end.x - signposts.size.x - signpost_inset.x, room.position.y + signpost_inset.y)
+	if edge_arrows.position != room.position:
+		edge_arrows.position = room.position
+	if edge_arrows.size != room.size:
+		edge_arrows.size = room.size
 
 
 func _on_list_pick(key: String, _by_keyboard: bool) -> void:
@@ -878,6 +893,7 @@ func open_monitor(context: CommandContext) -> void:
 	if agent_list.has_keyboard():
 		agent_list.release_keyboard()
 	monitor.open_monitor(context)
+	_fit_edge_arrows()
 
 
 func close_monitor() -> void:
@@ -886,6 +902,12 @@ func close_monitor() -> void:
 
 func monitor_open() -> bool:
 	return monitor.is_open()
+
+
+## The monitor closed, however: the edge arrows it covered are back.
+func _on_monitor_closed() -> void:
+	_fit_edge_arrows()
+	monitor_closed.emit()
 
 
 ## Lay the panels out for a `screen`-sized viewport.
@@ -900,13 +922,13 @@ func fit(screen: Vector2) -> void:
 
 ## The screen area left over for the office, from where the panels stand.
 ## Each slot takes room only while it is visible: the showroom hides the left
-## column and the NEWS strip (preview.gd). The signposts never take any: they stand over the world.
+## column and the NEWS strip (preview.gd). The edge arrows never take any: they stand over the world.
 func world_rect() -> Rect2:
-	var left := placed(floors)
+	var left := placed(spaces)
 	var right := placed(right_column)
 	var origin := Vector2(world_gap.x, placed(bar).end.y + world_gap.y)
 	var corner := Vector2(_screen.x - world_gap.x, maxf(left.end.y, right.end.y))
-	if floors.visible:
+	if spaces.visible:
 		origin.x = left.end.x + world_gap.x
 	if right_column.visible:
 		corner.x = right.position.x - world_gap.x

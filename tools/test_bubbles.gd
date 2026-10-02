@@ -1,9 +1,9 @@
 extends "res://tools/command_test_base.gd"
-## The bubbles over blocked agents and what a click in the world or on the
+## The chips over blocked agents and what a click in the world or on the
 ## bar does with them, against two fake herdrs of this suite's own whose pane
-## ids collide: the reads behind the bubbles (only blocked panes on screen, one
+## ids collide: the reads behind the chips (only blocked panes on screen, one
 ## at a time, each at most every ten seconds, never a look), the question in a
-## bubble's hover, a click on a bubble, a far badge, a blocked seat or the
+## chip's hover, a click on a chip, a far badge, a blocked seat or the
 ## blocked counter, NEXT and its wait, and the counters sending nothing; the
 ## reader's read of a blocked agent still launching, and the compact NEXT's
 ## whole words. Run through tools/run_tests.sh.
@@ -21,22 +21,22 @@ func _marker() -> String:
 	return "BUBBLE TESTS"
 
 
-# --- the bubbles' question reads -------------------------------------------------
+# --- the chips' question reads -------------------------------------------------
 
 
 ## bee's alpha floor with its alpha:p1 and alpha:p3 blocked, both asking
 ## QUESTION in their detection text; Local as the fixture has it. Shown on bee's
 ## floor while the card still follows Local's focus, every read fake B hears
-## is a bubble's.
-## Pan bee's alpha floor so both of its bubbles stand inside the world, below
-## the bar and above the staff panel: the reader reads only bubbles on screen.
+## is a chip's.
+## Pan bee's alpha floor so both of its chips stand inside the world, below
+## the bar and above the staff panel: the reader reads only chips on screen.
 func _bee_bubbles_on_screen(office: OfficeDouble) -> void:
-	var top := _station_of(office, HerdrFleet.pane_key(BEE, "alpha:p1")).bubble_rect().position.y
+	var top := _station_of(office, HerdrFleet.pane_key(BEE, "alpha:p1")).chip_rect().position.y
 	var room := office.hud.world_rect()
 	office.camera.pan = Vector2(office.camera.pan.x, top - room.position.y - 16)
 	await _frames(2)
 	for pane_id: String in ["alpha:p1", "alpha:p3"]:
-		var bubble := _station_of(office, HerdrFleet.pane_key(BEE, pane_id)).bubble_rect()
+		var bubble := _station_of(office, HerdrFleet.pane_key(BEE, pane_id)).chip_rect()
 		bubble.position -= office.camera.position
 		_check(room.encloses(bubble), "%s's bubble is on screen: %s" % [pane_id, bubble])
 
@@ -51,7 +51,7 @@ func _blocked_pair() -> void:
 		_ctl("control-b", "set_preview", {"pane_id": pane_id, "source": "detection", "text": QUESTION})
 
 
-## The bubbles read what a blocked agent on screen asks, and nothing else: only
+## The chips read what a blocked agent on screen asks, and nothing else: only
 ## the blocked panes of the floor shown (bee's alpha here, while the card reads
 ## Local's focus on fake A), the card's own payload (`detection`, 200 lines), one
 ## at a time for the whole office (the first reply held back a second holds the
@@ -62,7 +62,7 @@ func test_bubbles_read_blocked_panes_on_screen_one_at_a_time() -> void:
 	_blocked_pair()
 	var office := await _office_with(false, true, true, Vector2(SCREEN), true)
 	_ctl("control-b", "next", {"action": "delay", "method": "pane.read", "seconds": 1.0})
-	await _floor_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
+	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	await _bee_bubbles_on_screen(office)
 	await _until_stats(
 		"control-b", func(_stats: Dictionary) -> bool: return _read_panes("control-b").size() >= 1, "a read"
@@ -73,14 +73,23 @@ func test_bubbles_read_blocked_panes_on_screen_one_at_a_time() -> void:
 	await _until_stats(
 		"control-b", func(_stats: Dictionary) -> bool: return _read_panes("control-b").size() >= 2, "the second read"
 	)
+	await _until_stats(
+		"control-b", func(_stats: Dictionary) -> bool: return _read_panes("control-b").size() >= 3, "the third read"
+	)
 	await _wait(1.5)
-	_eq(_read_panes("control-b"), ["alpha:p1", "alpha:p3"], "then the other, and neither again within ten seconds")
+	# bee's blocked bravo:p1 is another zone of the same map now, its chip on
+	# screen under alpha's: it is read too, after alpha's two, in wait order.
+	_eq(
+		_read_panes("control-b"),
+		["alpha:p1", "alpha:p3", "bravo:p1"],
+		"then the other, then bravo's, one at a time, and none again within ten seconds"
+	)
 	_eq(
 		_sequence("control-b"),
-		PackedStringArray(["pane.read detection 200", "pane.read detection 200"]),
+		PackedStringArray(["pane.read detection 200", "pane.read detection 200", "pane.read detection 200"]),
 		"the card's own payload, nothing else asked of bee"
 	)
-	_eq(_read_panes("control-a"), [], "Local's blocked bravo:p1 is on a floor not shown: not read")
+	_eq(_read_panes("control-a"), [], "Local's blocked bravo:p1 is on a map not shown: not read")
 	var station := _station_of(office, HerdrFleet.pane_key(BEE, "alpha:p1"))
 	var p1 := HerdrFleet.pane_key(BEE, "alpha:p1")
 	await _until(
@@ -94,33 +103,49 @@ func test_bubbles_read_blocked_panes_on_screen_one_at_a_time() -> void:
 			_changed(_changed(_raw(), "alpha:p1", {"agent_status": "working"}), "alpha:p3", {"agent_status": "done"})
 		}
 	)
-	await _until(func() -> bool: return not station.bubble().visible, "no longer blocked: no bubble")
+	await _until(func() -> bool: return not station.chip().visible, "no longer blocked: no bubble")
 	await _wait(1.0)
-	_eq(_read_panes("control-b").size(), 2, "working, done and the shell are never read")
+	_eq(_read_panes("control-b").size(), 3, "working, done and the shell are never read")
 	_eq(_all_inputs(), 0, "no input went anywhere")
 	_eq(_count("control-a", "pane.focus") + _count("control-b", "pane.focus"), 0, "no switch either")
 	_eq(office.fleet.write_log().size(), 0, "and the audit has no write")
 
 
-## Nothing is read while the window is minimized, while the bubbles are off
+## Nothing is read while the window is minimized, while the chips are off
 ## screen (a pan brings them back without a refresh), while the terminal
 ## monitor covers the world, or while their machine is stale; the first read
-## comes once all of them let it. Stale and never read, a bubble shows no wait
+## comes once all of them let it. Stale and never read, a chip shows no wait
 ## and no frame, and its tooltip promises no read: it says there is no question
 ## read yet.
 func test_bubbles_read_nothing_while_minimized_covered_stale_or_off_screen() -> void:
 	_blocked_pair()
+	# Twelve more shells on bee's alpha:t1: a pod of eight columns (9 cells) takes
+	# two lanes, a map (23 cells) wide enough to pan its blocked seats off the
+	# 480-wide window; one lane's 13 cells leave only 76 units of pan (lane B2a).
+	var wide := _changed(
+		_changed(_raw(), "alpha:p1", {"agent_status": "blocked"}), "alpha:p3", {"agent_status": "blocked"}
+	)
+	var shell: Dictionary = {}
+	for record: Dictionary in _list(wide, "panes"):
+		if record.pane_id == "alpha:p2":
+			shell = record
+	for index in 12:
+		var extra: Dictionary = shell.duplicate(true)
+		extra.pane_id = "alpha:x%d" % index
+		extra.terminal_id = "term-alpha-x%d" % index
+		_list(wide, "panes").append(extra)
+	_ctl("control-b", "set_snapshot", {"snapshot": wide})
 	var office := await _office_with(false, true, true, Vector2(480, 320), true)
 	office.pacer.note_minimized(true)
-	await _floor_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
+	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	var station := _station_of(office, HerdrFleet.pane_key(BEE, "alpha:p1"))
-	await _until(func() -> bool: return station.bubble().visible, "the bubbles show")
+	await _until(func() -> bool: return station.chip().visible, "the bubbles show")
 	await _wait(1.0)
 	_eq(_read_panes("control-b"), [], "minimized: nothing read")
 	office.camera.pan = Vector2(10000, 10000)
 	await _frames(3)
 	for pane_id: String in ["alpha:p1", "alpha:p3"]:
-		var bubble := _station_of(office, HerdrFleet.pane_key(BEE, pane_id)).bubble_rect()
+		var bubble := _station_of(office, HerdrFleet.pane_key(BEE, pane_id)).chip_rect()
 		var on_screen := Rect2(bubble.position - office.camera.position, bubble.size)
 		_check(not on_screen.intersects(office.hud.world_rect()), "%s's bubble is panned off screen" % pane_id)
 	office.pacer.note_minimized(false)
@@ -131,7 +156,7 @@ func test_bubbles_read_nothing_while_minimized_covered_stale_or_off_screen() -> 
 	await _until(office.hud.monitor_open, "the monitor covers the world")
 	office.reveal(HerdrFleet.pane_key(BEE, "alpha:p1"))
 	await _frames(3)
-	var bubble := station.bubble_rect()
+	var bubble := station.chip_rect()
 	var shown := Rect2(bubble.position - office.camera.position, bubble.size)
 	_check(shown.intersects(office.hud.world_rect()), "alpha:p1's bubble is panned back on screen")
 	await _wait(1.0)
@@ -142,13 +167,13 @@ func test_bubbles_read_nothing_while_minimized_covered_stale_or_off_screen() -> 
 	await _until(func() -> bool: return not office.hud.monitor_open(), "the monitor closes")
 	await _wait(1.0)
 	_eq(_read_panes("control-b"), [], "on screen but stale: nothing read")
-	var wait: Label = station.bubble().get_node("%Wait")
+	var wait: Label = station.chip().get_node("%Wait")
 	_eq(wait.text, "", "stale: the bubble shows no wait")
-	var frame: NinePatchRect = station.bubble().get_node("%Frame")
+	var frame: NinePatchRect = station.chip().get_node("%Frame")
 	_check(not frame.visible, "nor an empty frame")
 	await _move_pointer(await _bubble_point(office, station.pane_key))
-	_check(office.hud.bubble_tip_shown(), "the tooltip shows over the bubble")
-	_eq(office.hud.bubble_tip_text(), OfficeQuestionReader.NOT_READ_TEXT, "and promises no read")
+	_check(office.hud.world_tip_shown(), "the tooltip shows over the bubble")
+	_eq(office.hud.world_tip_text(), OfficeQuestionReader.NOT_READ_TEXT, "and promises no read")
 	_ctl("control-b", "appear")
 	await _until(func() -> bool: return not office.fleet.is_stale(BEE), "bee is back and current")
 	await _until_stats(
@@ -157,8 +182,8 @@ func test_bubbles_read_nothing_while_minimized_covered_stale_or_off_screen() -> 
 	_eq(_all_inputs(), 0, "and nothing written, ever")
 
 
-## A bubble's read is never the look that turns writes back on after one ended:
-## once a key went to bee's alpha:p3, the bubble reads its question again and
+## A chip's read is never the look that turns writes back on after one ended:
+## once a key went to bee's alpha:p3, the chip reads its question again and
 ## shows it, and writes to that pane stay closed until the card's own preview
 ## read, begun after the write ended, comes back and is shown.
 func test_a_bubble_read_is_not_a_look() -> void:
@@ -194,17 +219,17 @@ func test_a_bubble_read_is_not_a_look() -> void:
 	_eq(_inputs("control-b").size(), 1, "one key, and nothing since")
 
 
-## A `--read-only` office reads nothing for its bubbles (it has no command
+## A `--read-only` office reads nothing for its chips (it has no command
 ## boundary to read through) and says so in the tooltip over them.
 func test_read_only_bubbles_read_nothing_and_say_so() -> void:
 	_blocked_pair()
 	var office := await _office_with(true, true, true, Vector2(SCREEN), true)
-	await _floor_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
+	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	var station := _station_of(office, HerdrFleet.pane_key(BEE, "alpha:p1"))
-	await _until(func() -> bool: return station.bubble().visible, "the bubble shows")
+	await _until(func() -> bool: return station.chip().visible, "the bubble shows")
 	await _wait(1.0)
 	await _move_pointer(await _bubble_point(office, station.pane_key))
-	_eq(office.hud.bubble_tip_text(), OfficeQuestionReader.READ_ONLY_TEXT, "the tooltip says read-only")
+	_eq(office.hud.world_tip_text(), OfficeQuestionReader.READ_ONLY_TEXT, "the tooltip says read-only")
 	_eq(_count("control-a", "pane.read") + _count("control-b", "pane.read"), 0, "and nothing was read")
 	_eq(_all_inputs(), 0, "nor written")
 
@@ -217,7 +242,7 @@ func test_read_only_bubbles_read_nothing_and_say_so() -> void:
 func test_a_pane_is_read_at_most_every_ten_seconds_whatever_it_does() -> void:
 	_blocked_pair()
 	var office := await _office_with(false, true, true, Vector2(SCREEN), true)
-	await _floor_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
+	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	await _bee_bubbles_on_screen(office)
 	await _until_stats(
 		"control-b", func(_stats: Dictionary) -> bool: return _read_panes("control-b").has("alpha:p1"), "p1 is read"
@@ -227,14 +252,15 @@ func test_a_pane_is_read_at_most_every_ten_seconds_whatever_it_does() -> void:
 	var station := _station_of(office, p1)
 	await _until(func() -> bool: return not _question_of(office, p1).is_empty(), "its question is kept")
 	_ctl("control-b", "status", {"pane_id": "alpha:p1", "agent_status": "working"})
-	await _until(func() -> bool: return not station.bubble().visible, "working: no bubble")
+	await _until(func() -> bool: return not station.chip().visible, "working: no bubble")
 	_ctl("control-b", "status", {"pane_id": "alpha:p1", "agent_status": "blocked"})
-	await _until(func() -> bool: return station.bubble().visible, "blocked again")
+	await _until(func() -> bool: return station.chip().visible, "blocked again")
 	_eq(_question_of(office, p1), "", "blocked again: the old question is not kept")
-	await _navigate_key(office, KEY_PAGEUP)
-	_eq(office.navigator.shown_key, HerdrFleet.pane_key(BEE, "bravo"), "PageUp shows bee's bravo")
+	# The rail is ascending: bravo (2) is the row after alpha (1).
 	await _navigate_key(office, KEY_PAGEDOWN)
-	_eq(office.navigator.shown_key, HerdrFleet.pane_key(BEE, "alpha"), "PageDown brings alpha back")
+	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(BEE, "bravo"), "PageDown pans to bee's bravo")
+	await _navigate_key(office, KEY_PAGEUP)
+	_eq(office.navigator.current_zone(office.frame), HerdrFleet.pane_key(BEE, "alpha"), "PageUp brings alpha back")
 	await _wait(1.0)
 	_eq(_read_panes("control-b").count("alpha:p1"), 1, "no second read of p1 within ten seconds")
 	_eq(_read_panes("control-b").count("alpha:p3"), 1, "nor of p3")
@@ -249,27 +275,27 @@ func test_a_pane_is_read_at_most_every_ten_seconds_whatever_it_does() -> void:
 	_eq(_all_inputs(), 0, "nothing written")
 
 
-## Hovering a blocked agent's bubble, by real pointer motion, shows the
+## Hovering a blocked agent's chip, by real pointer motion, shows the
 ## question's excerpt the reader keeps in a HUD tooltip near the pointer and
 ## inside the world's part of the screen, though its start was never seen and
-## the bubble draws no frame. The pane taking another terminal
+## the chip draws no frame. The pane taking another terminal
 ## while still blocked, under the pointer, drops the old excerpt at once: the
 ## tooltip says no question is read yet, never the old session's (the next
-## read waits for its ten seconds). The pointer leaving the bubble takes it away.
+## read waits for its ten seconds). The pointer leaving the chip takes it away.
 func test_hovering_a_bubble_shows_the_question_it_read() -> void:
 	_blocked_pair()
 	var office := await _office_with(false, true, true, Vector2(SCREEN), true)
-	await _floor_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
+	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	await _bee_bubbles_on_screen(office)
 	var p1 := HerdrFleet.pane_key(BEE, "alpha:p1")
 	await _until(func() -> bool: return not _question_of(office, p1).is_empty(), "p1's question is read")
-	var frame: NinePatchRect = _station_of(office, p1).bubble().get_node("%Frame")
+	var frame: NinePatchRect = _station_of(office, p1).chip().get_node("%Frame")
 	_check(not frame.visible, "blocked in the first snapshot: no wait and no frame")
 	var at := await _bubble_point(office, p1)
 	await _move_pointer(at)
-	_check(office.hud.bubble_tip_shown(), "the tooltip shows")
-	_eq(office.hud.bubble_tip_text(), "Do you want to proceed?", "with the excerpt read")
-	var tip: Control = office.hud.get_node("%BubbleTip")
+	_check(office.hud.world_tip_shown(), "the tooltip shows")
+	_eq(office.hud.world_tip_text(), "Do you want to proceed?", "with the excerpt read")
+	var tip: Control = office.hud.get_node("%WorldTip")
 	_check(office.hud.world_rect().encloses(tip.get_global_rect()), "inside the world's part of the screen")
 	var identity := office.frame.pane(p1).identity_key()
 	var again := _changed(
@@ -279,38 +305,36 @@ func test_hovering_a_bubble_shows_the_question_it_read() -> void:
 	)
 	_ctl("control-b", "set_snapshot", {"snapshot": again})
 	await _until(func() -> bool: return office.frame.pane(p1).identity_key() != identity, "p1 has another terminal")
-	_check(office.hud.bubble_tip_shown(), "still blocked, still under the pointer: the tooltip stays")
-	_eq(
-		office.hud.bubble_tip_text(), OfficeQuestionReader.NOT_READ_TEXT, "and drops the old session's question at once"
-	)
+	_check(office.hud.world_tip_shown(), "still blocked, still under the pointer: the tooltip stays")
+	_eq(office.hud.world_tip_text(), OfficeQuestionReader.NOT_READ_TEXT, "and drops the old session's question at once")
 	await _move_pointer(at + Vector2(0, 60))
-	_check(not office.hud.bubble_tip_shown(), "the pointer leaves: the tooltip goes")
+	_check(not office.hud.world_tip_shown(), "the pointer leaves: the tooltip goes")
 	_eq(_all_inputs(), 0, "nothing written")
 
 
-# --- a click on a blocked agent's bubble ------------------------------------------
+# --- a click on a blocked agent's chip ------------------------------------------
 
 
-## A real click on the bubble over bee's blocked alpha:p3 picks that pane as the
+## A real click on the chip over bee's blocked alpha:p3 picks that pane as the
 ## list does, and the card goes into answer mode only once its preview read has
 ## come back and shows the question (held back here for half a second): until
 ## then it is not answering. The click itself sends nothing, nor does opening
-## answer mode, and the bubble holds no button to answer with. Blocked in bee's
-## first snapshot, its start was never seen: the bubble draws nothing, frame
+## answer mode, and the chip holds no button to answer with. Blocked in bee's
+## first snapshot, its start was never seen: the chip draws nothing, frame
 ## included, and its rectangle answers the click all the same.
 func test_a_click_on_a_bubble_opens_answer_mode_once_the_question_is_shown() -> void:
 	_fakes()
 	_ctl("control-b", "set_snapshot", {"snapshot": _changed(_raw(), "alpha:p3", {"agent_status": "blocked"})})
 	_ctl("control-b", "set_preview", {"pane_id": "alpha:p3", "source": "detection", "text": QUESTION})
 	var office := await _office_with()
-	await _floor_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
+	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	var key := HerdrFleet.pane_key(BEE, "alpha:p3")
 	var station := _station_of(office, key)
-	_eq(station.bubble().find_children("*", "Button", true, false), [], "the bubble holds no button")
+	_eq(station.chip().find_children("*", "Button", true, false), [], "the bubble holds no button")
 	await _wait(OfficeAttention.TEXT_INTERVAL + 0.15)
-	var wait: Label = station.bubble().get_node("%Wait")
-	var frame: NinePatchRect = station.bubble().get_node("%Frame")
-	_check(station.bubble().visible and wait.text.is_empty(), "blocked, its start never seen: no wait")
+	var wait: Label = station.chip().get_node("%Wait")
+	var frame: NinePatchRect = station.chip().get_node("%Frame")
+	_check(station.chip().visible and wait.text.is_empty(), "blocked, its start never seen: no wait")
 	_check(not frame.visible, "and no frame")
 	var card := _card(office)
 	_ctl("control-b", "next", {"action": "delay", "method": "pane.read", "seconds": 0.5})
@@ -326,13 +350,13 @@ func test_a_click_on_a_bubble_opens_answer_mode_once_the_question_is_shown() -> 
 
 
 ## At the smallest screen, where the card is a compact header, a click on a
-## bubble opens the card up and then answer mode, as Enter on a picked pane does.
+## chip opens the card up and then answer mode, as Enter on a picked pane does.
 func test_a_bubble_click_opens_a_compact_card() -> void:
 	_fakes()
 	_ctl("control-b", "set_snapshot", {"snapshot": _changed(_raw(), "alpha:p3", {"agent_status": "blocked"})})
 	_ctl("control-b", "set_preview", {"pane_id": "alpha:p3", "source": "detection", "text": QUESTION})
 	var office := await _office_with(false, true, true, Vector2(480, 320))
-	await _floor_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
+	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	_check(office.hud.card_compact(), "the card is a compact header")
 	var key := HerdrFleet.pane_key(BEE, "alpha:p3")
 	await _click_bubble(office, key)
@@ -340,8 +364,8 @@ func test_a_bubble_click_opens_a_compact_card() -> void:
 	_check(not office.hud.card_compact(), "and opens the card up")
 	await _until(_card(office).answering, "answer mode, once the question is shown")
 	_check(not office.hud.card_compact(), "the card stays open in answer mode")
-	# The panel open on another pane: a bubble click opens it for the
-	# bubble's pane at once, and answer mode there, not a fold a frame later.
+	# The panel open on another pane: a chip click opens it for the
+	# chip's pane at once, and answer mode there, not a fold a frame later.
 	await _tap(KEY_ESCAPE)
 	await _pick_bee(office, "alpha:p1")
 	_check(not office.hud.card_compact(), "the panel open on alpha:p1")
@@ -469,7 +493,7 @@ func _click_world(office: OfficeDouble, key: String, global: Vector2) -> void:
 
 ## Bee's alpha floor shown, and the station of its first far agent.
 func _far_agent(office: OfficeDouble) -> OfficeStation:
-	await _floor_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
+	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	for pane_id: String in ["alpha:p1", "alpha:p3"]:
 		var station := _station_of(office, HerdrFleet.pane_key(BEE, pane_id))
 		if station.side == "far":
@@ -478,7 +502,8 @@ func _far_agent(office: OfficeDouble) -> OfficeStation:
 	return null
 
 
-## Where the far badge of `station` is drawn, its middle, in the world.
+## The middle of the far tag row of `station`, in the world: where its badge is
+## drawn at rest, and inside the chip while one shows.
 static func _badge_middle(station: OfficeStation) -> Vector2:
 	return station.global_position + OfficeStation.BADGE_AT["far"] + Vector2(0, -8)
 
@@ -489,7 +514,7 @@ func test_a_click_on_a_far_badge_picks_a_working_pane() -> void:
 	_fakes()
 	var office := await _office_with()
 	var station := await _far_agent(office)
-	_check(not station.bubble().visible, "a working agent has no bubble")
+	_check(not station.chip().visible, "a working agent has no bubble")
 	await _click_world(office, station.pane_key, _badge_middle(station))
 	_eq(office.picked_key, station.pane_key, "the badge picks its pane")
 	await _wait(0.5)
@@ -497,10 +522,10 @@ func test_a_click_on_a_far_badge_picks_a_working_pane() -> void:
 	_eq(_all_inputs(), 0, "nothing was sent")
 
 
-## On a blocked agent the badge lies over the bubble's right end and is drawn
-## above it; a click there is the bubble's: the pane is picked and answer mode
+## On a blocked agent the badge lies over the chip's right end and is drawn
+## above it; a click there is the chip's: the pane is picked and answer mode
 ## opens once the question is shown. Blocked while bee is watched, its start is
-## seen, and the wait shows in the bubble's frame.
+## seen, and the wait shows in the chip's frame.
 func test_a_click_on_a_blocked_far_badge_is_a_bubble_click() -> void:
 	_fakes()
 	var office := await _office_with()
@@ -508,17 +533,17 @@ func test_a_click_on_a_blocked_far_badge_is_a_bubble_click() -> void:
 	var pane_id := HerdrFleet.split_key(station.pane_key)[1]
 	_ctl("control-b", "set_preview", {"pane_id": pane_id, "source": "detection", "text": QUESTION})
 	_ctl("control-b", "status", {"pane_id": pane_id, "agent_status": "blocked"})
-	await _until(func() -> bool: return station.bubble().visible, "the bubble shows")
-	var frame: NinePatchRect = station.bubble().get_node("%Frame")
+	await _until(func() -> bool: return station.chip().visible, "the bubble shows")
+	var frame: NinePatchRect = station.chip().get_node("%Frame")
 	await _until(func() -> bool: return frame.visible, "blocked while watched: a wait, in its frame")
-	_check(station.bubble_rect().has_point(_badge_middle(station)), "the badge's middle is in the bubble")
+	_check(station.chip_rect().has_point(_badge_middle(station)), "the badge's middle is in the bubble")
 	await _click_world(office, station.pane_key, _badge_middle(station))
 	_eq(office.picked_key, station.pane_key, "the click picks the pane")
 	await _until(_card(office).answering, "answer mode, once the question is shown")
 	_eq(_all_inputs(), 0, "nothing was sent")
 
 
-## On a blocked agent a click on the seat itself, below the bubble, only picks.
+## On a blocked agent a click on the seat itself, below the chip, only picks.
 func test_a_click_on_a_blocked_seat_only_picks() -> void:
 	_fakes()
 	var office := await _office_with()
@@ -526,9 +551,9 @@ func test_a_click_on_a_blocked_seat_only_picks() -> void:
 	var pane_id := HerdrFleet.split_key(station.pane_key)[1]
 	_ctl("control-b", "set_preview", {"pane_id": pane_id, "source": "detection", "text": QUESTION})
 	_ctl("control-b", "status", {"pane_id": pane_id, "agent_status": "blocked"})
-	await _until(func() -> bool: return station.bubble().visible, "the bubble shows")
+	await _until(func() -> bool: return station.chip().visible, "the bubble shows")
 	var body := station.target_rect().get_center()
-	_check(not station.bubble_rect().has_point(body), "the seat's middle is not the bubble's")
+	_check(not station.chip_rect().has_point(body), "the seat's middle is not the bubble's")
 	await _click_world(office, station.pane_key, body)
 	_eq(office.picked_key, station.pane_key, "the click picks the pane")
 	var card := _card(office)
@@ -541,13 +566,66 @@ func test_a_click_on_a_blocked_seat_only_picks() -> void:
 	_eq(_all_inputs(), 0, "nothing was sent")
 
 
+## Bee's alpha floor shown, and the station of one of its agents on the near side.
+func _near_agent(office: OfficeDouble) -> OfficeStation:
+	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
+	for pane_id: String in ["alpha:p1", "alpha:p2", "alpha:p3"]:
+		var station := _station_of(office, HerdrFleet.pane_key(BEE, pane_id))
+		if station.side == "near" and station.actor() != null:
+			return station
+	_fail("bee's alpha has no near agent")
+	return null
+
+
+## A near agent's chip hangs below the chair, on the tag row: a click on the
+## seat itself (the chair and the worker) only picks, and answer mode stays
+## shut; a click on the chip, where its badge is drawn in its left half, picks
+## and opens answer mode once the question is shown. Neither sends anything.
+func test_a_near_chip_answers_and_the_near_seat_only_picks() -> void:
+	_fakes()
+	# alpha:p2 sits on the near side; the fixture has it a shell, so an agent here.
+	var near := _changed(_raw(), "alpha:p2", {"agent": "claude", "agent_status": "working"})
+	_ctl("control-b", "set_snapshot", {"snapshot": near})
+	var office := await _office_with()
+	var station := await _near_agent(office)
+	var pane_id := HerdrFleet.split_key(station.pane_key)[1]
+	_ctl("control-b", "set_preview", {"pane_id": pane_id, "source": "detection", "text": QUESTION})
+	_ctl("control-b", "status", {"pane_id": pane_id, "agent_status": "blocked"})
+	await _until(func() -> bool: return station.chip().visible, "the chip shows")
+	var frame: NinePatchRect = station.chip().get_node("%Frame")
+	await _until(func() -> bool: return frame.visible, "blocked while watched: a wait, in its frame")
+	var badge: Sprite2D = station.get_node("Overlay/Badge")
+	var on_badge := badge.get_global_transform() * badge.get_rect()
+	# Across, in the chip's left half; up and down it pulses (by up to 2), so
+	# only its columns are compared.
+	var chip := station.chip_rect()
+	_check(
+		(
+			on_badge.position.x >= chip.position.x - 1.5
+			and on_badge.end.x <= chip.position.x + OfficeChip.BADGE_SLOT + 0.5
+		),
+		"the badge is in the chip's left half, a unit over its edge: %s in %s" % [on_badge, chip]
+	)
+	var body := station.target_rect().get_center()
+	_check(not station.chip_rect().has_point(body), "the seat's middle is not the chip's")
+	_check(body.y < station.chip_rect().position.y, "the chip hangs below the seat")
+	await _click_world(office, station.pane_key, body)
+	_eq(office.picked_key, station.pane_key, "the seat's click picks the pane")
+	await _wait(0.5)
+	_check(not _card(office).answering(), "and opens no answer mode")
+	await _click_world(office, station.pane_key, on_badge.get_center())
+	_eq(office.picked_key, station.pane_key, "the chip's click picks the same pane")
+	await _until(_card(office).answering, "and answer mode opens, once the question is shown")
+	_eq(_all_inputs(), 0, "nothing was sent")
+
+
 # --- the top bar's counters ------------------------------------------------------
 
 
 ## A real click on the top bar's BLOCKED picks the one blocked agent, bee's
 ## alpha:p3, on its floor, and the card goes into answer mode only once its
 ## preview read has come back and shows the question, the way a click on its
-## bubble does. The click itself sends nothing: what it causes is the card's
+## chip does. The click itself sends nothing: what it causes is the card's
 ## preview reads of alpha:p3.
 func test_a_blocked_counter_click_opens_answer_mode_once_the_question_is_shown() -> void:
 	_fakes()
@@ -565,7 +643,11 @@ func test_a_blocked_counter_click_opens_answer_mode_once_the_question_is_shown()
 	await _click_control(office.hud.bar.counter(&"blocked"))
 	var key := HerdrFleet.pane_key(BEE, "alpha:p3")
 	_eq(office.picked_key, key, "the click picks the one blocked agent")
-	_eq(office.navigator.shown_key, HerdrFleet.pane_key(BEE, "alpha"), "on its floor")
+	_eq(
+		[office.navigator.shown_key, office.navigator.current_zone(office.frame)],
+		[BEE, HerdrFleet.pane_key(BEE, "alpha")],
+		"on its machine's map, its zone current"
+	)
 	_check(not card.answering(), "not answering before the question is shown")
 	await _until(func() -> bool: return card.preview_text() == QUESTION, "the question is shown")
 	await _until(card.answering, "then answer mode opens")
@@ -882,9 +964,9 @@ func test_the_step_buttons_walk_the_queue_both_ways_and_send_nothing() -> void:
 
 
 ## Blocked comes first: a start that asks at once is a blocked agent to the
-## bubbles too. bee's alpha:p3 blocks while herdr still launches it: the
+## chips too. bee's alpha:p3 blocks while herdr still launches it: the
 ## reader reads it (the card's own payload, nothing else asked of bee), the
-## hover over its bubble shows the question, and a click on BLOCKED picks it
+## hover over its chip shows the question, and a click on BLOCKED picks it
 ## and opens answer mode once the question is shown, the keys being open to a
 ## blocked start. Nothing is sent.
 func test_the_reader_reads_a_blocked_agent_still_launching() -> void:
@@ -899,15 +981,15 @@ func test_the_reader_reads_a_blocked_agent_still_launching() -> void:
 	await _until(
 		func() -> bool: return office.frame.pane(key) != null and office.frame.pane(key).starting, "still launching"
 	)
-	await _floor_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
+	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	var at := await _bubble_point(office, key)
-	_check(_station_of(office, key).bubble().visible, "its seat shows a bubble")
+	_check(_station_of(office, key).chip().visible, "its seat shows a bubble")
 	await _until(func() -> bool: return _read_panes("control-b").has("alpha:p3"), "the reader reads it")
 	_eq(_sequence("control-b"), PackedStringArray(["pane.read detection 200"]), "the card's own payload, nothing else")
 	await _until(func() -> bool: return _question_of(office, key) == "Do you want to proceed?", "the asking line kept")
 	await _move_pointer(at)
-	_check(office.hud.bubble_tip_shown(), "the hover over its bubble shows")
-	_eq(office.hud.bubble_tip_text(), "Do you want to proceed?", "the question it read")
+	_check(office.hud.world_tip_shown(), "the hover over its bubble shows")
+	_eq(office.hud.world_tip_text(), "Do you want to proceed?", "the question it read")
 	await _move_pointer(at + Vector2(0, 60))
 	var card := _card(office)
 	await _click_control(office.hud.bar.counter(&"blocked"))
@@ -918,16 +1000,16 @@ func test_the_reader_reads_a_blocked_agent_still_launching() -> void:
 	_eq(_count("control-a", "pane.focus") + _count("control-b", "pane.focus"), 0, "and no switch")
 
 
-## The strategic view (`S`) covers the world, and the bubbles' reader
+## The strategic view (`S`) covers the world, and the chips' reader
 ## stops at once, as under the monitor and the OVERVIEW: bee's two blocked
-## bubbles stand on screen under it and nothing is read for two seconds; once
+## chips stand on screen under it and nothing is read for two seconds; once
 ## `S` closes it, the longest-waiting is read. Nothing is written either way.
 func test_the_strategic_view_stops_the_question_reads() -> void:
 	_blocked_pair()
 	var office := await _office_with(false, true, true, Vector2(SCREEN), true)
 	# Minimized until the view is open, so no read begins before it.
 	office.pacer.note_minimized(true)
-	await _floor_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
+	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	await _bee_bubbles_on_screen(office)
 	await _tap(KEY_S)
 	_check(office.hud.strategic_open(), "S opens the strategic view")
@@ -935,7 +1017,7 @@ func test_the_strategic_view_stops_the_question_reads() -> void:
 	await _wait(2.0)
 	_eq(_read_panes("control-b"), [], "under the strategic view: nothing read")
 	for pane_id: String in ["alpha:p1", "alpha:p3"]:
-		var bubble := _station_of(office, HerdrFleet.pane_key(BEE, pane_id)).bubble_rect()
+		var bubble := _station_of(office, HerdrFleet.pane_key(BEE, pane_id)).chip_rect()
 		bubble.position -= office.camera.position
 		_check(office.hud.world_rect().encloses(bubble), "%s's bubble is still on screen under it" % pane_id)
 	await _tap(KEY_S)

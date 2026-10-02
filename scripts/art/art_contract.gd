@@ -32,10 +32,10 @@ const WOOD_LIGHT := &"wood_light"
 const TASK_LIGHT := &"task_light"
 const CONTACT_SHADOW := &"contact_shadow"
 ## The done state's own colour (its badge is `unread`): an UNREAD window in the
-## building section.
+## SPACES rail.
 const UNREAD := &"unread"
-## Structure accents, never state: a worktree group's floors share one on their
-## plates (HudTheme's PlateAccent variations, in this order).
+## Structure accents, never state: a worktree group's zones share one on their
+## signs (and HudTheme's PlateAccent variations, in this order).
 const SAGE := &"sage"
 const SKY := &"sky"
 const TERRA := &"terra"
@@ -76,32 +76,26 @@ const FLOOR_WALKWAY := &"floor.walkway"
 ## The three interchangeable wood variants, picked per cell so a floor does not
 ## read as one plank repeated; their outer 3px match, so the seam never moves.
 const FLOOR_WOOD: Array[StringName] = [&"floor.wood_a", &"floor.wood_b", &"floor.wood_c"]
-const RUG_ROWS: Array[StringName] = [&"top", &"middle", &"bottom"]
-const RUG_COLUMNS: Array[StringName] = [&"left", &"center", &"right"]
-## The floor's shell: behind every row of tables stand two courses of brick,
-## the cap on top and the face below it, and the two side walls run the whole
-## depth of the floor. `wall.front_*` and `wall.threshold` stay unused — see
-## docs/WORLD_MODEL.md for why there is no front wall.
+## The map's shell: the top wall is two courses of brick, the cap on top and
+## the face below it, and the two side walls run the whole depth of the map.
+## `wall.front_*` and `wall.threshold` stay unused — see docs/WORLD_MODEL.md
+## for why there is no front wall; nor do the row walls' joints (`*_t_left`,
+## `*_end_right`): a zone is bounded by low partitions, not walls.
 const WALL_CAP := &"cap"
 const WALL_FACE := &"face"
 const WALL_COURSES: Array[StringName] = [WALL_CAP, WALL_FACE]
 const WALL_ENDS: Array[StringName] = [&"left", &"center", &"right"]
-## The finite topology of the office: inner walls meet the left shell and
-## finish before the right-hand main aisle. Each junction owns both courses.
-const WALL_T_LEFT := &"t_left"
-const WALL_END_RIGHT := &"end_right"
-const WALL_JUNCTIONS: Array[StringName] = [WALL_T_LEFT, WALL_END_RIGHT]
 const WALL_SIDE_LEFT := &"wall.side_left"
 const WALL_SIDE_RIGHT := &"wall.side_right"
 
 # --- props and UI images --------------------------------------------------------
 
-## What a floor stands or hangs: the sign over each table row, the window and
-## lift door on the outer wall, and the two pieces of standing furniture. All
-## but the sign are furniture in the strict sense — they carry no herdr field —
-## and `desk`, `monitor` and `chair` are drawn from the shared table's own art
-## rather than from these.
-const PROP_SIGN := &"sign"
+## What a map stands or hangs: the window and lift door on the top wall, the
+## plants, the pictures, the pantry, the zones' partitions and the side tables
+## of the lane gaps. All of it is furniture in the strict sense — it carries
+## no herdr field — and `desk`, `monitor` and `chair` are drawn from the shared
+## table's own art rather than from these. The showroom (scripts/preview.gd)
+## draws its two zones from the same ids.
 const PROP_WINDOW := &"window"
 ## The same window at night (DayLight): its frame pixel for pixel, the view dark.
 const PROP_WINDOW_NIGHT := &"window_night"
@@ -110,30 +104,42 @@ const PROP_PLANT := &"plant"
 ## The second plant: the same piece in another pot, alternating with
 ## PROP_PLANT by place along a run (OfficeDecorPlanner.plant_at()).
 const PROP_PLANT_B := &"plant_b"
-const PROP_CABINET := &"cabinet"
-## A framed picture on a row wall: furnishing hung beside the signs on a
+## A small table standing on the floor that carries one piece from the `desk`
+## or `cat` pool on its top (OfficeDecor.hold()): furniture, never a signal.
+## The decor planner stands one in a lane gap (OfficeDecorPlanner).
+const PROP_SIDE_TABLE := &"side_table"
+## A framed picture on the top wall: furnishing hung between the windows on a
 ## grid of the wall itself, never a signal.
 const PROP_WALL_FRAME := &"wall_frame"
-## The entry band's two counters (docs/VISUAL_LANGUAGE.md): furniture only.
-## Idle agents rest at the pantry; nobody rests at the reception, which carries
-## no herdr field at all (the space in front of it stays empty).
-const PROP_RECEPTION := &"reception"
+## The entry band's counter (docs/VISUAL_LANGUAGE.md): furniture only. Idle
+## agents rest at the pantry's spots.
 const PROP_PANTRY := &"pantry"
-## A signal, not furniture: the stack of paper the table puts beside the laptop
-## of a seat whose agent is done and not yet looked at (OfficeTable.show_papers()).
-## Never in a pool (ITEM_GROUPS): it is placed by code, by state.
-const PROP_DONE_STACK := &"done_stack"
+## A zone's low partitions (OfficeShell.partition_pieces()): the side runs,
+## the posts at the open top corners, the bottom corners and the bottom run.
+const PROP_PARTITION_V := &"partition_v"
+const PROP_PARTITION_POST := &"partition_post"
+const PROP_PARTITION_CORNER_BL := &"partition_corner_bl"
+const PROP_PARTITION_CORNER_BR := &"partition_corner_br"
+const PROP_PARTITION_H := &"partition_h"
+## A signal, not furniture: the small stack of paper the pod puts beside the
+## laptop of a seat whose agent is done and not yet looked at
+## (OfficeTable.show_papers()). Never in a pool (ITEM_GROUPS): it is placed by
+## code, by state.
+const PROP_DONE_STACK_SMALL := &"done_stack_small"
 const PROP_IDS: Array[StringName] = [
-	PROP_SIGN,
 	PROP_WINDOW,
 	PROP_WINDOW_NIGHT,
 	PROP_DOOR,
 	PROP_PLANT,
 	PROP_PLANT_B,
-	PROP_CABINET,
 	PROP_WALL_FRAME,
-	PROP_RECEPTION,
 	PROP_PANTRY,
+	PROP_PARTITION_V,
+	PROP_PARTITION_POST,
+	PROP_PARTITION_CORNER_BL,
+	PROP_PARTITION_CORNER_BR,
+	PROP_PARTITION_H,
+	PROP_SIDE_TABLE,
 ]
 ## The pools scenes draw furniture from by weight (ItemSpec.group in the pack,
 ## docs/ITEMS.md), and what their members must stand on: never agent states.
@@ -145,13 +151,14 @@ const ITEM_GROUPS: Dictionary[StringName, StringName] = {
 }
 const UI_PANEL := &"panel"
 ## The dark HUD's panels (HdPanel); `panel` stays the world's and the tools'
-## light one (the blocked bubble, the Avatar Studio, the showroom's notes).
+## light one (the blocked chip, the Avatar Studio, the showroom's notes).
 const UI_HUD_PANEL := &"hud_panel"
-const UI_SELECTION := &"selection"
+## The corner marks round a selected seat, and round a worker resting away.
+const UI_SELECTION_SEAT := &"selection_seat"
 const UI_BRANCH := &"branch"
 ## Three display overlays, not herdr states: a pane whose agent is still
 ## starting, a machine that has dropped, and one that is answering. The
-## minimap's building headings wear all three.
+## SPACES rail's machine headings wear all three.
 const UI_STARTING := &"starting"
 const UI_OFFLINE := &"offline"
 const UI_CONNECTED := &"connected"
@@ -185,20 +192,21 @@ const TRACK_DRINK := &"drink"
 
 # --- the shared table -----------------------------------------------------------
 
-## The modules OfficeTable lays along the table, and the two pieces of furniture
-## it and OfficeStation place on and beside it.
+## The modules OfficeTable lays along a pod (its desks, apron, low screen, the
+## two short legs and a bracket per desk), and the two pieces of furniture it
+## and OfficeStation place on and beside it.
 const TABLE_MODULES: Array[StringName] = [
-	&"surface_left",
-	&"surface_mid_a",
-	&"surface_mid_b",
-	&"surface_right",
+	&"desk_left",
+	&"desk_mid_a",
+	&"desk_mid_b",
+	&"desk_right",
 	&"apron_left",
 	&"apron_mid",
 	&"apron_right",
-	&"divider_left",
-	&"divider_mid",
-	&"divider_right",
-	&"leg",
+	&"screen_left",
+	&"screen_mid",
+	&"screen_right",
+	&"leg_short",
 	&"bracket",
 ]
 const FURNITURE_CHAIR := &"chair"
@@ -236,9 +244,9 @@ static func problems(pack: ArtPack) -> PackedStringArray:
 		for member in members:
 			if member.item.place != ITEM_GROUPS[group]:
 				found.append("props: %s is in the %s pool but stands on the %s" % [member.id, group, member.item.place])
-	var stack := pack.prop_sprite(PROP_DONE_STACK)
+	var stack := pack.prop_sprite(PROP_DONE_STACK_SMALL)
 	if stack != null and stack.item != null and not stack.item.group.is_empty():
-		found.append("props: %s is a signal, never in a pool" % PROP_DONE_STACK)
+		found.append("props: %s is a signal, never in a pool" % PROP_DONE_STACK_SMALL)
 	for image in ui_ids():
 		if pack.ui_sprite(image) == null:
 			found.append("ui: no image named " + image)
@@ -262,33 +270,23 @@ static func problems(pack: ArtPack) -> PackedStringArray:
 	return found
 
 
-## Every tile a floor is laid out of: the wood variants, the walkway between the
-## rows, the nine-slice rug under each table, and the floor's shell.
+## Every tile a map is laid out of: the wood variants, the walkway of the entry
+## band and the main corridor, and the map's shell (the top wall's two courses
+## and the side walls). No rug: a pod stands on the floor itself.
 static func tile_ids() -> Array[StringName]:
 	var result: Array[StringName] = [FLOOR_WALKWAY, WALL_SIDE_LEFT, WALL_SIDE_RIGHT]
 	result.append_array(FLOOR_WOOD)
-	for row in RUG_ROWS:
-		for column in RUG_COLUMNS:
-			result.append(rug_cell(row, column))
 	for course in WALL_COURSES:
 		for end in WALL_ENDS:
 			result.append(wall_cell(course, end))
-		for junction in WALL_JUNCTIONS:
-			result.append(wall_cell(course, junction))
 	return result
 
 
-## One brick of a row's wall: the cap course or the face course, at the left
-## end, the right end, a junction or anywhere between. Built rather than named,
-## the way a rug cell is; atlas positions remain the art family's business.
+## One brick of the top wall: the cap course or the face course, at the left
+## end, the right end or anywhere between. The one semantic ID the scenes
+## build rather than name; atlas positions remain the art family's business.
 static func wall_cell(course: StringName, end: StringName) -> StringName:
 	return StringName("wall.%s_%s" % [course, end])
-
-
-## One cell of the stretchable rug. The row and column come from the rug's size,
-## so this is the one semantic ID the scenes build rather than name.
-static func rug_cell(row: StringName, column: StringName) -> StringName:
-	return StringName("rug.%s_%s" % [row, column])
 
 
 ## Every UI image a scene draws: the fixed ones, plus every state's badge.
@@ -296,7 +294,7 @@ static func ui_ids() -> Array[StringName]:
 	return [
 		UI_PANEL,
 		UI_HUD_PANEL,
-		UI_SELECTION,
+		UI_SELECTION_SEAT,
 		UI_BRANCH,
 		UI_STARTING,
 		UI_OFFLINE,
@@ -401,7 +399,7 @@ static func _file_problems(pack: ArtPack) -> PackedStringArray:
 ## Every prop a scene places by its id; the pools' members are drawn by group.
 static func prop_ids() -> Array[StringName]:
 	var ids: Array[StringName] = PROP_IDS.duplicate()
-	ids.append(PROP_DONE_STACK)
+	ids.append(PROP_DONE_STACK_SMALL)
 	return ids
 
 

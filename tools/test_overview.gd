@@ -148,14 +148,14 @@ func test_the_panes_counter_opens_the_overview_and_x_closes_it() -> void:
 	_check(hud.overview_open(), "PANES opens the overview")
 	_eq(panes.theme_type_variation, &"CounterOn", "and reads pressed")
 	_check(not office.world.visible, "the world is out of sight")
-	_check(not hud.signposts.visible, "so are the signposts")
-	_check(hud.floors.visible and hud.right_column.visible, "the minimap and the drawer stay, covered")
+	_check(not hud.edge_arrows.visible, "so are the edge arrows")
+	_check(hud.spaces.visible and hud.right_column.visible, "the minimap and the drawer stay, covered")
 	_eq(hud.world_rect(), room, "the world's room is what it was")
 	_eq(office.layout_attempt_count(), attempts, "no floor is planned for it")
 	_eq(moves[0], 0, "and no room changed")
 	var placed := hud.placed(hud.overview)
 	_eq([placed.position.x, placed.position.y, placed.end.x], [16.0, 40.0, 784.0], "under the bar, 16 in")
-	_eq(placed.end.y, hud.placed(hud.floors).end.y, "down to the columns' bottom edge")
+	_eq(placed.end.y, hud.placed(hud.spaces).end.y, "down to the columns' bottom edge")
 	_check(hud.overview.get_global_rect().encloses(Rect2(room.position, room.size)), "covering the world")
 	await _frames(2)
 	_check(_part(hud.overview, "%Summary").visible, "800 wide: the summary shows")
@@ -232,7 +232,11 @@ func test_a_row_click_picks_the_pane_and_the_staff_panel_can_answer() -> void:
 	_eq(office.picked_key, key, "the click picks it")
 	_eq(line.theme_type_variation, &"OverviewRowCurrent", "its row reads selected")
 	_check(office.hud.overview_open(), "the overview stays open")
-	_eq(office.navigator.shown_key, HerdrFleet.pane_key(BEE, "alpha"), "its floor is the one shown now")
+	_eq(
+		[office.navigator.shown_key, office.navigator.current_zone(office.frame)],
+		[BEE, HerdrFleet.pane_key(BEE, "alpha")],
+		"its machine's map is the one shown now, its zone current"
+	)
 	_check(not office.world.visible, "and the world built for it stays out of sight")
 	var card := _card(office)
 	# The panel is one line until opened: Enter opens it, under the overview too.
@@ -379,16 +383,16 @@ func test_the_timeline_draws_baseline_states_and_hatches_the_unobserved() -> voi
 	_check(idle != art.color(ArtContract.PAPER) and idle != art.color(ArtContract.CREAM), "nor the panel's")
 
 
-## While the overview covers the world the bubbles' reader reads nothing and
-## no tooltip shows; a click where a bubble was picks no desk (it lands on the
-## overview). Closed again, the bubble is read on schedule.
+## While the overview covers the world the chips' reader reads nothing and
+## no tooltip shows; a click where a chip was picks no desk (it lands on the
+## overview). Closed again, the chip is read on schedule.
 func test_bubbles_read_nothing_and_no_tip_while_the_overview_covers_the_world() -> void:
 	_fakes("snapshot_basic", ["pane.read"])
 	_ctl("control-b", "set_snapshot", {"snapshot": _changed(_raw(), "alpha:p1", {"agent_status": "blocked"})})
 	_ctl("control-b", "set_preview", {"pane_id": "alpha:p1", "source": "detection", "text": QUESTION})
 	var office := await _office_with(false, true, true, Vector2(SCREEN), true)
 	var key := HerdrFleet.pane_key(BEE, "alpha:p1")
-	await _floor_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
+	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	var at := await _bubble_point(office, key)
 	await _until_stats(
 		"control-b", func(_stats: Dictionary) -> bool: return _read_panes("control-b").size() >= 1, "read"
@@ -402,9 +406,9 @@ func test_bubbles_read_nothing_and_no_tip_while_the_overview_covers_the_world() 
 	_eq(_read_panes("control-b"), ["alpha:p1"], "under the overview, past the ten seconds: nothing read")
 	_check(not office.questions.reading(), "and nothing out")
 	await _move_pointer(at)
-	_check(not office.hud.bubble_tip_shown(), "no tooltip where the bubble is")
+	_check(not office.hud.world_tip_shown(), "no tooltip where the bubble is")
 	# No row under the pointer: DONE keeps nobody, so the click lands on the
-	# overview's own panel, where the bubble would be.
+	# overview's own panel, where the chip would be.
 	await _click_control(_part(office.hud.overview, "%ChipDone"))
 	_eq(office.hud.overview.shown_keys(), PackedStringArray(), "no row shown")
 	_check(office.hud.overview.get_global_rect().has_point(at), "the bubble's place is under the overview")
@@ -430,11 +434,12 @@ func test_arrows_scroll_the_table_not_the_world() -> void:
 	_check(office.hud.holds_keyboard(), "the overview holds the keyboard")
 	await _hold(KEY_DOWN, 5)
 	_eq(office.camera.pan, pan, "the world does not pan under it")
-	var shown := office.navigator.shown_key
+	var shown := [office.navigator.shown_key, office.navigator.current_zone(office.frame)]
 	await _tap(KEY_A)
-	await _tap(KEY_PAGEUP)
+	# PageDown: the key that would pan on from the rail's first zone, were it the office's.
+	await _tap(KEY_PAGEDOWN)
 	_check(not office.hud.agent_list.has_keyboard(), "A: the list does not take the keyboard")
-	_eq(office.navigator.shown_key, shown, "PageUp: no other floor")
+	_eq([office.navigator.shown_key, office.navigator.current_zone(office.frame)], shown, "PageDown: no other zone")
 	_check(office.hud.overview_open(), "the overview is still open")
 	await _tap(KEY_O)
 	_check(not office.hud.holds_keyboard(), "closed, it lets go")

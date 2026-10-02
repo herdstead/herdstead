@@ -276,8 +276,8 @@ func _office_with(
 	office.test_args = AppArgs.parse(line)
 	office.manifest_path = MANIFEST
 	office.remember_theme = false
-	# The bubbles' reader would add its reads to every exact request sequence;
-	# only the cases about the bubbles turn it on.
+	# The chips' reader would add its reads to every exact request sequence;
+	# only the cases about the chips turn it on.
 	office.test_question_reads = questions
 	_offices.append(office)
 	root.add_child(office)
@@ -297,24 +297,22 @@ func _last_write(office: OfficeDouble) -> String:
 	return "" if writes.is_empty() else writes[writes.size() - 1].last_state()
 
 
-## Show bee's alpha floor and pick pane `pane_id` on it with a real click;
+## Show bee's map (a click on its alpha zone's row) and pick pane `pane_id` on it with a real click;
 ## with `open`, then open the staff panel from its line with Enter, as a viewer
 ## would (it reads nothing while it is one line).
 func _pick_bee(office: OfficeDouble, pane_id: String, open := true) -> void:
-	var floor_key := HerdrFleet.pane_key(BEE, "alpha")
-	if office.navigator.shown_key != floor_key:
-		await _floor_pick(office, floor_key)
+	if office.navigator.shown_key != BEE:
+		await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	await _click_visible_pane(office, HerdrFleet.pane_key(BEE, pane_id))
 	if open:
 		await _open_panel(office)
 
 
-## Pick Local's pane `pane_id` with a real click, on Local's alpha floor; with
+## Pick Local's pane `pane_id` with a real click, on Local's map (its alpha zone's row first when another machine's is shown); with
 ## `open`, then open the staff panel with Enter (see _pick_bee()).
 func _pick_local(office: OfficeDouble, pane_id: String, open := true) -> void:
-	var floor_key := HerdrFleet.pane_key(HerdrFleet.LOCAL, "alpha")
-	if office.navigator.shown_key != floor_key:
-		await _floor_pick(office, floor_key)
+	if office.navigator.shown_key != HerdrFleet.LOCAL:
+		await _zone_pick(office, HerdrFleet.pane_key(HerdrFleet.LOCAL, "alpha"))
 	await _click_visible_pane(office, HerdrFleet.pane_key(HerdrFleet.LOCAL, pane_id))
 	if open:
 		await _open_panel(office)
@@ -366,14 +364,14 @@ func _station_of(office: OfficeDouble, key: String) -> OfficeStation:
 	return seat.node
 
 
-## A real click on the bubble over pane `key`'s seat: brought on screen the way
+## A real click on the chip over pane `key`'s seat: brought on screen the way
 ## any reveal does, then a press and a release through Input at its centre.
 func _click_bubble(office: OfficeDouble, key: String) -> void:
 	office.reveal(key)
 	await process_frame
 	await process_frame
 	var station := _station_of(office, key)
-	var at := station.bubble_rect().get_center() - office.camera.position
+	var at := station.chip_rect().get_center() - office.camera.position
 	_check(office.hud.world_rect().has_point(at), "the bubble over %s is on screen at %s" % [key, at])
 	for down: bool in [true, false]:
 		var event := InputEventMouseButton.new()
@@ -410,12 +408,12 @@ func _move_pointer(at: Vector2, held := false) -> void:
 	await physics_frame
 
 
-## Where the bubble over pane `key` is on screen, its middle, once revealed.
+## Where the chip over pane `key` is on screen, its middle, once revealed.
 func _bubble_point(office: OfficeDouble, key: String) -> Vector2:
 	office.reveal(key)
 	await process_frame
 	await process_frame
-	return _station_of(office, key).bubble_rect().get_center() - office.camera.position
+	return _station_of(office, key).chip_rect().get_center() - office.camera.position
 
 
 ## The panes fake `which` was asked to read `source` from, in order.
@@ -715,15 +713,18 @@ func _panels_apart(office: OfficeDouble, what: String) -> void:
 	var shown: Array[Control] = []
 	for panel: Control in [
 		hud.bar,
-		hud.floors,
+		hud.spaces,
 		hud.get_node("%ListHolder"),
 		hud.get_node("%DrawerTab"),
 		hud.staff,
 		hud.news,
-		hud.signposts,
 	]:
 		if panel.is_visible_in_tree():
 			shown.append(panel)
+	# The edge arrows stand over the world: each is a panel of its own here.
+	if hud.edge_arrows.is_visible_in_tree():
+		for arrow in hud.edge_arrows.shown():
+			shown.append(arrow)
 	_check(shown.size() >= 4, "%s: the bar, the minimap, the list and the staff panel are shown" % what)
 	for i in shown.size():
 		var rect := shown[i].get_global_rect()

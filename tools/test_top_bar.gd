@@ -250,7 +250,8 @@ func test_clicking_blocked_walks_the_longest_waits_like_n() -> void:
 		await _frames(3)
 		var key := office.picked_key
 		walked.append(key)
-		_eq(office.navigator.shown_key, office.frame.floor_of(key), "press %d shows the floor of %s" % [press, key])
+		var at := [office.navigator.shown_key, office.navigator.current_zone(office.frame)]
+		_eq(at, [LOCAL, office.frame.zone_of(key)], "press %d: the map of %s, its zone current" % [press, key])
 		_check(office.hud.world_rect().has_point(_desk_point(office, key)), "and brings its desk on screen")
 	_eq(walked, [_pane("infra:p1"), _pane("web:p1"), _pane("infra:p1")], "longest wait first, then round again")
 	office.picked_key = ""
@@ -278,7 +279,8 @@ func test_clicking_done_picks_the_oldest_unread() -> void:
 	await _press(counter)
 	await _frames(3)
 	_eq(office.picked_key, _pane("infra:p2"), "the one UNREAD longest")
-	_eq(office.navigator.shown_key, _floor("infra"), "on its floor")
+	var at := [office.navigator.shown_key, office.navigator.current_zone(office.frame)]
+	_eq(at, [LOCAL, _floor("infra")], "on its machine's map, its zone current")
 	_check(not office.hud.inspector.answering(), "not answering")
 	_check(not office.hud.card_expanded(), "and no card opened up for it")
 	await _press(counter)
@@ -483,6 +485,102 @@ func test_unseated_panes_count_and_dropped_machines_do_not() -> void:
 	_check(StateLog.longest(totals.blocked_tracks, 0).plus, "none of them seen begin: at least")
 
 
+## The showroom draws its mock as the office draws a map: each of its two
+## workspaces a zone (partitions in a y-sorted holder, a sign saying its number
+## and label), a pod of four desks with its tab's name under it, and a side
+## table carrying a desk piece where the row room's cabinet stood. Its cast is
+## the regression cast docs/WORLD_MODEL.md names: a bystander behind a pod and
+## one in front of one (sorted by their feet, like the pods), the one in front
+## capped and in a terra top; a done worker on each side with the small paper
+## stack beside the laptop (one on a pod's last desk); blocked far workers
+## under a chip, one with a wait and one with the badge alone.
+func test_the_showroom_stands_its_cast_in_zones() -> void:
+	var showroom: Node = (load(SHOWROOM_SCENE) as PackedScene).instantiate()
+	root.add_child(showroom)
+	await _frames(2)
+	var pack: ArtPack = showroom.get("art")
+	var sorted: Node2D = showroom.get("sorted")
+	var ground: Node2D = showroom.get("ground")
+	_check(sorted != null and sorted.y_sort_enabled, "what stands is under one y-sorted root")
+	if pack == null or sorted == null or ground == null:
+		showroom.free()
+		return
+	var signs: Array[String] = []
+	var pods: Dictionary[String, OfficeTable] = {}
+	var stations: Dictionary[String, OfficeStation] = {}
+	var pieces: Dictionary[StringName, OfficeDecor] = {}
+	var bystanders: Array[PixelPerson] = []
+	var holders := 0
+	for child in sorted.get_children():
+		if child is OfficeZoneSign:
+			signs.append("%s %s" % [_label(child, "%Number").text, _label(child, "%Title").text])
+		elif child is OfficeTable:
+			pods[str(child.name)] = child
+		elif child is OfficeStation:
+			stations[str(child.name)] = child
+		elif child is OfficeDecor:
+			pieces[(child as OfficeDecor).piece] = child
+		elif child is PixelPerson:
+			bystanders.append(child)
+		elif str(child.name).begins_with("Partitions"):
+			holders += 1
+			var holder := child as Node2D
+			_check(holder.y_sort_enabled, "a zone's partitions sort by their own feet")
+			_check(
+				holder.get_child_count() > 10,
+				"posts, side runs, corners and a bottom run: %d" % holder.get_child_count()
+			)
+	signs.sort()
+	_eq(signs, ["1 API", "2 WEB"] as Array[String], "each zone's sign says its number and label")
+	_eq(holders, 2, "and each stands in its partitions")
+	_eq(pods.keys(), ["API", "WEB"], "a pod in each")
+	var named: Array[String] = []
+	for label in ground.find_children("*", "Label", true, false):
+		named.append((label as Label).text)
+	_check(named.has("MAIN") and named.has("FEAT/UI"), "each pod's tab is named under it: %s" % [named])
+	_check(not named.has("API") and not named.has("WEB"), "no title on a row wall any more: %s" % [named])
+	var side_table: OfficeDecor = pieces.get(ArtContract.PROP_SIDE_TABLE)
+	_check(side_table != null, "a side table where the cabinet stood: %s" % [pieces.keys()])
+	if side_table != null:
+		var desk_pool := pack.items_in(&"desk").map(func(item: ArtSprite) -> StringName: return item.id)
+		_check(desk_pool.has(side_table.held_item), "carrying a desk piece: %s" % side_table.held_item)
+		_check(side_table.held() != null and side_table.held().visible, "drawn on its top")
+	var api: OfficeTable = pods.get("API")
+	var web: OfficeTable = pods.get("WEB")
+	if api == null or web == null or bystanders.size() != 2:
+		_check(false, "two pods and two bystanders: %s, %d" % [pods.keys(), bystanders.size()])
+		showroom.free()
+		return
+	bystanders.sort_custom(func(a: PixelPerson, b: PixelPerson) -> bool: return a.position.y < b.position.y)
+	var behind := bystanders[0]
+	var front := bystanders[1]
+	_check(
+		behind.position.y < web.position.y and behind.position.x > web.position.x + web.width,
+		"one behind WEB's right end"
+	)
+	_check(front.position.y > api.position.y and front.position.x < api.position.x, "one in front of API's left end")
+	_eq(front.look.slot(AvatarLook.TOP), &"terra", "the one in front in a terra top")
+	_eq(front.look.slot(AvatarLook.HEADWEAR), &"cap", "and capped")
+	var stack := pack.sprite_texture(pack.prop_sprite(ArtContract.PROP_DONE_STACK_SMALL))
+	var papers: Dictionary[String, Sprite2D] = {
+		"WEB 0/far": web.papers(0, "far"), "API 1/near": api.papers(1, "near"), "API 3/near": api.papers(3, "near")
+	}
+	for seat: String in papers:
+		_check(papers[seat].visible, seat + ": done, paper on the desk")
+		_eq(papers[seat].texture, stack, seat + ": the small stack")
+	_check(not api.papers(0, "far").visible, "a working seat has none")
+	var waited: OfficeStation = stations.get("APIFar1")
+	var unseen: OfficeStation = stations.get("WEBFar1")
+	_check(waited != null and unseen != null, "the blocked far seats: %s" % [stations.keys()])
+	if waited != null and unseen != null:
+		_check(waited.chip().visible and waited.chip().framed(), "API's blocked far worker under a chip with its wait")
+		_check(
+			unseen.chip().visible and not unseen.chip().framed(),
+			"WEB's under the badge alone: its start was never seen"
+		)
+	showroom.free()
+
+
 ## The showroom's top bar counts its own mock: Local's panes in the state the
 ## mock ledger leaves each in, bee (dropped) in no count, one of two machines
 ## answering. The same six numbers the live office's rule gives, worked out
@@ -629,8 +727,8 @@ func test_panes_no_floor_seats_wait_in_the_same_order() -> void:
 	quiet = _with(quiet, "api:p1", {"workspace_id": "web"})
 	quiet = _with(quiet, "api:p4", {"workspace_id": "web"})
 	var office := await _live_office(quiet)
-	_check(office.frame.floor_of(_pane("api:p1")).is_empty(), "no floor seats api:p1")
-	_check(office.frame.floor_of(_pane("api:p4")).is_empty(), "nor api:p4")
+	_check(office.frame.zone_of(_pane("api:p1")).is_empty(), "no floor seats api:p1")
+	_check(office.frame.zone_of(_pane("api:p4")).is_empty(), "nor api:p4")
 	var first := _with(quiet, "api:p4", {"agent_status": "blocked"})
 	_feed(office, first)
 	await _wait_seconds(1.2)

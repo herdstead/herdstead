@@ -1,12 +1,15 @@
 class_name OfficeFloorView
 extends RefCounted
-## A FloorPlan rendered through the Ground / Sorted world convention, and the
-## desks on it kept up to date in place: a status, a worker, the selection or a
-## task lamp changes only the seat it belongs to, and a dropped machine dims and
-## freezes the floor without rebuilding it. Its people walk between one
-## observation and the next (`presentation`): in at the lift door, out of it,
-## over to a new seat, and to the pantry in the entry band and back. The
-## reception counter is furniture: nobody rests there and it shows nothing.
+## A FloorPlan (a map of zones) rendered through the Ground / Sorted world
+## convention, and the desks on it kept up to date in place: a status, a
+## worker, the selection or a task lamp changes only the seat it belongs to,
+## and a dropped machine dims and freezes the map without rebuilding it. Each
+## zone stands inside its low partitions (drawn pieces in a y-sorted holder of
+## their own, rebuilt only when the zone's rectangle changes) under its sign
+## (OfficeZoneSign, whose text follows the zone's model on every reconcile).
+## Its people walk between one observation and the next (`presentation`): in
+## at the lift door, out of it, over to a new seat, and to the pantry in the
+## entry band and back.
 
 
 ## A desk on the floor: its station node and what that station shows now, so
@@ -27,11 +30,13 @@ class Seat:
 
 
 ## What the lens (`L` held) multiplies the furnishing by: the shell (floor,
-## walkways, walls, door, windows), the plants and cabinets, the counters and
-## each table's trinkets. Signals stay as bright as they are.
+## walkways, walls, door, windows, pictures), the plants and side tables (and
+## what they carry), the pantry counter, and the zones' partitions and signs.
+## Signals stay as bright as they are.
 const LENS_DIM := Color(0.55, 0.55, 0.55)
-## How opaque the lens's wash over a rug is (OfficeDeskView.wash).
+## How opaque the lens's wash over a pod's floor is (OfficeDeskView.wash).
 const LENS_WASH_ALPHA := 0.75
+const ZONE_SIGN_SCENE := preload("res://scenes/world/zone_sign.tscn")
 
 ## The floor's own node (FloorRooms in the office): what dims as a whole when
 ## its machine drops.
@@ -70,27 +75,41 @@ var _night := 0.0
 var _windows: Array[Sprite2D] = []
 var _shell: Node2D
 var _decor: Dictionary[String, OfficeDecor] = {}
-## The entry band's counters, by fixture key.
+## The entry band's counter, by fixture key.
 var _fixtures: Dictionary[String, OfficeDecor] = {}
+## Each zone's partition pieces, in a y-sorted holder under `sorted`, by zone
+## key, and the rectangle they were drawn for.
+var _partitions: Dictionary[String, Node2D] = {}
+var _partitioned: Dictionary[String, Rect2i] = {}
+## Each zone's sign, by zone key.
+var _signs: Dictionary[String, OfficeZoneSign] = {}
 var _shell_signature := ""
 ## _rooms_key() of the model the last structural pass laid out.
 var _rooms_signature := ""
 ## Connected to every station's `picked`: a click released over a desk.
 var _picked: Callable
-## Connected to every station's `asked`: a click released over a bubble.
+## Connected to every station's `asked`: a click released over a chip.
 var _asked: Callable
-## Connected to every station's `bubble_hovered`: the pointer on or off a bubble.
+## Connected to every station's `chip_hovered`: the pointer on or off a chip.
 var _hovered: Callable
+## Connected to every zone sign's `hovered`: the pointer on or off a sign.
+var _sign_hovered: Callable
 
 
 func setup(
-	drawing: OfficeDraw, floor_root: Node2D, picked := Callable(), asked := Callable(), hovered := Callable()
+	drawing: OfficeDraw,
+	floor_root: Node2D,
+	picked := Callable(),
+	asked := Callable(),
+	hovered := Callable(),
+	sign_hovered := Callable()
 ) -> void:
 	_pen = drawing
 	root = floor_root
 	_picked = picked
 	_asked = asked
 	_hovered = hovered
+	_sign_hovered = sign_hovered
 	ground = Node2D.new()
 	ground.name = "Ground"
 	floor_root.add_child(ground)
@@ -123,7 +142,7 @@ static func lamp_of(pane: PaneModel, room: RoomModel) -> OfficeTable.Lamp:
 ## Same floor, same layout as on screen: redraw just the desks whose worker,
 ## state or selection moved. `active_key` is the selected desk; a worker drawn
 ## while the floor's machine is `frozen` starts frozen, like the rest of it.
-func update_desks(model: FloorModel, active_key: String, frozen: bool) -> void:
+func update_desks(model: MapModel, active_key: String, frozen: bool) -> void:
 	# Repeated keys are part of the layout model; the rebuild owns those desks.
 	var repeated := model.repeated_keys()
 	for room_index in model.rooms.size():
@@ -169,7 +188,8 @@ func update_desks(model: FloorModel, active_key: String, frozen: bool) -> void:
 
 
 ## The lens (OfficeLens) is `held`: each seat's line says `texts[pane key]`
-## (OfficeStation.show_lens(); missing is nothing), each table's rug is washed
+## (OfficeStation.show_lens(), which also shows its name plate; missing is
+## nothing), each pod's floor is washed
 ## in `tones[tab key]`, a palette key, at LENS_WASH_ALPHA (missing: no wash),
 ## and the furnishing dims by LENS_DIM. Let go (`held` false), every line and
 ## wash hides and the furnishing is Color.WHITE again. Only visibility, text,
@@ -197,8 +217,8 @@ func show_lens(held: bool, texts: Dictionary[String, String], tones: Dictionary[
 		node.modulate = tint
 
 
-## What the lens dims: the shell, every decor piece, the counters and each
-## table's trinkets (its `%Decorations`).
+## What the lens dims: the shell, every decor piece, the counter, and the zones'
+## partitions and signs. A pod carries no furnishing: nothing but signals stands on a desk.
 func furnishing() -> Array[CanvasItem]:
 	var found: Array[CanvasItem] = []
 	if _shell != null:
@@ -207,22 +227,24 @@ func furnishing() -> Array[CanvasItem]:
 		found.append(_decor[key])
 	for key: String in _fixtures:
 		found.append(_fixtures[key])
-	for table in tables:
-		found.append(table.get_node("%Decorations") as CanvasItem)
+	for key: String in _partitions:
+		found.append(_partitions[key])
+	for key: String in _signs:
+		found.append(_signs[key])
 	return found
 
 
 ## Point at pane `key`'s desk (OfficePointer): its click area and, while it
-## shows, its bubble. Empty, or a pane with no seat here, points at nothing.
+## shows, its chip. Empty, or a pane with no seat here, points at nothing.
 func point(key: String) -> void:
 	var desk: Seat = null if key.is_empty() else seats.get(key)
 	if desk == null:
 		pointer.clear()
 		return
 	var bounds := desk.node.target_rect()
-	var bubble := desk.node.bubble_rect()
-	if bubble.has_area():
-		bounds = bounds.merge(bubble)
+	var chip := desk.node.chip_rect()
+	if chip.has_area():
+		bounds = bounds.merge(chip)
 	pointer.point_at(key, root.get_global_transform().affine_inverse() * bounds)
 
 
@@ -274,7 +296,7 @@ func freeze(is_stale: bool, tint: Color) -> void:
 ## is still there. The presentation takes whoever leaves out of their seat
 ## first, and keeps whoever will walk where they stand; `frozen` says the
 ## shown machine is stale, which walks nobody.
-func reconcile(next: FloorPlan, model: FloorModel, frozen := false) -> void:
+func reconcile(next: FloorPlan, model: MapModel, frozen := false) -> void:
 	presentation.before(self, next, model, frozen)
 	var wanted: Dictionary[String, RoomModel] = {}
 	for room in model.rooms:
@@ -289,23 +311,24 @@ func reconcile(next: FloorPlan, model: FloorModel, frozen := false) -> void:
 	var rooms_key := _rooms_key(model)
 	var same := next == plan and rooms_key == _rooms_signature
 	if not same:
-		# The pictures on the row walls hang where the signs leave room, so
-		# the shell is drawn again whenever a table's move moves one of them.
+		# The pictures on the top wall hang where the windows, the door and the
+		# pantry leave room, so the shell is drawn again whenever one moves.
 		var frames := OfficeShell.frames(next, _pen)
 		var shell_key := _shell_key(next, frames)
 		if shell_key != _shell_signature:
 			_draw_shell(next, frames)
 			_shell_signature = shell_key
+		_place_partitions(next)
 	for placed in next.desks:
 		var view: OfficeDeskView = desks.get(placed.tab_key)
 		if view == null:
 			view = OfficeDeskView.new()
 			view.setup(_pen, ground, sorted, placed.tab_key)
 			desks[placed.tab_key] = view
-		var wall_y := float(next.rows[placed.row].wall_cells.position.y * FloorLayoutPolicy.GRID)
-		view.reconcile(wanted[placed.tab_key], placed, wall_y)
+		view.reconcile(wanted[placed.tab_key], placed)
+	_place_signs(next, model)
 	if not same:
-		_order(model)
+		_order(model, next.zones)
 		plan = next
 		_index(model)
 		_rooms_signature = rooms_key
@@ -315,7 +338,7 @@ func reconcile(next: FloorPlan, model: FloorModel, frozen := false) -> void:
 
 ## The rooms in the model's order, each with its panes in order: what _order()
 ## and _index() lay out from, besides the plan.
-static func _rooms_key(model: FloorModel) -> String:
+static func _rooms_key(model: MapModel) -> String:
 	var parts := PackedStringArray()
 	for room in model.rooms:
 		parts.append(room.key)
@@ -328,7 +351,7 @@ static func _rooms_key(model: FloorModel) -> String:
 
 ## Seats by pane key and tables by room, after a reconcile: a seat whose station
 ## survived keeps what it shows, so the next update_desks() redraws only change.
-func _index(model: FloorModel) -> void:
+func _index(model: MapModel) -> void:
 	var indexed: Dictionary[String, Seat] = {}
 	tables.clear()
 	for room in model.rooms:
@@ -347,12 +370,12 @@ func _index(model: FloorModel) -> void:
 				station.picked.connect(_picked)
 			if _asked.is_valid() and not station.asked.is_connected(_asked):
 				station.asked.connect(_asked)
-			if _hovered.is_valid() and not station.bubble_hovered.is_connected(_hovered):
-				station.bubble_hovered.connect(_hovered)
+			if _hovered.is_valid() and not station.chip_hovered.is_connected(_hovered):
+				station.chip_hovered.connect(_hovered)
 	seats = indexed
 
 
-func _order(model: FloorModel) -> void:
+func _order(model: MapModel, plan_zones: Array[ZonePlacement]) -> void:
 	var index := 0
 	var ground_index := 1
 	for room in model.rooms:
@@ -376,18 +399,25 @@ func _order(model: FloorModel) -> void:
 	for key: String in fixture_keys:
 		sorted.move_child(_fixtures[key], index)
 		index += 1
+	# The zones in the plan's order, each one's partitions, then its sign.
+	for zone in plan_zones:
+		var holder: Node2D = _partitions.get(zone.zone_key)
+		if holder != null:
+			sorted.move_child(holder, index)
+			index += 1
+		var board: OfficeZoneSign = _signs.get(zone.zone_key)
+		if board != null:
+			sorted.move_child(board, index)
+			index += 1
 
 
 static func _shell_key(next: FloorPlan, frames: Array[Vector2]) -> String:
-	var walls := PackedStringArray()
-	for row in next.rows:
-		walls.append(str(row.wall_cells))
 	var furniture := PackedStringArray()
 	for placed in next.decorations:
 		furniture.append(placed.geometry_signature())
 	for fixture in next.fixtures():
 		furniture.append(fixture.geometry_signature())
-	return JSON.stringify([next.floor_cells, walls, next.corridors, furniture, frames])
+	return JSON.stringify([next.floor_cells, next.corridors, furniture, frames])
 
 
 func _draw_shell(next: FloorPlan, frames: Array[Vector2]) -> void:
@@ -470,17 +500,6 @@ func _draw_walls(next: FloorPlan) -> void:
 		var end: StringName = ArtContract.WALL_ENDS[0 if x == 0 else 2 if x == width - 1 else 1]
 		for course in ArtContract.WALL_COURSES.size():
 			cells[Vector2i(x, course)] = ArtContract.wall_cell(ArtContract.WALL_COURSES[course], end)
-	for row in next.rows:
-		for x in range(row.wall_cells.position.x, row.wall_cells.end.x):
-			var end := (
-				ArtContract.WALL_T_LEFT
-				if x == 0
-				else ArtContract.WALL_END_RIGHT if x == row.wall_cells.end.x - 1 else &"center"
-			)
-			for course in ArtContract.WALL_COURSES.size():
-				cells[Vector2i(x, row.wall_cells.position.y + course)] = ArtContract.wall_cell(
-					ArtContract.WALL_COURSES[course], end
-				)
 	var walls := _pen.layer(_shell, Vector2.ZERO)
 	walls.name = "Walls"
 	for at in cells:
@@ -515,9 +534,9 @@ func _window_id() -> StringName:
 	return ArtContract.PROP_WINDOW_NIGHT if DayLight.is_night(_night) else ArtContract.PROP_WINDOW
 
 
-## The framed pictures on the row walls (OfficeShell.frames()), in the shell:
-## laid on the wall like the signs, no footprint and nothing to walk round, and
-## dimmed, hidden and frozen with the rest of the shell.
+## The framed pictures on the top wall (OfficeShell.frames()), in the shell:
+## laid on the wall, no footprint and nothing to walk round, and dimmed,
+## hidden and frozen with the rest of the shell.
 func _hang_frames(frames: Array[Vector2]) -> void:
 	for index in frames.size():
 		var picture := _pen.prop(_shell, ArtContract.PROP_WALL_FRAME, frames[index])
@@ -525,9 +544,9 @@ func _hang_frames(frames: Array[Vector2]) -> void:
 
 
 ## The plan's standing pieces, each under a name made from its plan key (the
-## key's `/` read as `_`), so a floor updated in place names its pieces the way
+## key's `/` read as `_`), so a map updated in place names its pieces the way
 ## a rebuild of the same plan does, however many came and went before: the
-## wall-foot run and the spare bay's plant come and go with the tables.
+## lane gaps' pieces come and go with the zones.
 func _furnish(next: FloorPlan) -> void:
 	var wanted: Dictionary[String, bool] = {}
 	for placed in next.decorations:
@@ -540,12 +559,14 @@ func _furnish(next: FloorPlan) -> void:
 	for placed in next.decorations:
 		_place_decor(placed.key, placed.piece, placed.position, wanted)
 		_decor[placed.key].name = "Decor_" + placed.key.replace("/", "_")
+		# A side table's piece on its top (the plan's pick, by place only).
+		if not placed.item.is_empty() or _decor[placed.key].held_item != placed.item:
+			_decor[placed.key].hold(_pen.art, placed.item)
 	_place_fixtures(next)
 
 
-## The counters of the entry band: made the first time a plan has them, moved
-## with the plan (they follow the main corridor), gone with it. Both are plain
-## furniture (OfficeDecor).
+## The entry band's pantry counter: made the first time a plan has it, gone
+## with it. Plain furniture (OfficeDecor).
 func _place_fixtures(next: FloorPlan) -> void:
 	var wanted: Dictionary[String, FixturePlacement] = {}
 	for fixture in next.fixtures():
@@ -576,3 +597,87 @@ func _place_decor(key: String, piece: StringName, at: Vector2, wanted: Dictionar
 		node.modulate = _furnishing_tint()
 		_decor[key] = node
 	node.position = at
+
+
+## Every zone's partitions: a y-sorted holder of drawn pieces
+## (OfficeShell.partition_pieces()) under `sorted`, so each piece sorts with
+## the walkers by its own foot; made again only when the zone's rectangle
+## changed, gone with the zone.
+func _place_partitions(next: FloorPlan) -> void:
+	var wanted: Dictionary[String, ZonePlacement] = {}
+	for zone in next.zones:
+		wanted[zone.zone_key] = zone
+	for key: String in _partitions.keys():
+		if not wanted.has(key) or _partitioned[key] != wanted[key].cells:
+			sorted.remove_child(_partitions[key])
+			_partitions[key].queue_free()
+			_partitions.erase(key)
+			_partitioned.erase(key)
+	for key: String in wanted:
+		if _partitions.has(key):
+			continue
+		var holder := Node2D.new()
+		holder.name = "Partitions_" + key.sha256_text().left(16)
+		holder.y_sort_enabled = true
+		holder.modulate = _furnishing_tint()
+		for piece in OfficeShell.partition_pieces(wanted[key]):
+			_pen.prop(holder, piece.id, piece.foot)
+		sorted.add_child(holder)
+		_partitions[key] = holder
+		_partitioned[key] = wanted[key].cells
+
+
+## Every zone's sign at its post (ZonePlacement.sign_at), moved with the zone,
+## gone with it, and saying what `model`'s zone of that key says now.
+func _place_signs(next: FloorPlan, model: MapModel) -> void:
+	var zones: Dictionary[String, ZoneModel] = {}
+	for zone in model.zones:
+		zones[zone.key] = zone
+	var wanted: Dictionary[String, bool] = {}
+	for zone in next.zones:
+		wanted[zone.zone_key] = true
+	for key: String in _signs.keys():
+		if not wanted.has(key):
+			sorted.remove_child(_signs[key])
+			_signs[key].queue_free()
+			_signs.erase(key)
+	for zone in next.zones:
+		var board: OfficeZoneSign = _signs.get(zone.zone_key)
+		if board == null:
+			board = ZONE_SIGN_SCENE.instantiate()
+			board.name = "Sign_" + zone.zone_key.sha256_text().left(16)
+			board.dress(_pen)
+			board.zone_key = zone.zone_key
+			board.modulate = _furnishing_tint()
+			if _sign_hovered.is_valid():
+				board.hovered.connect(_sign_hovered)
+			sorted.add_child(board)
+			_signs[zone.zone_key] = board
+		board.position = zone.sign_at
+		var shown: ZoneModel = zones.get(zone.zone_key)
+		if shown != null:
+			board.show_zone(shown, _sign_limit(zone))
+
+
+## How far right, in its own coordinates, the sign of `zone` may reach: to the
+## drawn left edge of the zone's top-right post, never over the right partition.
+func _sign_limit(zone: ZonePlacement) -> float:
+	var post := OfficeShell.drawn(_pen, ArtContract.PROP_PARTITION_POST, OfficeShell.right_post(zone))
+	return post.position.x - zone.sign_at.x
+
+
+## The sign of zone `key`, or null.
+func zone_sign(key: String) -> OfficeZoneSign:
+	return _signs.get(key)
+
+
+## The partition pieces drawn for zone `key` (its holder's sprites), or none.
+func partition_sprites(key: String) -> Array[Sprite2D]:
+	var found: Array[Sprite2D] = []
+	var holder: Node2D = _partitions.get(key)
+	if holder == null:
+		return found
+	for child in holder.get_children():
+		if child is Sprite2D:
+			found.append(child as Sprite2D)
+	return found

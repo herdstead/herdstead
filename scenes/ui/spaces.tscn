@@ -1,0 +1,53 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/spaces.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/ui/space_row.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/ui/machine_heading.tscn" id="3"]
+
+[node name="Spaces" type="PanelContainer"]
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = 40.0
+offset_right = 88.0
+offset_bottom = -16.0
+grow_vertical = 2
+theme_type_variation = &"HdPanel"
+script = ExtResource("1")
+row_scene = ExtResource("2")
+heading_scene = ExtResource("3")
+
+[node name="Body" type="VBoxContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 0
+
+[node name="Heading" type="Control" parent="Body"]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="Body/Heading"]
+anchor_right = 1.0
+offset_left = 6.0
+offset_top = 5.0
+offset_right = -6.0
+offset_bottom = 17.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_type_variation = &"DisplayHeading"
+text = "SPACES"
+
+[node name="Scroll" type="ScrollContainer" parent="Body"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 36)
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 3
+
+[node name="Rows" type="VBoxContainer" parent="Body/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+theme_override_constants/separation = 0

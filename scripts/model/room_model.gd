@@ -1,6 +1,6 @@
 class_name RoomModel
 extends RefCounted
-## One herdr tab as the office draws it: a shared table with its rug, and the
+## One herdr tab as the office draws it: a pod of desks, and the
 ## panes seated around it in reading order.
 
 ## Whether this tab is the one its workspace has open. Herdr need not say —
