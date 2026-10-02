@@ -14,7 +14,8 @@ extends Node2D
 ## the tag row (the badge, or the chip), the lens row (only while `L` is held)
 ## and the plate row (the provider, only while the seat is hovered, selected or
 ## `L` is held). Far workers face the viewer, so theirs rise above the head;
-## near workers show their back, so theirs hang below the chair.
+## near workers show their back and sit over the desk's near plane, so theirs
+## hang below the chair.
 ##
 ## A seat with no pane is vacant: a chair and nothing else. A pane with no
 ## agent is a SHELL: a laptop with a prompt and nobody in the chair. furnish()
@@ -56,15 +57,16 @@ signal chip_hovered(key: String, inside: bool)
 
 const PERSON_SCENE := preload("res://scenes/people/pixel_person.tscn")
 ## The rows over a seat, relative to it (the far seat is at pod y -36, the near
-## one at 22), measured on the pixel people: seated, the head reaches y -31
+## one at 8), measured on the pixel people: seated, the head reaches y -31
 ## over the seat and a blocked worker's raised hand -36 (pod -72 on the far
-## side); the near chair is opaque down to seat + 6 (pod 28). Every row is
-## 30 wide, so two neighbours' rows (32 apart) keep 2 units between them.
+## side, -28 on the near one); the near chair is opaque down to seat + 6
+## (pod 14). Every row is 30 wide, so two neighbours' rows (32 apart) keep 2
+## units between them.
 ##
 ## The tag row is 16 tall: the badge (opaque 15 wide, 16 tall over its foot)
-## stands on BADGE_AT, centred, at pod [-88, -72) far and [30, 46) near. Its
+## stands on BADGE_AT, centred, at pod [-88, -72) far and [16, 32) near. Its
 ## pulse (OfficeAttention.PULSES) lifts it up to 2: [-90, -72) touches the
-## raised hand and [28, 46) the chair, overlapping neither.
+## raised hand and [14, 32) the chair, overlapping neither.
 const BADGE_AT := {"far": Vector2(0, -36), "near": Vector2(0, 24)}
 ## The chip (OfficeChip, 30 by 16) is on the tag row, by its top-left corner;
 ## while its frame is drawn the badge moves CHIP_BADGE_SHIFT left, into the
@@ -75,7 +77,7 @@ const CHIP_SIZE := OfficeChip.SIZE
 const CHIP_AT := {"far": Vector2(-15, -52), "near": Vector2(-15, 8)}
 const CHIP_BADGE_SHIFT := Vector2(-8.5, 0)
 ## The lens row (OfficeLens, while `L` is held), 30 by 12, next out from the
-## tag row: pod [-102, -90) far and [46, 58) near. It holds the compact wait
+## tag row: pod [-102, -90) far and [32, 44) near. It holds the compact wait
 ## (OfficeAttention.compact_duration(): 18 wide at most).
 const LENS_AT := {"far": Vector2(-15, -66), "near": Vector2(-15, 24)}
 const LENS_SIZE := Vector2(30, 12)
@@ -83,28 +85,35 @@ const LENS_SIZE := Vector2(30, 12)
 ## cut with a forced ellipsis when it is wider (the card and the list say the
 ## whole name). While the lens is not held its row is empty, so the plate
 ## takes the lens row's slot, next to the tag row (LENS_AT: pod [-102, -90)
-## far, [46, 58) near); while the lens is held it moves out to the outermost
-## row, PLATE_AT: pod [-114, -102) far and [58, 70) near.
+## far, [32, 44) near); while the lens is held it moves out to the outermost
+## row, PLATE_AT: pod [-114, -102) far and [44, 56) near.
 const PLATE_SIZE := Vector2(30, 12)
 const PLATE_AT := {"far": Vector2(-15, -78), "near": Vector2(-15, 36)}
 ## The seat mark (ui `selection_seat`, 32 by 48 over its foot) frames the seated
-## figure: pod [-72, -24) far, [-20, 28) near.
-const SELECTION_AT := {"far": Vector2(0, 10), "near": Vector2(0, 4)}
+## figure, a raised hand included: pod [-72, -24) far, [-32, 16) near. The near
+## one starts where the far seat's click rectangle ends and takes in the chair
+## (to 14); its foot touches the tag row (16), so a badge in the chip, lifted
+## by its pulse, is drawn over the bottom-left corner mark for that beat. The
+## two marks of one column share pod [-32, -24): the near worker's raised hand
+## (-28) is above the far mark's foot, and only one seat is ever selected.
+const SELECTION_AT := {"far": Vector2(0, 10), "near": Vector2(0, 6)}
 ## The lens row and the plate row are transient: they show only while `L` is
 ## held or the seat is hovered or selected, and are exempt from the pod's
 ## render_rect (the stationary drawing).
 ##
 ## The click target of each side, as scenes/world/station.tscn places it, 30
 ## wide: far pod [-90, -32) (the tag row's pulse envelope down to the desk's far
-## plane), near pod [-21, 46) (the near laptop down to the tag row). While the
-## chip shows, the seat's rectangle gives the tag row to the chip's
-## (CHIP_TARGET): far [-72, -32), near [-21, 28). Never both under a point.
+## plane), near pod [-24, 32) (from the far seat mark's foot, a unit over the
+## near worker's head, down to the tag row; only the tip of a raised hand,
+## -28..-24, is above it). While the chip shows, the seat's rectangle gives
+## the tag row to the chip's (CHIP_TARGET): far [-72, -32), near [-24, 14).
+## Never both under a point.
 const TARGET_OF := {"far": ^"Target/Far", "near": ^"Target/Near"}
-const SEAT_TARGET_AT := {"far": Vector2(0, -25), "near": Vector2(0, -9.5)}
-const UNDER_CHIP_AT := {"far": Vector2(0, -16), "near": Vector2(0, -18.5)}
-const UNDER_CHIP_SIZE := {"far": Vector2(30, 40), "near": Vector2(30, 49)}
+const SEAT_TARGET_AT := {"far": Vector2(0, -25), "near": Vector2(0, -4)}
+const UNDER_CHIP_AT := {"far": Vector2(0, -16), "near": Vector2(0, -13)}
+const UNDER_CHIP_SIZE := {"far": Vector2(30, 40), "near": Vector2(30, 38)}
 ## The chip's click rectangle (scenes/world/station.tscn), 30 by 18: the tag
-## row with the badge's pulse envelope, far pod [-90, -72), near [28, 46).
+## row with the badge's pulse envelope, far pod [-90, -72), near [14, 32).
 ## _place() lays it over the chip, CHIP_TARGET_AT from the chip's corner.
 const CHIP_TARGET := ^"Target/Chip"
 const CHIP_TARGET_AT := Vector2(15, 7)

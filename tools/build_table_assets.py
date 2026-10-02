@@ -55,14 +55,15 @@ far edge at y -48:
 - screen_* 32x6: fully opaque, a wooden rail over a sage panel; its panel
   lines repeat every 8 units, which divides 32, so modules in any order
   continue them.
-- leg_short 6x22: the pod's end leg, hung at LEG_DROP -2 (its mount right
-  under the apron). The last opaque row is 20, so the foot ends at pod y 19:
-  the near chair (chair_back, pivot at y 28) is opaque
-  across x -5.5..+5 of its column only over y 7..19.5 (below that only its
-  gas-lift column and then its base), so a leg centred under an end column's
-  near chair hides behind it from y 7 down, glide included. It is 6 wide
-  (x -3..+3 of its centre), every row attached; the shaft steps in once and
-  the ankle and glide are narrower than the shoulder.
+- leg_short 6x7: the pod's end leg, hung at LEG_DROP -2 (its mount right
+  under the apron). Every row is opaque, so the foot ends at pod y 5: the
+  near chair (chair_back, pushed in under the desk, its pivot at pod y 14)
+  is opaque across x -5.5..+5.5 of its column over y -7..5.5 (below that only
+  its gas-lift column and then its base), so a leg centred under an end
+  column's near chair is wholly behind the chair's back, glide included,
+  somebody in the chair or not. It is 6 wide (x -3..+3 of its centre), every
+  row attached; the shaft steps in once and the ankle and glide are narrower
+  than the shoulder.
 """
 from __future__ import annotations
 
@@ -97,7 +98,7 @@ POD_MODULES: dict[str, tuple[int, int]] = {
     "screen_left": (32, 6),
     "screen_mid": (32, 6),
     "screen_right": (32, 6),
-    "leg_short": (6, 22),
+    "leg_short": (6, 7),
 }
 
 ## The near edge every desk hangs: the apron's three modules and a bracket per desk.
@@ -454,7 +455,9 @@ def screen(palette: dict[str, str], cap: str | None) -> Image.Image:
 ## leg_short, texel by texel: (first texel row, last texel row + 1, first
 ## texel column, texel columns of deep, wood_light, wood, wood_shadow, deep).
 ## The shoulder is 10 texels wide and steps in once to 8; the glide below is 6.
-LEG_SHORT_SHAFT = ((6, 22, 1, (2, 2, 2, 2, 2)), (22, 34, 2, (2, 2, 0, 2, 2)))
+## One unit of each under the three-unit mount, then a two-unit glide: the foot
+## ends 7 units under the mount's top, behind the pushed-in chair's back.
+LEG_SHORT_SHAFT = ((6, 8, 1, (2, 2, 2, 2, 2)), (8, 10, 2, (2, 2, 0, 2, 2)))
 
 
 def leg_short(palette: dict[str, str]) -> Image.Image:
@@ -469,8 +472,8 @@ def leg_short(palette: dict[str, str]) -> Image.Image:
         for key, width in zip(keys, widths):
             rect(result, (x, top, width, bottom - top), rgba(palette, key))
             x += width
-    rect(result, (3, 34, 6, 8), deep)
-    rect(result, (4, 36, 4, 4), rgba(palette, "slate"))
+    rect(result, (3, 10, 6, 4), deep)
+    rect(result, (4, 11, 4, 2), rgba(palette, "slate"))
     return result
 
 

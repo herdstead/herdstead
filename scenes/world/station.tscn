@@ -8,7 +8,7 @@
 size = Vector2(30, 58)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_near"]
-size = Vector2(30, 67)
+size = Vector2(30, 56)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_chip"]
 size = Vector2(30, 18)
@@ -67,7 +67,7 @@ shape = SubResource("RectangleShape2D_far")
 disabled = true
 
 [node name="Near" type="CollisionShape2D" parent="Target"]
-position = Vector2(0, -9.5)
+position = Vector2(0, -4)
 shape = SubResource("RectangleShape2D_near")
 disabled = true
 

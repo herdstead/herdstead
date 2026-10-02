@@ -214,8 +214,8 @@ func test_shells_have_no_wait_line_and_unknown_tracks_say_question_mark() -> voi
 ## FLOORS windows' own scale (HudTheme.SECTION_PANELS through
 ## OfficeSpaceRow.WINDOW_LOOKS): blocked, then done (UNREAD), working, idle or
 ## starting (cream), unknown (muted); a table of shells only is slate. The wash
-## covers the cells under the pod's drawing and lies first in its background,
-## under the shadows, the sign and the title. (It used to lie over a rug; the
+## covers the cells under the pod's drawing and its title and lies first in its
+## background, under the shadows, the sign and the title. (It used to lie over a rug; the
 ## pods stand on the floor itself.)
 func test_each_rug_washes_in_its_tables_most_urgent_state_on_the_floors_scale() -> void:
 	var scale := {
@@ -237,11 +237,17 @@ func test_each_rug_washes_in_its_tables_most_urgent_state_on_the_floors_scale() 
 	var desk := office.floor_view.desks[main]
 	_eq(desk.background.find_children("*", "TileMapLayer", true, false), [], "no rug")
 	var grid := float(FloorLayoutPolicy.GRID)
-	var visual := desk.placement.measure.render_rect
+	# The pod's drawing and the tab's name right under it: the near row sits at
+	# the desk, so the drawing ends on a cell's edge (y 32) and the name is the
+	# next cell's.
+	var visual := desk.placement.measure.render_rect.grow_side(SIDE_BOTTOM, OfficeDraw.TAB_LABEL_HEIGHT)
 	var start := (visual.position / grid).floor() * grid
 	var end := (visual.end / grid).ceil() * grid
 	var cells := Rect2(desk.placement.origin + start, end - start)
-	_eq(Rect2(desk.wash.position, desk.wash.size), cells, "the wash covers the cells under the pod's drawing")
+	_eq(Rect2(desk.wash.position, desk.wash.size), cells, "the wash covers the cells under the pod's drawing and title")
+	_eq(cells.size.y, 160.0, "five cell rows: the far tags' row down to the near approach row")
+	var title_box := Rect2(desk.title.position, desk.title.size)
+	_check(cells.encloses(title_box), "the tab's name %s is on the wash %s" % [title_box, cells])
 	_eq(desk.wash.get_index(), 0, "first, under the shadows, sign and title")
 	var steps: Array = [
 		[_with(fixture, "api:p2", {"agent_status": "blocked"}), main, ArtContract.BLOCKED, "blocked beats working"],
