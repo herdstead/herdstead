@@ -158,7 +158,9 @@ static func build(art: ArtPack, font: Font) -> Theme:
 		_label(theme, name, LABEL_SIZES[name], art.color(LABEL_HEADINGS[name]))
 		if LABEL_SIZES[name] >= 13:
 			theme.set_font("font", name, heading)
-		theme.set_font("font", name, _fit(theme.get_font("font", name), art.font, LABEL_SIZES[name]))
+		# Godot sizes a row by the tallest font in the chain: a fallback never
+		# makes a row taller than the pack's face alone does.
+		theme.set_font("font", name, OfficeDraw.no_taller(theme.get_font("font", name), art.font, LABEL_SIZES[name]))
 	for name: StringName in DISPLAY_SIZES:
 		_label(theme, name, DISPLAY_SIZES[name], art.color(DISPLAY_COLORS[name]))
 		if art.display_font != null:
@@ -408,7 +410,7 @@ static func _card(theme: Theme, art: ArtPack, font: Font) -> void:
 	var bare := SystemFont.new()
 	bare.font_names = PackedStringArray(MONO_FACES)
 	_label(theme, &"PreviewText", PREVIEW_SIZE, art.color(ArtContract.PAPER))
-	theme.set_font("font", "PreviewText", _fit(mono, bare, PREVIEW_SIZE))
+	theme.set_font("font", "PreviewText", OfficeDraw.no_taller(mono, bare, PREVIEW_SIZE))
 	# Terminal rows sit edge to edge: twelve of them are a fixed block. A Latin
 	# descender still clears the next row's capitals at this pitch.
 	theme.set_constant("line_spacing", "PreviewText", PREVIEW_LINE_SPACING)
@@ -648,13 +650,16 @@ static func _counters(theme: Theme, art: ArtPack) -> void:
 		# A copy of the face the variation already has, so the numbers keep the
 		# heading's weight: a FontVariation wrapped in another one loses its
 		# own variation axes (seen in the capture: regular-weight numbers).
+		# The trim is added to the face's own spacing: the rows a taller
+		# fallback was cut by, above and below (build(), OfficeDraw.no_taller()),
+		# stay cut.
 		var face := theme.get_font("font", name)
 		var trimmed: FontVariation = face.duplicate() if face is FontVariation else FontVariation.new()
 		if face is not FontVariation:
 			trimmed.base_font = face
 		var value := name.begins_with("CounterValue")
-		trimmed.spacing_top = COUNTER_VALUE_TRIM.x if value else COUNTER_TITLE_TRIM.x
-		trimmed.spacing_bottom = COUNTER_VALUE_TRIM.y if value else COUNTER_TITLE_TRIM.y
+		trimmed.spacing_top += COUNTER_VALUE_TRIM.x if value else COUNTER_TITLE_TRIM.x
+		trimmed.spacing_bottom += COUNTER_VALUE_TRIM.y if value else COUNTER_TITLE_TRIM.y
 		theme.set_font("font", name, trimmed)
 
 
@@ -772,19 +777,6 @@ static func _agent_list(theme: Theme, art: ArtPack) -> void:
 	_dark_scroll(theme, art, "DrawerScroll", DRAWER_BAR)
 	theme.set_type_variation("DrawerRowsGap", "MarginContainer")
 	theme.set_constant("margin_right", "DrawerRowsGap", DRAWER_BAR_GAP)
-
-
-## `face` at `pixels`, never taller than `own` (the face without its fallbacks):
-## Godot sizes a row by the tallest font in the chain.
-static func _fit(face: Font, own: Font, pixels: int) -> Font:
-	var extra := face.get_height(pixels) - own.get_height(pixels)
-	if extra <= 0.0:
-		return face
-	var fitted: FontVariation = face.duplicate() if face is FontVariation else FontVariation.new()
-	if face is not FontVariation:
-		fitted.base_font = face
-	fitted.spacing_top -= int(extra)
-	return fitted
 
 
 static func _label(theme: Theme, name: StringName, pixels: int, color: Color) -> void:

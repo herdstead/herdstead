@@ -65,7 +65,13 @@ func test_bundled_typography_keeps_latin_and_cjk_readable() -> void:
 ## Godot sizes a text row by the tallest font in the fallback chain. Linux's
 ## Noto Sans CJK is taller than the pack's face (macOS's Hiragino is not), and
 ## on CI it grew the agent card's twelve preview rows out of the staff panel.
-## A fallback may draw its glyphs, never make a Latin row taller.
+## A fallback may draw its glyphs, never make a Latin row taller, nor move the
+## text in its row: a Label stands the shaped line in the middle of its row
+## (_text_at()), so the rows cut from the chain are cut half above the baseline
+## and half below (OfficeDraw.no_taller()). This machine's fallback may be no
+## taller than the pack's face, so the second half builds the theme on chains
+## that are taller on every machine, by one unit (Linux's surplus at 13 and 16)
+## and by two.
 func test_a_fallback_never_makes_a_row_taller() -> void:
 	for path: String in [MANIFEST]:
 		var pack := ArtPack.from_manifest(path)
@@ -84,16 +90,69 @@ func test_a_fallback_never_makes_a_row_taller() -> void:
 			preview <= mono.get_height(HudTheme.PREVIEW_SIZE),
 			"a preview row: %s, no taller than the mono face" % preview
 		)
+		var alone: FontVariation = text.duplicate()
+		alone.fallbacks = []
+		var plain := HudTheme.build(pack, alone)
+		var sizes: Array[int] = [HudTheme.PREVIEW_SIZE]
+		sizes.append_array(HudTheme.LABEL_SIZES.values())
+		for surplus: int in [1, 2]:
+			# A copy of the pack's own face behind it, its ascent `surplus` rows
+			# more at every size the HUD writes at: taller wherever the suite
+			# runs. Against the theme built on the face alone, every row is as
+			# tall and its text where it was; a counter's own trim
+			# (HudTheme._counters()) is added to the rows cut, not put in their place.
+			var tall: FontFile = pack.font.duplicate()
+			for pixels in sizes:
+				tall.set_cache_ascent(0, pixels, pack.font.get_ascent(pixels) + surplus)
+			var chain: FontVariation = text.duplicate()
+			chain.fallbacks = [tall]
+			var fitted := HudTheme.build(pack, chain)
+			for name: StringName in HudTheme.LABEL_SIZES:
+				var pixels := HudTheme.LABEL_SIZES[name]
+				var said := "%s, a chain %d taller" % [name, surplus]
+				_eq(
+					chain.get_height(pixels),
+					pack.font.get_height(pixels) + surplus,
+					said + ": taller than the face by that: the case has a subject"
+				)
+				var own := plain.get_font("font", name)
+				var face := fitted.get_font("font", name)
+				_eq(face.get_height(pixels), own.get_height(pixels), said + ": the row the face alone makes")
+				_eq(await _label_row(face, pixels), await _label_row(own, pixels), said + ": and so is a Label's")
+				_check(
+					await _label_row(chain, pixels) > await _label_row(own, pixels),
+					said + ": which the chain uncut would make taller"
+				)
+				_stays(_text_at(face, pixels) - _text_at(own, pixels), surplus % 2 == 0, said)
+			var screen := fitted.get_font("font", "PreviewText")
+			var over := tall.get_height(HudTheme.PREVIEW_SIZE) - mono.get_height(HudTheme.PREVIEW_SIZE)
+			var said := "a preview row, a chain %d taller" % over
+			_check(over > 0, said + ": the fallback is taller than the mono face too: the case has a subject")
+			_check(
+				screen.get_height(HudTheme.PREVIEW_SIZE) <= mono.get_height(HudTheme.PREVIEW_SIZE),
+				said + ": %s, no taller than the mono face" % screen.get_height(HudTheme.PREVIEW_SIZE)
+			)
+			_stays(
+				_text_at(screen, HudTheme.PREVIEW_SIZE) - _text_at(mono, HudTheme.PREVIEW_SIZE),
+				_whole(over, mono.get_descent(HudTheme.PREVIEW_SIZE)),
+				said
+			)
 
 
 ## The world's small labels (name plates, the lens line, the chip's wait, zone
-## signs) wear the pack's pixel face over the same system fallbacks, and a
-## fallback taller than the pixel face must not make their rows taller either:
-## on CI (Linux, Noto Sans CJK: 13 tall at 8 where the pixel face is 9) the
-## plate and the lens row grew to 13 and a sign's words out of its board. The
-## rows given up are below the baseline, so the text stays where the pixel face
-## alone puts it (a top spacing would lift it by as much).
-func test_a_fallback_never_makes_a_world_label_taller_or_moves_its_baseline() -> void:
+## signs, and the tab labels in their own cut) wear the pack's pixel face over
+## the same system fallbacks, and a fallback taller than the pixel face must
+## not make their rows taller either: on CI (Linux, Noto Sans CJK: 13 tall at 8
+## where the pixel face is 9) the plate and the lens row grew to 13 and a
+## sign's words out of its board. Nor may it move the text in its row: with the
+## rows all cut below the baseline the row was right and the words stood a
+## unit low on Linux (a Label stands the line in the middle of its row,
+## _text_at()). Chains one to six units taller: the row is the pixel face's
+## own and the text where the pixel face alone puts it, within half a unit
+## where an odd surplus cannot be halved.
+## (Was test_a_fallback_never_makes_a_world_label_taller_or_moves_its_baseline:
+## it compared a TextLine's ascent, which is not where a Label's text lands.)
+func test_a_fallback_never_makes_a_world_label_taller_or_moves_its_text() -> void:
 	var pack := ArtPack.from_manifest(MANIFEST)
 	var own := pack.display_font
 	var pixels := OfficeDraw.DISPLAY_PIXELS
@@ -102,22 +161,40 @@ func test_a_fallback_never_makes_a_world_label_taller_or_moves_its_baseline() ->
 		pen.display.get_height(pixels) <= own.get_height(pixels),
 		"the pen's display face: %s, no taller than the pixel face" % pen.display.get_height(pixels)
 	)
-	# A chain that is taller on every machine: the pack's text face as fallback.
-	var chain := FontVariation.new()
-	chain.base_font = own
-	chain.fallbacks = [pack.font]
-	_check(
-		chain.get_height(pixels) > own.get_height(pixels),
-		"the text face makes the chain taller: the case has a subject"
+	_eq(
+		pen.tab_face.get_height(OfficeDraw.TAB_LABEL_PIXELS),
+		OfficeDraw.TAB_LABEL_HEIGHT,
+		"the pen's tab face: its band's height"
 	)
-	var fitted := OfficeDraw.no_taller(chain, own, pixels)
-	_eq(fitted.get_height(pixels), own.get_height(pixels), "cut to the pixel face's own height")
-	var alone := TextLine.new()
-	alone.add_string("DATA 12m", own, pixels)
-	var line := TextLine.new()
-	line.add_string("DATA 12m", fitted, pixels)
-	_eq(line.get_line_ascent(), alone.get_line_ascent(), "and the baseline is where the pixel face alone puts it")
-	_check(OfficeDraw.no_taller(fitted, own, pixels) == fitted, "a chain that already fits is handed back as it is")
+	var tab_alone := OfficeDraw.tab_cut(own, own)
+	for surplus in range(1, 7):
+		# A chain that is taller on every machine: a copy of the pixel face
+		# behind it whose ascent is `surplus` rows more.
+		var tall: FontFile = own.duplicate()
+		tall.set_cache_ascent(0, pixels, own.get_ascent(pixels) + surplus)
+		var chain := FontVariation.new()
+		chain.base_font = own
+		chain.fallbacks = [tall]
+		var said := "a chain %d taller" % surplus
+		_eq(chain.get_height(pixels), own.get_height(pixels) + surplus, said + ": the case has a subject")
+		var fitted := OfficeDraw.no_taller(chain, own, pixels)
+		_eq(fitted.get_height(pixels), own.get_height(pixels), said + ": cut to the pixel face's own height")
+		_eq(await _label_row(fitted, pixels), await _label_row(own, pixels), said + ": and so is a Label's row")
+		_eq(
+			await _label_row(chain, pixels),
+			await _label_row(own, pixels) + surplus,
+			said + ": which the chain uncut makes that much taller"
+		)
+		_stays(_text_at(fitted, pixels) - _text_at(own, pixels), _whole(surplus, own.get_descent(pixels)), said)
+		_check(OfficeDraw.no_taller(fitted, own, pixels) == fitted, said + ": cut once, handed back as it is")
+		var tab := OfficeDraw.tab_cut(chain, own)
+		var band := OfficeDraw.TAB_LABEL_PIXELS
+		_eq(tab.get_height(band), OfficeDraw.TAB_LABEL_HEIGHT, said + ": the tab face is its band's height")
+		_stays(
+			_text_at(tab, band) - _text_at(tab_alone, band),
+			_whole(surplus, tab_alone.get_descent(band)),
+			said + ", the tab face"
+		)
 
 
 ## The set of semantic IDs the scenes draw with lives in GDScript, next to the
@@ -1090,6 +1167,51 @@ func test_avatar_layers_and_tracks() -> void:
 
 
 # --- harness --------------------------------------------------------------------
+
+
+## Where a Label puts a Latin line's baseline under the top of its row, in
+## units. Its row is the taller of the font's height and the shaped line, and
+## the line stands in the middle of it: measured in pixels on a window (lane
+## FOLLOWUPS, 2026-10-03; a headless Label reports its row, not its ink). So a
+## taller fallback moves text none of whose glyphs are its own, and a row cut
+## back above the baseline lifts it, below the baseline lowers it.
+func _text_at(font: Font, pixels: int) -> float:
+	var line := TextLine.new()
+	line.add_string("CLAUDE 12m", font, pixels)
+	var shaped := line.get_line_ascent() + line.get_line_descent()
+	return (maxf(font.get_height(pixels), shaped) - shaped) / 2.0 + line.get_line_ascent()
+
+
+## The height a real Label asks for one Latin line in `font` at `pixels`. In
+## the tree and a frame on: off the tree a Label answers with the default
+## theme's font, whatever it was handed.
+func _label_row(font: Font, pixels: int) -> float:
+	var label := Label.new()
+	label.text = "CLAUDE 12m"
+	label.add_theme_font_override("font", font)
+	label.add_theme_font_size_override("font_size", pixels)
+	root.add_child(label)
+	await process_frame
+	var row := label.get_minimum_size().y
+	label.free()
+	return row
+
+
+## Whether a chain `surplus` taller can be cut with the text exactly where it
+## was: an even surplus halves, and one of twice the face's `descent` or more
+## takes all of the descent below and the rest above. Otherwise half a unit is
+## the closest a whole spacing gets.
+func _whole(surplus: float, descent: float) -> bool:
+	return int(surplus) % 2 == 0 or surplus >= 2.0 * descent
+
+
+## `moved` (units a Label's text stands lower than the face alone puts it) is
+## nothing where the cut can be `whole`, and half a unit at most where not.
+func _stays(moved: float, whole: bool, said: String) -> void:
+	if whole:
+		_eq(moved, 0.0, said + ": the text where the face alone puts it")
+	else:
+		_check(absf(moved) <= 0.5, said + ": the text within half a unit of the face alone's: %+.1f" % moved)
 
 
 ## The ids of a typed art dictionary, sorted, for a comparison that does not

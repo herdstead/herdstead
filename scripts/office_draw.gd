@@ -59,25 +59,50 @@ func _init(pack: ArtPack) -> void:
 		small.fallbacks = [system]
 		chain = small
 		display = no_taller(small, art.display_font, DISPLAY_PIXELS)
+	tab_face = tab_cut(chain, art.display_font if art.display_font != null else art.font)
+
+
+## `chain` (a face and its fallbacks) for the tab labels: its line cut to
+## TAB_LABEL_HEIGHT at TAB_LABEL_PIXELS by giving up descent rows of `own` (the
+## face without its fallbacks), and no taller for the fallbacks (no_taller()):
+## the text stands where `own`, cut the same, puts it.
+static func tab_cut(chain: Font, own: Font) -> Font:
+	var rows := mini(0, int(TAB_LABEL_HEIGHT) - ceili(own.get_height(TAB_LABEL_PIXELS)))
 	var cut := FontVariation.new()
 	cut.base_font = chain
-	cut.spacing_bottom = mini(0, int(TAB_LABEL_HEIGHT) - ceili(chain.get_height(TAB_LABEL_PIXELS)))
-	tab_face = cut
+	cut.spacing_bottom = rows
+	var alone := FontVariation.new()
+	alone.base_font = own
+	alone.spacing_bottom = rows
+	return no_taller(cut, alone, TAB_LABEL_PIXELS)
 
 
 ## `face` (a face and its fallbacks) at `pixels`, its row no taller than `own`'s
-## (the face without its fallbacks). Godot sizes a row by the tallest font in
-## the chain, used or not: Linux's Noto Sans CJK is 13 tall at 8 where the pixel
-## face is 9 (macOS's Hiragino is not taller, so it never shows there), and a
-## name plate or a zone sign grew out of its box. The rows given up are below
-## the baseline, so the baseline stays where the face's own puts it; a top
-## spacing would lift the text by as much.
-static func no_taller(face: FontVariation, own: Font, pixels: int) -> FontVariation:
+## (the face without its fallbacks) and its text where `own` puts it: the one
+## rule for the world's labels and the HUD's (HudTheme). Godot sizes a row by
+## the tallest font in the chain, used or not: Linux's Noto Sans CJK is 13 tall
+## at 8 where the pixel face is 9 (macOS's Hiragino is not taller, so it never
+## shows there), and a name plate or a zone sign grew out of its box.
+## A Label stands the shaped line in the middle of its row (measured in
+## pixels): rows cut only above the baseline lift the text by half of them,
+## only below lower it by as much. So the surplus is cut half above and half
+## below, an odd row above (the text is then half a unit high, toward the room
+## capitals leave over them, never nearer the row's lower edge). A descent
+## cannot go below nothing: once the rows below would be more than `own`'s
+## descent, as many rows as that descent go above and the rest below, which
+## is where the text is in its place again.
+## A FontVariation is copied, keeping its own axes (a heading's weight) and
+## spacing; wrapping it in another one would lose them.
+static func no_taller(face: Font, own: Font, pixels: int) -> Font:
 	var extra := ceili(face.get_height(pixels)) - ceili(own.get_height(pixels))
 	if extra <= 0:
 		return face
-	var fitted: FontVariation = face.duplicate()
-	fitted.spacing_bottom -= extra
+	var fitted: FontVariation = face.duplicate() if face is FontVariation else FontVariation.new()
+	if face is not FontVariation:
+		fitted.base_font = face
+	var above := mini(ceili(extra / 2.0), maxi(0, floori(own.get_descent(pixels))))
+	fitted.spacing_top -= above
+	fitted.spacing_bottom -= extra - above
 	return fitted
 
 
