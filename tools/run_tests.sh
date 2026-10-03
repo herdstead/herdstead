@@ -59,9 +59,13 @@ MIN_CASES_OFFICE_WALKING=33
 MIN_CASES_OFFICE_RESTS=28
 MIN_CASES_OFFICE_NAVIGATOR=26
 # FLOORS (22 cases, tools/test_floors.gd) was retired with the FLOORS minimap and
-# its signposts (lane B3): SPACE RAIL covers every one of its cases on the
-# SPACES rail and the edge arrows, and adds ten.
-MIN_CASES_SPACE_RAIL=40
+# its signposts (lane B3): SPACE RAIL covered every one of its cases on the
+# SPACES rail and the edge arrows, and added ten (40).
+# SPACE RAIL 40 -> 20: the edge arrows' 20 cases moved, unchanged, to EDGE
+# ARROWS (tools/test_edge_arrows.gd), so both files stay under gdlint's
+# max-file-lines; the two floors still add up to 40.
+MIN_CASES_SPACE_RAIL=20
+MIN_CASES_EDGE_ARROWS=20
 MIN_CASES_ATTENTION_STORE=28
 MIN_CASES_AGENT_LIST=35
 MIN_CASES_ATTENTION_INTEGRATION=19
@@ -378,10 +382,14 @@ run_scene_suite test_office_walking "WALKING TESTS" "$MIN_CASES_OFFICE_WALKING" 
 # Who rests where: the seat with its chip and its paper, the pantry.
 run_scene_suite test_office_rests "RESTS TESTS" "$MIN_CASES_OFFICE_RESTS" -- --read-only \
 	--socket="$WORK/rests-nowhere.sock" --work="$WORK"
-# The left column's SPACES rail (rows, headings, in-view marks), the edge arrows,
-# the zone signs and the plate's problem line, by real input.
+# The left column's SPACES rail (rows, headings, in-view marks), the zone signs
+# and the plate's problem line, by real input.
 run_scene_suite test_space_rail "SPACE RAIL TESTS" "$MIN_CASES_SPACE_RAIL" -- --read-only \
 	--socket="$WORK/space-rail-nowhere.sock" --work="$WORK"
+# The arrows on the world's edges toward blocked desks off screen (where they
+# stand, the pool and its `+N`, the fold, clicks, hovers, overlays), by real input.
+run_scene_suite test_edge_arrows "EDGE ARROW TESTS" "$MIN_CASES_EDGE_ARROWS" -- --read-only \
+	--socket="$WORK/edge-arrows-nowhere.sock" --work="$WORK"
 
 run_scene_suite test_attention_store "ATTENTION STORE TESTS" "$MIN_CASES_ATTENTION_STORE"
 run_scene_suite test_agent_list "AGENT LIST TESTS" "$MIN_CASES_AGENT_LIST" -- --work="$WORK"

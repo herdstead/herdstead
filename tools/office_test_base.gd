@@ -93,6 +93,14 @@ func _feed(office: OfficeDouble, snapshot: Dictionary, online := true) -> void:
 	office.refresh()
 
 
+## A snapshot reaches Local as its stream delivers one: the fleet queues its
+## refresh for the end of the frame and nothing is drawn yet (_feed() draws it
+## at once).
+func _arrive(office: OfficeDouble, snapshot: Dictionary) -> void:
+	_fed[office.get_instance_id()] = snapshot.duplicate(true)
+	_local(office)._apply_snapshot(snapshot.duplicate(true))
+
+
 func _set_online(office: OfficeDouble, online: bool) -> void:
 	if online:
 		_local(office).online = true
@@ -483,6 +491,13 @@ func _desk_target(office: OfficeDouble, key: String) -> Rect2:
 	return Rect2()
 
 
+## Whether the desk drawn for `key` answers a click wholly inside the world's
+## room on screen.
+func _desk_in_view(office: OfficeDouble, key: String) -> bool:
+	var target := _desk_target(office, key)
+	return office.hud.world_rect().encloses(Rect2(target.position - office.camera.position, target.size))
+
+
 ## A seat whose click target's middle falls inside `bounds` on screen, or null.
 func _seat_under(office: OfficeDouble, bounds: Rect2) -> OfficeStation:
 	for station in _seats(office):
@@ -608,6 +623,30 @@ func _mouse_button(at: Vector2, button: MouseButton, down: bool) -> InputEventMo
 	return event
 
 
+## A real left click at `at`, in viewport pixels.
+func _click_at(at: Vector2) -> void:
+	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, true))
+	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, false))
+
+
+## A real pointer move to `at` (viewport pixels), then physics frames for the
+## picking to answer.
+func _pointer_to(at: Vector2) -> void:
+	var motion := InputEventMouseMotion.new()
+	motion.position = at
+	motion.global_position = at
+	await _parsed(motion)
+	await _frames(1)
+
+
+## The release of a left press at `at`, handed to the window with no frame
+## going by: what was queued for the end of this frame is still waiting when
+## the gesture's own refresh runs.
+func _release_now(at: Vector2) -> void:
+	Input.parse_input_event(_mouse_button(at, MOUSE_BUTTON_LEFT, false))
+	Input.flush_buffered_events()
+
+
 func _world_ids(office: OfficeDouble) -> Array:
 	var ids: Array = []
 	for node in office.world.find_children("*", "", true, false):
@@ -666,6 +705,31 @@ func _visit_zone(office: OfficeScene, key: String) -> void:
 	await _parsed(_mouse_button(at, MOUSE_BUTTON_LEFT, false))
 
 
+## A real left click on machine `key`'s SPACES heading.
+func _click_heading(office: OfficeDouble, key: String) -> void:
+	var heading := office.hud.spaces.heading_for(key)
+	if heading == null:
+		_fail("no heading for " + key)
+		return
+	var scroll: ScrollContainer = office.hud.spaces.get_node("%Scroll")
+	scroll.ensure_control_visible(heading)
+	await _frames(2)
+	await _click_at(heading.button().get_global_rect().get_center())
+
+
+## Each shown arrow's words, glyph to count, as one string.
+func _arrow_texts(office: OfficeDouble) -> Array:
+	return office.hud.edge_arrows.shown().map(
+		func(arrow: OfficeEdgeArrow) -> String:
+			var words := PackedStringArray()
+			for part: String in ["%Glyph", "%Zone", "%Count"]:
+				var label: Label = arrow.get_node(part)
+				if label.visible:
+					words.append(label.text)
+			return " ".join(words)
+	)
+
+
 func _office_key(_to: OfficeScene, code: Key) -> void:
 	var event := _key(code)
 	await _parsed(event)
@@ -701,6 +765,30 @@ func _with_residents(snapshot: Dictionary, count := 3) -> Dictionary:
 		pane.agent_status = "idle"
 		_list(result, "panes").append(pane)
 	return result
+
+
+## Six workspaces of four working agents each, herdr's focus on the first: a
+## map whose zones are a window apart.
+func _six_zones() -> Dictionary:
+	var raw := {"workspaces": [], "tabs": [], "panes": [], "layouts": [], "focused_pane_id": "w0:t0:p0"}
+	for zone in 6:
+		var workspace := "w%d" % zone
+		var tab := workspace + ":t0"
+		_list(raw, "workspaces").append({"workspace_id": workspace, "number": zone + 1, "label": workspace})
+		_list(raw, "tabs").append({"workspace_id": workspace, "tab_id": tab, "number": 1})
+		for index in 4:
+			var pane := "%s:p%d" % [tab, index]
+			_list(raw, "panes").append(
+				{
+					"workspace_id": workspace,
+					"tab_id": tab,
+					"pane_id": pane,
+					"terminal_id": "terminal-" + pane,
+					"agent": "claude",
+					"agent_status": "working"
+				}
+			)
+	return raw
 
 
 ## Every piece of standing furniture on the shown map, in tree order: the
@@ -877,6 +965,18 @@ func _two_machine_office(first := fixture, screen := Vector2(SCREEN)) -> OfficeD
 	_feed_bee(office, _bee_snapshot("blocked"))
 	await _frames(2)
 	return office
+
+
+## A HUD on its own, laid out for the suite's screen.
+func _hud() -> OfficeHud:
+	var art := ArtPack.from_manifest(MANIFESTS[0])
+	var scene: PackedScene = load("res://scenes/ui/hud.tscn")
+	var hud: OfficeHud = scene.instantiate()
+	root.add_child(hud)
+	hud.dress(art, OfficeDraw.new(art).font)
+	hud.fit(Vector2(SCREEN))
+	await _frames(2)
+	return hud
 
 
 func _bee(office: OfficeDouble) -> HerdrClient:
