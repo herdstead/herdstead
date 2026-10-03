@@ -317,13 +317,13 @@ class PodSourceSetTests(unittest.TestCase):
     def test_the_one_set_is_the_pod_alone(self):
         self.assertEqual(SOURCE_SETS, {"pod": POD_ONLY})
         self.assertEqual(POD_ONLY, {**POD_MODULES, **POD_SHARED, **FURNITURE})
-        self.assertEqual(len(POD_ONLY), 18)
-        self.assertEqual(len(POD_MODULES) + len(POD_SHARED) + len(FURNITURE), 18, "the three parts share no name")
+        self.assertEqual(len(POD_ONLY), 17)
+        self.assertEqual(len(POD_MODULES) + len(POD_SHARED) + len(FURNITURE), 17, "the three parts share no name")
         self.assertFalse(set(POD_ONLY) & set(LONG_TABLE),
                          "the pod alone leaves out the long table's surface, divider and leg")
         self.assertEqual(POD_MODULES, {
             "desk_left": (32, 48), "desk_mid_a": (32, 48), "desk_mid_b": (32, 48), "desk_right": (32, 48),
-            "screen_left": (32, 6), "screen_mid": (32, 6), "screen_right": (32, 6), "leg_short": (6, 7),
+            "screen_left": (32, 6), "screen_mid": (32, 6), "screen_right": (32, 6),
         })
         self.assertEqual(POD_SHARED, {
             "apron_left": (32, 3), "apron_mid": (32, 3), "apron_right": (32, 3), "bracket": (12, 10),
@@ -333,7 +333,7 @@ class PodSourceSetTests(unittest.TestCase):
         self.assertEqual(set(json.loads(self.manifest.read_text())["modules"]), set(POD_ONLY))
         self.assertEqual({path.name for path in (self.source / "table").iterdir()},
                          {f"{name}.png" for name in POD_ONLY} | {"manifest.json"},
-                         "the templates draw the pod family's 18 images and its manifest, nothing of the long table")
+                         "the templates draw the pod family's 17 images and its manifest, nothing of the long table")
         runtime = self.build()
         for name in POD_ONLY:
             self.assertEqual((runtime / f"{name}.png").read_bytes(), (self.source / "table" / f"{name}.png").read_bytes(), name)
@@ -373,10 +373,10 @@ class PodSourceSetTests(unittest.TestCase):
         listed = re.search(r"const TABLE_MODULES: Array\[StringName\] = \[(.*?)\]", source, re.S)
         self.assertIsNotNone(listed, "art_contract.gd still names TABLE_MODULES as a literal list")
         runtime = set(re.findall(r'&"(\w+)"', listed.group(1)))
-        self.assertEqual(len(runtime), 12, sorted(runtime))
+        self.assertEqual(len(runtime), 11, sorted(runtime))
         self.assertFalse(runtime & set(FURNITURE), "the furniture views are not table modules")
         self.assertEqual(set(POD_ONLY), runtime | set(FURNITURE))
-        self.assertEqual(len(POD_ONLY), 18)
+        self.assertEqual(len(POD_ONLY), 17)
         self.assertEqual(runtime, set(POD_MODULES) | set(POD_SHARED))
 
     def test_a_pod_set_missing_one_image_is_refused_before_writing(self):
@@ -395,7 +395,7 @@ class PodSourceSetTests(unittest.TestCase):
     def test_a_manifest_that_is_not_its_sets_contract_is_refused(self):
         original = self.manifest.read_text()
         cases = {
-            "size": lambda data: data["modules"]["leg_short"].__setitem__("size", [6, 24]),
+            "size": lambda data: data["modules"]["screen_mid"].__setitem__("size", [32, 8]),
             "path": lambda data: data["modules"]["desk_mid_a"].__setitem__("path", "desk_mid_b.png"),
             "assembly": lambda data: data["assembly"].__setitem__("surface_depth", 48),
         }
@@ -407,6 +407,21 @@ class PodSourceSetTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "native table contract"):
                     self.build(f"bad-{label}")
         self.manifest.write_text(original)
+
+
+    def test_a_source_that_still_declares_the_retired_leg_is_refused(self):
+        """leg_short left the pod set with the legs: a source manifest that still
+        declares it is a different set, refused with the name, and nothing is written."""
+        original = self.manifest.read_text()
+        data = json.loads(original)
+        data["modules"]["leg_short"] = {"path": "leg_short.png", "size": [6, 7]}
+        self.manifest.write_text(json.dumps(data))
+        try:
+            with self.assertRaisesRegex(ValueError, r"unknown \['leg_short'\]"):
+                self.build("with-leg")
+            self.assertFalse((self.root / "with-leg").exists(), "nothing written")
+        finally:
+            self.manifest.write_text(original)
 
     def test_a_part_of_the_pod_set_or_an_unknown_module_is_refused(self):
         original = json.loads(self.manifest.read_text())
@@ -506,25 +521,15 @@ class PodModuleContractTests(unittest.TestCase):
                 for screen in images.values():
                     screen.close()
 
-    def test_the_short_leg_ends_on_row_6_attached_and_tapered(self):
-        d = DENSITY
+    def test_the_pod_has_no_leg(self):
+        """The pod's two short end legs were retired: the near chairs, pushed in
+        under the desk, hid them at every column. No template and no shipped
+        tree draws one."""
+        self.assertNotIn("leg_short", POD_ONLY)
         for label, table in self.trees:
-            with self.subTest(tree=label), Image.open(table / "leg_short.png") as leg:
-                self.assertEqual(leg.size, (6 * d, 7 * d))
-                alpha = leg.getchannel("A")
-                self.assertEqual({value for _, value in alpha.getcolors()}, {0, 255}, "hard alpha")
-                left, top, right, bottom = alpha.getbbox()
-                self.assertEqual((top, bottom), (0, 7 * d), "hung at LEG_DROP -2, the foot ends at pod y 5")
-                self.assertEqual(left + right, 6 * d, "centred on its canvas")
-                for y in range(7 * d):
-                    self.assertIsNotNone(alpha.crop((0, y, alpha.width, y + 1)).getbbox(), f"row {y} is attached")
-                def span(unit_row):
-                    box = alpha.crop((0, unit_row * d, alpha.width, unit_row * d + 1)).getbbox()
-                    return box[2] - box[0]
-                self.assertLess(span(6), span(3), "the glide is narrower than the shoulder")
-                self.assertLess(span(4), span(3), "the shaft steps in")
-                self.assertLess(span(5), span(4), "the glide is narrower than the ankle")
-
+            with self.subTest(tree=label):
+                self.assertFalse((table / "leg_short.png").exists(), "no leg image")
+                self.assertNotIn("leg_short", json.loads((table / "manifest.json").read_text())["modules"])
 
 if __name__ == "__main__":
     unittest.main()

@@ -211,7 +211,8 @@ still look at seams and corners at 2× and 4×.
 
 A tab is one `OfficeTable` prefab (`scenes/world/table.tscn`), a **pod of single desks**, assembled from the
 `table/` companion pack: `desk_left/mid_a/mid_b/right` (the desktop and its grain, one module per column),
-`screen_left/mid/right` (the low screen between the two rows), `apron_*` (near edge), `leg_short` and `bracket`.
+`screen_left/mid/right` (the low screen between the two rows), `apron_*` (near edge) and `bracket`. The pod has no legs
+(its two short end legs were retired: the near chairs, pushed in under the desk, hid them at every column).
 Occlusion is Y-sort by position; there is no occlusion module. Modules repeat at their native 32 units, never
 stretched. The pod is 48 units deep, one 32-unit desk per column with a seat on each side. It is not a pack prop
 ID, because its length comes from the tab's pane count: pods stand in rows inside their zone
@@ -220,9 +221,9 @@ ID, because its length comes from the tab's pane count: pods stand in rows insid
 The top is warm pixel-art oak: planks along the pod, one dark seam row, sparse light grain (no dithering), a
 far edge of one outline row and one lit row, a near lip of one highlight over two shadow rows; lit from the
 top-left. The family is **density 2**, sampled NEAREST; canvases, rows, columns and probe points below are units,
-× `DENSITY` in the PNG (`tools/build_table_assets.py`). The pod set is **18 images** (`POD_ONLY` in the builder):
-the 12 modules the runtime lays (`ArtContract.TABLE_MODULES`: four desks, three screens, three aprons, the short
-leg and the bracket) and the 6 furniture views (two chairs, two laptops, two shell marks); a test holds the two
+× `DENSITY` in the PNG (`tools/build_table_assets.py`). The pod set is **17 images** (`POD_ONLY` in the builder):
+the 11 modules the runtime lays (`ArtContract.TABLE_MODULES`: four desks, three screens, three aprons and the
+bracket) and the 6 furniture views (two chairs, two laptops, two shell marks); a test holds the two
 lists together (`test_the_pod_only_set_is_exactly_what_the_office_draws`).
 
 - `desk_*` 32×48: opaque rows 0..42, transparent 43..47. Rows 0..39 are the working top (pod y −48..−8), 40..42
@@ -231,9 +232,7 @@ lists together (`test_the_pod_only_set_is_exactly_what_the_office_draws`).
   columns of each module are one uniform column and grain falls only in columns 3–28, so modules join in any order.
 - `screen_*` 32×6: fully opaque, a wooden rail over a sage panel; its panel lines repeat every 8 units, which
   divides 32, so modules in any order continue them.
-- `leg_short` 6×7: the pod's end leg, hung at y −2 with every row opaque, so the foot ends at pod y 5, wholly
-  behind the back of an end column's near chair (pushed in under the desk; somebody in it or not); every row
-  attached, the ankle and glide narrower than the shoulder. `bracket` is 12×10 at y −11.
+- `bracket` 12×10 at y −11, one under each desk: the near edge's only support below the apron.
 - Chairs are charcoal (`jacket` ramp, `ink` shadow, `deep` outline), not teal, so teal clothes against a chair
   back never merge. Both are the same office chair at a person's scale, 17 wide over rows 24–45 (22 units, about
   60% of a standing person), with armrests, a gas-lift column and a five-star base: the far one (`chair_front`,
@@ -243,28 +242,28 @@ lists together (`test_the_pod_only_set_is_exactly_what_the_office_draws`).
 
 ### Table sources and templates
 
-- **`art/daylight/table/` is the source**: the pod set's 18 PNGs and `manifest.json`. The build only reads it: no repainting,
+- **`art/daylight/table/` is the source**: the pod set's 17 PNGs and `manifest.json`. The build only reads it: no repainting,
   no saving back, no deleting unlisted drafts.
 - **`assets/<id>/table/` is the runtime copy**: `build_table_assets.py` validates the whole set, then copies PNGs
   and manifest byte for byte. It refuses missing, broken, non-RGBA or fully transparent images, sizes other than
   contract × `DENSITY`, and a mismatched manifest; a failed validation writes nothing. It prunes only stale
   PNGs / `.import` files in the runtime directory.
 - **Procedural drawing is authoring only**: `make table-templates` (and `make pixel-sources`, with the desk
-  library) exports the pod set's 18 images and its manifest into the empty directory `OUT` names; `make art` never
+  library) exports the pod set's 17 images and its manifest into the empty directory `OUT` names; `make art` never
   runs it. To redo geometry, change the drawing functions, export, review and copy chosen files into
   `art/daylight/table/`. The apron, the bracket and the chairs are drawn in units on a 1x canvas and scaled by
-  `DENSITY` with NEAREST as written; the desks, the screens, the short leg and the laptop are drawn texel by texel
+  `DENSITY` with NEAREST as written; the desks, the screens and the laptop are drawn texel by texel
   at `DENSITY`. `shell_*` is derived from the written `monitor_*` by `shell_mark()` (covers the lid mark
   on the rear, clears two output rows on the front, then draws a texel `$_` with its cursor at `CURSOR_AT`);
-  derive it again after redrawing a monitor, because the probe points are contract. The pixel contract of every image (the desk's rows, the screen, the leg's last row,
+  derive it again after redrawing a monitor, because the probe points are contract. The pixel contract of every image (the desk's rows, the screen,
   chair and laptop probe points) is in the docstring of `tools/build_table_assets.py`, and
   `tools/test_table_assets.py` checks each item.
 
 The table contract is fixed (schema 2, density 2, `filter: nearest`, the modules of the accepted set, one set of
 size / pivot / views / assembly) and `manifest.json` must match the builder's; the build never repairs it. The
-builder accepts one module set, `pod` (the 18 above, what the office draws): a source manifest declares exactly
+builder accepts one module set, `pod` (the 17 above, what the office draws): a source manifest declares exactly
 those names, and one that declares fewer, more or others (the long table's `surface_*`, `divider_*` and `leg`,
-which the builder took until the office drew the pod alone) is refused with what is missing and what is unknown,
+which the builder took until the office drew the pod alone, or the pod's retired `leg_short`) is refused with what is missing and what is unknown,
 before anything is written. Changing table geometry
 means updating the contract and the world model together; changing pixels needs no code or manifest change. `make
 art` copies the table, then compares against the committed products.

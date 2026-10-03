@@ -156,7 +156,7 @@ Coordinates are relative to the pod's origin at the left end of its near edge:
 | `reserved_rect` | `(0, -128, width + 32, 192)`: six cells, from the far approach row to the near one, with a one-cell passage on the right; bottom edge 64 |
 | Seats | far `(x, -36)` (`FAR_SEAT` 12 inside the far edge), near `(x, 8)` (`NEAR_SEAT` 8 below the near edge: the sitter's head reaches −23 and the shoulders −10, over the near working plane; the near row used to sit at 22, wholly below the apron, typing on air) |
 | Laptops | same x as the seat; far foot `(x, -40)` (8 inside the far edge: the rear view −48..−40, clear of the far worker, who shows only above −48), near `(x, -10)` (−21..−10). 14 units wide; rear view 8 units tall, front view with keyboard 11. A shell's empty chair gets the same laptop as an agent |
-| Near edge and supports | The working surface ends at `NEAR_SURFACE_EDGE = -8`; a 3-unit lip meets the apron at `APRON_DROP = -5`, `APRON_HEIGHT = 3`. Two `leg_short` legs, `LEG_DROP = -2`, centred under the end columns' near chairs (x 16 and width − 16), which hide them, somebody in the chair or not: the foot ends at y 5, behind the chair's solid back (opaque across the leg over −7..5.5; only its gas lift and base below). A `bracket` per desk at `BRACKET_DROP = -11`. Lamp light stops at the working surface, never past the edge |
+| Near edge and supports | The working surface ends at `NEAR_SURFACE_EDGE = -8`; a 3-unit lip meets the apron at `APRON_DROP = -5`, `APRON_HEIGHT = 3`. A `bracket` per desk at `BRACKET_DROP = -11`, and no legs: the pod's two short end legs were retired once the near chairs, pushed in under the desk (opaque over −7.5..14), hid them at every column, somebody in the chair or not. Lamp light stops at the working surface, never past the edge |
 | Low screen | `SCREEN_TOP = 16` below the far edge, `SCREEN_HEIGHT = 6` (−32..−26). The far working plane is −48..−32, the near one −26..−8 |
 | Lamps | `LAMP_HALF_WIDTH = 4` at the screen, `LIGHT_HALF_WIDTH = 14` at the sitter's edge |
 | Chair | `CHAIR_OFFSET` far −4 (sorts just behind the worker), near 6 (just in front; opaque over y −7.5..14: its top right under the working top's near edge at −8, so it covers none of the working top and none of a shell's laptop) |
@@ -362,8 +362,8 @@ The allocation budget has three parts. Input pane / tab counts bound parsing wor
 bound the TileMap, the shell, the partitions and the standing furniture (the top-wall run at most one plant per 160
 units, the lane gaps at most one piece every two rows of a lane). `FloorLayoutPolicy.max_desk_nodes` (default 32768) separately bounds **the
 sum of the node upper bounds of all live table groups on a map**, every zone's together. `OfficeDeskView.node_budget(capacity)` charges
-`26 + 71 × capacity` per pod, where capacity is the retained columns per side, not the current pane count: 26 fixed
-nodes (21 of the pod: its body, 12 holders, the footprint, the overlay, the frame and its 4 bars, the 2 short legs;
+`24 + 71 × capacity` per pod, where capacity is the retained columns per side, not the current pane count: 24 fixed
+nodes (19 of the pod: its body, 12 holders, the footprint, the overlay, the frame and its 4 bars;
 5 of the background: itself, the lens's wash, the contact holder, the tab label, and the row wall sign's, spare
 since the row walls went) and 71 per column (20 of the
 pod's: a desk, an apron and a screen module, a bracket, 2 laptops, 2 three-node grommets, 2 lamps, 2 papers, 2 seat
@@ -550,7 +550,7 @@ Besides the client / machine / incremental-update tests, `tools/run_tests.sh` ch
 - Laptops on both sides share x with the seated person and sit at their own edge of the desk, not by the low screen, including
   columns added by growth. A shell's `$_` view survives growth and rebinding; starting and done agents draw no shell
   mark.
-- The pod's near edge meets the legs without a seam and the feet stay put; near lamp light never passes the
+- The pod's near edge hangs one bracket under each desk and nothing else (no legs); near lamp light never passes the
   working surface. The real opaque pixels of every piece a side table carries are read and stay on its top; a
   fixed-identity rebuild, growth, state updates and theme rebuilds leave existing placements unchanged.
 - Shell bricks are all under `Ground`, standing furniture, partition pieces and zone signs all under `Sorted` (the
@@ -559,8 +559,8 @@ Besides the client / machine / incremental-update tests, `tools/run_tests.sh` ch
   wall joint is laid; the top wall's courses are drawn once per cell.
 - In every occupied column: far chair y < far person y < table y < near person y < near chair y. A near sitter's
   shoulders are above the desk's near working edge and the figure draws over part of its laptop, in every state; the
-  near chair's top is under that edge and above the apron's foot, and covers none of a shell's laptop. From the
-  chair's top down, every texel of a short leg is behind the end column's near chair, vacant or occupied.
+  near chair's top is under that edge and above the apron's foot, and covers none of a shell's laptop. The pod stands on no
+  legs: nothing under the apron but the brackets, no leg module in the pack or the contract.
 - A person is always the pixel-people family's six layers + one `AnimationPlayer`, no chest badge; all layers show the
   same `frame` at every moment; state changes, sitting / standing and re-dressing never replace nodes. Far people face
   the viewer; near people show their backs.

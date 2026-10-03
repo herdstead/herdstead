@@ -206,7 +206,6 @@ const TABLE_MODULES: Array[StringName] = [
 	&"screen_left",
 	&"screen_mid",
 	&"screen_right",
-	&"leg_short",
 	&"bracket",
 ]
 const FURNITURE_CHAIR := &"chair"
