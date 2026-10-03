@@ -21,7 +21,7 @@ RUN_TESTS = GODOT=$(GODOT) PYTHON=$(PYTHON) bash tools/run_tests.sh
 PACKS := $(notdir $(patsubst %/manifest.json,%,$(wildcard assets/*/manifest.json)))
 
 .DEFAULT_GOAL := help
-.PHONY: help setup import imported run people people-templates people-skins wall-templates table-templates pixel-sources test test-art check check-scripts check-packs smoke docs-check lint fmt art capture walk-strips perf pack export clean
+.PHONY: help setup import imported run people people-templates people-skins wall-templates table-templates pixel-sources test test-art test-suite check check-quick check-scripts check-packs smoke docs-check lint fmt art capture walk-strips perf pack export clean
 
 help:  ## List these targets
 	@grep -hE '^[a-z][a-z-]*:.*##' $(MAKEFILE_LIST) \
@@ -56,6 +56,13 @@ test-art:  ## The three Python art contract tests (packs, table, pixel people)
 # check-packs: both have just run as prerequisites.
 check: check-scripts check-packs lint docs-check test-art  ## What CI runs, in the order it runs it
 	HERDSTEAD_SKIP_LOAD_CHECKS=1 $(RUN_TESTS)
+
+check-quick: check-scripts check-packs lint docs-check test-art  ## The quick tier: the same gates, then only the art and world suites (QUICK_SUITES in tools/run_tests.sh); not a substitute for check before a push
+	HERDSTEAD_SKIP_LOAD_CHECKS=1 TIER=quick $(RUN_TESTS)
+
+test-suite:  ## One or more Godot suites as the full run starts them, with their floors: make test-suite S="test_lens test_office_geometry"
+	@test -n "$(S)" || { echo "make test-suite S=<script names under tools/, without .gd>"; exit 2; }
+	HERDSTEAD_SKIP_LOAD_CHECKS=1 SUITES="$(S)" $(RUN_TESTS)
 
 check-scripts: imported  ## Prove every script and scene still loads
 	$(GODOT) --headless --path . --script tools/check_scripts.gd

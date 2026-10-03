@@ -82,6 +82,8 @@ Every command lives in the `Makefile`; `make help` lists them.
 make setup      # .venv with the Python and lint tools
 make import     # fill Godot's import cache after a fresh clone
 make check      # everything CI runs: script load, packs, lint, docs, art tests, all Godot tests
+make check-quick            # the same gates, then only the art and world suites (about five minutes)
+make test-suite S=test_lens # one Godot suite, as the full run starts it
 make test       # only the Godot and Python tests
 make fmt        # format GDScript the way make lint expects
 make capture OUT=/abs/dir   # screenshots against a fake herdr (needs a display)

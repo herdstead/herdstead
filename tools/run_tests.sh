@@ -23,6 +23,15 @@
 # loads, every art pack dresses the scenes) for a caller that has just run them
 # itself: `make check` and CI. Everything else still runs.
 #
+# SUITES="test_office_geometry test_lens" runs only the Godot suites named (by
+# their script's name under tools/), each with its floor, marker and log gates
+# as in a full run; the Python asset tests and the fakes still run. `make
+# test-suite S=...` is the everyday spelling. TIER=quick is the quick tier,
+# QUICK_SUITES below: the art layer and the world (plans, pods, geometry,
+# people, walking, the lens), none of the HUD or the write boundary; `make
+# check-quick` runs it. A suite left out is not checked: the full run (`make
+# check`, CI) is still the gate before a push.
+#
 # Needs Godot 4.6+ (StreamPeerUDS) and Python 3 with Pillow for asset checks.
 set -u
 
@@ -95,6 +104,40 @@ MIN_CASES_SPACES=16
 
 # Unix socket paths stop at ~104 bytes on macOS: keep them short, under /tmp.
 WORK="$(mktemp -d /tmp/herdstead-test.XXXXXX)"
+
+# The quick tier (TIER=quick): every suite that an art, world or geometry
+# change can break and nothing a HUD or write-boundary change needs; about
+# five minutes on a quiet machine with the gates before it, two of them the
+# suites (measured 269 s / 110 s), and none of the suites that wait on
+# wall-clock time with a fake herdr.
+QUICK_SUITES="test_art test_office_incremental test_office_layout test_office_map test_office_service
+test_office_navigator test_office_geometry test_office_frames test_office_quiet test_day_light
+test_office_reconcile test_office_walking test_office_rests test_lens test_pixel_people"
+SUITES="${SUITES:-}"
+if [ "${TIER:-}" = "quick" ]; then
+	SUITES="$QUICK_SUITES"
+elif [ -n "${TIER:-}" ]; then
+	echo "RUN_TESTS: unknown TIER '$TIER' (only quick)"
+	exit 2
+fi
+if [ -n "$SUITES" ]; then
+	for name in $SUITES; do
+		[ -f "$ROOT/tools/$name.gd" ] || {
+			echo "RUN_TESTS: no suite tools/$name.gd"
+			exit 2
+		}
+	done
+	echo "== suites: $(echo "$SUITES" | tr '\n' ' ')"
+fi
+
+# Whether suite `$1` (a script name) runs: every one when SUITES is empty.
+wanted() {
+	[ -z "$SUITES" ] && return 0
+	case " $(echo "$SUITES" | tr '\n' ' ') " in
+		*" $1 "*) return 0 ;;
+	esac
+	return 1
+}
 SERVER_PID=""
 SERVER_B_PID=""
 SERVER_C_PID=""
@@ -244,21 +287,24 @@ else
 	fi
 fi
 
-echo "== art layer tests"
-# No herdr: a pack is not a client, and its fixtures are written under $WORK.
-bounded "$GODOT" --headless --path "$ROOT" --script tools/test_art.gd -- \
-	--work="$WORK" 2>&1 | tee "$WORK/art.log"
-art_status=${PIPESTATUS[0]}
-if grep -q "SCRIPT ERROR" "$WORK/art.log"; then
-	echo "RUN_TESTS: Godot reported a SCRIPT ERROR during the art tests"
-	[ "$art_status" -eq 0 ] && art_status=1
-fi
-if ! cases_floor "$WORK/art.log" "ART TESTS" "$MIN_CASES_ART"; then
-	[ "$art_status" -eq 0 ] && art_status=1
-fi
-if ! grep -q "^ART TESTS OK" "$WORK/art.log" && [ "$art_status" -eq 0 ]; then
-	echo "RUN_TESTS: the art test run did not finish"
-	art_status=1
+art_status=0
+if wanted test_art; then
+	echo "== art layer tests"
+	# No herdr: a pack is not a client, and its fixtures are written under $WORK.
+	bounded "$GODOT" --headless --path "$ROOT" --script tools/test_art.gd -- \
+		--work="$WORK" 2>&1 | tee "$WORK/art.log"
+	art_status=${PIPESTATUS[0]}
+	if grep -q "SCRIPT ERROR" "$WORK/art.log"; then
+		echo "RUN_TESTS: Godot reported a SCRIPT ERROR during the art tests"
+		[ "$art_status" -eq 0 ] && art_status=1
+	fi
+	if ! cases_floor "$WORK/art.log" "ART TESTS" "$MIN_CASES_ART"; then
+		[ "$art_status" -eq 0 ] && art_status=1
+	fi
+	if ! grep -q "^ART TESTS OK" "$WORK/art.log" && [ "$art_status" -eq 0 ]; then
+		echo "RUN_TESTS: the art test run did not finish"
+		art_status=1
+	fi
 fi
 
 start_fake herdr
@@ -268,78 +314,86 @@ start_fake machine
 SERVER_B_PID=$FAKE_PID
 
 started=$(date +%s)
-echo "== client + office tests"
-bounded "$GODOT" --headless --path "$ROOT" --script tools/test_client.gd -- \
-	--socket="$WORK/herdr.sock" --control="$WORK/herdr-ctl.sock" 2>&1 | tee "$WORK/tests.log"
-status=${PIPESTATUS[0]}
-[ "$status" -eq 0 ] && status=$art_status
+status=$art_status
+if wanted test_client; then
+	echo "== client + office tests"
+	bounded "$GODOT" --headless --path "$ROOT" --script tools/test_client.gd -- \
+		--socket="$WORK/herdr.sock" --control="$WORK/herdr-ctl.sock" 2>&1 | tee "$WORK/tests.log"
+	status=${PIPESTATUS[0]}
+	[ "$status" -eq 0 ] && status=$art_status
 
-# The client must notice a closed peer without reading it (engine: "!is_open()").
-if grep -q '!is_open()' "$WORK/tests.log"; then
-	echo "RUN_TESTS: the client read a closed socket"
-	[ "$status" -eq 0 ] && status=1
-fi
-if grep -q "SCRIPT ERROR" "$WORK/tests.log"; then
-	echo "RUN_TESTS: Godot reported a SCRIPT ERROR during the tests"
-	[ "$status" -eq 0 ] && status=1
-fi
-if ! cases_floor "$WORK/tests.log" "TESTS" "$MIN_CASES_CLIENT"; then
-	[ "$status" -eq 0 ] && status=1
-fi
-if ! grep -q "^TESTS OK" "$WORK/tests.log" && [ "$status" -eq 0 ]; then
-	echo "RUN_TESTS: the test run did not finish"
-	status=1
+	# The client must notice a closed peer without reading it (engine: "!is_open()").
+	if grep -q '!is_open()' "$WORK/tests.log"; then
+		echo "RUN_TESTS: the client read a closed socket"
+		[ "$status" -eq 0 ] && status=1
+	fi
+	if grep -q "SCRIPT ERROR" "$WORK/tests.log"; then
+		echo "RUN_TESTS: Godot reported a SCRIPT ERROR during the tests"
+		[ "$status" -eq 0 ] && status=1
+	fi
+	if ! cases_floor "$WORK/tests.log" "TESTS" "$MIN_CASES_CLIENT"; then
+		[ "$status" -eq 0 ] && status=1
+	fi
+	if ! grep -q "^TESTS OK" "$WORK/tests.log" && [ "$status" -eq 0 ]; then
+		echo "RUN_TESTS: the test run did not finish"
+		status=1
+	fi
 fi
 
-echo "== machine tests"
-# fake_ssh.py stands in for ssh; this wrapper runs it with the chosen Python.
-printf '#!/bin/sh\nexec "%s" "%s" "$@"\n' "$(command -v "$PYTHON")" "$ROOT/tools/fake_ssh.py" >"$WORK/ssh"
-chmod +x "$WORK/ssh"
-PYTHON="$PYTHON" bounded "$GODOT" --headless --path "$ROOT" --script tools/test_machines.gd -- --read-only \
-	--socket-a="$WORK/herdr.sock" --control-a="$WORK/herdr-ctl.sock" \
-	--socket-b="$WORK/machine.sock" --control-b="$WORK/machine-ctl.sock" \
-	--work="$WORK" --ssh="$WORK/ssh" 2>&1 | tee "$WORK/machines.log"
-machine_status=${PIPESTATUS[0]}
-if grep -q '!is_open()' "$WORK/machines.log"; then
-	echo "RUN_TESTS: a client read a closed socket during the machine tests"
-	[ "$machine_status" -eq 0 ] && machine_status=1
+if wanted test_machines; then
+	echo "== machine tests"
+	# fake_ssh.py stands in for ssh; this wrapper runs it with the chosen Python.
+	printf '#!/bin/sh\nexec "%s" "%s" "$@"\n' "$(command -v "$PYTHON")" "$ROOT/tools/fake_ssh.py" >"$WORK/ssh"
+	chmod +x "$WORK/ssh"
+	PYTHON="$PYTHON" bounded "$GODOT" --headless --path "$ROOT" --script tools/test_machines.gd -- --read-only \
+		--socket-a="$WORK/herdr.sock" --control-a="$WORK/herdr-ctl.sock" \
+		--socket-b="$WORK/machine.sock" --control-b="$WORK/machine-ctl.sock" \
+		--work="$WORK" --ssh="$WORK/ssh" 2>&1 | tee "$WORK/machines.log"
+	machine_status=${PIPESTATUS[0]}
+	if grep -q '!is_open()' "$WORK/machines.log"; then
+		echo "RUN_TESTS: a client read a closed socket during the machine tests"
+		[ "$machine_status" -eq 0 ] && machine_status=1
+	fi
+	if grep -q "SCRIPT ERROR" "$WORK/machines.log"; then
+		echo "RUN_TESTS: Godot reported a SCRIPT ERROR during the machine tests"
+		[ "$machine_status" -eq 0 ] && machine_status=1
+	fi
+	if ! cases_floor "$WORK/machines.log" "MACHINE TESTS" "$MIN_CASES_MACHINE"; then
+		[ "$machine_status" -eq 0 ] && machine_status=1
+	fi
+	if ! grep -q "^MACHINE TESTS OK" "$WORK/machines.log" && [ "$machine_status" -eq 0 ]; then
+		echo "RUN_TESTS: the machine test run did not finish"
+		machine_status=1
+	fi
+	[ "$status" -eq 0 ] && status=$machine_status
 fi
-if grep -q "SCRIPT ERROR" "$WORK/machines.log"; then
-	echo "RUN_TESTS: Godot reported a SCRIPT ERROR during the machine tests"
-	[ "$machine_status" -eq 0 ] && machine_status=1
-fi
-if ! cases_floor "$WORK/machines.log" "MACHINE TESTS" "$MIN_CASES_MACHINE"; then
-	[ "$machine_status" -eq 0 ] && machine_status=1
-fi
-if ! grep -q "^MACHINE TESTS OK" "$WORK/machines.log" && [ "$machine_status" -eq 0 ]; then
-	echo "RUN_TESTS: the machine test run did not finish"
-	machine_status=1
-fi
-[ "$status" -eq 0 ] && status=$machine_status
 
-echo "== incremental office tests"
-# No herdr here: the office's client is stopped and handed snapshots directly.
-bounded "$GODOT" --headless --path "$ROOT" --script tools/test_office_incremental.gd -- --read-only \
-	--socket="$WORK/nowhere.sock" --work="$WORK" 2>&1 | tee "$WORK/incremental.log"
-incremental_status=${PIPESTATUS[0]}
-if grep -q "SCRIPT ERROR" "$WORK/incremental.log"; then
-	echo "RUN_TESTS: Godot reported a SCRIPT ERROR during the incremental office tests"
-	[ "$incremental_status" -eq 0 ] && incremental_status=1
+if wanted test_office_incremental; then
+	echo "== incremental office tests"
+	# No herdr here: the office's client is stopped and handed snapshots directly.
+	bounded "$GODOT" --headless --path "$ROOT" --script tools/test_office_incremental.gd -- --read-only \
+		--socket="$WORK/nowhere.sock" --work="$WORK" 2>&1 | tee "$WORK/incremental.log"
+	incremental_status=${PIPESTATUS[0]}
+	if grep -q "SCRIPT ERROR" "$WORK/incremental.log"; then
+		echo "RUN_TESTS: Godot reported a SCRIPT ERROR during the incremental office tests"
+		[ "$incremental_status" -eq 0 ] && incremental_status=1
+	fi
+	if ! cases_floor "$WORK/incremental.log" "INCREMENTAL TESTS" "$MIN_CASES_INCREMENTAL"; then
+		[ "$incremental_status" -eq 0 ] && incremental_status=1
+	fi
+	if ! grep -q "^INCREMENTAL TESTS OK" "$WORK/incremental.log" && [ "$incremental_status" -eq 0 ]; then
+		echo "RUN_TESTS: the incremental office test run did not finish"
+		incremental_status=1
+	fi
+	[ "$status" -eq 0 ] && status=$incremental_status
 fi
-if ! cases_floor "$WORK/incremental.log" "INCREMENTAL TESTS" "$MIN_CASES_INCREMENTAL"; then
-	[ "$incremental_status" -eq 0 ] && incremental_status=1
-fi
-if ! grep -q "^INCREMENTAL TESTS OK" "$WORK/incremental.log" && [ "$incremental_status" -eq 0 ]; then
-	echo "RUN_TESTS: the incremental office test run did not finish"
-	incremental_status=1
-fi
-[ "$status" -eq 0 ] && status=$incremental_status
 
 # Each suite below runs in its own bounded Godot. Godot can exit 0 on script
 # errors: both log and marker remain gates, just like the existing suites above.
 run_scene_suite() {
 	local script="$1" marker="$2" floor="$3"
 	shift 3
+	wanted "$script" || return 0
 	local log="$WORK/$script.log"
 	bounded "$GODOT" --headless --path "$ROOT" --script "tools/$script.gd" "$@" 2>&1 | tee "$log"
 	local suite_status=${PIPESTATUS[0]}
