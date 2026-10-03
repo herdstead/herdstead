@@ -61,7 +61,7 @@ MIN_CASES_OFFICE_SERVICE=16
 # the furniture's clearance on the map now. 25 -> 29: the near row sits at the
 # desk (the sitter over the near plane, the short legs behind the end chairs,
 # the near paper and the near lamp in sight beside whoever sits there).
-MIN_CASES_OFFICE_GEOMETRY=29
+MIN_CASES_OFFICE_GEOMETRY=30
 MIN_CASES_OFFICE_FRAMES=5
 MIN_CASES_OFFICE_QUIET=8
 MIN_CASES_DAY_LIGHT=8

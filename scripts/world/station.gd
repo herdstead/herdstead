@@ -77,18 +77,20 @@ const CHIP_SIZE := OfficeChip.SIZE
 const CHIP_AT := {"far": Vector2(-15, -52), "near": Vector2(-15, 8)}
 const CHIP_BADGE_SHIFT := Vector2(-8.5, 0)
 ## The lens row (OfficeLens, while `L` is held), 30 by 12, next out from the
-## tag row: pod [-102, -90) far and [32, 44) near. It holds the compact wait
+## tag row: pod [-102, -90) far, and [40, 52) near, past the tab's label
+## ([32, 40), right under the pod's drawing: the near rows below the chairs
+## give it its band and hang under it). It holds the compact wait
 ## (OfficeAttention.compact_duration(): 18 wide at most).
-const LENS_AT := {"far": Vector2(-15, -66), "near": Vector2(-15, 24)}
+const LENS_AT := {"far": Vector2(-15, -66), "near": Vector2(-15, 32)}
 const LENS_SIZE := Vector2(30, 12)
 ## The plate, 30 by 12: the provider in upper case, in the display face at 8,
 ## cut with a forced ellipsis when it is wider (the card and the list say the
 ## whole name). While the lens is not held its row is empty, so the plate
 ## takes the lens row's slot, next to the tag row (LENS_AT: pod [-102, -90)
-## far, [32, 44) near); while the lens is held it moves out to the outermost
-## row, PLATE_AT: pod [-114, -102) far and [44, 56) near.
+## far, [40, 52) near); while the lens is held it moves out to the outermost
+## row, PLATE_AT: pod [-114, -102) far and [52, 64) near.
 const PLATE_SIZE := Vector2(30, 12)
-const PLATE_AT := {"far": Vector2(-15, -78), "near": Vector2(-15, 36)}
+const PLATE_AT := {"far": Vector2(-15, -78), "near": Vector2(-15, 44)}
 ## The seat mark (ui `selection_seat`, 32 by 48 over its foot) frames the seated
 ## figure, a raised hand included: pod [-72, -24) far, [-32, 16) near. The near
 ## one starts where the far seat's click rectangle ends and takes in the chair

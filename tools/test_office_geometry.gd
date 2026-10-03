@@ -652,7 +652,7 @@ func test_labels_clear_the_heads_they_hang_on() -> void:
 
 ## The lens line on each side and over a worker resting away: its row is the
 ## one between the tag row and the plate row (far pod [-102, -90), near
-## [32, 44)), its text clears the badge at the top of its pulse and the
+## [40, 52), past the tab label), its text clears the badge at the top of its pulse and the
 ## plate's text, and away it is centred over the worker, above their badge.
 ## While it shows the chip draws nothing and the badge is back in the middle of
 ## its row; let go, the line is gone and the chip is drawn again. (The line
@@ -672,7 +672,7 @@ func test_the_lens_line_stays_inside_the_desk_and_off_the_badge() -> void:
 		_check(line.is_visible_in_tree(), "%s: the line shows" % side)
 		var in_table := table.global_transform.affine_inverse() * line.get_global_transform()
 		var drawn := in_table * Rect2(Vector2.ZERO, line.size)
-		var row := Rect2(1, -102, 30, 12) if side == "far" else Rect2(1, 32, 30, 12)
+		var row := Rect2(1, -102, 30, 12) if side == "far" else Rect2(1, 40, 30, 12)
 		_eq(drawn, row, "%s: the lens row" % side)
 		_eq(badge_node.position, OfficeStation.BADGE_AT[side], "%s: the badge is back in the middle" % side)
 		_check(badge_node.position != chipped, "%s: it was in the chip before" % side)
@@ -1156,9 +1156,9 @@ func _check_row_literals(
 			_eq(to_pod * rows["chip"], Rect2(1, tag_top, 30, 16), "%s: the chip" % where)
 		_eq(rows.has("lens"), held, "%s: the lens row only under the lens" % where)
 		if held:
-			_eq(to_pod * rows["lens"], Rect2(1, -102.0 if far else 32.0, 30, 12), "%s: the lens row" % where)
+			_eq(to_pod * rows["lens"], Rect2(1, -102.0 if far else 40.0, 30, 12), "%s: the lens row" % where)
 		# Held, the plate is the outermost row; unheld, it takes the lens row's slot.
-		var plate_top := (-114.0 if far else 44.0) if held else (-102.0 if far else 32.0)
+		var plate_top := (-114.0 if far else 52.0) if held else (-102.0 if far else 40.0)
 		_eq(to_pod * rows["plate"], Rect2(1, plate_top, 30, 12), "%s: the plate row" % where)
 		_eq(
 			to_pod * rows["chip rect"],
@@ -1331,6 +1331,56 @@ func test_a_near_sitter_sits_at_the_near_working_plane() -> void:
 		_check(not shell.is_empty(), "column %d: the shell's laptop is drawn" % column)
 		_eq(hidden, 0, "column %d: the empty chair covers none of the shell's laptop" % column)
 		station.free()
+
+
+## The tab's label stands right under the pod's drawing ([32, 40)), and the near
+## seats' transient rows hang below the chairs of the same pod: while a near
+## seat is hovered or selected its plate, and under the held lens its lens
+## line and its plate, meet the label's box at no column, in either slot.
+## Seen on a real fleet before this: a selected near seat's plate over the tab
+## name (MAI|LAUDE) and a lens line glued to it (4s+TESTS).
+func test_the_near_rows_stand_clear_of_the_tab_label() -> void:
+	world = Node2D.new()
+	ground = Node2D.new()
+	sorted = Node2D.new()
+	world.add_child(ground)
+	world.add_child(sorted)
+	root.add_child(world)
+	var room := RoomModel.new()
+	room.key = "label-table"
+	room.label = "critics"
+	var view := OfficeDeskView.new()
+	view.setup(pen, ground, sorted, room.key)
+	var placed := DeskPlacement.new()
+	placed.tab_key = room.key
+	placed.capacity = 4
+	placed.measure = OfficeTable.measure(4)
+	view.reconcile(room, placed)
+	await process_frame
+	var label := view.title.get_global_rect()
+	var to_pod := view.table.global_transform.affine_inverse()
+	_eq(to_pod * label, Rect2(0, 32, placed.measure.table_width, 8), "the label right under the drawing")
+	for station in view.stations:
+		station.furnish("claude", ArtContract.STATE_WORKING)
+	for held: bool in [false, true]:
+		for station in view.stations:
+			station.show_lens(held, "4s+")
+			station.select(true)
+		await process_frame
+		for station in view.stations:
+			if station.side != "near":
+				continue
+			var rows := _seat_rows(station)
+			var where := "column %d, lens %s" % [station.column, held]
+			_check(rows.has("plate"), "%s: the plate shows" % where)
+			_eq(rows.has("lens"), held, "%s: the lens line only under the lens" % where)
+			for name: String in ["plate", "lens"]:
+				if rows.has(name):
+					_check(
+						not rows[name].intersects(label),
+						"%s: the %s %s clears the label %s" % [where, name, rows[name], label]
+					)
+			_check(label.end.y <= rows["plate"].position.y, "%s: the plate hangs below the label" % where)
 
 
 ## The pod stands on no legs: its two short end legs were retired once the
