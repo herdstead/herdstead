@@ -21,7 +21,9 @@ Commands live only in the `Makefile`; `make help` lists them all. A new everyday
 
 | To do | Command |
 |---|---|
-| Every check run before committing and on CI | `make check` |
+| Every check, before a push and on CI | `make check` |
+| The quick tier: the same gates, then only the art and world suites (`QUICK_SUITES` in `tools/run_tests.sh`); enough before a commit confined to art / world (see "Commits") | `make check-quick` |
+| One or more Godot suites as the full run starts them, floors included (the load stages skipped) | `make test-suite S="test_lens test_office_geometry"` |
 | Only the Godot + Python tests | `make test` |
 | Format GDScript (`make lint` checks it) | `make fmt` |
 | Run the main scene headless for one frame; fail on any script error in the log (the same step as CI) | `make smoke` |
@@ -213,8 +215,17 @@ herdr machine list ─ Roster ┘        │      commands: CommandContext in, C
 
 ## Commits
 
-- Before committing, run `make fmt` and then `make check`. gdformat folds "a multi-line lambda inside a lambda" into something Godot cannot parse: give the inner lambda a name.
-  The script load check in `make check` catches this; do not skip it.
+- Before committing, run `make fmt` and then the check the change needs; before a push or a PR, always the full `make check`, whatever the commits ran (CI runs the full one).
+  **Two tiers, by what the change touches**: a commit confined to `art/`, `assets/`, `scripts/art/`, `scripts/world/`, `scenes/world/`, the draw / build tools
+  (`tools/build_*.py`, `tools/draw_pixel_sources.py`, `tools/people_skins.py`) and `docs/` may stop at `make check-quick` (about five minutes, measured: the same load, lint and docs gates,
+  the Python art tests, then the art layer and the world suites). Anything under `scripts/ui/`, `scenes/ui/`, `scripts/office.gd`, the data layer, `scripts/herdr_commands.gd`
+  or `tools/run_tests.sh` itself runs the full `make check` before the commit. While iterating, `make test-suite S=...` runs the suites you are in.
+- gdformat folds "a multi-line lambda inside a lambda" into something Godot cannot parse: give the inner lambda a name.
+  The script load check in `make check` and `make check-quick` catches this; do not skip it.
+- **Load-sensitive suites.** The write suites and a few others wait on wall-clock time against a fake herdr; on a loaded machine (other projects' tests, two `make check` at once)
+  one of them can fail with a time-out or a count off by one: MONITOR's frame budget, OVERVIEW's and BUBBLE's ten-second read and chip order, ANSWER / LAUNCH / CLOSE / SPACES waits,
+  STRATEGIC's redraw count, INCREMENTAL's wait label, SPACE RAIL's in-view marks have all done it. The rule: look at `uptime`, rerun that suite alone (`make test-suite`), then the
+  full check once more, and report every run as it was; never loosen the assertion, never call a run green that was not, and never run two full checks side by side.
 - Commit art products (`art/`, `assets/`, `.import`) separately from code.
 - Do not push or open PRs unless asked.
 
