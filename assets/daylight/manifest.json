@@ -606,6 +606,28 @@
         8
       ]
     },
+    "key_enter": {
+      "path": "ui/key_enter.png",
+      "size": [
+        10,
+        10
+      ],
+      "pivot": [
+        0,
+        0
+      ]
+    },
+    "expand": {
+      "path": "ui/expand.png",
+      "size": [
+        10,
+        10
+      ],
+      "pivot": [
+        0,
+        0
+      ]
+    },
     "panel": {
       "path": "ui/panel.png",
       "size": [
