@@ -143,8 +143,10 @@ func _draw_background(next: DeskPlacement) -> void:
 	background.name = _name + "Ground"
 	_ground.add_child(background)
 	# No rug: the pod stands on the floor itself. The lens's wash covers the
-	# cells under the pod's drawing, under the contact shadows, the sign and the title.
-	var visual := next.measure.render_rect
+	# cells under the pod's drawing and its title (which stands right under the
+	# drawing, and with the near seats at the desk starts on a cell's edge),
+	# under the contact shadows, the sign and the title.
+	var visual := next.measure.render_rect.grow_side(SIDE_BOTTOM, OfficeDraw.TAB_LABEL_HEIGHT)
 	var grid := float(FloorLayoutPolicy.GRID)
 	var start := (visual.position / grid).floor()
 	var end := (visual.end / grid).ceil()

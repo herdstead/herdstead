@@ -231,9 +231,9 @@ lists together (`test_the_pod_only_set_is_exactly_what_the_office_draws`).
   columns of each module are one uniform column and grain falls only in columns 3–28, so modules join in any order.
 - `screen_*` 32×6: fully opaque, a wooden rail over a sage panel; its panel lines repeat every 8 units, which
   divides 32, so modules in any order continue them.
-- `leg_short` 6×22: the pod's end leg, hung at y −2 with its last opaque row at 20, so the foot ends at pod y 19,
-  hidden behind the near chair of an end column; every row attached, the ankle and glide narrower than the
-  shoulder. `bracket` is 12×10 at y −11.
+- `leg_short` 6×7: the pod's end leg, hung at y −2 with every row opaque, so the foot ends at pod y 5, wholly
+  behind the back of an end column's near chair (pushed in under the desk; somebody in it or not); every row
+  attached, the ankle and glide narrower than the shoulder. `bracket` is 12×10 at y −11.
 - Chairs are charcoal (`jacket` ramp, `ink` shadow, `deep` outline), not teal, so teal clothes against a chair
   back never merge. Both are the same office chair at a person's scale, 17 wide over rows 24–45 (22 units, about
   60% of a standing person), with armrests, a gas-lift column and a five-star base: the far one (`chair_front`,
@@ -272,7 +272,8 @@ art` copies the table, then compares against the committed products.
 The pod sorts as one piece by its near edge. Each pane is an `OfficeStation` (chair, occupant, badge, click
 area, incremental-update boundary). Near and far panes in the same layout x column face each other; a pane with
 no layout x takes a stable fallback column. The far worker's seat lies inside the pod's footprint, so the pod
-hides their lower body; the near worker sorts before the pod and the near chair back before them. The task
+hides their lower body; the near worker's seat is just below the pod's near edge, so they are drawn over the pod,
+head and shoulders over its near working plane, and the near chair back, pushed in under the desk, over them. The task
 light is a child of the table and falls only on its top; the contact shadow is on the ground layer; neither
 darkens the floor. Full depth, collision and geometry rules: [the world model](WORLD_MODEL.md).
 

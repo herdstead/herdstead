@@ -150,7 +150,7 @@ Agent state is drawn only at the station. idle is the only state that leaves the
   (never `$_`) with nothing over it.
 - The chip's click area and the seat's never overlap: a seat click selects; a chip click selects and enters answer mode once the question shows
   (never sends; under `--read-only` it only selects). While a chip shows, the seat's click area gives up the tag row (far: its top drops from
-  −90 to −72; near: its bottom rises from 46 to 28): every point belongs to one click area.
+  −90 to −72; near: its bottom rises from 32 to 14): every point belongs to one click area.
 - Standing still happens only in the pantry or on a frozen, disconnected map; passers-by never stop. The pantry row is not a path: people step
   into it from the aisle below.
 - A new terminal or session re-orders a pantry person from that moment; in a full pantry they sit back down, and two people may swap spots when one's
@@ -283,7 +283,7 @@ machine that disappears takes its map with it. The `door` on the outer wall is f
 
 A herdr pane is a terminal; the office draws a laptop. A monitor offset sideways to clear faces read as belonging to the next seat, so the laptop
 shares the column centre with person and chair and sits at its own edge of the desk. It is shaped after a silver MacBook (thin lid, narrow hinge,
-keyboard and trackpad); 14 units wide, the far back 8 units high and the near front 11, small enough to leave the far worker's face, shoulders and arms visible without touching the Y-sort.
+keyboard and trackpad); 14 units wide, the far back 8 units high and the near front 11, small enough to leave the far worker's face, shoulders and arms visible without touching the Y-sort. A near worker sits at theirs with their back to the viewer, head and shoulders over it, so only its corners show beside the head; a shell's, with nobody in the chair, shows whole (the pushed-in chair's top is below it).
 
 Seats come in three kinds: **empty** (a chair), **SHELL** (an empty chair + a `$_` laptop), **agent** (a person + an ordinary laptop). Launch pending is
 never drawn as a shell, even before there is a provider. The `$_` is a static mark on the screen (near) or lid (far): no `>_` bubble, no blinking, no

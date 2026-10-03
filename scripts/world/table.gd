@@ -40,15 +40,19 @@ const APRON_DROP := -5
 ## Below the far edge: a far worker's feet are inside the pod's footprint,
 ## so the pod (sorted at its near edge, drawn later) hides their legs.
 const FAR_SEAT := 12
-## Below the near edge: a near worker is wholly in front of the apron.
-const NEAR_SEAT := 22
+## Below the near edge, the chair pushed in under the desk: a near worker sits
+## at the near working plane, the head (pod y -23) and shoulders (from -10)
+## over it and the laptop, the rest behind the chair. Their feet are still
+## below the pod's origin, so they are drawn over the pod, never under it.
+const NEAR_SEAT := 8
 ## The cell beside a seat that the near seat's leg turns round the chair at
 ## (OfficeWalkGraph.leg_to_seat(); DeskMeasure calls it the standing spot).
 ## Nobody stands there: done agents sit with their paper, and these numbers
 ## stay so the walk graph is planned the same way. Half a column beside the
 ## seat, in the 16-unit gap between two chairs (x+8..x+24: the near leg's feet,
 ## x+10..x+22, keep 2 units each side); the far one FAR_STAND above the far
-## edge, off the pod's footprint; the near one at the seat's depth.
+## edge, off the pod's footprint; the near one at the seat's depth, where the
+## feet (pod y 4..8) are still 4 units clear of the pod's footprint.
 const STAND_ASIDE := 16
 const FAR_STAND := 6
 const NEAR_STAND := NEAR_SEAT
@@ -80,38 +84,45 @@ const LAMP_STRONG := 1.4
 ## A station's chair relative to its seat: the far chair (front view) sorts
 ## just behind its worker, the near chair (back view) in front. The painted
 ## office chair is 22 units tall; a small offset leaves the upper back clear.
-## The near chair is opaque down to seat + 6, pod y 28.
+## The near chair is opaque from seat - 15.5 down to seat + 6: pod y -7.5,
+## right under the working top's near edge, to 14.
 const CHAIR_OFFSET := {"far": -4, "near": 6}
 ## How far outside render_rect the pod's selection frame is drawn: its 2-unit
-## bars then lie on [-92, -90) over the far rows, [46, 48) under the near ones
+## bars then lie on [-92, -90) over the far rows, [32, 34) under the near ones
 ## and one bar's width beside the end desks, clear of the last column's paper
-## (to x = width) and of the near chip (to 46). An overlay, never planned
+## (to x = width) and of the near chip (to 32). An overlay, never planned
 ## around: it stays inside the passage cells between pods and the row's own band.
 const FRAME_OUTSIDE := 2.0
 ## The stationary drawing of a pod (render_rect), above the far edge and below
-## the near one: the far tag row's pulse envelope reaches -90, the near one 46.
+## the near one: the far tag row's pulse envelope reaches -90, the near one
+## (it hangs under the near chair, so it follows NEAR_SEAT) 32.
 const DRAWN_ABOVE_FAR := 42
-const DRAWN_BELOW_NEAR := 46
+const DRAWN_BELOW_NEAR := 32
 ## The reservation (reserved_rect): FAR_RESERVE above the far edge (the far
 ## approach row and the far tag rows), NEAR_RESERVE below the near edge (the
 ## near approach row), and one passage cell right of the pod.
 const FAR_RESERVE := 80
 const NEAR_RESERVE := 64
-## The two short legs stand under the end columns' near chairs (x 16 and
-## w - 16), which hide them whenever somebody sits there; LEG_DROP hangs their
-## mount under the apron, and their foot ends at pod y 19, above the chair's
-## gas lift (the art lane's measurement). A bracket hangs under each desk.
+## The two short legs stand behind the end columns' near chairs (x 16 and
+## w - 16), which hide them, somebody in the chair or not: LEG_DROP hangs their
+## mount under the apron, and their foot ends at pod y 5, behind the chair's
+## solid back (opaque across the leg down to 5.5; below that only its gas lift
+## and base). A bracket hangs under each desk.
 const LEG_DROP := -2
 const BRACKET_DROP := -11
 const SIDES := ["far", "near"]
 ## A done seat's stack of paper (ArtContract.PROP_DONE_STACK_SMALL, 6 wide and
 ## 9 tall, opaque x-3..x+3 about its foot) stands PAPERS_ASIDE right of the
 ## seat column: opaque over x+10..x+16, clear of the laptop (x-7..x+7), of the
-## worker and their raised hand (x-8..x+12), of the next column's worker
-## (from x+22) and raised hand (from x+24), and inside the desktop on the last
-## column (x+16 is the pod's right edge). Its foot is on its side's working
-## plane: PAPERS_FAR puts it at -42..-33 (far plane -48..-32), PAPERS_NEAR at
-## -24..-15 (near plane -26..-8), above the near raised hand's top (-14).
+## next column's worker (from x+24) and inside the desktop on the last column
+## (x+16 is the pod's right edge). Its foot is on its side's working plane:
+## PAPERS_FAR puts it at -42..-33 (far plane -48..-32), below the far edge the
+## far worker shows above; PAPERS_NEAR at -24..-15 (near plane -26..-8), beside
+## the near worker, who sits over that plane: a done agent's head is x-6..x+6
+## there and the shoulders (x-8..x+8) start below the paper, at -11. A blocked
+## agent's raised hand (x+7..x+12, pod -28..-11 on the near side) would cover
+## the paper's left 2 units, and never does: a seat shows the paper (done) or
+## the hand (blocked), never both (OfficeStation.furnish()).
 const PAPERS_ASIDE := 13
 const PAPERS_FAR := -33
 const PAPERS_NEAR := -15

@@ -49,8 +49,10 @@ MIN_CASES_OFFICE_MAP=23
 MIN_CASES_OFFICE_SERVICE=16
 # GEOMETRY 27 -> 25: its two row-wall sign and title cases went with the row
 # walls (lane B2a); MAP's test_top_run_and_lane_gap_pieces_clear_... covers
-# the furniture's clearance on the map now.
-MIN_CASES_OFFICE_GEOMETRY=25
+# the furniture's clearance on the map now. 25 -> 29: the near row sits at the
+# desk (the sitter over the near plane, the short legs behind the end chairs,
+# the near paper and the near lamp in sight beside whoever sits there).
+MIN_CASES_OFFICE_GEOMETRY=29
 MIN_CASES_OFFICE_FRAMES=5
 MIN_CASES_OFFICE_QUIET=8
 MIN_CASES_DAY_LIGHT=8

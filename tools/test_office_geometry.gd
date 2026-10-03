@@ -1,6 +1,12 @@
 extends "res://tools/test_base.gd"
 ## Public workstation geometry and identity across repeated placement.
 
+## How much of a near task lamp's wedge stays in sight on each side of whoever
+## sits at it, in half-unit texels (four to a square unit). Measured: 248 on
+## each side of a sitter (of the wedge's 650 a side; the laptop alone, with
+## nobody over the desk, leaves 342), 146 on the right of one with a hand up.
+const NEAR_LAMP_IN_SIGHT := 140
+
 var art: ArtPack
 var pen: OfficeDraw
 var world: Node2D
@@ -81,7 +87,8 @@ func test_measure_is_the_capacity_and_clearance_contract() -> void:
 	# A pod of single desks (docs/WORLD_MODEL.md): one 32-unit desk per column,
 	# a 48-deep desktop, six reserved cells from the far approach row to the
 	# near one with a passage cell on the right, and the stationary drawing from
-	# the far tag row's pulse envelope (-90) to the near one's foot (46).
+	# the far tag row's pulse envelope (-90) to the near one's foot (32: the near
+	# seat is 8 below the near edge, at the near working plane).
 	var minimum := OfficeTable.measure(0)
 	_eq(minimum.capacity, 2, "even an empty tab reserves two columns")
 	_eq(minimum.table_width, 64.0, "minimum pod width: two desks")
@@ -91,12 +98,12 @@ func test_measure_is_the_capacity_and_clearance_contract() -> void:
 		_eq(measured.table_width, capacity * 32.0, "one 32-unit desk per column")
 		_eq(measured.physical_rect, Rect2(0, -48, measured.table_width, 48), "physical desktop only")
 		_eq(measured.reserved_rect, Rect2(0, -128, measured.table_width + 32, 192), "walk and drawing reserve")
-		_eq(measured.render_rect, Rect2(0, -90, measured.table_width, 136), "the stationary drawing")
+		_eq(measured.render_rect, Rect2(0, -90, measured.table_width, 122), "the stationary drawing")
 		_check(measured.reserved_rect.encloses(measured.render_rect), "all stationary drawing fits reservation")
 		for index in capacity:
 			_eq(measured.columns[index], 16.0 + 32.0 * index, "growth never recenters an existing column")
 			_eq(measured.seat_position(index, "far"), Vector2(16.0 + 32.0 * index, -36), "far seat")
-			_eq(measured.seat_position(index, "near"), Vector2(16.0 + 32.0 * index, 22), "near seat")
+			_eq(measured.seat_position(index, "near"), Vector2(16.0 + 32.0 * index, 8), "near seat")
 			_eq(measured.approach_position(index, "far"), Vector2(16.0 + 32.0 * index, -80), "far approach")
 			_eq(measured.approach_position(index, "near"), Vector2(16.0 + 32.0 * index, 48), "near approach")
 			for side: String in OfficeTable.SIDES:
@@ -116,8 +123,8 @@ func test_thin_front_joins_supports_without_moving_the_floor() -> void:
 		var apron := child as Sprite2D
 		_eq(apron.position.y, -5.0, "apron directly follows the painted surface")
 		_eq(apron.position.y + apron.get_rect().size.y * apron.scale.y, -2.0, "thin front ends at -2")
-	# Two short legs, one under each end column's near chair (which hides it
-	# whenever somebody sits there), their foot above the chair's gas lift.
+	# Two short legs, one behind each end column's near chair (which hides it,
+	# somebody in it or not), their foot behind the chair's solid back.
 	_check(table.resize(4), "a pod with middle columns")
 	var legs: Array[float] = []
 	for child in table.get_node("Supports").get_children():
@@ -127,7 +134,7 @@ func test_thin_front_joins_supports_without_moving_the_floor() -> void:
 		var painted := support.texture.get_image().get_used_rect()
 		legs.append(support.position.x + painted.get_center().x * support.scale.x)
 		_eq(support.position.y, -2.0, "leg meets apron without a gap")
-		_eq(support.position.y + painted.end.y * support.scale.y, 19.0, "its foot stands at pod y 19")
+		_eq(support.position.y + painted.end.y * support.scale.y, 5.0, "its foot ends at pod y 5")
 	legs.sort()
 	_eq(legs, [table.columns[0], table.columns[3]], "the two legs are centred under the end columns")
 	for index in table.columns.size():
@@ -649,7 +656,7 @@ func test_labels_clear_the_heads_they_hang_on() -> void:
 
 ## The lens line on each side and over a worker resting away: its row is the
 ## one between the tag row and the plate row (far pod [-102, -90), near
-## [46, 58)), its text clears the badge at the top of its pulse and the
+## [32, 44)), its text clears the badge at the top of its pulse and the
 ## plate's text, and away it is centred over the worker, above their badge.
 ## While it shows the chip draws nothing and the badge is back in the middle of
 ## its row; let go, the line is gone and the chip is drawn again. (The line
@@ -669,7 +676,7 @@ func test_the_lens_line_stays_inside_the_desk_and_off_the_badge() -> void:
 		_check(line.is_visible_in_tree(), "%s: the line shows" % side)
 		var in_table := table.global_transform.affine_inverse() * line.get_global_transform()
 		var drawn := in_table * Rect2(Vector2.ZERO, line.size)
-		var row := Rect2(1, -102, 30, 12) if side == "far" else Rect2(1, 46, 30, 12)
+		var row := Rect2(1, -102, 30, 12) if side == "far" else Rect2(1, 32, 30, 12)
 		_eq(drawn, row, "%s: the lens row" % side)
 		_eq(badge_node.position, OfficeStation.BADGE_AT[side], "%s: the badge is back in the middle" % side)
 		_check(badge_node.position != chipped, "%s: it was in the chip before" % side)
@@ -840,10 +847,17 @@ func test_the_bubble_clears_every_click_target_and_its_neighbours() -> void:
 ## A done seat's paper (the small stack) stands on its own side's working plane
 ## (far -48..-32, near -26..-8, from the pod's constants), inside the desktop on
 ## every column including the last one, right of the laptop and clear of it,
-## and clear of every opaque pixel its own worker and the next column's worker
-## draw while blocked (the raised hand is on the right). On the far side only
-## what shows above the far edge counts: the desk hides the rest of the far
-## worker. Pods of two, four and six desks.
+## clear of every opaque pixel its own worker draws as a done agent sits (the
+## only state the paper shows in), and clear of what the workers of the
+## columns on either side draw while blocked (the raised hand is on the
+## right). A seat's own raised hand is not held against its paper: a seat
+## shows one or the other, never both, and on the near side, where the worker
+## sits over the near plane, the hand's column (x+7..x+12, pod -28..-11) does
+## pass over the paper's left 2 units
+## (test_the_near_paper_shows_beside_whoever_sits_there holds that the two
+## never show together, and the paper's texels against the sitters'). On the
+## far side only what shows above the far edge counts: the desk hides the rest
+## of the far worker. Pods of two, four and six desks.
 func test_the_paper_stack_sits_beside_the_laptop_and_off_the_neighbours() -> void:
 	var table := _table()
 	for capacity: int in [2, 4, 6]:
@@ -862,16 +876,19 @@ func test_the_paper_stack_sits_beside_the_laptop_and_off_the_neighbours() -> voi
 		}
 		_eq(planes["far"], Rect2(0, -48, w, 16), "the far plane")
 		_eq(planes["near"], Rect2(0, -26, w, 18), "the near plane")
-		var workers: Dictionary[String, Rect2] = {}
+		var blocked: Dictionary[String, Rect2] = {}
+		var done: Dictionary[String, Rect2] = {}
 		for column in table.columns.size():
 			for side: String in OfficeTable.SIDES:
 				var station := pen.station(sorted, table, column, side)
-				station.furnish("claude", ArtContract.STATE_BLOCKED)
-				var figure := _drawn_figure(station)
-				figure.position += station.position - table.position
-				if side == "far":
-					figure = figure.intersection(Rect2(-1000, -1000, 3000, 1000 - OfficeTable.SURFACE_DEPTH))
-				workers["%d/%s" % [column, side]] = figure
+				for state: StringName in [ArtContract.STATE_BLOCKED, ArtContract.STATE_DONE]:
+					station.furnish("claude", state)
+					var figure := _drawn_figure(station)
+					figure.position += station.position - table.position
+					if side == "far":
+						figure = figure.intersection(Rect2(-1000, -1000, 3000, 1000 - OfficeTable.SURFACE_DEPTH))
+					var into := blocked if state == ArtContract.STATE_BLOCKED else done
+					into["%d/%s" % [column, side]] = figure
 				station.free()
 		for column in table.columns.size():
 			for side: String in OfficeTable.SIDES:
@@ -888,11 +905,15 @@ func test_the_paper_stack_sits_beside_the_laptop_and_off_the_neighbours() -> voi
 					var local := table.global_transform.affine_inverse() * bar
 					_check(not local.intersects(paper), "%s: the frame's bar %s clears the paper" % [where, local])
 				table.set_selected(false)
-				for other: String in ["%d/%s" % [column, side], "%d/%s" % [column + 1, side]]:
-					if workers.has(other):
+				var own := "%d/%s" % [column, side]
+				_check(
+					not paper.intersects(done[own]), "%s: clear of its done worker %s: %s" % [where, done[own], paper]
+				)
+				for other: String in ["%d/%s" % [column - 1, side], "%d/%s" % [column + 1, side]]:
+					if blocked.has(other):
 						_check(
-							not paper.intersects(workers[other]),
-							"%s: clear of worker %s %s: %s" % [where, other, workers[other], paper]
+							not paper.intersects(blocked[other]),
+							"%s: clear of blocked worker %s %s: %s" % [where, other, blocked[other], paper]
 						)
 				table.show_papers(column, side, false)
 
@@ -1016,6 +1037,8 @@ func test_rows_at_the_pod_pitch_never_meet() -> void:
 							continue
 						if owners[index] == owners[other] and not _same_seat_clash(names[index], names[other]):
 							continue
+						if _facing_marks(owners[index], names[index], owners[other], names[other]):
+							continue
 						clashes.append(
 							(
 								"%s %s %s / %s %s %s"
@@ -1069,6 +1092,16 @@ func _frame_bars(table: OfficeTable) -> Array[Rect2]:
 	return bars
 
 
+## Whether these are the seat marks of the two seats facing each other across
+## one desk. Those two may meet: the near worker sits over the desk's near
+## plane, a raised hand's top (pod -28) above the far mark's foot (-24), so the
+## near mark [-32, 16) and the far one [-72, -24) share pod [-32, -24). Only
+## one seat is ever selected, so the two are never drawn together; this case
+## selects every seat only to measure each mark against everything else.
+static func _facing_marks(a: OfficeStation, a_part: String, b: OfficeStation, b_part: String) -> bool:
+	return a_part == "mark" and b_part == "mark" and a.table == b.table and a.column == b.column and a.side != b.side
+
+
 ## Whether two parts of the same seat may not meet: the three rows (plate,
 ## lens, tag) with each other, and the seat's rectangle with the chip's. The
 ## seat mark, and a click rectangle over the rows it answers for, may.
@@ -1117,7 +1150,7 @@ func _check_row_literals(
 		var far := station.side == "far"
 		var rows := _seat_rows(station)
 		var where := "%s, wait %s, lens %s, lift %d" % [station.side, known, held, lift]
-		var tag_top := -88.0 if far else 30.0
+		var tag_top := -88.0 if far else 16.0
 		var badge := to_pod * rows["badge"]
 		var chipped := known and not held
 		var badge_x := 0.0 if chipped else 8.5
@@ -1127,29 +1160,29 @@ func _check_row_literals(
 			_eq(to_pod * rows["chip"], Rect2(1, tag_top, 30, 16), "%s: the chip" % where)
 		_eq(rows.has("lens"), held, "%s: the lens row only under the lens" % where)
 		if held:
-			_eq(to_pod * rows["lens"], Rect2(1, -102.0 if far else 46.0, 30, 12), "%s: the lens row" % where)
+			_eq(to_pod * rows["lens"], Rect2(1, -102.0 if far else 32.0, 30, 12), "%s: the lens row" % where)
 		# Held, the plate is the outermost row; unheld, it takes the lens row's slot.
-		var plate_top := (-114.0 if far else 58.0) if held else (-102.0 if far else 46.0)
+		var plate_top := (-114.0 if far else 44.0) if held else (-102.0 if far else 32.0)
 		_eq(to_pod * rows["plate"], Rect2(1, plate_top, 30, 12), "%s: the plate row" % where)
 		_eq(
 			to_pod * rows["chip rect"],
-			Rect2(1, -90.0 if far else 28.0, 30, 18),
+			Rect2(1, -90.0 if far else 14.0, 30, 18),
 			"%s: the chip's click rectangle" % where
 		)
 		_eq(
 			to_pod * rows["seat"],
-			Rect2(1, -72.0 if far else -21.0, 30, 40 if far else 49),
+			Rect2(1, -72.0 if far else -24.0, 30, 40 if far else 38),
 			"%s: the seat's, under the chip" % where
 		)
 		var mark := to_pod * (station.get_node("Overlay/Selection") as Sprite2D).get_global_transform()
 		var mark_canvas := mark * (station.get_node("Overlay/Selection") as Sprite2D).get_rect()
-		_eq(mark_canvas, Rect2(0, -72.0 if far else -20.0, 32, 48), "%s: the seat mark's canvas" % where)
+		_eq(mark_canvas, Rect2(0, -72.0 if far else -32.0, 32, 48), "%s: the seat mark's canvas" % where)
 
 
 ## The near badge hangs right under the near chair, on its column (the chair
-## is opaque down to pod y 28, the badge's row is [30, 46)), and at every lift
+## is opaque down to pod y 14, the badge's row is [16, 32)), and at every lift
 ## of its pulse, centred or in the chip, it never shares a texel with the
-## chair: its pulse envelope [28, 46) only touches it. The badge over the head
+## chair: its pulse envelope [14, 32) only touches it. The badge over the head
 ## of a far worker likewise stands right over the raised hand (top at -72) and
 ## never shares a texel with it.
 func test_the_near_chair_clears_the_badge_at_its_highest_lift() -> void:
@@ -1162,7 +1195,7 @@ func test_the_near_chair_clears_the_badge_at_its_highest_lift() -> void:
 		var to_pod := table.global_transform.affine_inverse()
 		var rest := to_pod * badge.get_global_transform() * _opaque_local(badge)
 		var column := table.columns[0]
-		_eq(rest, Rect2(column - 7.5, -88.0 if side == "far" else 30.0, 15, 16), side + ": the badge on its column")
+		_eq(rest, Rect2(column - 7.5, -88.0 if side == "far" else 16.0, 15, 16), side + ": the badge on its column")
 		var under := to_pod * (chair.get_global_transform() * _opaque_local(chair))
 		if side == "near":
 			_check(
@@ -1214,6 +1247,233 @@ func test_the_far_laptop_never_covers_the_far_worker() -> void:
 				covered += int(laptop_texels.has(texel))
 		_check(visible > 0, "column %d: the far worker shows over the desk" % column)
 		_eq(covered, 0, "column %d: and the laptop covers none of it" % column)
+		station.free()
+
+
+## A near worker sits at the desk, not below it: the shoulders (the topmost
+## row the seated figure is at its full width on) are above the near working
+## edge, and the figure draws over part of its own laptop, in every state. The
+## back-view chair is pushed in under the desk: its top is under the working
+## top's near edge and above the apron's foot, so it covers none of the working
+## top, and a shell's laptop with nobody in the chair shares no texel with it.
+## Sorting is still by feet alone: the pod, then the sitter, then the chair.
+## The leg of a walk into the seat (OfficeWalkGraph.leg_to_seat()) still goes
+## round the chair: at every knee of it the walker's feet are off the desktop's
+## footprint, and at the knee beside the seat they are clear of the chair.
+func test_a_near_sitter_sits_at_the_near_working_plane() -> void:
+	var table := _table()
+	_check(table.resize(4), "four columns")
+	var to_pod := table.global_transform.affine_inverse()
+	var edge := OfficeTable.NEAR_SURFACE_EDGE * 2
+	var apron_foot := (OfficeTable.APRON_DROP + OfficeTable.APRON_HEIGHT) * 2
+	for column in table.columns.size():
+		var station := pen.station(sorted, table, column, "near")
+		for state: StringName in [
+			ArtContract.STATE_WORKING, ArtContract.STATE_BLOCKED, ArtContract.STATE_IDLE, ArtContract.STATE_DONE
+		]:
+			station.furnish("claude", state)
+			var where := "column %d %s" % [column, state]
+			var figure := _figure_texels(station, to_pod)
+			var laptop := _texels(table.monitor(column, "near"), to_pod)
+			var shared := 0
+			for texel: Vector2i in laptop:
+				shared += int(figure.has(texel))
+			_check(shared > 0, "%s: the sitter is at the laptop, over part of it" % where)
+			if state == ArtContract.STATE_BLOCKED:
+				continue
+			# Half units: the widest row is the shoulders (the raised arm aside).
+			var spans: Dictionary[int, Vector2i] = {}
+			for texel: Vector2i in figure:
+				var span: Vector2i = spans.get(texel.y, Vector2i(texel.x, texel.x))
+				spans[texel.y] = Vector2i(mini(span.x, texel.x), maxi(span.y, texel.x))
+			var widest := 0
+			var shoulders := 0
+			var rows := spans.keys()
+			rows.sort()
+			for row: int in rows:
+				var wide := spans[row].y - spans[row].x + 1
+				if wide > widest:
+					widest = wide
+					shoulders = row
+			_check(shoulders < edge, "%s: the shoulders (pod y %s) are above the near edge" % [where, shoulders / 2.0])
+		var chair: Sprite2D = station.get_node("Chair")
+		var chair_texels := _texels(chair, to_pod)
+		var top := 1 << 20
+		for texel: Vector2i in chair_texels:
+			top = mini(top, texel.y)
+		_check(top >= edge, "column %d: the chair (top %s) covers none of the working top" % [column, top / 2.0])
+		_check(top < apron_foot, "column %d: and is pushed in under the desk's edge" % column)
+		_check(
+			table.position.y < station.position.y and station.position.y < station.position.y + chair.position.y,
+			"column %d: the pod sorts before the sitter, the sitter before the chair" % column
+		)
+		var feet := PixelPerson.footprint()
+		var seat := table.geometry.seat_position(column, "near")
+		var spot := table.geometry.standing_position(column, "near")
+		var leg := OfficeWalkGraph.leg_to_seat(table.geometry.approach_position(column, "near"), seat, spot, true)
+		_eq(leg[leg.size() - 1], seat, "column %d: the leg ends on the seat" % column)
+		_eq(leg[leg.size() - 2], spot, "column %d: after the knee beside it" % column)
+		for knee in leg:
+			var stood := Rect2(knee + feet.position, feet.size)
+			_check(
+				not stood.intersects(table.geometry.physical_rect),
+				"column %d: at %s the feet %s are off the desktop" % [column, knee, stood]
+			)
+		var beside := Rect2(spot + feet.position, feet.size)
+		var chair_box := to_pod * (chair.get_global_transform() * _opaque_local(chair))
+		_check(
+			beside.position.x >= chair_box.end.x,
+			"column %d: the knee %s is clear of the chair %s" % [column, beside, chair_box]
+		)
+		# A shell: a laptop with a prompt and nobody in the chair. The chair hides none of it.
+		station.furnish("", ArtContract.STATE_WORKING)
+		_check(station.actor() == null, "column %d: nobody sits at a shell" % column)
+		var shell := _texels(table.monitor(column, "near"), to_pod)
+		var hidden := 0
+		for texel: Vector2i in shell:
+			hidden += int(chair_texels.has(texel))
+		_check(not shell.is_empty(), "column %d: the shell's laptop is drawn" % column)
+		_eq(hidden, 0, "column %d: the empty chair covers none of the shell's laptop" % column)
+		station.free()
+
+
+## The two short legs stand behind the end columns' near chairs: from the
+## chair's top row down, every texel a leg draws is behind a texel of that
+## chair, vacant or with somebody in it, so no foot shows beside the gas lift
+## or below the base; and the leg ends above the chair's own foot.
+func test_the_short_legs_hide_behind_the_end_chairs() -> void:
+	var table := _table()
+	_check(table.resize(4), "a pod with middle columns")
+	var to_pod := table.global_transform.affine_inverse()
+	var seen: Array[int] = []
+	for child in table.get_node("Supports").get_children():
+		var leg := child as Sprite2D
+		if leg.texture != art.table.module_texture(&"leg_short"):
+			continue
+		var centre := leg.position.x + leg.texture.get_size().x * leg.scale.x / 2.0
+		var column := table.columns.find(centre)
+		seen.append(column)
+		var drawn := _texels(leg, to_pod)
+		_check(not drawn.is_empty(), "column %d: the leg is drawn" % column)
+		var station := pen.station(sorted, table, column, "near")
+		for occupied: bool in [false, true]:
+			if occupied:
+				station.furnish("claude", ArtContract.STATE_WORKING)
+			else:
+				station.vacate()
+			var where := "column %d, %s" % [column, "occupied" if occupied else "vacant"]
+			var chair := _chair_texels(station, to_pod)
+			var chair_top := 1 << 20
+			var chair_foot := -(1 << 20)
+			for texel: Vector2i in chair:
+				chair_top = mini(chair_top, texel.y)
+				chair_foot = maxi(chair_foot, texel.y)
+			var bare := 0
+			var leg_foot := -(1 << 20)
+			for texel: Vector2i in drawn:
+				leg_foot = maxi(leg_foot, texel.y)
+				if texel.y >= chair_top and not chair.has(texel):
+					bare += 1
+			_eq(bare, 0, "%s: no texel of the leg shows beside or below the chair" % where)
+			_check(
+				leg_foot <= chair_foot,
+				"%s: the leg's foot (%s) is not below the chair's (%s)" % [where, leg_foot / 2.0, chair_foot / 2.0]
+			)
+		station.free()
+	seen.sort()
+	_eq(seen, [0, 3], "one leg under each end column, none between")
+
+
+## A near done seat's paper stays in sight now that the sitter leans over the
+## near plane: no texel of it is behind its own sitter (who plays what a done
+## agent plays), behind either neighbour, blocked with a hand up, or behind
+## any of their chairs. A seat shows the paper or the raised hand, never both:
+## the paper is a done agent's, the hand a blocked one's.
+func test_the_near_paper_shows_beside_whoever_sits_there() -> void:
+	var table := _table()
+	for capacity: int in [2, 4, 6]:
+		_check(table.resize(capacity), "%d columns" % capacity)
+		var to_pod := table.global_transform.affine_inverse()
+		var stations: Array[OfficeStation] = []
+		for column in table.columns.size():
+			stations.append(pen.station(sorted, table, column, "near"))
+		for column in table.columns.size():
+			for other in stations.size():
+				stations[other].furnish(
+					"claude", ArtContract.STATE_DONE if other == column else ArtContract.STATE_BLOCKED
+				)
+				_eq(
+					table.papers(other, "near").visible,
+					other == column,
+					"%d columns, column %d: paper only at the done seat (%d)" % [capacity, column, other]
+				)
+				_eq(
+					stations[other].chip().visible,
+					other != column,
+					"%d columns, column %d: the chip only at the blocked seats (%d)" % [capacity, column, other]
+				)
+			var paper := _texels(table.papers(column, "near"), to_pod)
+			_check(not paper.is_empty(), "%d columns, column %d: the paper is drawn" % [capacity, column])
+			for other: int in [column - 1, column, column + 1]:
+				if other < 0 or other >= stations.size():
+					continue
+				var covers := _figure_texels(stations[other], to_pod)
+				covers.merge(_chair_texels(stations[other], to_pod))
+				var hidden := 0
+				for texel: Vector2i in paper:
+					hidden += int(covers.has(texel))
+				_eq(
+					hidden,
+					0,
+					(
+						"%d columns, column %d: the sitter and chair of column %d cover none of it"
+						% [capacity, column, other]
+					)
+				)
+		for station in stations:
+			station.free()
+
+
+## The near task lamp's wedge still reads with somebody at the desk: the sitter
+## covers its middle (as the laptop always did), and on each side of them at
+## least NEAR_LAMP_IN_SIGHT half-unit texels of it stay in sight, whatever the
+## agent plays, a raised hand and a done seat's paper included.
+func test_the_near_lamp_shows_on_both_sides_of_its_sitter() -> void:
+	var table := _table()
+	_check(table.resize(4), "four columns")
+	var to_pod := table.global_transform.affine_inverse()
+	for column in table.columns.size():
+		var station := pen.station(sorted, table, column, "near")
+		table.light(column, "near", OfficeTable.Lamp.FOCUS)
+		var lamp := table.task_light(column, "near")
+		var wedge := to_pod * lamp.get_global_transform() * lamp.polygon
+		var bounds := Rect2(wedge[0], Vector2.ZERO)
+		for point in wedge:
+			bounds = bounds.expand(point)
+		for state: StringName in [
+			ArtContract.STATE_WORKING, ArtContract.STATE_BLOCKED, ArtContract.STATE_IDLE, ArtContract.STATE_DONE
+		]:
+			station.furnish("claude", state)
+			var covers := _figure_texels(station, to_pod)
+			covers.merge(_chair_texels(station, to_pod))
+			covers.merge(_texels(table.monitor(column, "near"), to_pod))
+			if table.papers(column, "near").visible:
+				covers.merge(_texels(table.papers(column, "near"), to_pod))
+			var sides: Dictionary[String, int] = {"left": 0, "right": 0}
+			for y in range(floori(bounds.position.y * 2.0), ceili(bounds.end.y * 2.0)):
+				for x in range(floori(bounds.position.x * 2.0), ceili(bounds.end.x * 2.0)):
+					var middle := Vector2(x + 0.5, y + 0.5) / 2.0
+					if not Geometry2D.is_point_in_polygon(middle, wedge) or covers.has(Vector2i(x, y)):
+						continue
+					sides["left" if middle.x < table.columns[column] else "right"] += 1
+			for side: String in sides:
+				_check(
+					sides[side] >= NEAR_LAMP_IN_SIGHT,
+					(
+						"column %d %s: %d texels of the lamp in sight on the %s, at least %d"
+						% [column, state, sides[side], side, NEAR_LAMP_IN_SIGHT]
+					)
+				)
 		station.free()
 
 
@@ -1366,6 +1626,12 @@ func _texels(sprite: Sprite2D, into: Transform2D = Transform2D.IDENTITY) -> Dict
 			var middle := to_world * (sprite.offset + Vector2(x + 0.5, y + 0.5))
 			found[Vector2i(floori(middle.x * 2.0), floori(middle.y * 2.0))] = true
 	return found
+
+
+## Every opaque texel of the station's chair, as texel cells (see _texels()).
+func _chair_texels(station: OfficeStation, into: Transform2D = Transform2D.IDENTITY) -> Dictionary[Vector2i, bool]:
+	var chair: Sprite2D = station.get_node("Chair")
+	return _texels(chair, into)
 
 
 ## Every opaque texel the station's worker draws in the track it plays, over

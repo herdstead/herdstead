@@ -323,7 +323,7 @@ class PodSourceSetTests(unittest.TestCase):
                          "the pod alone leaves out the long table's surface, divider and leg")
         self.assertEqual(POD_MODULES, {
             "desk_left": (32, 48), "desk_mid_a": (32, 48), "desk_mid_b": (32, 48), "desk_right": (32, 48),
-            "screen_left": (32, 6), "screen_mid": (32, 6), "screen_right": (32, 6), "leg_short": (6, 22),
+            "screen_left": (32, 6), "screen_mid": (32, 6), "screen_right": (32, 6), "leg_short": (6, 7),
         })
         self.assertEqual(POD_SHARED, {
             "apron_left": (32, 3), "apron_mid": (32, 3), "apron_right": (32, 3), "bracket": (12, 10),
@@ -506,23 +506,24 @@ class PodModuleContractTests(unittest.TestCase):
                 for screen in images.values():
                     screen.close()
 
-    def test_the_short_leg_ends_on_row_20_attached_and_tapered(self):
+    def test_the_short_leg_ends_on_row_6_attached_and_tapered(self):
         d = DENSITY
         for label, table in self.trees:
             with self.subTest(tree=label), Image.open(table / "leg_short.png") as leg:
-                self.assertEqual(leg.size, (6 * d, 22 * d))
+                self.assertEqual(leg.size, (6 * d, 7 * d))
                 alpha = leg.getchannel("A")
                 self.assertEqual({value for _, value in alpha.getcolors()}, {0, 255}, "hard alpha")
                 left, top, right, bottom = alpha.getbbox()
-                self.assertEqual((top, bottom), (0, 21 * d), "hung at LEG_DROP -2, the foot ends at pod y 19")
+                self.assertEqual((top, bottom), (0, 7 * d), "hung at LEG_DROP -2, the foot ends at pod y 5")
                 self.assertEqual(left + right, 6 * d, "centred on its canvas")
-                for y in range(21 * d):
+                for y in range(7 * d):
                     self.assertIsNotNone(alpha.crop((0, y, alpha.width, y + 1)).getbbox(), f"row {y} is attached")
                 def span(unit_row):
                     box = alpha.crop((0, unit_row * d, alpha.width, unit_row * d + 1)).getbbox()
                     return box[2] - box[0]
-                self.assertLess(span(19), span(4), "the glide is narrower than the shoulder")
-                self.assertLess(span(14), span(4), "the shaft steps in")
+                self.assertLess(span(6), span(3), "the glide is narrower than the shoulder")
+                self.assertLess(span(4), span(3), "the shaft steps in")
+                self.assertLess(span(5), span(4), "the glide is narrower than the ankle")
 
 
 if __name__ == "__main__":
