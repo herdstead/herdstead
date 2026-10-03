@@ -154,7 +154,7 @@ func test_the_grid_draws_every_dump() -> void:
 # --- the monitor, live -----------------------------------------------------------------
 
 
-## The card's "Monitor ⤢" opens it on the pane; it reads the screen and shows
+## The card's "Monitor" opens it on the pane; it reads the screen and shows
 ## herdr's rows; Ctrl+] closes it and is never sent; the reads stop.
 func test_ctrl_bracket_closes_and_reads_stop() -> void:
 	var office := await _live(_dump("codex", "ansi"))
@@ -809,7 +809,7 @@ func test_a_double_click_in_the_list_opens_the_monitor() -> void:
 
 
 ## At the 480x320 minimum the staff panel is one compact line, which says
-## Monitor as `⤢` and has no room for the full panel's "Monitor ⤢" chip;
+## Monitor as the icon alone and has no room for the full panel's "Monitor" chip;
 ## Enter opens the panel up, and there the chip is on screen, inside the panel.
 ## The open monitor covers the whole screen, the right column and the staff
 ## panel included, and gives them back on close.
@@ -822,7 +822,10 @@ func test_the_monitor_chip_fits_the_opened_panel_and_the_monitor_covers_the_colu
 	var line_chip: Button = card.get_node("%CompactMonitor")
 	_check(office.hud.card_compact(), "the card is a compact line at 480x320")
 	_check(not chip.is_visible_in_tree(), "with no room for the full panel's chip")
-	_check(line_chip.is_visible_in_tree() and line_chip.text == "⤢", "the line has its own, short")
+	_check(
+		line_chip.is_visible_in_tree() and line_chip.text == "" and line_chip.icon != null,
+		"the line has its own, the icon alone"
+	)
 	_check(card.get_global_rect().encloses(line_chip.get_global_rect()), "inside the line")
 	await _tap(KEY_ENTER)
 	await _until(func() -> bool: return not office.hud.card_compact(), "Enter opens the panel up")

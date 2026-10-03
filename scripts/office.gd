@@ -270,7 +270,7 @@ func _ready() -> void:
 	hud.zone_pointed.connect(_point_at_zone)
 	# The EVENTS page is laid out only while it shows: the moment it does, too.
 	hud.events_shown.connect(_show_events)
-	# The list's double-click, Enter or Open, and the card's "Monitor ⤢".
+	# The list's double-click, Enter or Open, and the card's "Monitor".
 	hud.monitor_requested.connect(_open_monitor)
 	hud.agent_list_changed.connect(_remember_list)
 	# NEXT on the staff panel is `N`; its line's `‹ ›` walk the same queue.
@@ -1557,7 +1557,7 @@ func _open_monitor(key: String) -> void:
 
 ## Whether something is drawn over the agent card: its preview stops reading.
 ## The one-line panel counts: at every size, a pane's card is opened (Enter,
-## `Open ⏎`) to be read.
+## `Open`) to be read.
 func _card_covered() -> bool:
 	return hud.card_compact() or hud.monitor_open()
 

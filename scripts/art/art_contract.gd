@@ -162,6 +162,11 @@ const UI_BRANCH := &"branch"
 const UI_STARTING := &"starting"
 const UI_OFFLINE := &"offline"
 const UI_CONNECTED := &"connected"
+## The staff panel's key hints beside a button's word (`Open`, `Answer`, the
+## Enter key; `Monitor`): the pack's faces have no return or expand arrow,
+## and a glyph from a platform fallback brings that font's own row height.
+const UI_KEY_ENTER := &"key_enter"
+const UI_EXPAND := &"expand"
 
 # --- states and animations ------------------------------------------------------
 
@@ -298,6 +303,8 @@ static func ui_ids() -> Array[StringName]:
 		UI_STARTING,
 		UI_OFFLINE,
 		UI_CONNECTED,
+		UI_KEY_ENTER,
+		UI_EXPAND,
 		&"working",
 		&"blocked",
 		&"unread",

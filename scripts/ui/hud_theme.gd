@@ -122,6 +122,8 @@ const BUTTON_STATES := ["normal", "hover", "pressed", "focus", "disabled"]
 const MONO_FACES := ["Menlo", "SF Mono", "Monaco", "DejaVu Sans Mono", "monospace"]
 ## Pixels per preview row's glyphs, and the pitch from one row to the next:
 ## twelve rows of it, and the card around them, fit a 640x320 screen (3x).
+## The staff panel's key-hint icons (ArtContract.UI_KEY_ENTER / UI_EXPAND), in units.
+const KEY_HINT_ICON := 10
 const PREVIEW_SIZE := 7
 const PREVIEW_LINE_SPACING := -1
 ## Units taken off the top and bottom of a counter's title and number line
@@ -483,6 +485,10 @@ static func _answer(theme: Theme, art: ArtPack) -> void:
 		theme.set_stylebox(state, "CardHint", key)
 	for name: String in ["CardKey", "CardHint"]:
 		_dark_button_text(theme, art, name)
+		# The key hints (`ui.key_enter`, `ui.expand`) are 10 units: drawn at
+		# that, texel for texel at zoom 2, never stretched to the row.
+		theme.set_constant("icon_max_width", name, KEY_HINT_ICON)
+		theme.set_constant("h_separation", name, 3)
 	# The best-effort line and the result line may take two lines in answer
 	# mode; without the default 3 units between them both fit at 480x320.
 	for name: StringName in [&"CardNote", &"CardOutcome"]:
@@ -715,7 +721,7 @@ static func _tooltips(theme: Theme, art: ArtPack) -> void:
 ## The agent list (scenes/ui/agent_list*.tscn): rows that light `deep` under
 ## the pointer, the selected row `slate` like the SPACES rail's shown machine, group
 ## headers on a `deep` band with a slate rule under it, the Flat / Tree switch,
-## the rows' `⋯` and the filter box, a dark field like the card's reply box.
+## the rows' `…` and the filter box, a dark field like the card's reply box.
 ## The drawer's two pages (this list and EVENTS) scroll with a thin bar
 ## (`DrawerScroll`, the OVERVIEW's look at DRAWER_BAR wide) a gap
 ## (`DrawerRowsGap`) right of their rows; their scrolls reserve that room
@@ -737,7 +743,7 @@ static func _agent_list(theme: Theme, art: ArtPack) -> void:
 		band.border_width_bottom = 1
 		band.border_color = art.color(ArtContract.SLATE)
 		theme.set_stylebox(state, "ListGroup", band)
-		# The `⋯` only shows on the selected row, which is slate: deep under the pointer.
+		# The `…` only shows on the selected row, which is slate: deep under the pointer.
 		var more: StyleBox = _flat(art.color(ArtContract.DEEP)) if hover else StyleBoxEmpty.new()
 		theme.set_stylebox(state, "ListMore", more)
 	for name: String in ["ListRow", "ListRowCurrent", "ListGroup", "ListMore"]:

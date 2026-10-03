@@ -72,6 +72,53 @@ func test_bundled_typography_keeps_latin_and_cjk_readable() -> void:
 ## taller than the pack's face, so the second half builds the theme on chains
 ## that are taller on every machine, by one unit (Linux's surplus at 13 and 16)
 ## and by two.
+## The HUD's own words draw no glyph from a platform font. Every character the
+## HUD scenes and scripts write themselves (`text =` and `tooltip_text =` in
+## scenes/ui, the string literals of scripts/ui) is in the pack's text face or
+## its pixel face: a glyph from a platform fallback brings that font's own row
+## height, and the rows differ by platform (measured: `Open ⏎` 16 tall on Linux,
+## 15 on macOS, from the return symbol alone). Remote strings (titles, labels,
+## terminal text) are not the HUD's own and may fall back. The chain the pen
+## builds puts the pixel face before any platform font, so an arrow or a
+## triangle the text face lacks comes from the pack too.
+func test_the_huds_own_words_need_no_platform_glyph() -> void:
+	var pack := ArtPack.from_manifest("res://assets/daylight/manifest.json")
+	var pen := OfficeDraw.new(pack)
+	var chain := pen.font as FontVariation
+	_check(
+		chain != null and chain.fallbacks.size() >= 2 and chain.fallbacks[0] == pack.display_font,
+		"the pixel face is the first fallback"
+	)
+	var seen: Dictionary[String, String] = {}
+	var literal := RegEx.create_from_string('"((?:[^"\\\\]|\\\\.)*)"')
+	for directory: String in ["res://scenes/ui", "res://scripts/ui"]:
+		for file in DirAccess.get_files_at(directory):
+			if not (file.ends_with(".tscn") or file.ends_with(".gd")):
+				continue
+			var path := directory.path_join(file)
+			for line in FileAccess.get_file_as_string(path).split("\n"):
+				var stripped := line.strip_edges()
+				if stripped.begins_with("#"):
+					continue
+				if (
+					file.ends_with(".tscn")
+					and not (stripped.begins_with("text = ") or stripped.begins_with("tooltip_text = "))
+				):
+					continue
+				for found in literal.search_all(stripped):
+					for character in found.get_string(1):
+						if character.unicode_at(0) < 128 or seen.has(character):
+							continue
+						seen[character] = file
+	_check(seen.size() >= 8, "the HUD writes some symbols of its own: %s" % [seen.keys()])
+	for character: String in seen:
+		var code := character.unicode_at(0)
+		_check(
+			pack.font.has_char(code) or pack.display_font.has_char(code),
+			"U+%04X %s (%s) is in one of the pack's faces" % [code, character, seen[character]]
+		)
+
+
 func test_a_fallback_never_makes_a_row_taller() -> void:
 	for path: String in [MANIFEST]:
 		var pack := ArtPack.from_manifest(path)

@@ -137,7 +137,7 @@ func _after_office(office: OfficeDouble) -> void:
 
 
 ## Pick the pane with a real click, then press Monitor on the staff panel's
-## one line (the line keeps Monitor, `Monitor ⤢` or `⤢` by the width).
+## one line (the line keeps Monitor, `Monitor` with its icon or the icon alone by the width).
 func _open(office: OfficeDouble) -> void:
 	await _frames(4)
 	var key := HerdrFleet.pane_key(HerdrFleet.LOCAL, PANE)

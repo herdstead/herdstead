@@ -16,7 +16,7 @@ extends Button
 signal picked(key: String)
 ## A double-click: open this pane (the monitor, once it lands).
 signal activated(key: String)
-## A right-click or the `⋯` button: this row's local actions, at `at` on screen.
+## A right-click or the `…` button: this row's local actions, at `at` on screen.
 signal menu_requested(key: String, at: Vector2)
 
 ## Palette-driven looks for the row that is selected and the rest.
@@ -135,7 +135,7 @@ func show_entry(entry: AgentListModel.Entry, current: bool, now_msec: int) -> vo
 	var indent: PanelContainer = %Indent
 	indent.visible = next.depth > 0
 	indent.theme_type_variation = StringName("ListIndent%d" % next.depth)
-	# The `⋯` only on the selected row: on every row it would take the label's
+	# The `…` only on the selected row: on every row it would take the label's
 	# room. A right-click opens the same menu on any row that has one.
 	var more: Button = %More
 	more.visible = next.actions and current
@@ -241,7 +241,7 @@ func _has_menu() -> bool:
 	return _look != null and _look.actions
 
 
-## Whether `entry`'s row has a menu (and its `⋯`): a live episode or a History line.
+## Whether `entry`'s row has a menu (and its `…`): a live episode or a History line.
 static func has_actions(entry: AgentListModel.Entry) -> bool:
 	return entry.item != null or entry.history != null
 

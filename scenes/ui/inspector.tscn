@@ -338,7 +338,7 @@ layout_mode = 2
 focus_mode = 0
 theme_type_variation = &"CardKey"
 disabled = true
-text = "⏎"
+icon_alignment = 1
 
 [node name="Apart" type="Control" parent="Frame/Row/CardFrame/Stack/Detail/Middle/Answer/Keys/Choices"]
 custom_minimum_size = Vector2(6, 0)
@@ -693,7 +693,8 @@ layout_mode = 2
 tooltip_text = "M: open this pane's terminal in the monitor: its live screen, and every key you press goes to it (Ctrl+] closes)."
 focus_mode = 0
 theme_type_variation = &"CardHint"
-text = "Monitor ⤢"
+text = "Monitor"
+icon_alignment = 2
 
 [node name="FoldButton" type="Button" parent="Frame/Row/CardFrame/Stack/Detail/Actions/TopRow"]
 unique_name_in_owner = true
@@ -712,7 +713,8 @@ layout_mode = 2
 tooltip_text = "Enter: answer this agent. Opens the answer keys and the reply box; nothing is sent until you press one of them."
 focus_mode = 0
 theme_type_variation = &"CardHint"
-text = "Answer ⏎"
+text = "Answer"
+icon_alignment = 2
 
 [node name="ActionGap" type="Control" parent="Frame/Row/CardFrame/Stack/Detail/Actions"]
 custom_minimum_size = Vector2(0, 2)
@@ -801,7 +803,8 @@ size_flags_vertical = 8
 tooltip_text = "M: open this pane's terminal in the monitor: its live screen, and every key you press goes to it (Ctrl+] closes)."
 focus_mode = 0
 theme_type_variation = &"CardHint"
-text = "Monitor ⤢"
+text = "Monitor"
+icon_alignment = 2
 
 [node name="CompactOpen" type="Button" parent="Frame/Row/CardFrame/Stack/CompactRow"]
 unique_name_in_owner = true
@@ -810,7 +813,8 @@ size_flags_vertical = 8
 tooltip_text = "Enter: open the panel: the terminal's preview, the switch and the pane's details. It only opens; nothing is sent."
 focus_mode = 0
 theme_type_variation = &"CardHint"
-text = "Open ⏎"
+text = "Open"
+icon_alignment = 2
 
 [node name="Empty" type="VBoxContainer" parent="Frame/Row/CardFrame/Stack"]
 unique_name_in_owner = true

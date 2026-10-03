@@ -78,7 +78,7 @@ size_flags_vertical = 4
 tooltip_text = "Close the monitor (Ctrl+]). Nothing is sent."
 focus_mode = 0
 theme_type_variation = &"CardAction"
-text = "Close ✕"
+text = "Close ×"
 
 [node name="Screen" type="PanelContainer" parent="Bezel/Frame/Column"]
 layout_mode = 2

@@ -559,7 +559,7 @@ func test_raw_input_follows_the_terminal_not_its_agent() -> void:
 
 
 ## Open the monitor on bee's pane `pane_id`: pick the desk and press the card's
-## "Monitor ⤢", both by real clicks.
+## "Monitor", both by real clicks.
 func _open_monitor(office: OfficeDouble, pane_id: String) -> void:
 	await _pick_bee(office, pane_id)
 	var button: Button = office.hud.inspector.get_node("%MonitorButton")

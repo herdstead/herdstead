@@ -390,7 +390,7 @@ func test_row_menu_snoozes_hides_and_restores_by_real_input() -> void:
 	await _frames(2)
 	var row := hud.agent_list.row_for(key)
 	var more: Button = row.get_node("%More")
-	_check(not more.visible, "an unselected row keeps its label's room: no `⋯`")
+	_check(not more.visible, "an unselected row keeps its label's room: no `…`")
 	var working := hud.agent_list.row_for(_local("api:p1"))
 	await _click_at(working.get_global_rect().get_center(), MOUSE_BUTTON_RIGHT)
 	_check(not hud.agent_list.actions_menu().visible, "a working row has no actions: a right-click opens nothing")
@@ -399,7 +399,7 @@ func test_row_menu_snoozes_hides_and_restores_by_real_input() -> void:
 	item.snoozed_until_msec = 10_000
 	hud.show_agents(frame, [item], [], key, 0)
 	await _frames(2)
-	_check(more.visible, "the selected row shows its `⋯`")
+	_check(more.visible, "the selected row shows its `…`")
 	_eq(
 		more.get_theme_color("font_color"), art.color(ArtContract.PAPER), "in paper, readable on the selected row's ink"
 	)
@@ -564,7 +564,7 @@ func test_the_staff_panel_is_one_row_at_the_smallest_screen() -> void:
 
 ## The staff panel is compact at every size until it is opened: a card at
 ## 800x480 (tall enough: its header over the line's buttons, the line's words
-## hidden), one line at 480x320. At both, only `Open ⏎` (a real click) opens
+## hidden), one line at 480x320. At both, only `Open` (a real click) opens
 ## it, and only `▾ Esc` folds it again; the room and the world's rect are the
 ## scene's. Each move is said once through room_changed. Enter and Escape are
 ## the office's (tools/test_answers.gd, tools/test_commands.gd).
@@ -605,7 +605,8 @@ func test_the_staff_panel_is_compact_at_every_size_until_opened() -> void:
 			)
 		_eq(hud.world_rect(), wanted[1], "%s: the world above it" % screen)
 		_check(open.is_visible_in_tree(), "%s: `Open` is on the line" % screen)
-		_eq(open.text, "Open ⏎" if screen.x >= 640 else "⏎", "%s: in the line's words" % screen)
+		_eq(open.text, "Open" if screen.x >= 640 else "", "%s: in the line's words" % screen)
+		_check(open.icon != null, "%s: the Enter key's hint is the pack's icon" % screen)
 		await _click(open)
 		await _frames(2)
 		_check(not hud.card_compact(), "%s: a click on `Open` opens the panel" % screen)
@@ -631,8 +632,8 @@ func test_the_staff_panel_is_compact_at_every_size_until_opened() -> void:
 ## for the opened panel. Seen on a real fleet: with the note in the card the
 ## name was cut off above the frame and the note stood under the buttons.
 ## The header's last row and the buttons are not compared box to box: they
-## touch on macOS and share a unit on Linux, where `Open ⏎` is a unit taller
-## (its glyph comes from a fallback), with or without a note.
+## touched on macOS and shared a unit on Linux while `Open ⏎` drew its arrow
+## from a platform font (a unit taller there); the hint is an icon now.
 func test_the_card_holds_all_it_shows_for_a_state_with_a_note() -> void:
 	await _hud(Vector2i(800, 480), false)
 	var frame := _frame([_machine(LOCAL, _snapshot(FLOORS))])
@@ -701,7 +702,7 @@ func test_the_drawer_starts_closed_and_floors_are_planned_for_its_tab() -> void:
 
 
 ## The one-line row keeps Monitor: offered exactly when the full panel's
-## Monitor is (a pane shown, with a fleet), `Monitor ⤢` or `⤢` by the width,
+## Monitor is (a pane shown, with a fleet), `Monitor` or the icon alone by the width,
 ## and a real click on it asks for that pane's monitor, as the full panel's does.
 func test_the_one_line_monitor_button_asks_for_the_monitor() -> void:
 	await _hud(Vector2i(800, 480), false)
@@ -718,7 +719,8 @@ func test_the_one_line_monitor_button_asks_for_the_monitor() -> void:
 	hud.inspector.show_pane(frame.pane(_local("api:p1")), "", false)
 	await _frames(2)
 	_check(button.is_visible_in_tree(), "with a fleet it is on the line")
-	_eq(button.text, "Monitor ⤢", "in its long words from 640 wide")
+	_eq(button.text, "Monitor", "in its long words from 640 wide")
+	_check(button.icon != null, "the expand hint is the pack's icon")
 	_check(button.tooltip_text.begins_with("M: "), "its tooltip names its key: " + button.tooltip_text)
 	var full: Button = hud.inspector.get_node("%MonitorButton")
 	_check(full.tooltip_text.begins_with("M: "), "and so does the full panel's: " + full.tooltip_text)
@@ -726,7 +728,8 @@ func test_the_one_line_monitor_button_asks_for_the_monitor() -> void:
 	_eq(said, [["open", _local("api:p1")]], "a click asks for that pane's monitor")
 	hud.fit(Vector2(480, 320))
 	await _frames(2)
-	_eq(button.text, "⤢", "narrower, its short word")
+	_eq(button.text, "", "narrower, the icon alone")
+	_check(button.icon != null, "still the pack's icon")
 	await _click(button)
 	_eq(said.size(), 2, "and it still asks")
 	hud.inspector.show_pane(null, "", false)
@@ -1541,7 +1544,7 @@ func _hud(size := Vector2i(800, 480), open_drawer := true) -> void:
 		await _frames(2)
 
 
-## Open the staff panel up from its line, as Enter or `Open ⏎` would (the
+## Open the staff panel up from its line, as Enter or `Open` would (the
 ## office's and a click's; here the HUD's own call), and let it settle.
 func _open_staff() -> void:
 	hud.expand_card()
@@ -1687,7 +1690,7 @@ func _scroll_to(control: Control) -> void:
 	await _frames(2)
 
 
-## Open `row`'s menu, by right-click or by its `⋯`, and choose `label` from it
+## Open `row`'s menu, by right-click or by its `…`, and choose `label` from it
 ## with the keyboard; `disabled` expects that entry to be greyed out instead.
 func _choose(row: AgentListRow, label: String, right_click: bool, disabled := false) -> void:
 	await _scroll_to(row)

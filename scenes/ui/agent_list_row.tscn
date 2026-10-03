@@ -75,4 +75,4 @@ size_flags_vertical = 4
 tooltip_text = "Local actions: snooze, hide, restore (right-click works too). herdr is unchanged."
 focus_mode = 0
 theme_type_variation = &"ListMore"
-text = "⋯"
+text = "…"
