@@ -175,14 +175,15 @@ half-open; the badge's pulse (`OfficeAttention.PULSES`) lifts it by 0, −1 or �
 |---|---|---|
 | Tag (the badge, 15 opaque, centred) | [−88, −72); pulse envelope [−90, −72) | [16, 32); pulse envelope [14, 32) |
 | Chip (blocked with a known wait) | `panel` [−15, 15) × [−88, −72); the badge in x [−16, −1) (one unit over the chip's left edge), the wait's 14-wide label in [0, 14): the widest form inks 13 units, so daylight stays between it and the badge and before the frame's right border | the same, over [16, 32) |
-| Lens (held `L`), 30×12 | [−102, −90) | [32, 44) |
-| Plate (hover, selection, held `L`), 30×12, display face at 8, upper case, forced ellipsis | the lens row's slot [−102, −90); while `L` is held, [−114, −102) | the lens row's slot [32, 44); while `L` is held, [44, 56) |
+| Lens (held `L`), 30×12 | [−102, −90) | [40, 52), past the tab label |
+| Plate (hover, selection, held `L`), 30×12, display face at 8, upper case, forced ellipsis | the lens row's slot [−102, −90); while `L` is held, [−114, −102) | the lens row's slot [40, 52); while `L` is held, [52, 64) |
 | Seat click rectangle | [−90, −32); [−72, −32) while the chip shows | [−24, 32) (from the far seat mark's foot, a unit over the near head, to the tag row; only a raised hand's tip, −28..−24, is above it); [−24, 14) while the chip shows |
 | Chip click rectangle | [−90, −72) | [14, 32) |
 | Pod selection frame (2-unit bars, `FRAME_OUTSIDE` 2 outside `render_rect`) | top bar [−92, −90), sides x [−2, 0) and [w, w + 2) | bottom bar [32, 34) |
+| Tab label (`OfficeDraw.tab_label()`, the pod's width × 8, right under `render_rect`) | — | [32, 40); the near lens and plate rows hang below it and meet it at no column (`test_the_near_rows_stand_clear_of_the_tab_label`) |
 | Seat mark (`selection_seat`, 32×48, pivot (16, 46)) | `SELECTION_AT` (0, 10): [−72, −24) | `SELECTION_AT` (0, 6): [−32, 16), from the far seat's click rectangle's end to the tag row, the raised hand (−28) and the chair (to 14) inside |
 
-At the 192-unit row pitch the next row's far plate starts at 192 − 114 = 78, past this row's near plate (56): 22 units
+At the 192-unit row pitch the next row's far plate starts at 192 − 114 = 78, past this row's near plate (64): 14 units
 to spare. The geometry suite pins every row, both pulse extremes, known and unknown waits and held `L` across two rows
 (`test_rows_at_the_pod_pitch_never_meet`). One pair may meet: the seat marks of the two seats facing each other across
 a desk share [−32, −24), because the near worker's raised hand (−28) is above the far mark's foot (−24); only one seat
