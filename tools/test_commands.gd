@@ -1424,7 +1424,7 @@ func test_the_staff_panels_buttons_show_their_whole_labels() -> void:
 	office.refresh()
 	await _frames(3)
 	_check(office.hud.card_compact(), "800x480: still one line")
-	_eq((card.get_node("%CompactOpen") as Button).text, "Open ⏎", "in its long words")
+	_eq((card.get_node("%CompactOpen") as Button).text, "Open", "in its long words")
 	_whole_labels(card, "(800, 480), one line")
 	_eq(_all_inputs(), 0, "nothing was sent")
 

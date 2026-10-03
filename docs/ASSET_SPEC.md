@@ -403,6 +403,12 @@ and licences in `assets/agent_badges/ATTRIBUTIONS.md`) appear only in Avatar Stu
 ## UI assets (12) and state semantics
 
 - 16×16 icons: working, blocked, unread, idle, unknown, offline, starting, branch, connected.
+- 10×10 key hints beside a staff-panel button's word, in `paper`: `key_enter` (the Enter key, after `Open` and `Answer`
+  and on the answer keys' Enter) and `expand` (after `Monitor`). They are icons because no face in the pack has a return or
+  an expand arrow, and a glyph from a platform font brings that font's row height (measured: a unit taller on Linux).
+  `HudTheme.KEY_HINT_ICON` draws them at 10 units, texel for texel at zoom 2. The HUD's own words never need a
+  platform glyph (`tools/test_art.gd`); the pen puts the pixel face before any platform font, so an arrow or a
+  triangle the text face lacks is the pack's too.
 - `panel`: 32×32 NinePatch, margin 4 on each side, for the world's light panels (the chip, the zone signs, the
   showroom's notes); `hud_panel`: the same shape for the dark HUD's panels.
 - `selection_seat`: 32×48 transparent corner marks round a seated figure, pivot 16,46.

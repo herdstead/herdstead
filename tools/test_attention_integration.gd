@@ -403,7 +403,7 @@ func test_blocked_row_shows_the_desks_wait_and_done_says_unread() -> void:
 	await _tap(row)
 	await _frames(2)
 	var more: Button = row.get_node("%More")
-	_check(more.visible, "the selected waiting row shows its `⋯`")
+	_check(more.visible, "the selected waiting row shows its `…`")
 	var unread := await _visible_row(office, HerdrFleet.pane_key(LOCAL, "web:p2"))
 	var note: Label = unread.get_node("%Tail")
 	_eq(note.text, "UNREAD", "a done row says UNREAD")

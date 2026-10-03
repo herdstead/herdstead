@@ -49,7 +49,10 @@ func _init(pack: ArtPack) -> void:
 	readable.base_font = art.font
 	var text_server := TextServerManager.get_primary_interface()
 	readable.variation_opentype = {text_server.name_to_tag("wght"): 500.0, text_server.name_to_tag("opsz"): 10.0}
-	readable.fallbacks = [system]
+	# A glyph the text face lacks comes from the pack's own pixel face first
+	# (its arrows, triangles and circles, at that face's small row), and only
+	# then from a platform font, whose own row height would come with it.
+	readable.fallbacks = [art.display_font, system] if art.display_font != null else [system]
 	font = readable
 	display = readable
 	var chain: Font = readable

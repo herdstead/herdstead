@@ -8,7 +8,7 @@ extends HdPanel
 ## agent's terminal. At its right end, NEXT names whom `N` picks next.
 ##
 ## The HUD shows the panel as one line (set_compact()) at every size until it is
-## opened: Enter, the line's `Open ⏎` and answer mode open it to full height,
+## opened: Enter, the line's `Open` and answer mode open it to full height,
 ## Escape out of answer mode and `▾ Esc` fold it (OfficeHud._fit_staff()). The
 ## line keeps `‹ ›` (NEXT's queue, selection only), Monitor and NEXT.
 ##
@@ -55,11 +55,11 @@ extends HdPanel
 ## the new pane, and the office then picks it (a selection, never a write), so
 ## its card offers START AGENT, which takes a click of its own. No key splits.
 
-## "Monitor ⤢" was pressed: open the terminal monitor on pane `pane_key`.
+## "Monitor" was pressed: open the terminal monitor on pane `pane_key`.
 signal monitor_requested(pane_key: String)
 ## NEXT was pressed: the office does what `N` does.
 signal next_requested
-## `Open ⏎` on the one-line row was pressed: the HUD opens the panel up. Only
+## `Open` on the one-line row was pressed: the HUD opens the panel up. Only
 ## that: it never opens answer mode.
 signal open_requested
 ## `▾ Esc` was pressed: the HUD folds the panel back to its line.
@@ -270,6 +270,8 @@ var _outcome_detail := ""
 var _outcome_identity := ""
 ## The HUD folded the panel to its compact line (set_compact()).
 var _compact := false
+## The Enter key's hint icon (dress()), beside `Open`, `Answer` and the answer keys' Enter.
+var _key_enter_icon: Texture2D
 ## The screen is wide enough for the line's long words (set_wide()).
 var _wide := true
 ## The HUD shows the compact panel as a card (set_card()).
@@ -349,6 +351,21 @@ func dress(pack: ArtPack) -> void:
 	super(pack)
 	var frame: HdPanel = %CardFrame
 	frame.dress(pack)
+	# The key hints beside the buttons' words: the pack's icons, never a glyph
+	# from a platform font (none of the pack's faces has a return or an expand
+	# arrow, and a fallback glyph brings its own font's row height; measured on
+	# Linux: `Open` 16 tall where every other row is 15).
+	_key_enter_icon = pack.sprite_texture(pack.ui_sprite(ArtContract.UI_KEY_ENTER))
+	var expand := pack.sprite_texture(pack.ui_sprite(ArtContract.UI_EXPAND))
+	for unique: String in ["%CompactOpen", "%KeyEnter"]:
+		var button: Button = get_node(unique)
+		button.icon = _key_enter_icon
+	for unique: String in ["%CompactMonitor", "%MonitorButton"]:
+		var button: Button = get_node(unique)
+		button.icon = expand
+	var hint: Button = %AnswerButton
+	if not _answering:
+		hint.icon = _key_enter_icon
 	# A pack swap is a new people family and animation library, so the portrait
 	# is dressed again.
 	_details().forget_look()
@@ -410,7 +427,7 @@ func duration_label() -> Label:
 
 
 ## The HUD shows the panel as one line until it is opened: provider, state and
-## seat, the wait, `‹ ›`, Monitor, `Open ⏎`, and NEXT. The line holds no
+## seat, the wait, `‹ ›`, Monitor, `Open`, and NEXT. The line holds no
 ## preview, so the office counts a one-line panel as covered and reads nothing for it.
 func set_compact(on: bool) -> void:
 	if on == _compact:
@@ -445,17 +462,17 @@ func compact() -> bool:
 	return _compact
 
 
-## Whether the screen has room for the line's long words (`Monitor ⤢`,
-## `Open ⏎`, and NEXT's `NEXT:`, whom and the wait in a row); the HUD says so
-## from `staff_next_from`. Below it they are `⤢`, `⏎` and whom alone.
+## Whether the screen has room for the line's long words (`Monitor`,
+## `Open`, and NEXT's `NEXT:`, whom and the wait in a row); the HUD says so
+## from `staff_next_from`. Below it they are the icons and whom alone.
 func set_wide(wide: bool) -> void:
 	if wide == _wide:
 		return
 	_wide = wide
 	var monitor: Button = %CompactMonitor
 	var open: Button = %CompactOpen
-	monitor.text = "Monitor ⤢" if wide else "⤢"
-	open.text = "Open ⏎" if wide else "⏎"
+	monitor.text = "Monitor" if wide else ""
+	open.text = "Open" if wide else ""
 	_show_stack()
 	_word_next()
 
@@ -1047,7 +1064,7 @@ func _measure_rows() -> void:
 # --- the switch ---------------------------------------------------------------
 
 
-## "Monitor ⤢": ask for the terminal monitor on the pane shown. It opens and
+## "Monitor": ask for the terminal monitor on the pane shown. It opens and
 ## reads nothing on its own; the office decides.
 func _on_monitor_pressed() -> void:
 	if _pane != null:
@@ -1348,7 +1365,8 @@ func _show_answer() -> void:
 	var answer: Control = %Answer
 	var possible := _answer_possible()
 	hint.visible = _answering or possible
-	hint.text = "Close" if _answering else "Answer ⏎"
+	hint.text = "Close" if _answering else "Answer"
+	hint.icon = null if _answering else _key_enter_icon
 	hint.tooltip_text = (
 		"Esc: leave answer mode. Nothing is sent."
 		if _answering
@@ -1422,7 +1440,7 @@ func _key_buttons() -> Array[Button]:
 	return found
 
 
-## The key name a key button sends: its own label, but ⏎ and "Send Esc" by name.
+## The key name a key button sends: its own label, but Enter (an icon) and "Send Esc" by name.
 func _key_of(button: Button) -> String:
 	if button == %KeyEnter:
 		return "enter"

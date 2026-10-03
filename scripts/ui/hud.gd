@@ -25,7 +25,7 @@ signal arrow_picked(pane_key: String)
 ## A pane was chosen in the agent list: pick it, as a click on its desk does.
 signal agent_picked(key: String)
 ## The viewer asked for the terminal monitor on pane `pane_key`: a pane opened
-## in the agent list (double-click, Enter, Open) or the card's "Monitor ⤢".
+## in the agent list (double-click, Enter, Open) or the card's "Monitor".
 ## The office decides and opens it.
 signal monitor_requested(pane_key: String)
 signal history_locate_requested(key: String)
@@ -115,7 +115,7 @@ enum DrawerTab { AGENTS, EVENTS }
 ## room (see _fit_news()). Set in the scene.
 @export var staff_tall_from := 0.0
 ## The logical screen width from which NEXT stays beside the panel at full
-## height, and the one-line row says its long words (`Monitor ⤢`, `Open ⏎`,
+## height, and the one-line row says its long words (`Monitor`, `Open`,
 ## NEXT's whole line); below it, the full panel needs NEXT's room for its
 ## preview and the row says its short ones. Set in the scene.
 @export var staff_next_from := 0.0
@@ -284,7 +284,7 @@ func _ready() -> void:
 	inspector.monitor_requested.connect(func(key: String) -> void: monitor_requested.emit(key))
 	inspector.next_requested.connect(func() -> void: next_requested.emit())
 	inspector.step_requested.connect(func(direction: int) -> void: step_requested.emit(direction))
-	# The line's `Open ⏎` and the panel's `▾ Esc` are the HUD's own: they only
+	# The line's `Open` and the panel's `▾ Esc` are the HUD's own: they only
 	# open the panel or fold it, which is the HUD's layout, not the office's.
 	inspector.open_requested.connect(expand_card)
 	inspector.fold_requested.connect(compact_card)
@@ -631,7 +631,7 @@ func card_expanded() -> bool:
 
 
 ## Open the staff panel up from its line to full height: Enter on a shown pane,
-## the line's `Open ⏎`, or answer mode. It folds again on Escape out of answer
+## the line's `Open`, or answer mode. It folds again on Escape out of answer
 ## mode, the panel's `▾ Esc`, the card aimed at another pane, or compact_card();
 ## answer mode ending by itself leaves it open, so what a sent key did stays in
 ## sight, and so does a new terminal, agent or connection in the same pane (a
@@ -765,7 +765,7 @@ func _label_tab() -> void:
 
 ## The staff panel is one line (`staff_compact_top`: who, state and seat, the
 ## wait, `‹ ›`, Monitor, Open, and NEXT) at every size until it is opened: Enter
-## on a shown pane, the line's `Open ⏎` and answer mode open it to full height
+## on a shown pane, the line's `Open` and answer mode open it to full height
 ## (`staff_full_top`), Escape out of answer mode and its `▾ Esc` fold it (see
 ## expand_card()). At full height on a screen narrower than `staff_next_from`,
 ## the preview takes NEXT's room; from that width the line says its long

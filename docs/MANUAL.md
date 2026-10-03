@@ -254,7 +254,7 @@ The bottom of the screen is the staff panel, which hosts the agent card. The car
 does not fit is in the tooltip.
 
 **Compact by default, at every size.** On a screen at least 400 units tall it is a card at the bottom-left: portrait,
-name, the state in a pill of its colour, where, and `‹ ›`, `Monitor ⤢`, `Open ⏎` under them, with NEXT (▶) at the right
+name, the state in a pill of its colour, where, and `‹ ›`, `Monitor ⤢`, `Open ⏎` under them (the `⤢` and `⏎` are small icons after the word), with NEXT (▶) at the right
 end; the office shows between them but takes no click there. Below 400 units it is one line: who · state · where, how long
 it has waited, `‹ ›`, `Monitor ⤢`, `Open ⏎`, NEXT. Below 640 units of screen width these read `⤢`, `⏎`, and NEXT shows only
 provider and space. Compact, the panel reads no preview: to see a working agent's terminal, expand it.

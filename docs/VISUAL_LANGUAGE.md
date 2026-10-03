@@ -169,7 +169,7 @@ Everything below is HUD and never changes the world. The world draws only what t
 
 The staff panel (the agent card; scene name `inspector`) runs across the bottom. **It is compact by default at every size**: on a screen
 at least 400 units tall a card at the bottom-left (portrait, name, the state in a pill of its colour, location, and `‹ ›`, `Monitor ⤢`,
-`Open ⏎` under them) with NEXT at the right end and the office showing, but not clickable, between them; below that one line (provider
+`Open ⏎` under them; `⏎` and `⤢` here stand for the pack's key-hint icons `ui.key_enter` / `ui.expand` after the word, never a platform glyph) with NEXT at the right end and the office showing, but not clickable, between them; below that one line (provider
 · state · location, wait, `‹ ›`, `Monitor ⤢`, `Open ⏎` and NEXT). Compact, the preview is neither shown nor read. `Enter` or `Open ⏎` expands it to
 full height: portrait, name, state, wait, location; the terminal preview; details (`PANE`: pane id, label, directory, session, terminal title);
 actions (`▾ Esc`, Monitor, Answer, Switch herdr here); NEXT. `Esc` outside answer mode, `▾ Esc` or selecting another pane collapses it; `Esc` in
