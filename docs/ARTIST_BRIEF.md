@@ -77,15 +77,15 @@ foot point stay empty; rows 6–43 in the 2x PNG).
 `done_stack_small` is a signal, not decoration: it is the small paper stack beside a done agent's laptop (§5),
 6 units wide and 9 tall over its foot point, so it fits between the laptop and the edge of a 32-unit desk.
 
-**The pod family** (`table/`): four desk modules, the low screen (three), the apron (three), the short leg,
+**The pod family** (`table/`): four desk modules, the low screen (three), the apron (three),
 the bracket, chair front and back,
-laptop front and back and the `$_` marker views, 18 images, also density 2 (canvas = units ×2).
-The build derives none of them: it validates the 18 source PNGs and copies them as they are. A `shell_*`
+laptop front and back and the `$_` marker views, 17 images, also density 2 (canvas = units ×2).
+The build derives none of them: it validates the 17 source PNGs and copies them as they are. A `shell_*`
 view is its `monitor_*` with the `$_` mark, made by `shell_mark()` in `tools/build_table_assets.py`, which
 only the template generator runs (`make table-templates`, on the monitors it has just drawn). So do not
 paint a shell freehand, and when you repaint a monitor, derive its shell from it again the same way:
 the silhouette stays the monitor's and the cursor's probe point is contract. Each image's canvas and the
-pixels it must keep (which desk rows are transparent, the leg's last row, the chair and laptop
+pixels it must keep (which desk rows are transparent, the chair and laptop
 probe points) are in "Open floor and pods" of [ASSET_SPEC.md](ASSET_SPEC.md) and in the notes of
 `tools/build_table_assets.py`; `make test-art` checks every one.
 

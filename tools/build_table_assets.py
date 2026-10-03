@@ -12,12 +12,12 @@ art/daylight/table explicitly; normal builds never invoke the drawing code.
 
 The apron, the bracket and the chairs are drawn in units on a density-1
 canvas and blown up by DENSITY, nearest, as they are written; the desks, the
-screens, the short leg and the laptop are drawn texel by texel at DENSITY. A
+screens and the laptop are drawn texel by texel at DENSITY. A
 shell view is derived from its monitor view by shell_mark() at DENSITY, so a
 repainted monitor gets its shell the same way.
 
 One source module set is accepted (SOURCE_SETS), the pod: what the office
-draws and nothing else (POD_ONLY, 18 images). The pod's own 8 modules
+draws and nothing else (POD_ONLY, 17 images). The pod's own 7 modules
 (POD_MODULES), the near edge every desk hangs (POD_SHARED: the apron's three
 and the bracket) and the 6 furniture views (FURNITURE), which is exactly the
 runtime's ArtContract.TABLE_MODULES plus the furniture (a test holds the two
@@ -55,15 +55,6 @@ far edge at y -48:
 - screen_* 32x6: fully opaque, a wooden rail over a sage panel; its panel
   lines repeat every 8 units, which divides 32, so modules in any order
   continue them.
-- leg_short 6x7: the pod's end leg, hung at LEG_DROP -2 (its mount right
-  under the apron). Every row is opaque, so the foot ends at pod y 5: the
-  near chair (chair_back, pushed in under the desk, its pivot at pod y 14)
-  is opaque across x -5.5..+5.5 of its column over y -7..5.5 (below that only
-  its gas-lift column and then its base), so a leg centred under an end
-  column's near chair is wholly behind the chair's back, glide included,
-  somebody in the chair or not. It is 6 wide (x -3..+3 of its centre), every
-  row attached; the shaft steps in once and the ankle and glide are narrower
-  than the shoulder.
 """
 from __future__ import annotations
 
@@ -98,7 +89,6 @@ POD_MODULES: dict[str, tuple[int, int]] = {
     "screen_left": (32, 6),
     "screen_mid": (32, 6),
     "screen_right": (32, 6),
-    "leg_short": (6, 7),
 }
 
 ## The near edge every desk hangs: the apron's three modules and a bracket per desk.
@@ -452,14 +442,6 @@ def screen(palette: dict[str, str], cap: str | None) -> Image.Image:
     return result
 
 
-## leg_short, texel by texel: (first texel row, last texel row + 1, first
-## texel column, texel columns of deep, wood_light, wood, wood_shadow, deep).
-## The shoulder is 10 texels wide and steps in once to 8; the glide below is 6.
-## One unit of each under the three-unit mount, then a two-unit glide: the foot
-## ends 7 units under the mount's top, behind the pushed-in chair's back.
-LEG_SHORT_SHAFT = ((6, 8, 1, (2, 2, 2, 2, 2)), (8, 10, 2, (2, 2, 0, 2, 2)))
-
-
 def leg_short(palette: dict[str, str]) -> Image.Image:
     """The pod's small end leg under a dark mount, on a small glide (see the contract above)."""
     result = dense(POD_MODULES["leg_short"])
@@ -505,7 +487,6 @@ def generate_templates(source: Path, output: Path) -> None:
         sprites[f"desk_{end}"] = desk(palette, variant, end if end in ("left", "right") else None)
     for end in ("left", "mid", "right"):
         sprites[f"screen_{end}"] = screen(palette, None if end == "mid" else end)
-    sprites["leg_short"] = leg_short(palette)
     require(set(sprites) == set(POD_ONLY), f"the templates draw {sorted(set(sprites) ^ set(POD_ONLY))} out of the pod set")
     for name, sprite in sprites.items():
         expected = tuple(value * DENSITY for value in POD_ONLY[name])

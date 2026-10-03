@@ -103,12 +103,10 @@ const DRAWN_BELOW_NEAR := 32
 ## near approach row), and one passage cell right of the pod.
 const FAR_RESERVE := 80
 const NEAR_RESERVE := 64
-## The two short legs stand behind the end columns' near chairs (x 16 and
-## w - 16), which hide them, somebody in the chair or not: LEG_DROP hangs their
-## mount under the apron, and their foot ends at pod y 5, behind the chair's
-## solid back (opaque across the leg down to 5.5; below that only its gas lift
-## and base). A bracket hangs under each desk.
-const LEG_DROP := -2
+## A bracket hangs under each desk. The pod has no legs: its two short end legs
+## were retired once the near chairs, pushed in under the desk, hid them at
+## every column, somebody in the chair or not; the apron and the brackets are
+## the near edge's whole drawing.
 const BRACKET_DROP := -11
 const SIDES := ["far", "near"]
 ## A done seat's stack of paper (ArtContract.PROP_DONE_STACK_SMALL, 6 wide and
@@ -279,10 +277,6 @@ func _rebuild_modules() -> void:
 		_module($Surface, StringName(grain), Vector2(index * MODULE, far))
 		_module($Apron, StringName("apron_" + end), Vector2(index * MODULE, APRON_DROP))
 		_module($Divider, StringName("screen_" + end), Vector2(index * MODULE, far + SCREEN_TOP))
-	# Centred on the end columns by the module's own width (units).
-	var leg_width := float(art.table.modules[&"leg_short"].size.x)
-	for leg_x: float in [columns[0], columns[columns.size() - 1]]:
-		_module($Supports, &"leg_short", Vector2(leg_x - leg_width / 2.0, LEG_DROP))
 	for x in columns:
 		_module($Supports, &"bracket", Vector2(x - 6, BRACKET_DROP))
 	# The frame stands FRAME_OUTSIDE outside the stationary drawing, so its bars

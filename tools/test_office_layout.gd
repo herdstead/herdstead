@@ -755,16 +755,16 @@ func test_moving_panes_cannot_hide_retained_capacity() -> void:
 
 
 func test_desk_node_budget_boundary_includes_fixed_cost_and_both_sides() -> void:
-	# One empty two-column pod (168) plus a four-column pod (310): 26 fixed
+	# One empty two-column pod (166) plus a four-column pod (308): 24 fixed
 	# (the lens's wash among them) and 71 a column (a chip at each seat, a
 	# stack of paper each, the lens line), as the geometry suite counts them.
 	# Expected costs are independent of the implementation's accounting helper.
 	var model := _floor([_room("empty"), _room("full", 8)])
-	for limit: int in [477, 478, 479]:
+	for limit: int in [473, 474, 475]:
 		var rules := FloorLayoutPolicy.new()
 		rules.max_desk_nodes = limit
 		var result := OfficeFloorLayout.plan(MapModel.of(model), null, rules)
-		_eq(result.plan != null, limit >= 478, "exact boundary is inclusive")
+		_eq(result.plan != null, limit >= 474, "exact boundary is inclusive")
 		if result.plan != null:
 			_eq(result.plan.desk("empty").capacity, 2, "empty table reserves both pairs of seats")
 			_eq(result.plan.desk("full").capacity, 4, "occupied table has four columns, not eight")
@@ -782,8 +782,8 @@ func test_desk_node_budget_boundary_includes_fixed_cost_and_both_sides() -> void
 
 func test_repeated_migrations_retain_seats_until_cumulative_budget_is_full() -> void:
 	var rules := FloorLayoutPolicy.new()
-	# An eight-column pod costs 26 + 71 * 8 = 594: four fit (2376), five
-	# (2970) do not.
+	# An eight-column pod costs 24 + 71 * 8 = 592: four fit (2368), five
+	# (2960) do not.
 	rules.max_desk_nodes = 2800
 	var model := _floor([])
 	var panes := _room("traveller", 16).panes
@@ -797,12 +797,12 @@ func test_repeated_migrations_retain_seats_until_cumulative_budget_is_full() -> 
 		var result := OfficeFloorLayout.plan(MapModel.of(model), previous, rules)
 		_eq(model.pane_count(), 16, "every step carries the same sixteen panes")
 		if step == 4:
-			_check(result.plan == null, "five retained eight-column pods cost 2970, not 2800")
+			_check(result.plan == null, "five retained eight-column pods cost 2960, not 2800")
 			_eq(result.problems, PackedStringArray(["map exceeds desk node budget"]), "cumulative refusal")
 			_eq(previous.desks.size(), 4, "failed addition never mutates previous table membership")
 			_check(previous.seat(panes[0].key) != null, "previous pane binding survives rejection")
 			continue
-		_eq(result.problems, PackedStringArray(), "four pods cost 2376 and fit")
+		_eq(result.problems, PackedStringArray(), "four pods cost 2368 and fit")
 		_check(result.plan != null, "migration within budget succeeds")
 		if result.plan == null:
 			return
@@ -829,13 +829,13 @@ func test_previous_empty_capacity_is_validated_against_current_budgets() -> void
 	var signature := empty.geometry_signature()
 	_eq(empty.desks[0].seats.size() + empty.desks[1].seats.size(), 0, "no current panes remain")
 	_eq(empty.desks[0].capacity + empty.desks[1].capacity, 500, "1000 empty slots still exist")
-	# Two 250-column pods: 2 * (26 + 71 * 250).
-	for limit: int in [35551, 35552, 35553]:
+	# Two 250-column pods: 2 * (24 + 71 * 250).
+	for limit: int in [35547, 35548, 35549]:
 		rules.max_desk_nodes = limit
-		_eq(OfficeFloorLayout.validate(empty, rules).is_empty(), limit >= 35552, "old allocation boundary")
+		_eq(OfficeFloorLayout.validate(empty, rules).is_empty(), limit >= 35548, "old allocation boundary")
 		_eq(
 			OfficeFloorLayout.plan(MapModel.of(model), empty, rules).plan != null,
-			limit >= 35552,
+			limit >= 35548,
 			"old input uses same budget"
 		)
 	_eq(empty.geometry_signature(), signature, "budget changes neither shrink nor reflow previous desks")

@@ -123,20 +123,16 @@ func test_thin_front_joins_supports_without_moving_the_floor() -> void:
 		var apron := child as Sprite2D
 		_eq(apron.position.y, -5.0, "apron directly follows the painted surface")
 		_eq(apron.position.y + apron.get_rect().size.y * apron.scale.y, -2.0, "thin front ends at -2")
-	# Two short legs, one behind each end column's near chair (which hides it,
-	# somebody in it or not), their foot behind the chair's solid back.
+	# No legs: the supports are one bracket under each desk and nothing else.
 	_check(table.resize(4), "a pod with middle columns")
-	var legs: Array[float] = []
+	var brackets: Array[float] = []
 	for child in table.get_node("Supports").get_children():
 		var support := child as Sprite2D
-		if support.texture != art.table.module_texture(&"leg_short"):
-			continue
-		var painted := support.texture.get_image().get_used_rect()
-		legs.append(support.position.x + painted.get_center().x * support.scale.x)
-		_eq(support.position.y, -2.0, "leg meets apron without a gap")
-		_eq(support.position.y + painted.end.y * support.scale.y, 5.0, "its foot ends at pod y 5")
-	legs.sort()
-	_eq(legs, [table.columns[0], table.columns[3]], "the two legs are centred under the end columns")
+		_eq(support.texture, art.table.module_texture(&"bracket"), "every support is a bracket")
+		brackets.append(support.position.x + 6.0)
+		_eq(support.position.y, -11.0, "hung under the apron")
+	brackets.sort()
+	_eq(brackets, table.columns, "one bracket under each column")
 	for index in table.columns.size():
 		for point in table.task_light(index, "near").polygon:
 			_check(point.y <= -8.0, "near light stops on the working top, not below the thin edge")
@@ -1337,51 +1333,21 @@ func test_a_near_sitter_sits_at_the_near_working_plane() -> void:
 		station.free()
 
 
-## The two short legs stand behind the end columns' near chairs: from the
-## chair's top row down, every texel a leg draws is behind a texel of that
-## chair, vacant or with somebody in it, so no foot shows beside the gas lift
-## or below the base; and the leg ends above the chair's own foot.
-func test_the_short_legs_hide_behind_the_end_chairs() -> void:
+## The pod stands on no legs: its two short end legs were retired once the
+## near chairs, pushed in under the desk, hid them at every column, somebody
+## in the chair or not. Nothing under the apron but the brackets, no module of
+## the table family named for a leg, and the fixed node cost two lower.
+func test_the_pod_stands_on_no_legs() -> void:
 	var table := _table()
 	_check(table.resize(4), "a pod with middle columns")
-	var to_pod := table.global_transform.affine_inverse()
-	var seen: Array[int] = []
+	_eq(table.get_node("Supports").get_child_count(), 4, "one bracket a column, nothing else")
 	for child in table.get_node("Supports").get_children():
-		var leg := child as Sprite2D
-		if leg.texture != art.table.module_texture(&"leg_short"):
-			continue
-		var centre := leg.position.x + leg.texture.get_size().x * leg.scale.x / 2.0
-		var column := table.columns.find(centre)
-		seen.append(column)
-		var drawn := _texels(leg, to_pod)
-		_check(not drawn.is_empty(), "column %d: the leg is drawn" % column)
-		var station := pen.station(sorted, table, column, "near")
-		for occupied: bool in [false, true]:
-			if occupied:
-				station.furnish("claude", ArtContract.STATE_WORKING)
-			else:
-				station.vacate()
-			var where := "column %d, %s" % [column, "occupied" if occupied else "vacant"]
-			var chair := _chair_texels(station, to_pod)
-			var chair_top := 1 << 20
-			var chair_foot := -(1 << 20)
-			for texel: Vector2i in chair:
-				chair_top = mini(chair_top, texel.y)
-				chair_foot = maxi(chair_foot, texel.y)
-			var bare := 0
-			var leg_foot := -(1 << 20)
-			for texel: Vector2i in drawn:
-				leg_foot = maxi(leg_foot, texel.y)
-				if texel.y >= chair_top and not chair.has(texel):
-					bare += 1
-			_eq(bare, 0, "%s: no texel of the leg shows beside or below the chair" % where)
-			_check(
-				leg_foot <= chair_foot,
-				"%s: the leg's foot (%s) is not below the chair's (%s)" % [where, leg_foot / 2.0, chair_foot / 2.0]
-			)
-		station.free()
-	seen.sort()
-	_eq(seen, [0, 3], "one leg under each end column, none between")
+		var support := child as Sprite2D
+		_eq(support.texture, art.table.module_texture(&"bracket"), "a bracket")
+	for module: StringName in art.table.modules:
+		_check(not String(module).begins_with("leg"), "no leg module in the pack: %s" % module)
+	_check(not ArtContract.TABLE_MODULES.has(&"leg_short"), "none in the contract")
+	_eq(OfficeDeskView.node_budget(0), 24, "24 fixed nodes, two fewer than with the legs")
 
 
 ## A near done seat's paper stays in sight now that the sitter leans over the

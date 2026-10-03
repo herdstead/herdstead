@@ -877,8 +877,8 @@ class PixelSourceTests(unittest.TestCase):
         self.assertEqual(
             len(files),
             len(draw_pixel_sources.DESK_PIECES) + len(draw_pixel_sources.FIXTURE_SIZES)
-            + len(draw_pixel_sources.DENSE_SIZES) + len(draw_pixel_sources.PARTITION_SIZES) + 19,
-            "8 desk props, 2 fixture props, 2 density-2 pieces, 7 partition pieces, the pod family's 18 images, 1 manifest",
+            + len(draw_pixel_sources.DENSE_SIZES) + len(draw_pixel_sources.PARTITION_SIZES) + 18,
+            "8 desk props, 2 fixture props, 2 density-2 pieces, 7 partition pieces, the pod family's 17 images, 1 manifest",
         )
         self.assertEqual(files, sorted(path.relative_to(second) for path in second.rglob("*") if path.is_file()))
         for relative in files:

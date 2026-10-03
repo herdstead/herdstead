@@ -671,9 +671,9 @@ func _agent_pane(key: String) -> PaneModel:
 
 
 ## The desk node budget is charged on the composed map: two zones of a
-## 200-column pod cost 28,452 nodes of 32,768 (26 + 71 a column); the first
-## growing to 262 columns (18,628) fits on its own but not with the second's
-## 14,226 (32,854 in all), so the whole map fails, the previous one stays, and
+## 200-column pod cost 28,448 nodes of 32,768 (24 + 71 a column); the first
+## growing to 262 columns (18,626) fits on its own but not with the second's
+## 14,224 (32,850 in all), so the whole map fails, the previous one stays, and
 ## the zone the total ran out at is named. (Codex's numbers, 31,666 and 32,930
 ## at 216 columns, were the long tables' 33 + 79 a column.)
 func test_the_budget_is_charged_on_the_composed_map() -> void:
@@ -684,12 +684,12 @@ func test_the_budget_is_charged_on_the_composed_map() -> void:
 	if plan == null:
 		return
 	_eq([plan.desk("a").capacity, plan.desk("b").capacity], [200, 200], "200 columns each")
-	_eq(OfficeDeskView.node_budget(200) * 2, 28452, "28,452 nodes")
-	_eq(OfficeDeskView.node_budget(262), 18628, "the grown first zone alone: 18,628")
+	_eq(OfficeDeskView.node_budget(200) * 2, 28448, "28,448 nodes")
+	_eq(OfficeDeskView.node_budget(262), 18626, "the grown first zone alone: 18,626")
 	_eq(
 		OfficeDeskView.node_budget(262) + OfficeDeskView.node_budget(200),
-		32854,
-		"a grown first zone and the second: 32,854"
+		32850,
+		"a grown first zone and the second: 32,850"
 	)
 	var grown: Array[ZoneModel] = [_zoned("machine/1", 1, [_room("a", 524)]), _zoned("machine/2", 2, [_room("b", 400)])]
 	_eq(
