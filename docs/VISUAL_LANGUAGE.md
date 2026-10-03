@@ -177,6 +177,7 @@ answer mode only leaves answer mode. A new terminal, agent, session or connectio
 panel's height; the drawer stays as it is. Every line fits the smallest 480×320-unit screen; a sentence that does not fit goes whole into the tooltip.
 
 - **State words**: done adds `UNREAD = not yet seen / Not task success.`; disconnected adds `Connection lost. / Not an idle signal.`.
+  The note stands under the caption of the opened panel; the card form has no row for it (the card is as tall as the portrait).
   **A shell's card** has no portrait, badge or timer: `SHELL`, `no agent` (the idle herdr reports for a shell is the terminal's). There is no terminal
   icon before SHELL: the pack's terminal image `ui.working` is WORKING's badge and would read as a state.
 - **Preview**: blocked reads herdr's full `detection` (up to 200 rows), other states the end of `recent_unwrapped`; it shows the last 12 rows,
