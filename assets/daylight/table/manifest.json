@@ -123,13 +123,6 @@
         32,
         6
       ]
-    },
-    "leg_short": {
-      "path": "leg_short.png",
-      "size": [
-        6,
-        7
-      ]
     }
   },
   "furniture": {
