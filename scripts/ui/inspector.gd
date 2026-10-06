@@ -1287,14 +1287,15 @@ func _answer_possible() -> bool:
 ## Why an input of `kind` may not be pressed now, or NONE: this card's own
 ## state, what the boundary says about the pane (its state, an open write, a
 ## look still owed), and whether the preview shows what that input is checked
-## against.
+## against (CardActions.ladder()).
 func _input_refusal(kind: CommandContext.Kind) -> CommandRefusal.Reason:
-	var reason := _card_refusal()
-	if reason == CommandRefusal.Reason.NONE:
-		reason = _fleet.can_operate(_pane.key, kind)
-	if reason == CommandRefusal.Reason.NONE:
-		reason = _shown_refusal(kind)
-	return reason
+	var own := _card_refusal()
+	# A card that refuses by itself may have no fleet or pane: the fleet is not asked.
+	var seam := CommandRefusal.Reason.NONE
+	if own == CommandRefusal.Reason.NONE:
+		seam = _fleet.command_refusal(_pane.key, kind)
+	var frozen := CommandPreview.of(_shown_ticket, _shown_seq)
+	return CardActions.ladder(kind, own, seam, _state == PreviewState.SHOWN, frozen)
 
 
 ## No fleet or pane, read-only, a pane the viewer did not pick, or a write of
@@ -1314,10 +1315,8 @@ func _card_refusal() -> CommandRefusal.Reason:
 ## Whether the preview shows uncut text from the source `kind` is checked
 ## against: the whole `detection` text for keys, the recent output for a line.
 func _shown_refusal(kind: CommandContext.Kind) -> CommandRefusal.Reason:
-	if _state != PreviewState.SHOWN or _shown_ticket == null or _cut:
-		return CommandRefusal.Reason.UNSEEN
-	var wanted := CommandContext.SOURCE_DETECTION if kind == CommandContext.Kind.KEYS else CommandContext.SOURCE_RECENT
-	return CommandRefusal.Reason.NONE if _shown_ticket.context.source == wanted else CommandRefusal.Reason.UNSEEN
+	var frozen := CommandPreview.of(_shown_ticket, _shown_seq)
+	return CardActions.shown_refusal(kind, _state == PreviewState.SHOWN, frozen)
 
 
 ## The reason worth saying when answer mode has nothing to press (NONE while
@@ -1676,10 +1675,13 @@ func _show_launch() -> void:
 	_show_more()
 
 
-## What the card shows this instant, for the aiming family (CardActions.View).
+## What the card shows this instant, for the aiming family (CardActions.View):
+## values only, the fleet's answers about the pane among them, asked now for
+## the kinds the block's form may press. Built anew at every call, a press and
+## a release included: every answer in it was asked at that call. Only the
+## list of kinds the block still offers (its buttons) comes from the last look.
 func _view() -> CardActions.View:
 	var view := CardActions.View.new()
-	view.fleet = _fleet
 	view.pane = _pane
 	view.binding = _binding
 	view.form = _launch_form()
@@ -1690,6 +1692,8 @@ func _view() -> CardActions.View:
 	view.branch = _branch_text()
 	view.machine = _machine
 	view.now_msec = Time.get_ticks_msec()
+	if _fleet != null and _pane != null:
+		view.answers = _fleet.answers(_pane.key, _binding, CardActions.asked(view.form), _actions.launch_kinds)
 	return view
 
 

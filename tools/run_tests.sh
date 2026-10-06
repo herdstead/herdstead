@@ -101,6 +101,7 @@ MIN_CASES_PROMPT=12
 MIN_CASES_SPLIT=15
 MIN_CASES_CLOSE=15
 MIN_CASES_SPACES=16
+MIN_CASES_REFUSAL_LADDER=23
 
 # Unix socket paths stop at ~104 bytes on macOS: keep them short, under /tmp.
 WORK="$(mktemp -d /tmp/herdstead-test.XXXXXX)"
@@ -162,12 +163,15 @@ SERVER_U_PID=""
 SERVER_V_PID=""
 SERVER_W_PID=""
 SERVER_X_PID=""
+SERVER_Y_PID=""
+SERVER_Z_PID=""
 
 cleanup() {
 	for pid in "$SERVER_PID" "$SERVER_B_PID" "$SERVER_C_PID" "$SERVER_D_PID" "$SERVER_E_PID" "$SERVER_F_PID" \
 		"$SERVER_G_PID" "$SERVER_H_PID" "$SERVER_I_PID" "$SERVER_J_PID" "$SERVER_K_PID" "$SERVER_L_PID" \
 		"$SERVER_M_PID" "$SERVER_N_PID" "$SERVER_O_PID" "$SERVER_P_PID" "$SERVER_Q_PID" "$SERVER_R_PID" \
-		"$SERVER_S_PID" "$SERVER_T_PID" "$SERVER_U_PID" "$SERVER_V_PID" "$SERVER_W_PID" "$SERVER_X_PID"; do
+		"$SERVER_S_PID" "$SERVER_T_PID" "$SERVER_U_PID" "$SERVER_V_PID" "$SERVER_W_PID" "$SERVER_X_PID" \
+		"$SERVER_Y_PID" "$SERVER_Z_PID"; do
 		if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
 			kill "$pid" 2>/dev/null
 			wait "$pid" 2>/dev/null
@@ -606,6 +610,20 @@ run_scene_suite test_strategic "STRATEGIC TESTS" "$MIN_CASES_STRATEGIC" -- --rea
 # In the background: the title's (N), the one Dock bounce, the chime; headless, so decided, never rung.
 run_scene_suite test_alerts "ALERTS TESTS" "$MIN_CASES_ALERTS" -- --read-only \
 	--socket="$WORK/alerts-nowhere.sock" --work="$WORK"
+
+# "May pane P take kind K now, and why not": the fleet's answer per kind and
+# state on a bare fleet (no office) against two more fakes, and the card's
+# ladder, aims and confirms as tables with no scene. Its one deliberate write
+# is a pair of switches; it closes by checking the two saw only what it opened.
+start_fake ladder-a
+SERVER_Y_PID=$FAKE_PID
+start_fake ladder-b
+SERVER_Z_PID=$FAKE_PID
+BOUND_SECONDS=300
+run_scene_suite test_refusal_ladder "REFUSAL LADDER TESTS" "$MIN_CASES_REFUSAL_LADDER" -- \
+	--socket-a="$WORK/ladder-a.sock" --control-a="$WORK/ladder-a-ctl.sock" \
+	--socket-b="$WORK/ladder-b.sock" --control-b="$WORK/ladder-b-ctl.sock" --work="$WORK"
+unset BOUND_SECONDS
 
 echo "RUN_TESTS: exit $status in $(( $(date +%s) - started ))s"
 exit "$status"

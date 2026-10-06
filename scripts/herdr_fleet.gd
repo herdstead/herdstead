@@ -40,6 +40,20 @@ enum Kind { LOCAL, SOCKET, SSH }
 const LOCAL := "local"
 ## Joins machine key and pane id; it cannot occur in either.
 const KEY_SEPARATOR := "\u001f"
+## The kinds can_operate() asks about by their own name; any other is a read.
+const _OPERATED: Array[CommandContext.Kind] = [
+	CommandContext.Kind.FOCUS,
+	CommandContext.Kind.KEYS,
+	CommandContext.Kind.LINE,
+]
+## The kinds whose commands carry a value read off the snapshot (answers());
+## a start's is its name, per agent kind.
+const _CARRIED: Array[CommandContext.Kind] = [
+	CommandContext.Kind.SPLIT,
+	CommandContext.Kind.CLOSE,
+	CommandContext.Kind.SPACE,
+	CommandContext.Kind.WORKTREE,
+]
 
 var _roster: MachineRoster
 ## One per shown machine, Local first.
@@ -275,27 +289,68 @@ func context_for(key: String, binding: int) -> CommandContext:
 
 
 ## Why a command of `kind` to pane `key` would be refused if it were asked for
-## now, or NONE. A write (FOCUS, KEYS, LINE) also waits for an open write to
-## that pane and for a look after the last one (LOOK_FIRST). KEYS and LINE are
-## judged with a payload that always passes (`enter`, one letter) and without
-## the terminal text a real press freezes: whether the pane may receive them.
-func can_operate(key: String, kind := CommandContext.Kind.FOCUS) -> CommandRefusal.Reason:
+## now, or NONE: the one place that says so, for a read, a switch, an answer
+## key, a line, a start (of `agent_kind`), a split, a close, a new space and a
+## new worktree. First whether this office writes at all (READ_ONLY), then the
+## boundary's word on the command such a press would aim now
+## (HerdrCommands.refusal(): its machine, its pane, and what its kind asks of
+## the pane), then an open write to that pane or a look owed after the last
+## one (HerdrCommands.blocker(); never for a read). A close is judged with
+## what it takes with it now, a new space with the shell's directory, a start
+## with the name it would get, a worktree with the pane's workspace: the
+## values answers() hands the card. What only a press knows is not judged
+## here: which key, the line, the branch typed, the terminal text frozen
+## (line_refusal(), branch_refusal(), prompt_refusal(), and the card's own
+## steps in CardActions.ladder()). NOT_ALLOWED for any other kind.
+func command_refusal(key: String, kind: CommandContext.Kind, agent_kind := "") -> CommandRefusal.Reason:
 	if _commands == null:
 		return CommandRefusal.Reason.READ_ONLY
-	var context := context_for(key, 0)
-	match kind:
-		CommandContext.Kind.FOCUS:
-			context = context.focusing()
-		CommandContext.Kind.KEYS:
-			context = context.keying(HerdrCommands.LINE_ENTER, null)
-		CommandContext.Kind.LINE:
-			context = context.replying("x", null)
-		_:
-			context = context.reading(CommandContext.SOURCE_DETECTION, 1)
-	var reason := HerdrCommands.refusal(context, _machine(context.machine))
-	if reason == CommandRefusal.Reason.NONE:
-		reason = _commands.blocker(context)
-	return reason
+	var facts := CommandAnswers.new()
+	facts.target = context_for(key, 0)
+	_note_values(facts, kind, agent_kind)
+	return _asked(facts, kind, agent_kind)
+
+
+## Everything the agent card reads of pane `key` this instant, as values
+## (CommandAnswers): a target on `binding` (context_for()), what the block's
+## commands carry (the close's scope, the split's side, the shell's directory,
+## the workspace, each start's next name), how the pane's last start is going,
+## and for each of `kinds` the same answer command_refusal() gives, judged on
+## those very values. A START is answered for every agent kind the machine
+## shows now and for each of `offered` (the kinds a card still offers from
+## its last look). Asked again at every look and at every press; an answer is
+## never a later press's verdict, and the boundary judges the aimed command
+## again when it is sent.
+func answers(
+	key: String, binding: int, kinds: Array[CommandContext.Kind] = [], offered := PackedStringArray()
+) -> CommandAnswers:
+	var said := CommandAnswers.new()
+	said.target = context_for(key, binding)
+	for kind: CommandContext.Kind in _CARRIED:
+		_note_values(said, kind, "")
+	said.launch = launch_of(key)
+	said.last_write = last_write(key)
+	said.launch_outcome = launch_outcome(key)
+	said.must_look = must_look(key)
+	for kind in kinds:
+		if kind != CommandContext.Kind.START:
+			said.answer(kind, _asked(said, kind, ""))
+			continue
+		var starts := agent_kinds(said.target.machine)
+		for agent_kind in offered:
+			if not agent_kind in starts:
+				starts.append(agent_kind)
+		for agent_kind in starts:
+			_note_values(said, kind, agent_kind)
+			said.answer(kind, _asked(said, kind, agent_kind), agent_kind)
+	return said
+
+
+## command_refusal() for a switch (the default), an answer key or a line, and
+## for any other kind a read's: the name the card's preview, its switch and
+## the terminal monitor ask by.
+func can_operate(key: String, kind := CommandContext.Kind.FOCUS) -> CommandRefusal.Reason:
+	return command_refusal(key, kind if kind in _OPERATED else CommandContext.Kind.READ)
 
 
 ## Why `text` cannot be sent as a line, or NONE (HerdrCommands.line_refusal()).
@@ -376,44 +431,24 @@ func close_scope(key: String) -> CloseScope:
 	return CloseScope.of(snapshot(parts[0]), parts[1])
 
 
-## Why a close of pane `key` would be refused if it were asked for now, or
-## NONE: the machine, the pane, its scope (never a worktree group's parent),
-## an open write and a look owed. The card's own two clicks are not judged here.
+## command_refusal() for a close: the machine, the pane, its scope (never a
+## worktree group's parent), an open write and a look owed. The card's own two
+## clicks are not judged here.
 func can_close(key: String) -> CommandRefusal.Reason:
-	if _commands == null:
-		return CommandRefusal.Reason.READ_ONLY
-	var context := context_for(key, 0).closing(close_scope(key))
-	var reason := HerdrCommands.refusal(context, _machine(context.machine))
-	if reason == CommandRefusal.Reason.NONE:
-		reason = _commands.blocker(context)
-	return reason
+	return command_refusal(key, CommandContext.Kind.CLOSE)
 
 
-## Why a new space from pane `key` would be refused if it were asked for now,
-## or NONE: the machine, the pane, its directory (absolute, and spelled as
-## herdr sent it), an open write and a look owed.
+## command_refusal() for a new space: the machine, the pane, its directory
+## (absolute, and spelled as herdr sent it), an open write and a look owed.
 func can_space(key: String) -> CommandRefusal.Reason:
-	if _commands == null:
-		return CommandRefusal.Reason.READ_ONLY
-	var context := context_for(key, 0).spacing(pane_cwd(key))
-	var reason := HerdrCommands.refusal(context, _machine(context.machine))
-	if reason == CommandRefusal.Reason.NONE:
-		reason = _commands.blocker(context)
-	return reason
+	return command_refusal(key, CommandContext.Kind.SPACE)
 
 
-## Why a new worktree from pane `key` would be refused if it were asked for
-## now, or NONE: the machine, the pane, its workspace (listed once, not a
-## linked worktree), an open write and a look owed. Judged with a branch that
-## passes (`x`): whether the typed one does is branch_refusal()'s.
+## command_refusal() for a new worktree: the machine, the pane, its workspace
+## (listed once, not a linked worktree), an open write and a look owed.
+## Whether the branch typed may go is branch_refusal()'s.
 func can_worktree(key: String) -> CommandRefusal.Reason:
-	if _commands == null:
-		return CommandRefusal.Reason.READ_ONLY
-	var context := worktree_context(key, 0, "x")
-	var reason := HerdrCommands.refusal(context, _machine(context.machine))
-	if reason == CommandRefusal.Reason.NONE:
-		reason = _commands.blocker(context)
-	return reason
+	return command_refusal(key, CommandContext.Kind.WORKTREE)
 
 
 ## The directory of pane `key`'s shell, exactly as its machine's current
@@ -424,25 +459,6 @@ func pane_cwd(key: String) -> String:
 		if pane.pane_id == parts[1]:
 			return pane.cwd
 	return ""
-
-
-## A context to make a worktree of pane `key`'s workspace on `branch`: the
-## workspace as the office cleaned it and as herdr spelled it (empty when the
-## snapshot lists no such workspace: sending it is refused with the reason).
-func worktree_context(key: String, binding: int, branch: String) -> CommandContext:
-	var parts := split_key(key)
-	var held := snapshot(parts[0])
-	var space_id := ""
-	for pane in held.panes:
-		if pane.pane_id == parts[1]:
-			space_id = pane.workspace_id
-			break
-	var wire := ""
-	for index in held.workspaces.size():
-		if held.workspaces[index].workspace_id == space_id:
-			wire = held.wire_workspace_ids[index]
-			break
-	return context_for(key, binding).branching(space_id, wire, branch)
 
 
 ## Why `text` cannot be the branch of a new worktree, or NONE
@@ -478,35 +494,17 @@ func next_agent_name(key: String, kind: String) -> String:
 	return ""
 
 
-## Why a start of `kind` in pane `key` would be refused if it were asked for
-## now, or NONE: the machine, the pane (a shell, not launching), the kind and
-## the next name, an open write and a look owed (HerdrCommands.refusal() and
-## blocker()). Judged without the terminal text a real press freezes: whether
-## that ends at a prompt is prompt_state()'s.
+## command_refusal() for a start of `kind`: the machine, the pane (a shell,
+## not launching), the kind and the next name, an open write and a look owed.
+## Whether the terminal text a press freezes ends at a prompt is prompt_state()'s.
 func can_start(key: String, kind: String) -> CommandRefusal.Reason:
-	if _commands == null:
-		return CommandRefusal.Reason.READ_ONLY
-	var context := context_for(key, 0)
-	context = context.starting(kind, next_agent_name(context.machine, kind), null)
-	var reason := HerdrCommands.refusal(context, _machine(context.machine))
-	if reason == CommandRefusal.Reason.NONE:
-		reason = _commands.blocker(context)
-	return reason
+	return command_refusal(key, CommandContext.Kind.START, kind)
 
 
-## Why a split of pane `key` would be refused if it were asked for now, or
-## NONE: the machine, the pane and its size (HerdrCommands.split_choice()), an
-## open write and a look owed.
+## command_refusal() for a split: the machine, the pane and its size
+## (HerdrCommands.split_choice()), an open write and a look owed.
 func can_split(key: String) -> CommandRefusal.Reason:
-	if _commands == null:
-		return CommandRefusal.Reason.READ_ONLY
-	var context := context_for(key, 0)
-	var side := split_direction(key)
-	context = context.splitting(side if not side.is_empty() else HerdrCommands.SPLIT_DIRECTIONS[0])
-	var reason := HerdrCommands.refusal(context, _machine(context.machine))
-	if reason == CommandRefusal.Reason.NONE:
-		reason = _commands.blocker(context)
-	return reason
+	return command_refusal(key, CommandContext.Kind.SPLIT)
 
 
 ## The side pane `key` splits to now, `right` or `down`, by its shape in the
@@ -663,6 +661,78 @@ func read_log() -> Array[CommandAuditEntry]:
 	if _commands == null:
 		return []
 	return _commands.read_log()
+
+
+## Read into `facts` what a command of `kind` (a START: of `agent_kind`) to its
+## target carries, as the machine's current snapshot gives it now.
+func _note_values(facts: CommandAnswers, kind: CommandContext.Kind, agent_kind: String) -> void:
+	var key := facts.target.pane_key
+	match kind:
+		CommandContext.Kind.START:
+			facts.names[agent_kind] = next_agent_name(facts.target.machine, agent_kind)
+		CommandContext.Kind.SPLIT:
+			facts.direction = split_direction(key)
+		CommandContext.Kind.CLOSE:
+			facts.scope = close_scope(key)
+		CommandContext.Kind.SPACE:
+			facts.cwd = pane_cwd(key)
+		CommandContext.Kind.WORKTREE:
+			# The workspace as the office cleaned it and as herdr spelled it
+			# (empty when the snapshot lists none such: refused with the reason).
+			var parts := split_key(key)
+			var held := snapshot(parts[0])
+			for pane in held.panes:
+				if pane.pane_id == parts[1]:
+					facts.workspace_id = pane.workspace_id
+					break
+			for index in held.workspaces.size():
+				if held.workspaces[index].workspace_id == facts.workspace_id:
+					facts.wire_workspace_id = held.wire_workspace_ids[index]
+					break
+
+
+## The command a press of `kind` on `facts`' target would aim now, as far as
+## the fleet knows it: the values read into `facts`, and, for what only the
+## press knows, a payload that always passes (the `enter` key, a one-letter
+## line, a one-letter branch, the first side for a pane that does not split:
+## why it does not is then the answer) and no terminal text. Null for a kind
+## nobody asks about this way.
+static func _probe(facts: CommandAnswers, kind: CommandContext.Kind, agent_kind: String) -> CommandContext:
+	match kind:
+		CommandContext.Kind.READ:
+			return facts.target.reading(CommandContext.SOURCE_DETECTION, 1)
+		CommandContext.Kind.FOCUS:
+			return facts.target.focusing()
+		CommandContext.Kind.KEYS:
+			return facts.target.keying(HerdrCommands.LINE_ENTER, null)
+		CommandContext.Kind.LINE:
+			return facts.target.replying("x", null)
+		CommandContext.Kind.START:
+			return facts.starting(agent_kind, null)
+		CommandContext.Kind.SPLIT:
+			if facts.direction.is_empty():
+				return facts.target.splitting(HerdrCommands.SPLIT_DIRECTIONS[0])
+			return facts.splitting()
+		CommandContext.Kind.CLOSE:
+			return facts.closing()
+		CommandContext.Kind.SPACE:
+			return facts.spacing()
+		CommandContext.Kind.WORKTREE:
+			return facts.branching("x")
+	return null
+
+
+## command_refusal()'s three steps for the values in `facts`: no boundary,
+## what the boundary says of the probe against what the fleet knows of its
+## machine now, then what stands against a write to its pane.
+func _asked(facts: CommandAnswers, kind: CommandContext.Kind, agent_kind: String) -> CommandRefusal.Reason:
+	if _commands == null:
+		return CommandRefusal.Reason.READ_ONLY
+	var probe := _probe(facts, kind, agent_kind)
+	var reason := HerdrCommands.refusal(probe, _machine(facts.target.machine))
+	if reason == CommandRefusal.Reason.NONE:
+		reason = _commands.blocker(probe)
+	return reason
 
 
 func _submit(context: CommandContext, kind: CommandContext.Kind) -> CommandTicket:
