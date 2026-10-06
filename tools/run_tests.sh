@@ -12,7 +12,8 @@
 # it as a violation. Only tools/test_commands.gd, tools/test_raw_input.gd,
 # tools/test_answers.gd, tools/test_bubbles.gd, tools/test_monitor.gd,
 # tools/test_overview.gd, tools/test_launch.gd, tools/test_prompt.gd,
-# tools/test_split.gd, tools/test_close.gd and tools/test_spaces.gd run offices
+# tools/test_split.gd, tools/test_close.gd, tools/test_spaces.gd and
+# tools/test_launch_news.gd run offices
 # as an operator, each against two fakes nothing else talks to, opening exactly
 # what each case needs.
 #
@@ -96,11 +97,21 @@ MIN_CASES_LENS=20
 MIN_CASES_STRATEGIC=28
 MIN_CASES_ALERTS=19
 MIN_CASES_OVERVIEW=21
-MIN_CASES_LAUNCH=40
+# LAUNCH 40 -> 43: three transitions of the card's launch state by real input (a
+# cancelled confirm does not return with its screen, a click after the kinds
+# change, a start that came up across cards with and without a look owed).
+MIN_CASES_LAUNCH=43
 MIN_CASES_PROMPT=12
 MIN_CASES_SPLIT=15
 MIN_CASES_CLOSE=15
 MIN_CASES_SPACES=16
+MIN_CASES_REFUSAL_LADDER=23
+# The agent card's picture (CardPicture): pure tables, no scene and no herdr.
+MIN_CASES_CARD_PICTURE=27
+# How a start that is over is said across cards of its pane: four transitions
+# by real input and the closing case, in a suite of its own because
+# tools/test_launch.gd stands at gdlint's file cap.
+MIN_CASES_LAUNCH_NEWS=5
 # Where a desk's signal is and where a zone opens (lane RECT): DESK SIGNAL is
 # the floor view's answers and the camera's pan rules, pure; DESK SIGNAL WIRING
 # is the live office's reveal, zone opening, pointer and arrows against the
@@ -168,12 +179,17 @@ SERVER_U_PID=""
 SERVER_V_PID=""
 SERVER_W_PID=""
 SERVER_X_PID=""
+SERVER_Y_PID=""
+SERVER_Z_PID=""
+SERVER_NEWS_A_PID=""
+SERVER_NEWS_B_PID=""
 
 cleanup() {
 	for pid in "$SERVER_PID" "$SERVER_B_PID" "$SERVER_C_PID" "$SERVER_D_PID" "$SERVER_E_PID" "$SERVER_F_PID" \
 		"$SERVER_G_PID" "$SERVER_H_PID" "$SERVER_I_PID" "$SERVER_J_PID" "$SERVER_K_PID" "$SERVER_L_PID" \
 		"$SERVER_M_PID" "$SERVER_N_PID" "$SERVER_O_PID" "$SERVER_P_PID" "$SERVER_Q_PID" "$SERVER_R_PID" \
-		"$SERVER_S_PID" "$SERVER_T_PID" "$SERVER_U_PID" "$SERVER_V_PID" "$SERVER_W_PID" "$SERVER_X_PID"; do
+		"$SERVER_S_PID" "$SERVER_T_PID" "$SERVER_U_PID" "$SERVER_V_PID" "$SERVER_W_PID" "$SERVER_X_PID" \
+		"$SERVER_Y_PID" "$SERVER_Z_PID" "$SERVER_NEWS_A_PID" "$SERVER_NEWS_B_PID"; do
 		if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
 			kill "$pid" 2>/dev/null
 			wait "$pid" 2>/dev/null
@@ -346,11 +362,13 @@ if wanted test_client; then
 	fi
 fi
 
+# fake_ssh.py stands in for ssh; this wrapper runs it with the chosen Python.
+# Written for every run: the machine suite and every write suite take --ssh,
+# so a write suite asked for alone (make test-suite) must find it too.
+printf '#!/bin/sh\nexec "%s" "%s" "$@"\n' "$(command -v "$PYTHON")" "$ROOT/tools/fake_ssh.py" >"$WORK/ssh"
+chmod +x "$WORK/ssh"
 if wanted test_machines; then
 	echo "== machine tests"
-	# fake_ssh.py stands in for ssh; this wrapper runs it with the chosen Python.
-	printf '#!/bin/sh\nexec "%s" "%s" "$@"\n' "$(command -v "$PYTHON")" "$ROOT/tools/fake_ssh.py" >"$WORK/ssh"
-	chmod +x "$WORK/ssh"
 	PYTHON="$PYTHON" bounded "$GODOT" --headless --path "$ROOT" --script tools/test_machines.gd -- --read-only \
 		--socket-a="$WORK/herdr.sock" --control-a="$WORK/herdr-ctl.sock" \
 		--socket-b="$WORK/machine.sock" --control-b="$WORK/machine-ctl.sock" \
@@ -612,6 +630,35 @@ run_scene_suite test_strategic "STRATEGIC TESTS" "$MIN_CASES_STRATEGIC" -- --rea
 # In the background: the title's (N), the one Dock bounce, the chime; headless, so decided, never rung.
 run_scene_suite test_alerts "ALERTS TESTS" "$MIN_CASES_ALERTS" -- --read-only \
 	--socket="$WORK/alerts-nowhere.sock" --work="$WORK"
+# The agent card's picture: what the card shows for the facts it is given
+# (footer, forms, preview captions, NEXT, header), as pure tables.
+run_scene_suite test_card_picture "CARD PICTURE TESTS" "$MIN_CASES_CARD_PICTURE"
+# How a start that is over is said across cards of its pane (the footer's
+# launch line), by real input, against two more fakes of its own; started only
+# when the suite runs, being the last stage.
+if wanted test_launch_news; then
+	start_fake news-a
+	SERVER_NEWS_A_PID=$FAKE_PID
+	start_fake news-b
+	SERVER_NEWS_B_PID=$FAKE_PID
+	run_scene_suite test_launch_news "LAUNCH NEWS TESTS" "$MIN_CASES_LAUNCH_NEWS" -- \
+		--socket-a="$WORK/news-a.sock" --control-a="$WORK/news-a-ctl.sock" \
+		--socket-b="$WORK/news-b.sock" --control-b="$WORK/news-b-ctl.sock" --work="$WORK" --ssh="$WORK/ssh"
+fi
+
+# "May pane P take kind K now, and why not": the fleet's answer per kind and
+# state on a bare fleet (no office) against two more fakes, and the card's
+# ladder, aims and confirms as tables with no scene. Its one deliberate write
+# is a pair of switches; it closes by checking the two saw only what it opened.
+start_fake ladder-a
+SERVER_Y_PID=$FAKE_PID
+start_fake ladder-b
+SERVER_Z_PID=$FAKE_PID
+BOUND_SECONDS=300
+run_scene_suite test_refusal_ladder "REFUSAL LADDER TESTS" "$MIN_CASES_REFUSAL_LADDER" -- \
+	--socket-a="$WORK/ladder-a.sock" --control-a="$WORK/ladder-a-ctl.sock" \
+	--socket-b="$WORK/ladder-b.sock" --control-b="$WORK/ladder-b-ctl.sock" --work="$WORK"
+unset BOUND_SECONDS
 # Where a desk's signal is and where a zone opens, as the floor view answers
 # them on a bare floor, and the camera's two pan rules: pure, no office.
 run_scene_suite test_desk_signal "DESK SIGNAL TESTS" "$MIN_CASES_DESK_SIGNAL"

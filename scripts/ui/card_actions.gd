@@ -1,14 +1,17 @@
 class_name CardActions
 extends RefCounted
-## The agent card's aiming family: what a press on the launch block's buttons
-## aims (a start, a split, a close, a new space, a new worktree), the confirms
-## a first click arms (an unsure prompt's kind, the close's two clicks) and
-## how long they hold, and the footer's launch line. No node: the card
-## (OfficePaneInspector) hands in what it shows this instant as a View and
-## keeps the nodes, the signals and the release (its `_release()` checks the
-## binding, the pane, the pick and the mode again before anything reaches
-## the fleet). Every aim fixes its CommandContext at the press, through the
-## fleet (HerdrFleet.context_for()); nothing here sends.
+## The agent card's aiming family: why a press may not go now (ladder(), the
+## one place that says so for the card: answer keys, a line, a start, a
+## split, a close, a new space, a new worktree), what a press on the launch
+## block's buttons aims, the confirms a first click arms (an unsure prompt's
+## kind, the close's two clicks) and how long they hold, and the footer's
+## launch line. No node and no fleet: the card (OfficePaneInspector) hands in
+## what it shows this instant as a View, the fleet's answers about the pane
+## among it (CommandAnswers, asked at that instant), and keeps the nodes, the
+## signals and the release (its `_release()` checks the binding, the pane, the
+## pick and the mode again before anything reaches the fleet). Every aim
+## fixes its CommandContext at the press, from the target the fleet aimed
+## then (HerdrFleet.context_for(), in the View's answers); nothing here sends.
 
 
 ## One press: the command it would send, fixed at the press. A kind button's
@@ -53,13 +56,15 @@ class Said:
 	var detail := ""
 
 
-## What the card shows this instant, handed to every call: the fleet it writes
-## through, the pane and binding, the block's form, the preview frozen now (and
-## its text, and whether it is shown), why the card itself refuses a write
-## (NONE for none), the branch box's text, the machine's label (empty for one
-## machine), and the clock.
+## What the card shows this instant, handed to every call, all of it values:
+## what the fleet answers about the pane now (asked for the kinds asked() names
+## for the form; answers no fleet gave when the card has none), the pane and
+## binding, the block's form, the preview frozen now (and its text, and
+## whether it is shown), why the card itself refuses a write (NONE for none),
+## the branch box's text, the machine's label (empty for one machine), and
+## the clock.
 class View:
-	var fleet: HerdrFleet
+	var answers := CommandAnswers.new()
 	var pane: PaneModel
 	var binding := 0
 	var form := OfficePaneInspector.Form.NONE
@@ -99,6 +104,77 @@ func expire(now_msec: int) -> bool:
 	return expired
 
 
+# --- the ladder -------------------------------------------------------------------
+
+
+## Why a press of `kind` may not go now, or NONE: four steps in this order,
+## the first that refuses being the answer. `card`, the card's own state (no
+## fleet or pane, read-only, a pane not picked, a write of its own on its
+## way); `seam`, the fleet's word on the pane for that kind
+## (HerdrFleet.command_refusal(), or the same in a View's answers); whether
+## the preview shows what that kind is checked against (shown_refusal());
+## and `typed`, what only this press's payload says (the prompt a start ends
+## at, the branch typed). Every refusal the card shows for a press comes
+## through here.
+static func ladder(
+	kind: CommandContext.Kind,
+	card: CommandRefusal.Reason,
+	seam: CommandRefusal.Reason,
+	shown: bool,
+	frozen: CommandPreview,
+	typed := CommandRefusal.Reason.NONE
+) -> CommandRefusal.Reason:
+	if card != CommandRefusal.Reason.NONE:
+		return card
+	if seam != CommandRefusal.Reason.NONE:
+		return seam
+	var seen := shown_refusal(kind, shown, frozen)
+	return seen if seen != CommandRefusal.Reason.NONE else typed
+
+
+## Whether the preview (`shown`, and `frozen` as a press would freeze it)
+## shows uncut text from the source `kind` is checked against: the whole
+## `detection` text for answer keys, the recent output for a line and a
+## start. NONE for a kind that reads no screen (a split, a close, a new
+## space, a new worktree).
+static func shown_refusal(kind: CommandContext.Kind, shown: bool, frozen: CommandPreview) -> CommandRefusal.Reason:
+	var wanted := ""
+	match kind:
+		CommandContext.Kind.KEYS:
+			wanted = CommandContext.SOURCE_DETECTION
+		CommandContext.Kind.LINE, CommandContext.Kind.START:
+			wanted = CommandContext.SOURCE_RECENT
+		_:
+			return CommandRefusal.Reason.NONE
+	if not shown or frozen == null or frozen.cut or frozen.source != wanted:
+		return CommandRefusal.Reason.UNSEEN
+	return CommandRefusal.Reason.NONE
+
+
+## ladder() over a View: the seam's word is the View's answer for `kind` (a
+## START: for a start of `agent_kind`).
+static func refusal(
+	view: View, kind: CommandContext.Kind, agent_kind := "", typed := CommandRefusal.Reason.NONE
+) -> CommandRefusal.Reason:
+	return ladder(kind, view.card_refusal, view.answers.refusal(kind, agent_kind), view.shown, view.frozen, typed)
+
+
+## The kinds a View of `form` asks the fleet about: the block's own, and none
+## for no block (nothing there may be pressed, so nothing is asked).
+static func asked(form: OfficePaneInspector.Form) -> Array[CommandContext.Kind]:
+	var manage: Array[CommandContext.Kind] = [
+		CommandContext.Kind.CLOSE, CommandContext.Kind.SPACE, CommandContext.Kind.WORKTREE
+	]
+	match form:
+		OfficePaneInspector.Form.NONE:
+			return []
+		OfficePaneInspector.Form.START:
+			manage.push_front(CommandContext.Kind.START)
+		OfficePaneInspector.Form.SPLIT:
+			manage.push_front(CommandContext.Kind.SPLIT)
+	return manage
+
+
 # --- starts and splits ------------------------------------------------------------
 
 
@@ -108,23 +184,7 @@ func expire(now_msec: int) -> bool:
 ## whether the preview shows a whole recent output ending as `prompt` says
 ## (PROMPT_UNSURE unless `confirmed`: a first click then arms the confirm).
 func launch_refusal(view: View, kind: String, prompt: PromptState, confirmed: bool) -> CommandRefusal.Reason:
-	var reason := view.card_refusal
-	if reason == CommandRefusal.Reason.NONE:
-		reason = view.fleet.can_start(view.pane.key, kind)
-	if reason == CommandRefusal.Reason.NONE:
-		reason = shown_refusal(view)
-	if reason == CommandRefusal.Reason.NONE:
-		reason = HerdrFleet.prompt_refusal(prompt, confirmed)
-	return reason
-
-
-## Whether the preview shows uncut recent output, which a start is judged by.
-func shown_refusal(view: View) -> CommandRefusal.Reason:
-	if not view.shown or view.frozen == null or view.frozen.cut:
-		return CommandRefusal.Reason.UNSEEN
-	if view.frozen.source != CommandContext.SOURCE_RECENT:
-		return CommandRefusal.Reason.UNSEEN
-	return CommandRefusal.Reason.NONE
+	return refusal(view, CommandContext.Kind.START, kind, HerdrFleet.prompt_refusal(prompt, confirmed))
 
 
 ## Why a split of the pane shown may not be pressed now, or NONE: the card's
@@ -132,10 +192,7 @@ func shown_refusal(view: View) -> CommandRefusal.Reason:
 ## machine, the same terminal and agent, no open write, no look owed). A split
 ## reads no screen, so the preview is not asked.
 func split_refusal(view: View) -> CommandRefusal.Reason:
-	var reason := view.card_refusal
-	if reason == CommandRefusal.Reason.NONE:
-		reason = view.fleet.can_split(view.pane.key)
-	return reason
+	return refusal(view, CommandContext.Kind.SPLIT)
 
 
 ## Aim the split button's press: the split it would send, to the side the
@@ -143,12 +200,11 @@ func split_refusal(view: View) -> CommandRefusal.Reason:
 func aim_split(view: View, button: Button) -> Aim:
 	if view.form != OfficePaneInspector.Form.SPLIT or split_refusal(view) != CommandRefusal.Reason.NONE:
 		return null
-	var side := view.fleet.split_direction(view.pane.key)
-	if side.is_empty():
+	if view.answers.direction.is_empty():
 		return null
 	var aim := Aim.new()
 	aim.button = button
-	aim.context = view.fleet.context_for(view.pane.key, view.binding).splitting(side)
+	aim.context = view.answers.splitting()
 	return aim
 
 
@@ -171,8 +227,7 @@ func aim_start(view: View, button: Button, index: int) -> Aim:
 		return aim
 	if reason != CommandRefusal.Reason.NONE or view.frozen == null:
 		return null
-	var named := view.fleet.next_agent_name(view.pane.machine(), kind)
-	aim.context = view.fleet.context_for(view.pane.key, view.binding).starting(kind, named, view.frozen, confirmed)
+	aim.context = view.answers.starting(kind, view.frozen, confirmed)
 	return aim
 
 
@@ -214,30 +269,19 @@ func confirm_holds(view: View, kind: String) -> bool:
 ## terminal and agent, never the parent of an open worktree group, no open
 ## write, no look owed). The two clicks are the card's, judged apart.
 func close_refusal(view: View) -> CommandRefusal.Reason:
-	var reason := view.card_refusal
-	if reason == CommandRefusal.Reason.NONE:
-		reason = view.fleet.can_close(view.pane.key)
-	return reason
+	return refusal(view, CommandContext.Kind.CLOSE)
 
 
 ## Why a new space may not start from the pane shown now, or NONE.
 func space_refusal(view: View) -> CommandRefusal.Reason:
-	var reason := view.card_refusal
-	if reason == CommandRefusal.Reason.NONE:
-		reason = view.fleet.can_space(view.pane.key)
-	return reason
+	return refusal(view, CommandContext.Kind.SPACE)
 
 
 ## Why a new worktree may not be made from the pane shown now, or NONE: the
 ## card's own state, the boundary's word on the pane and its space, and the
 ## branch typed (HerdrFleet.branch_refusal()).
 func worktree_refusal(view: View) -> CommandRefusal.Reason:
-	var reason := view.card_refusal
-	if reason == CommandRefusal.Reason.NONE:
-		reason = view.fleet.can_worktree(view.pane.key)
-	if reason == CommandRefusal.Reason.NONE:
-		reason = HerdrFleet.branch_refusal(view.branch)
-	return reason
+	return refusal(view, CommandContext.Kind.WORKTREE, "", HerdrFleet.branch_refusal(view.branch))
 
 
 ## Whether a first click on Close has armed its confirm for the pane shown:
@@ -252,7 +296,7 @@ func close_confirm_holds(view: View) -> bool:
 		return false
 	if close_confirm.identity_key != view.pane.identity_key():
 		return false
-	if view.fleet.close_scope(view.pane.key).signature() != close_confirm.scope_signature:
+	if view.answers.scope.signature() != close_confirm.scope_signature:
 		return false
 	return view.now_msec < close_confirm.until_msec
 
@@ -263,7 +307,7 @@ func close_confirm_holds(view: View) -> bool:
 func aim_close(view: View, button: Button) -> Aim:
 	if view.form == OfficePaneInspector.Form.NONE or close_refusal(view) != CommandRefusal.Reason.NONE:
 		return null
-	var scope := view.fleet.close_scope(view.pane.key)
+	var scope := view.answers.scope
 	if scope.missing or scope.group_parent:
 		return null
 	var aim := Aim.new()
@@ -273,7 +317,7 @@ func aim_close(view: View, button: Button) -> Aim:
 	if not close_confirm_holds(view):
 		aim.arms_close = true
 		return aim
-	aim.context = view.fleet.context_for(view.pane.key, view.binding).closing(scope)
+	aim.context = view.answers.closing()
 	return aim
 
 
@@ -282,7 +326,7 @@ func aim_close(view: View, button: Button) -> Aim:
 func arm_close(view: View, aim: Aim) -> void:
 	if aim.binding != view.binding or view.pane == null or aim.scope == null:
 		return
-	if view.fleet.close_scope(view.pane.key).signature() != aim.scope.signature():
+	if view.answers.scope.signature() != aim.scope.signature():
 		return
 	var armed := CloseConfirm.new()
 	armed.binding = view.binding
@@ -300,7 +344,7 @@ func aim_space(view: View, button: Button) -> Aim:
 		return null
 	var aim := Aim.new()
 	aim.button = button
-	aim.context = view.fleet.context_for(view.pane.key, view.binding).spacing(view.fleet.pane_cwd(view.pane.key))
+	aim.context = view.answers.spacing()
 	return aim
 
 
@@ -311,7 +355,7 @@ func aim_worktree(view: View, button: Button) -> Aim:
 		return null
 	var aim := Aim.new()
 	aim.button = button
-	aim.context = view.fleet.worktree_context(view.pane.key, view.binding, view.branch)
+	aim.context = view.answers.branching(view.branch)
 	return aim
 
 
@@ -320,7 +364,7 @@ func aim_worktree(view: View, button: Button) -> Aim:
 ## space and worktree buttons' reasons, and the note under them.
 func manage_words(view: View, on: String, machine: String) -> LaunchBlock.Manage:
 	var manage := LaunchBlock.Manage.new()
-	var scope := view.fleet.close_scope(view.pane.key)
+	var scope := view.answers.scope
 	var armed := close_confirm_holds(view)
 	manage.close_reason = close_refusal(view)
 	if manage.close_reason == CommandRefusal.Reason.NONE and scope.group_parent:
@@ -349,7 +393,7 @@ func manage_words(view: View, on: String, machine: String) -> LaunchBlock.Manage
 		)
 		manage.confirm_line = LaunchBlock.close_line(scope, view.pane.pane_id)
 	manage.space_reason = space_refusal(view)
-	var directory := view.fleet.pane_cwd(view.pane.key)
+	var directory := view.answers.cwd
 	manage.space_tip = (
 		(
 			"Makes a new space%s: a space with one shell in %s."
@@ -391,18 +435,18 @@ func manage_words(view: View, on: String, machine: String) -> LaunchBlock.Manage
 ## is owed. A start whose answer was lost and that no snapshot shows yet is an
 ## unknown result. Null when there is nothing to say.
 func launch_line(view: View) -> Said:
-	if view.pane == null or view.fleet == null:
+	if view.pane == null:
 		return null
-	var watch := view.fleet.launch_of(view.pane.key)
-	if watch == null or view.fleet.last_write(view.pane.key) != watch.ticket:
+	var watch := view.answers.launch
+	if watch == null or view.answers.last_write != watch.ticket:
 		return null
-	var outcome := view.fleet.launch_outcome(view.pane.key)
+	var outcome := view.answers.launch_outcome
 	var over := [LaunchWatch.Outcome.READY, LaunchWatch.Outcome.REPLACED, LaunchWatch.Outcome.GONE]
 	if outcome in over:
 		if over_watch != watch:
 			over_watch = watch
 			over_binding = view.binding
-		if over_binding != view.binding and not view.fleet.must_look(view.pane.key):
+		if over_binding != view.binding and not view.answers.must_look:
 			return null
 	var said := Said.new()
 	if watch.ticket.state == CommandTicket.State.UNKNOWN and outcome == LaunchWatch.Outcome.PENDING:

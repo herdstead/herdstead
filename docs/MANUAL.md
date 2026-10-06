@@ -802,12 +802,13 @@ scripts/office_projection.gd  pure projection: typed snapshot → OfficeFrame
 scripts/office_*.gd      navigator, camera, lens, alerts, draw helpers, window (fill the screen, bar as title bar),
                          question tips, new-pane follow, view marks (the rail's in-view marks and the edge arrows)
 scripts/model/           typed models: HerdrSnapshot (the only reader of raw snapshots), OfficeFrame, StateLog,
-                         command context / ticket / refusal / results, layout plans
+                         command context / ticket / refusal / answers / results, layout plans
 scripts/layout/          map and zone planning, seat planning, walk graph, validation
 scripts/world/           pods (table.gd), stations, chips, the floor view, machine plate, zone signs, shell,
                          presentation (walking), rests, pointer
 scripts/ui/              HUD scripts: hud, theme, bar, spaces (the SPACES rail), edge arrows, agent list, staff
-                         panel, monitor, NEWS, EVENTS, OVERVIEW, strategic view
+                         panel (inspector writes what card_picture, pure, says it shows; card_details, card_words,
+                         card_actions, launch_block), monitor, NEWS, EVENTS, OVERVIEW, strategic view
 scripts/art/             typed art pack models; the only readers of manifest JSON
 scripts/people/          PixelPerson prefab script
 tools/                   builders, contract tests, fake herdr / fake ssh, test suites (test_*.gd), capture and perf

@@ -1622,6 +1622,74 @@ func test_a_start_herdr_gave_up_frees_its_name() -> void:
 	commands.free()
 
 
+## A confirm cancelled by another screen stays cancelled when the screen it
+## was armed on reads in again: the card dropped it, it did not merely stop
+## showing it. The next click there only arms, and nothing is sent.
+func test_a_cancelled_confirm_stays_cancelled_when_its_screen_reads_in_again() -> void:
+	var office := await _shell_card("➜  repo \n", ["pane.read", "agent.start"])
+	var card := _card(office)
+	var note: Label = _control(office, "LaunchNote")
+	var armed := 'Start anyway? Types "claude" + Enter after:'
+	await _until(func() -> bool: return not _kind(office, 0).disabled, "CLAUDE may be pressed")
+	await _click_control(_kind(office, 0))
+	_eq(note.text, armed, "armed on the first screen")
+	_ctl("control-a", "set_preview", {"pane_id": "alpha:p2", "source": "recent_unwrapped", "text": "➜  api \n"})
+	await _until(func() -> bool: return card.preview_text() == "➜  api \n", "another text read in")
+	_eq(note.text, "Types the kind + Enter in this terminal", "which cancels it")
+	_ctl("control-a", "set_preview", {"pane_id": "alpha:p2", "source": "recent_unwrapped", "text": "➜  repo \n"})
+	await _until(func() -> bool: return card.preview_text() == "➜  repo \n", "the first screen reads in again")
+	_eq(note.text, "Types the kind + Enter in this terminal", "and the confirm does not come back with it")
+	_check(not (_control(office, "LaunchScreen")).is_visible_in_tree(), "nor its row")
+	await _click_control(_kind(office, 0))
+	_eq(note.text, armed, "a click there only arms again")
+	await _frames(10)
+	_eq(_count("control-a", "agent.start"), 0, "nothing was ever sent")
+
+
+## The kind buttons are the kinds the machine shows now, in that order: when
+## one goes, the button that stood second is first, and a click on the first
+## button starts the kind it names now, never the one that stood there before.
+func test_a_click_starts_the_kind_its_button_names_after_the_kinds_change() -> void:
+	var office := await _shell_card("$ \n", ["pane.read", "agent.start"])
+	_eq(_kinds_shown(office), ["CLAUDE", "CODEX", "PI"], "three kinds at first")
+	_ctl("control-a", "set_snapshot", {"snapshot": _changed(_raw(), "alpha:p1", {"agent": null})})
+	_ctl("control-a", "emit", {"fixture_event": "pane_updated"})
+	await _until(func() -> bool: return _kinds_shown(office) == ["CODEX", "PI"], "claude is seen no more")
+	var named := office.fleet.next_agent_name(HerdrFleet.LOCAL, "codex")
+	_check("`codex`" in _kind(office, 0).tooltip_text, "the first button says it types codex")
+	await _until(func() -> bool: return not _kind(office, 0).disabled, "and may be pressed")
+	await _click_control(_kind(office, 0))
+	await _until(func() -> bool: return _count("control-a", "agent.start") == 1, "one start went")
+	_eq(_asked("control-a", "agent.start"), [{"name": named, "kind": "codex", "pane_id": "alpha:p2"}], "codex's")
+
+
+## A start that came up is said on the card that first saw it. On a later card
+## of the same pane (the viewer left and came back) it is said only while the
+## look its write owes is still owed; once the terminal was looked at, it is
+## news no more and the footer says nothing.
+func test_a_start_that_came_up_is_said_on_a_later_card_only_while_a_look_is_owed() -> void:
+	var office := await _shell_card("$ \n", ["pane.read", "agent.start"], {"detect": 0.2, "delay": 0.6})
+	var card := _card(office)
+	var key := HerdrFleet.pane_key(HerdrFleet.LOCAL, "alpha:p2")
+	await _until(func() -> bool: return not _kind(office, 0).disabled, "CLAUDE may be pressed")
+	await _click_control(_kind(office, 0))
+	await _until(func() -> bool: return _count("control-a", "agent.start") == 1, "the start went")
+	# The card's next read of the terminal never answers: no look for five seconds.
+	_ctl("control-a", "next", {"action": "hang", "method": "pane.read"})
+	await _until(func() -> bool: return card.outcome_text() == "claude-1 started", "the card that saw it says so")
+	_check(office.fleet.must_look(key), "the look is still owed")
+	var first := card.binding()
+	await _pick_local(office, "alpha:p1")
+	await _pick_local(office, "alpha:p2")
+	_check(card.binding() != first, "left and came back: another card of the same pane")
+	_check(office.fleet.must_look(key), "the look still owed")
+	_eq(card.outcome_text(), "claude-1 started", "still news there: nobody has looked")
+	await _until(func() -> bool: return not office.fleet.must_look(key), "a read is shown: looked at")
+	await _until(func() -> bool: return card.outcome_text().is_empty(), "and it is news no more")
+	_eq(card.outcome_text(), "", "the footer says nothing")
+	_eq(_count("control-a", "agent.start"), 1, "one start, never again")
+
+
 ## Sums up both fakes over the whole run, so it has to be the last `test_`
 ## function in this file: cases run in source order. Nothing reached them that
 ## no case opened, and no violation.
