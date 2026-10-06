@@ -405,6 +405,34 @@ kept is the plan and the view, not the people's nodes or animation clocks across
   "release within `CLICK_SLOP` (4) of the press" is `OfficeCamera.still_click()`. One place each, no duplicates. The
   viewport only picks inside the visible area: an off-screen station cannot be clicked, and `OfficeScene.reveal()`
   pans it in first.
+- **Where a desk's signal is, is answered once, by `OfficeFloorView`, in the floor's own coordinates** (its root's: a
+  station's rectangles are global, and the floor view converts them in one place). Four answers, each an empty
+  `Rect2()` for a pane with no seat on the map or a zone the plan does not place:
+  - `signal_extent(key)`: where the desk answers a click (`OfficeStation.target_rect()`: the seat's rectangle, or a
+    pantry worker's own where they stand) merged with its chip while it shows (`chip_rect()`; a chip that draws
+    nothing, under the lens or with no wait to say, still shows). The pointer's dashed frame (`point()`, which
+    `OfficePointer` grows by `GROW` and rounds out to whole units) and the camera's reveal both take it.
+  - `arrow_target(key)`: the chip alone while it shows, else the click rectangle. What an edge arrow aims at
+    (`OfficeViewMarks`). **Not the extent, and meant so**: `EdgeArrowModel.of()` keeps an arrow while the target does
+    not meet the view, so a blocked desk whose seat is in view and whose chip is not still has its arrow. Never merge
+    the two answers.
+  - `pod_extent(key)`: the desk's whole pod as drawn (`DeskMeasure.render_rect`), for the framing a map opens on.
+  - `zone_opening(key)`: as wide as the zone's cells, from the top of its sign's drawing (the aisle row's own top
+    while no sign is drawn) down to the bottom of its cells.
+
+  Each consumer converts once, through the nodes' own transforms: the pointer draws in the floor's coordinates and
+  converts nothing; `OfficeScene.reveal()` / `reveal_zone()` add where the floor's root stands in the world (under
+  the plate), because the pan is measured in the world; `OfficeViewMarks` takes the target to global coordinates
+  (`root.to_global()`), which the view it is compared with is in. `office.gd` holds no desk or zone geometry: its two
+  methods only hand an answer to the camera.
+- **The camera pans by two rules, each a pure static of `OfficeCamera`, and they stay two.** A desk is *revealed*
+  (`reveal()`: `framing()`, then `revealed()`): the least pan that shows its extent with `REVEAL_HEADROOM` (32) above
+  it, and its pod too only when the two together fit the view with that headroom (`fits()`), else the desk alone
+  (a pantry worker stands too far above their pod). A zone is *opened* (`open_on()`: `opened()`): its opening's top
+  at the top of the world with no headroom, sideways only as far as its width needs, its left edge when it is wider
+  than the view. Neither clamps: `_process()` clamps the pan to the map and rounds the camera's position on the next
+  frame. `tools/test_desk_signal.gd` pins the answers and both rules without an office;
+  `tools/test_desk_signal_wiring.gd` pins the live office's pans, pointer frames and arrows.
 - People are `CharacterBody2D`: standing, the feet collider is on and `move_and_slide()` is stopped by furniture;
   seated, it is off.
 - **The walk graph (`OfficeWalkGraph`, `scripts/layout/`) is the one graph the layout validator checks and the people
@@ -628,6 +656,12 @@ Besides the client / machine / incremental-update tests, `tools/run_tests.sh` ch
 - Geometry tests read each real Sprite / Label envelope, check that everything stationary (badges at every lift, chips,
   seat marks) stays inside the measured range (`render_rect`; the plate and lens rows are transient and pinned by the
   cross-row case), and verify moved stations through real input: a seat click emits `picked`, a chip click `asked`.
+- Where a desk's signal is and where a zone opens (`OfficeFloorView`'s four answers) are the same rectangles for both
+  seat sides seated, with a chip, resting in the pantry and as a shell, wherever the world stands and with the lens
+  held; the extent and the arrow's target differ exactly while a chip shows; the pod joins a desk's framing only when
+  the two fit with the headroom, to the unit; a zone opens at its sign's top with none. The live office's pans, pointer
+  frames and arrows are pinned to recorded numbers in three windows and across a drawer relayout, so they also follow
+  where `hud.tscn` puts the panels.
 
 Screenshots remain part of visual acceptance and must actually be opened and looked at; use the capture target in the
 Makefile, never a headless capture. The preview draws its two mock workspaces as zones (partitions, a sign, a pod with

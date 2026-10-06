@@ -112,6 +112,12 @@ MIN_CASES_CARD_PICTURE=27
 # by real input and the closing case, in a suite of its own because
 # tools/test_launch.gd stands at gdlint's file cap.
 MIN_CASES_LAUNCH_NEWS=5
+# Where a desk's signal is and where a zone opens (lane RECT): DESK SIGNAL is
+# the floor view's answers and the camera's pan rules, pure; DESK SIGNAL WIRING
+# is the live office's reveal, zone opening, pointer and arrows against the
+# numbers 6413cec left, through the paths that commit already had.
+MIN_CASES_DESK_SIGNAL=12
+MIN_CASES_DESK_SIGNAL_WIRING=9
 
 # Unix socket paths stop at ~104 bytes on macOS: keep them short, under /tmp.
 WORK="$(mktemp -d /tmp/herdstead-test.XXXXXX)"
@@ -123,7 +129,7 @@ WORK="$(mktemp -d /tmp/herdstead-test.XXXXXX)"
 # wall-clock time with a fake herdr.
 QUICK_SUITES="test_art test_office_incremental test_office_layout test_office_map test_office_service
 test_office_navigator test_office_geometry test_office_frames test_office_quiet test_day_light
-test_office_reconcile test_office_walking test_office_rests test_lens test_pixel_people"
+test_office_reconcile test_office_walking test_office_rests test_lens test_pixel_people test_desk_signal"
 SUITES="${SUITES:-}"
 if [ "${TIER:-}" = "quick" ]; then
 	SUITES="$QUICK_SUITES"
@@ -653,6 +659,13 @@ run_scene_suite test_refusal_ladder "REFUSAL LADDER TESTS" "$MIN_CASES_REFUSAL_L
 	--socket-a="$WORK/ladder-a.sock" --control-a="$WORK/ladder-a-ctl.sock" \
 	--socket-b="$WORK/ladder-b.sock" --control-b="$WORK/ladder-b-ctl.sock" --work="$WORK"
 unset BOUND_SECONDS
+# Where a desk's signal is and where a zone opens, as the floor view answers
+# them on a bare floor, and the camera's two pan rules: pure, no office.
+run_scene_suite test_desk_signal "DESK SIGNAL TESTS" "$MIN_CASES_DESK_SIGNAL"
+# The live office's reveal, zone opening, pointer and edge arrows, pinned to
+# what 6413cec did on the same fixture.
+run_scene_suite test_desk_signal_wiring "DESK SIGNAL WIRING TESTS" "$MIN_CASES_DESK_SIGNAL_WIRING" -- --read-only \
+	--socket="$WORK/desk-signal-nowhere.sock" --work="$WORK"
 
 echo "RUN_TESTS: exit $status in $(( $(date +%s) - started ))s"
 exit "$status"
