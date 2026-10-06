@@ -3,7 +3,8 @@ extends RefCounted
 ## The agent card's words that depend on nothing but what they are given: what
 ## became of a write, why a read brought nothing back, how old a preview is,
 ## why a new pane was not picked, and how the preview's rows are cut. Static
-## only: no node, no fleet, no state (OfficePaneInspector says them).
+## only: no node, no fleet, no state (the card keeps the outcome lines it is
+## told here; CardPicture says which line the footer shows).
 
 ## A row is clipped by the panel anyway; beyond this many characters it is not shaped at all.
 const ROW_CHARS := 240
@@ -29,6 +30,12 @@ const NEW_PANE_UNPICKED: Dictionary[OfficePaneInspector.Unpicked, String] = {
 const CLOSE_UNKNOWN := "Close: no answer from herdr. The next snapshot shows whether %s closed."
 const SPACE_UNKNOWN := "New space: no answer from herdr; if a new space appears, that is it."
 const WORKTREE_UNKNOWN := "New worktree: no answer from herdr; git may have run. If a new space appears, that is it."
+## A press whose card moved on before its release: nothing went anywhere. The
+## same in full for an answer button held while the card moved, and for the
+## switch.
+const TARGET_CHANGED := "Not sent: target changed"
+const HELD_DETAIL := "Nothing was sent: the card moved to another pane or terminal while an answer button was held."
+const SWITCH_MOVED_DETAIL := "Nothing was sent: the card moved to another pane or terminal between your press and release."
 
 
 ## `3s`, `12m`, `2h`: as short as the caption line needs.
@@ -61,6 +68,16 @@ static func expand_tabs(row: String) -> String:
 		else:
 			out += character
 	return out
+
+
+## A write the card itself refused before anything reached the fleet, in one
+## line, and the same in full for the footer's tooltip.
+static func not_sent(reason: CommandRefusal.Reason) -> String:
+	return "Not sent: " + CommandRefusal.text(reason)
+
+
+static func not_sent_detail(reason: CommandRefusal.Reason) -> String:
+	return "Nothing was sent: " + CommandRefusal.detail(reason)
 
 
 ## What the caption says about a read that brought no text back, in a few words.

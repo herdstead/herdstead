@@ -807,7 +807,8 @@ scripts/layout/          map and zone planning, seat planning, walk graph, valid
 scripts/world/           pods (table.gd), stations, chips, the floor view, machine plate, zone signs, shell,
                          presentation (walking), rests, pointer
 scripts/ui/              HUD scripts: hud, theme, bar, spaces (the SPACES rail), edge arrows, agent list, staff
-                         panel, monitor, NEWS, EVENTS, OVERVIEW, strategic view
+                         panel (inspector writes what card_picture, pure, says it shows; card_details, card_words,
+                         card_actions, launch_block), monitor, NEWS, EVENTS, OVERVIEW, strategic view
 scripts/art/             typed art pack models; the only readers of manifest JSON
 scripts/people/          PixelPerson prefab script
 tools/                   builders, contract tests, fake herdr / fake ssh, test suites (test_*.gd), capture and perf
