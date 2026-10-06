@@ -54,22 +54,24 @@ func _blocked_pair() -> void:
 ## The chips read what a blocked agent on screen asks, and nothing else: only
 ## the blocked panes of the floor shown (bee's alpha here, while the card reads
 ## Local's focus on fake A), the card's own payload (`detection`, 200 lines), one
-## at a time for the whole office (the first reply held back a second holds the
-## second read back too), and no pane again within ten seconds. A floor that is
+## at a time for the whole office (the first reply held back holds the second
+## read back too), and no pane again within ten seconds. A floor that is
 ## not shown (Local's bravo, blocked too) is not read; working, done and shell
 ## panes are not; nothing is ever written. The reader keeps the asking line.
 func test_bubbles_read_blocked_panes_on_screen_one_at_a_time() -> void:
 	_blocked_pair()
+	# Held from before the office is there: bee's map is the one shown, its
+	# chips on screen and read, for as long as bee's snapshot is in and Local's
+	# is not.
+	_ctl("control-b", "next", {"action": "hold", "method": "pane.read"})
 	var office := await _office_with(false, true, true, Vector2(SCREEN), true)
-	_ctl("control-b", "next", {"action": "delay", "method": "pane.read", "seconds": 1.0})
 	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	await _bee_bubbles_on_screen(office)
-	await _until_stats(
-		"control-b", func(_stats: Dictionary) -> bool: return _read_panes("control-b").size() >= 1, "a read"
-	)
+	await _until(func() -> bool: return _number(_ctl("control-b", "stats"), "held_replies") == 1, "a read is held")
 	await _wait(0.6)
 	_eq(_read_panes("control-b"), ["alpha:p1"], "the longest-waiting first, and while it is out, nothing else")
 	_check(office.questions.reading(), "the reader says a read is out")
+	_ctl("control-b", "release_held")
 	await _until_stats(
 		"control-b", func(_stats: Dictionary) -> bool: return _read_panes("control-b").size() >= 2, "the second read"
 	)
@@ -135,8 +137,13 @@ func test_bubbles_read_nothing_while_minimized_covered_stale_or_off_screen() -> 
 		extra.terminal_id = "term-alpha-x%d" % index
 		_list(wide, "panes").append(extra)
 	_ctl("control-b", "set_snapshot", {"snapshot": wide})
-	var office := await _office_with(false, true, true, Vector2(480, 320), true)
+	# Minimized from before the office's first frame: bee's map is the one shown,
+	# its chips on screen, for as long as bee's snapshot is in and Local's is not.
+	var office := await _office_with(false, true, false, Vector2(480, 320), true)
 	office.pacer.note_minimized(true)
+	await _until(
+		func() -> bool: return office.fleet.size() == 2 and office.fleet.live_count() == 2, "both machines live"
+	)
 	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	var station := _station_of(office, HerdrFleet.pane_key(BEE, "alpha:p1"))
 	await _until(func() -> bool: return station.chip().visible, "the bubbles show")
