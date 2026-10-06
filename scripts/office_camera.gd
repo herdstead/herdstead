@@ -115,9 +115,55 @@ func still_click(at: Vector2) -> bool:
 
 
 ## Pan just enough for `bounds` (in the world's own coordinates) to be on
-## screen, with REVEAL_HEADROOM above it.
-func reveal(bounds: Rect2) -> void:
+## screen, with REVEAL_HEADROOM above it; and for `beside` too (the pod a desk
+## stands at, for the framing a map opens on) when the two together fit the
+## view, headroom included: else `bounds` alone (framing()). From where the pan
+## is now; _process() clamps it to the map on the next frame.
+func reveal(bounds: Rect2, beside := Rect2()) -> void:
+	var room := free_rect().size
+	pan = revealed(pan, framing(bounds, beside, room), room)
+
+
+## Pan to `opening` (a zone's, OfficeFloorView.zone_opening(), in the world's
+## own coordinates): its top at the top of the world, with no headroom, and as
+## little sideways as brings its width in (opened()). Another rule than
+## reveal()'s, and meant so: a desk is moved into view, a zone is opened at
+## its sign. _process() clamps the pan to the map on the next frame.
+func open_on(opening: Rect2) -> void:
+	pan = opened(pan, opening, free_rect().size)
+
+
+## Whether `bounds` fits a view of `room`, REVEAL_HEADROOM above it included.
+static func fits(bounds: Rect2, room: Vector2) -> bool:
+	return bounds.size.x <= room.x and bounds.size.y + REVEAL_HEADROOM <= room.y
+
+
+## What reveal() brings into a view of `room`: `bounds` and `beside` together
+## when `beside` has an area and the two fit (fits()), else `bounds` alone.
+static func framing(bounds: Rect2, beside: Rect2, room: Vector2) -> Rect2:
+	if not beside.has_area():
+		return bounds
+	var both := bounds.merge(beside)
+	return both if fits(both, room) else bounds
+
+
+## The pan that, from `from`, moves a view of `room` just enough to hold
+## `bounds` with REVEAL_HEADROOM above it; where they cannot both fit, its
+## top-left wins. Not clamped to any map.
+static func revealed(from: Vector2, bounds: Rect2, room: Vector2) -> Vector2:
 	var rect := bounds.grow_side(SIDE_TOP, REVEAL_HEADROOM)
-	var shown_size := free_rect().size
-	pan.x = minf(maxf(pan.x, rect.end.x - shown_size.x), rect.position.x)
-	pan.y = minf(maxf(pan.y, rect.end.y - shown_size.y), rect.position.y)
+	return Vector2(
+		minf(maxf(from.x, rect.end.x - room.x), rect.position.x),
+		minf(maxf(from.y, rect.end.y - room.y), rect.position.y)
+	)
+
+
+## The pan that, from `from`, opens a view of `room` on `opening`: its top at
+## the view's top whatever `from` was, and as little sideways as brings its
+## width in, or its left edge when it is wider than the view. Not clamped to
+## any map.
+static func opened(from: Vector2, opening: Rect2, room: Vector2) -> Vector2:
+	var left := opening.position.x
+	if opening.size.x > room.x:
+		return Vector2(left, opening.position.y)
+	return Vector2(minf(maxf(from.x, opening.end.x - room.x), left), opening.position.y)

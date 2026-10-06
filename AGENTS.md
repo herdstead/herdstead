@@ -57,7 +57,9 @@ herdr machine list ─ Roster ┘        │      commands: CommandContext in, C
                                                              right drawer (closed at start): the AGENTS tab's agent list (AgentListModel; its History group comes from StateLog via AgentHistory) and the EVENTS tab /
                                                              bottom staff panel (agent card, `inspector`; compact by default: a card on tall screens, one row below) + NEXT (NextModel's verbs) / bottom row NEWS (NewsItem) /
                                                              OVERVIEW, opened by PANES or O (OverviewModel; the timeline is a Control drawn in _draw())
-        OfficeViewMarks: follows the view without a refresh: which SPACES rows are in view, and the edge arrows (handed to the HUD only when they change)
+        OfficeFloorView also answers, once and in floor coordinates, where a desk's signal is: signal_extent() (the pointer's frame, the camera's reveal), arrow_target() (the edge arrows' aim: the chip alone, on purpose), pod_extent(), zone_opening();
+        office.gd's reveal() / reveal_zone() only hand an answer to OfficeCamera (reveal() a desk with headroom, open_on() a zone at its sign's top: two rules, pure statics)
+        OfficeViewMarks: follows the view without a refresh: which SPACES rows are in view, and the edge arrows (each aimed at OfficeFloorView.arrow_target(); handed to the HUD only when they change)
         OfficeQuestionTips: the world tooltip (`%WorldTip`) over a blocked seat's chip (the question's excerpt) and over a zone's sign (repository and checkout)
         OfficeLens: the lens while L is held (one duration row per station, a wash under each pod, furniture dimmed); OfficePointer: a dashed frame off the station while a HUD row is hovered
         OfficeStrategic: the strategic view on `S` (a schematic of the shown machine's map over the world area; StrategicModel in, StrategicLayout lays out, %Plan's _draw() draws)
