@@ -1003,12 +1003,20 @@ func test_the_reader_reads_a_blocked_agent_still_launching() -> void:
 ## The strategic view (`S`) covers the world, and the chips' reader
 ## stops at once, as under the monitor and the OVERVIEW: bee's two blocked
 ## chips stand on screen under it and nothing is read for two seconds; once
-## `S` closes it, the longest-waiting is read. Nothing is written either way.
+## `S` closes it, the longest-waiting is read. That read's reply is held back
+## until the case has looked: the reader reads one pane at a time, so nothing
+## else is out meanwhile; answered at once, the next watch would read the
+## other pane before the look. Nothing is written either way.
 func test_the_strategic_view_stops_the_question_reads() -> void:
 	_blocked_pair()
-	var office := await _office_with(false, true, true, Vector2(SCREEN), true)
-	# Minimized until the view is open, so no read begins before it.
+	# Minimized from before the office's first frame until the view is open, so
+	# no read begins before it: bee's map is the one shown, its chips on screen,
+	# for as long as bee's snapshot is in and Local's is not.
+	var office := await _office_with(false, true, false, Vector2(SCREEN), true)
 	office.pacer.note_minimized(true)
+	await _until(
+		func() -> bool: return office.fleet.size() == 2 and office.fleet.live_count() == 2, "both machines live"
+	)
 	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	await _bee_bubbles_on_screen(office)
 	await _tap(KEY_S)
@@ -1020,12 +1028,16 @@ func test_the_strategic_view_stops_the_question_reads() -> void:
 		var bubble := _station_of(office, HerdrFleet.pane_key(BEE, pane_id)).chip_rect()
 		bubble.position -= office.camera.position
 		_check(office.hud.world_rect().encloses(bubble), "%s's bubble is still on screen under it" % pane_id)
+	_ctl("control-b", "next", {"action": "hold", "method": "pane.read"})
 	await _tap(KEY_S)
 	_check(not office.hud.strategic_open(), "S closes it")
-	await _until_stats(
-		"control-b", func(_stats: Dictionary) -> bool: return not _read_panes("control-b").is_empty(), "a read"
-	)
+	await _until(func() -> bool: return _number(_ctl("control-b", "stats"), "held_replies") == 1, "a read is held")
 	_eq(_read_panes("control-b"), ["alpha:p1"], "the longest-waiting is read once the view is gone")
+	_eq(_sequence("control-b"), PackedStringArray(["pane.read detection 200"]), "the chip's read, nothing else")
+	_check(office.questions.reading(), "and it is the one read out")
+	_ctl("control-b", "release_held")
+	var key := HerdrFleet.pane_key(BEE, "alpha:p1")
+	await _until(func() -> bool: return _question_of(office, key) == "Do you want to proceed?", "its reply is kept")
 	_eq(_all_inputs(), 0, "nothing written")
 	_eq(office.fleet.write_log().size(), 0, "and the audit has no write")
 
