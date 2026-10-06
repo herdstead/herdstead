@@ -344,11 +344,13 @@ if wanted test_client; then
 	fi
 fi
 
+# fake_ssh.py stands in for ssh; this wrapper runs it with the chosen Python.
+# Written for every run: the machine suite and every write suite take --ssh,
+# so a write suite asked for alone (make test-suite) must find it too.
+printf '#!/bin/sh\nexec "%s" "%s" "$@"\n' "$(command -v "$PYTHON")" "$ROOT/tools/fake_ssh.py" >"$WORK/ssh"
+chmod +x "$WORK/ssh"
 if wanted test_machines; then
 	echo "== machine tests"
-	# fake_ssh.py stands in for ssh; this wrapper runs it with the chosen Python.
-	printf '#!/bin/sh\nexec "%s" "%s" "$@"\n' "$(command -v "$PYTHON")" "$ROOT/tools/fake_ssh.py" >"$WORK/ssh"
-	chmod +x "$WORK/ssh"
 	PYTHON="$PYTHON" bounded "$GODOT" --headless --path "$ROOT" --script tools/test_machines.gd -- --read-only \
 		--socket-a="$WORK/herdr.sock" --control-a="$WORK/herdr-ctl.sock" \
 		--socket-b="$WORK/machine.sock" --control-b="$WORK/machine-ctl.sock" \
