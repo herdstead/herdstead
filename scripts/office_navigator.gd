@@ -38,7 +38,7 @@ var reveal_on_arrival := ""
 ## (a drag, the wheel, the arrow keys), never a desk click, never herdr's focus
 ## moving, never `--space`, and never the office's own pick of a new pane
 ## (follow_to()). A pick waiting for a new pane records it
-## (OfficeNewPaneFollow.PendingPick): the viewer navigating meanwhile cancels it.
+## (PickFollowsWrite.Awaited): the viewer navigating meanwhile cancels it.
 var nav_revision := 0
 ## One-shot: the pane whose desk the office pans to after it next draws the
 ## shown map, framing its whole pod with `pan_whole_table`; empty for none. Set

@@ -97,12 +97,13 @@ MIN_CASES_LENS=20
 MIN_CASES_STRATEGIC=28
 MIN_CASES_ALERTS=19
 MIN_CASES_OVERVIEW=21
-# LAUNCH 40 -> 43: three transitions of the card's launch state by real input (a
+# LAUNCH 40 -> 44: three transitions of the card's launch state by real input (a
 # cancelled confirm does not return with its screen, a click after the kinds
 # change, a start that came up across cards with and without a look owed).
-MIN_CASES_LAUNCH=43
+# and one more: the pick that follows a start is the office's, not the viewer's.
+MIN_CASES_LAUNCH=44
 MIN_CASES_PROMPT=12
-MIN_CASES_SPLIT=15
+MIN_CASES_SPLIT=16
 MIN_CASES_CLOSE=15
 MIN_CASES_SPACES=16
 MIN_CASES_REFUSAL_LADDER=23
@@ -118,6 +119,7 @@ MIN_CASES_LAUNCH_NEWS=5
 # numbers 6413cec left, through the paths that commit already had.
 MIN_CASES_DESK_SIGNAL=12
 MIN_CASES_DESK_SIGNAL_WIRING=9
+MIN_CASES_PICK_FOLLOWS_WRITE=20
 
 # Unix socket paths stop at ~104 bytes on macOS: keep them short, under /tmp.
 WORK="$(mktemp -d /tmp/herdstead-test.XXXXXX)"
@@ -666,6 +668,8 @@ run_scene_suite test_desk_signal "DESK SIGNAL TESTS" "$MIN_CASES_DESK_SIGNAL"
 # what 6413cec did on the same fixture.
 run_scene_suite test_desk_signal_wiring "DESK SIGNAL WIRING TESTS" "$MIN_CASES_DESK_SIGNAL_WIRING" -- --read-only \
 	--socket="$WORK/desk-signal-nowhere.sock" --work="$WORK"
+# Where the pick goes after a start, a split, a new space or a worktree the office sent: pure, no office.
+run_scene_suite test_pick_follows_write "PICK FOLLOWS WRITE TESTS" "$MIN_CASES_PICK_FOLLOWS_WRITE"
 
 echo "RUN_TESTS: exit $status in $(( $(date +%s) - started ))s"
 exit "$status"

@@ -803,6 +803,7 @@ scripts/office_*.gd      navigator, camera, lens, alerts, draw helpers, window (
                          question tips, new-pane follow, view marks (the rail's in-view marks and the edge arrows)
 scripts/model/           typed models: HerdrSnapshot (the only reader of raw snapshots), OfficeFrame, StateLog,
                          command context / ticket / refusal / answers / results, layout plans
+                         PickFollowsWrite (pure: where the pick goes after a write the office sent)
 scripts/layout/          map and zone planning, seat planning, walk graph, validation
 scripts/world/           pods (table.gd), stations, chips, the floor view, machine plate, zone signs, shell,
                          presentation (walking), rests, pointer

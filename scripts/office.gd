@@ -171,15 +171,13 @@ var _refreshing := false
 ## The fleet has changed since the last refresh: one refresh is queued for the
 ## end of the frame (_queue_refresh()), and any refresh before it takes this in.
 var _data_pending := false
-## The identity the pick last carried to from a start's shell
-## (_carry_pick_to_started()), and whether it had no session yet.
-var _carried_pick := ""
-var _carried_sessionless := false
 ## Draws the open overview again every OVERVIEW_TICK_SECONDS; stopped while it is closed.
 var _overview_tick: Timer
 ## Shows the open strategic view again every STRATEGIC_TICK_SECONDS; stopped while it is closed.
 var _strategic_tick: Timer
-## The new pane a split (or a new space) from the card made, waited for and picked.
+## Carries out what PickFollowsWrite decides: the new pane a split (or a new
+## space or worktree) from the card made, waited for and picked, and the pick
+## carried on to an agent a start from the card became.
 var _new_pane: OfficeNewPaneFollow
 ## What a HUD line under the mouse points at (_show_pointer()): a pane, or a
 ## zone (an edge arrow); empty for none.
@@ -1338,7 +1336,7 @@ func _show_staff() -> void:
 	var dimmed := fleet.is_stale(parts[0]) if known else stale
 	var machine := fleet.label(parts[0]) if known and frame.several_machines() else ""
 	var pane: PaneModel = frame.pane(navigator.active_key) if known else null
-	_carry_pick_to_started(pane)
+	_new_pane.follow_start(pane)
 	var pick := OfficePaneInspector.Pick.FOLLOWING
 	if pane != null and not navigator.picked_key.is_empty() and navigator.picked_key == pane.key:
 		pick = OfficePaneInspector.Pick.PICKED if navigator.is_picked(pane) else OfficePaneInspector.Pick.REPLACED
@@ -1616,37 +1614,6 @@ func _pick_pane(pane: PaneModel) -> void:
 	hud.inspector.leave_answer()
 	navigator.locate(frame, pane)
 	_refresh()
-
-
-## A start from the card changes the picked pane's identity when herdr
-## detects the agent, and again when the agent reports its first session: the
-## same terminal, now with that agent in it. The viewer picked that shell and
-## started this agent there, so the pick carries over to it, which keeps the
-## card's answers to the agent open. Only this run's own start
-## (HerdrFleet.launch_of()) while it is the pane's last write, in the same
-## terminal, of the kind it named: from the shell the start was aimed at (herdr
-## may not list the name yet), or on from a pick carried here before that has
-## no session yet, to the agent under the start's own name. A session after
-## the first (`/clear`), another kind, an agent herdr lists without that name,
-## anything after another write: a new identity to pick again, as always.
-func _carry_pick_to_started(pane: PaneModel) -> void:
-	if pane == null or navigator.picked_key != pane.key or navigator.is_picked(pane):
-		return
-	var watch := fleet.launch_of(pane.key)
-	if watch == null or fleet.last_write(pane.key) != watch.ticket or pane.terminal_id != watch.terminal_id:
-		return
-	if pane.provider != watch.kind:
-		return
-	if navigator.picked_identity == watch.ticket.context.identity_key:
-		if not pane.agent_name in ["", watch.name]:
-			return
-	elif _carried_pick.is_empty() or navigator.picked_identity != _carried_pick or not _carried_sessionless:
-		return
-	elif pane.agent_name != watch.name:
-		return
-	_carried_pick = pane.identity_key()
-	_carried_sessionless = pane.session == null or pane.session.identity_key().is_empty()
-	navigator.pick_desk(pane.key, _carried_pick)
 
 
 ## Whether the card could answer or start something in the selected pane, as

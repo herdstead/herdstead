@@ -464,7 +464,8 @@ starting like any other, and never asked about.
 
 **The pick follows the start.** A start makes the pane's identity change a few times within seconds (herdr
 recognises the agent, then its first session appears). The office carries the viewer's pick across exactly that
-(`_carry_pick_to_started()` in `scripts/office.gd`): while this start is still the pane's last write, in the same
+(`PickFollowsWrite.started()` in `scripts/model/pick_follows_write.gd`, pure; `OfficeNewPaneFollow` carries it
+out): while this start is still the pane's last write, in the same
 terminal, of the same kind, under this start's name (the first step may still have no name), and while the step
 before had no session yet. Anything after that (a `/clear`, another kind, any later write to it) is a new identity
 and the card says `New terminal: pick again`. A launching agent that is blocked counts as blocked everywhere (the
