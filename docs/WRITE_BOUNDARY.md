@@ -16,6 +16,22 @@ Section 6 collects those measurements.
 which also records every method herdr 0.9.0 lists in its schema. The office talks to the rest of the system only
 through `HerdrFleet`'s typed calls: a `CommandContext` in, a `CommandTicket` out (invariant 1 in `AGENTS.md`).
 
+**Whether a press may go is asked in one place on each side of that seam.** `HerdrFleet.command_refusal(key, kind)`
+answers "may this pane take this kind of command now, and why not" for a read, a switch, an answer key, a line, a
+start, a split, a close, a new space and a new worktree: read-only first, then `HerdrCommands.refusal()` on the
+command such a press would aim now, then `blocker()`. The probe carries what the snapshot gives (the close's scope,
+the shell's directory, the workspace, a start's next name, the split's side) and, for what only the press knows, a
+payload that always passes; `can_operate()` and the five `can_*()` are that question under their older names.
+`HerdrFleet.answers()` hands the card the same answers together with those values and a target aimed at that instant
+(`CommandAnswers`), and `CardActions.ladder()` puts the card's own steps around the fleet's word in a fixed order:
+the card's own state, the fleet's word, the preview the kind is checked against (the `detection` text for answer
+keys, the recent output for a line and a start, none for a split, a close, a space or a worktree), then what was
+typed (the prompt a start ends at, the branch). The first step that refuses is what the card says.
+An answer is how things stood when it was asked, never a verdict kept for later: the card asks again at every
+refresh and at every press, the command a press aims is built from the answers asked at that press, and that same
+`CommandContext` is what `submit()` and, for an input command, the check after its re-read judge again (rule 3).
+`tools/test_refusal_ladder.gd` holds both halves as tables.
+
 ### Method allowlist
 
 Twelve methods. "Reply cap" is the longest reply line the boundary reads before it gives up on the command;

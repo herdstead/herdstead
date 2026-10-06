@@ -240,11 +240,14 @@ var _cut := false
 ## press freezes. Null whenever the preview shows no text.
 var _shown_ticket: CommandTicket
 var _shown_seq := 0
-## Rows in the shown text, and how many of the shown ones are wider than the preview.
-var _rows_total := 0
+## The read a FAILED preview names; null in every other state.
+var _read_failed: CommandTicket
+## How many of the rows shown are wider than the preview (_measure_rows()).
 var _rows_clipped := 0
 ## Time.get_ticks_msec() of the read whose text is shown.
 var _read_at := -1
+## The age the caption last said, in seconds: it is written again only when
+## that moves (_show_age()).
 var _caption_seconds := -1
 ## Aimed at the press of the switch; sent at its release, if still bound the same.
 var _focus_context: CommandContext
@@ -289,6 +292,12 @@ var _pending_outcome := ""
 ## said last time: the footer is written again only when it changes.
 var _launch_tick := 0.0
 var _launch_said := ""
+## Counts the shows (_show_action(), _show_answer(), _show_stack()). Hiding a
+## button that is held down makes the engine release it at once, inside the
+## write: its handler may change what the card remembers and show the card
+## anew, and what the outer show had still to write is then old. A show that
+## finds another ran inside it shows once more, from what is true now.
+var _shows := 0
 
 
 ## A reply typed for one pane and terminal.
@@ -338,7 +347,7 @@ func _ready() -> void:
 	var next: Button = %NextButton
 	next.pressed.connect(func() -> void: next_requested.emit())
 	_next_tip = next.tooltip_text
-	_show_preview_text("")
+	_show_preview()
 	_show_action()
 	show_next(null)
 	# The card's own frame shows only in card mode (set_card()).
@@ -394,16 +403,15 @@ func show_pane(pane: PaneModel, machine: String, dimmed: bool, pick := Pick.FOLL
 	_show_stack()
 	_bind(pane)
 	if pane == null:
-		var message: Label = %Message
-		message.text = "Waiting for herdr." if dimmed else "This session has no panes."
 		_details().clear()
 		_show_action()
 		return
-	_details().show_pane(pane, machine, dimmed, art)
+	var header := CardPicture.header_of(_facts(Time.get_ticks_msec()))
+	_details().show_header(header, art)
 	# The compact line says the same three things in the same words.
 	var line: Label = %CompactLine
-	line.text = _details().summary()
-	line.tooltip_text = line.text if machine.is_empty() else line.text + " @ " + machine
+	line.text = header.summary
+	line.tooltip_text = header.summary_tip
 	# A status change is one more reason to read now, whatever the interval says.
 	var status := "%s/%s" % [pane.state, pane.starting]
 	if status != _last_status:
@@ -469,10 +477,6 @@ func set_wide(wide: bool) -> void:
 	if wide == _wide:
 		return
 	_wide = wide
-	var monitor: Button = %CompactMonitor
-	var open: Button = %CompactOpen
-	monitor.text = "Monitor" if wide else ""
-	open.text = "Open" if wide else ""
 	_show_stack()
 	_word_next()
 
@@ -495,51 +499,33 @@ func set_next_width(width: float) -> void:
 ## floor and state in herdr's words; `next` null is nobody, and the button is
 ## off, and so are `‹ ›`. Its wait is OfficeAttention's to tick (set_next_wait()).
 func show_next(next: NextModel) -> void:
-	var button: Button = %NextButton
-	var chevron: Control = %Chevron
-	var back: Button = %StepBack
-	var on: Button = %StepOn
 	_next = next
-	button.disabled = next == null
-	back.disabled = next == null
-	on.disabled = next == null
-	chevron.visible = next != null
-	var play: Control = %PlayMark
-	play.visible = next != null
 	if next == null:
 		set_next_wait("")
 	_word_next()
 
 
-## NEXT's words. At full height `NEXT:` over what a press does and to whom
-## (`Answer CLAUDE web`, `Read CODEX api`; ` @ bee` with several machines) and
-## the wait; on a wide line the same three in a row. A narrow line has room
-## for provider and space only, whole, and no `NEXT:` before them; on either
-## line the button's tooltip says the whole sentence. An office that cannot write has
-## no verb, and says whom and herdr's state instead (`CLAUDE web · blocked`).
-## `NEXT: All clear` fits every form.
+## Write the NEXT pill (CardPicture.next_of()): whether anybody is next (the
+## button and `‹ ›` are off with nobody), its words in the panel's form, and
+## its tooltip.
 func _word_next() -> void:
+	var pill := CardPicture.next_of(_facts(Time.get_ticks_msec()))
 	var button: Button = %NextButton
+	var back: Button = %StepBack
+	var on: Button = %StepOn
+	var chevron: Control = %Chevron
+	var play: Control = %PlayMark
 	var title: Label = %NextTitle
 	var line: Label = %NextLine
-	var short := _compact and not _wide
-	title.visible = not short or _next == null
-	var tip := NEXT_PICKS_TIP if _next != null and _next.verb.is_empty() else _next_tip
-	button.tooltip_text = tip
-	if _next == null:
-		line.text = "All clear"
-		line.theme_type_variation = &"LabelMuted"
-		return
-	var who := "%s %s" % ["SHELL" if _next.provider.is_empty() else _next.provider.to_upper(), _next.space]
-	var whole := "%s · %s" % [who, _next.state] if _next.verb.is_empty() else "%s %s" % [_next.verb, who]
-	if not _next.machine.is_empty():
-		whole += " @ " + _next.machine
-	line.text = who if short else whole
-	# The one line clips what does not fit (a long space, ` @ machine`): its
-	# tooltip says the whole sentence, at either width.
-	if _compact:
-		button.tooltip_text = tip + "\nNext: " + whole
-	line.theme_type_variation = &"Heading13"
+	button.disabled = not pill.somebody
+	back.disabled = not pill.somebody
+	on.disabled = not pill.somebody
+	chevron.visible = pill.somebody
+	play.visible = pill.somebody
+	title.visible = pill.title
+	button.tooltip_text = pill.tip
+	line.text = pill.line
+	line.theme_type_variation = &"LabelMuted" if pill.muted else &"Heading13"
 
 
 ## The wait under NEXT's line: `12m (N)`, `(N)` when its start is unknown,
@@ -558,34 +544,43 @@ func next_text() -> String:
 	return line.text if wait.text.is_empty() or short else line.text + " " + wait.text
 
 
-## The pane's details at full height, its compact line, or the empty state.
-## NEXT reads down at full height, along a wide line, and names whom alone on
-## a narrow one.
+## Write the stack (CardPicture.stack_of()): the pane's details at full
+## height, its compact line, the card form of it, or the empty state; the
+## line's long words; and how NEXT reads (down at full height, along a wide
+## line, whom alone on a narrow one). The boxes only change what shows.
 func _show_stack() -> void:
+	var stack := CardPicture.stack_of(_facts(Time.get_ticks_msec()))
+	_shows += 1
+	var mine := _shows
+	_write_stack(stack)
+	if _shows != mine:
+		_show_stack()
+
+
+func _write_stack(stack: CardPicture.Stack) -> void:
+	var carded := stack.carded
 	var detail: Control = %Detail
 	var line: Control = %CompactRow
-	var empty: Control = %Empty
-	var no_pane: Control = %NoPane
-	var wait: Control = %NextWait
-	var next: BoxContainer = %NextText
-	var next_line: Label = %NextLine
+	detail.visible = stack.detail
+	line.visible = stack.line
 	# Card mode: the header (from %Detail) over the line's buttons (from
 	# %CompactRow), which sit on its foot; the line's words and the rest of
-	# the details stay hidden. The boxes only change what shows.
-	var carded := _compact and _card
-	detail.visible = _pane != null and (not _compact or carded)
-	line.visible = _pane != null and _compact
+	# the details stay hidden.
 	for part: Control in [%Middle, %Actions]:
 		part.visible = not carded
 	# The header alone in the card takes the card's whole width.
 	var left: Control = %Left
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL if carded else Control.SIZE_FILL
 	var title: Control = %Title
-	title.visible = not carded and not _answering
+	title.visible = stack.title
 	_details().set_noted(not carded)
 	_show_more()
 	for words: Control in [%CompactLine, %CompactWait]:
 		words.visible = not carded
+	var monitor: Button = %CompactMonitor
+	var open: Button = %CompactOpen
+	monitor.text = stack.monitor_word
+	open.text = stack.open_word
 	set_framed(not carded)
 	var frame: HdPanel = %CardFrame
 	frame.set_framed(carded)
@@ -596,11 +591,19 @@ func _show_stack() -> void:
 	var next_button: Control = %NextButton
 	next_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER if carded else Control.SIZE_EXPAND_FILL
 	next_button.custom_minimum_size.y = next_pill_height if carded else 0.0
-	empty.visible = _pane == null
-	no_pane.visible = not _compact
-	next.vertical = not _compact
-	wait.visible = not _compact or _wide
-	next_line.autowrap_mode = TextServer.AUTOWRAP_OFF if _compact else TextServer.AUTOWRAP_WORD_SMART
+	var empty: Control = %Empty
+	var no_pane: Control = %NoPane
+	var message: Label = %Message
+	empty.visible = stack.empty
+	no_pane.visible = stack.full
+	if stack.empty:
+		message.text = stack.message
+	var next: BoxContainer = %NextText
+	var wait: Control = %NextWait
+	var next_line: Label = %NextLine
+	next.vertical = stack.full
+	wait.visible = stack.next_wait
+	next_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if stack.full else TextServer.AUTOWRAP_OFF
 
 
 ## The portrait's person while there is one; null in the empty state.
@@ -681,10 +684,7 @@ func keys_refusal() -> CommandRefusal.Reason:
 
 ## Why "Send line" is off for the reply typed now, or NONE while it may be pressed.
 func line_refusal() -> CommandRefusal.Reason:
-	var reason := _input_refusal(CommandContext.Kind.LINE)
-	if reason == CommandRefusal.Reason.NONE:
-		reason = HerdrFleet.line_refusal(_reply_text())
-	return reason
+	return CardPicture.send_refusal(_input_refusal(CommandContext.Kind.LINE), HerdrFleet.line_refusal(_reply_text()))
 
 
 ## Leave answer mode and give up keyboard focus. The office calls this when a
@@ -836,8 +836,8 @@ func _bind(pane: PaneModel) -> void:
 			_outcome_identity = last.context.identity_key
 	if held:
 		# Said on the new binding, like the switch's: nothing went anywhere.
-		_outcome = "Not sent: target changed"
-		_outcome_detail = "Nothing was sent: the card moved to another pane or terminal while an answer button was held."
+		_outcome = CardWords.TARGET_CHANGED
+		_outcome_detail = CardWords.HELD_DETAIL
 		_outcome_identity = ""
 	_last_status = ""
 	_text = ""
@@ -967,81 +967,41 @@ func _set_state(next: PreviewState, failed: CommandTicket = null, shown: Command
 	_state = next
 	_shown_ticket = shown if next == PreviewState.SHOWN else null
 	_shown_seq = seq if next == PreviewState.SHOWN else 0
-	var caption: Label = %PreviewCaption
-	match next:
-		PreviewState.NONE:
-			caption.text = ""
-			caption.tooltip_text = ""
-		PreviewState.LOADING:
-			caption.text = "Reading…"
-			caption.tooltip_text = "Reading this pane's terminal from herdr."
-		PreviewState.UNAVAILABLE:
-			caption.text = "No preview: " + CommandRefusal.text(_reason)
-			caption.tooltip_text = "No terminal preview: " + CommandRefusal.detail(_reason)
-		PreviewState.FAILED:
-			caption.text = "Read failed: " + CardWords.failure(failed)
-			caption.tooltip_text = "The last read brought no text back: " + CardWords.failure_detail(failed)
-	_show_preview_text(_text if next == PreviewState.SHOWN else "")
-	if next == PreviewState.SHOWN:
-		_caption_seconds = -1
-		_show_age()
+	_read_failed = failed if next == PreviewState.FAILED else null
+	_show_preview()
 	_show_answer()
 	_show_launch()
 
 
-## The caption of shown text: its source, how old it is, and whether it was
-## cut or has rows wider than the card. A blocked pane's caption leads with how
-## many of its rows are shown. Written only when the number of seconds changes.
+## Write the preview (CardPicture.preview_of()): its rows, then, the rows
+## measured, the caption over them.
+func _show_preview() -> void:
+	var picture := CardPicture.preview_of(_facts(Time.get_ticks_msec()))
+	var preview: Label = %Preview
+	if preview.text != picture.rows:
+		preview.text = picture.rows
+	_measure_rows()
+	_show_caption()
+
+
+## Write the caption over the preview: the source and age of shown text and
+## whether it was cut or clipped, or why there is none.
+func _show_caption() -> void:
+	var picture := CardPicture.preview_of(_facts(Time.get_ticks_msec()))
+	_caption_seconds = picture.seconds
+	var caption: Label = %PreviewCaption
+	caption.text = picture.caption
+	caption.tooltip_text = picture.caption_tip
+
+
+## The caption of shown text says how old it is: written again only when the
+## number of seconds changes.
 func _show_age() -> void:
 	if _state != PreviewState.SHOWN:
 		return
-	var seconds := int((Time.get_ticks_msec() - _read_at) / 1000.0)
-	if seconds == _caption_seconds:
+	if CardPicture.age_seconds(_read_at, Time.get_ticks_msec()) == _caption_seconds:
 		return
-	_caption_seconds = seconds
-	var caption: Label = %PreviewCaption
-	var shown := mini(_rows_total, PREVIEW_ROWS)
-	var clipped := (
-		" %d of them wider than the card and clipped: look at herdr for the rest." % _rows_clipped
-		if _rows_clipped > 0
-		else ""
-	)
-	var cut := " Cut: only the end of it is shown." if _cut else ""
-	if _source == CommandContext.SOURCE_DETECTION:
-		var rows := "%d of %d row%s" % [shown, _rows_total, "" if _rows_total == 1 else "s"]
-		var flag := " · cut" if _cut else " · clipped" if _rows_clipped > 0 else " · %s ago" % CardWords.age(seconds)
-		caption.text = rows + flag
-		caption.tooltip_text = (
-			"The last %d of the %d rows of herdr's detection source (what its agent detection reads), read %s ago.%s%s"
-			% [shown, _rows_total, CardWords.age(seconds), clipped, cut]
-		)
-		return
-	caption.text = (
-		"recent · %s ago%s" % [CardWords.age(seconds), " · cut" if _cut else " · clipped" if _rows_clipped > 0 else ""]
-	)
-	caption.tooltip_text = (
-		"The last %d lines of herdr's %s source, read %s ago.%s%s"
-		% [PREVIEW_ROWS, _source, CardWords.age(seconds), clipped, cut]
-	)
-
-
-## The last PREVIEW_ROWS rows of `text`, tabs expanded, padded at the top so
-## the block is always that many rows tall. Long rows are clipped by the label.
-func _show_preview_text(text: String) -> void:
-	var rows := CardWords.rows_of(text)
-	_rows_total = rows.size()
-	if rows.size() > PREVIEW_ROWS:
-		rows = rows.slice(rows.size() - PREVIEW_ROWS)
-	var shown := PackedStringArray()
-	for index in PREVIEW_ROWS - rows.size():
-		shown.append("")
-	for row in rows:
-		shown.append(CardWords.expand_tabs(row.left(CardWords.ROW_CHARS)))
-	var preview: Label = %Preview
-	var joined := "\n".join(shown)
-	if preview.text != joined:
-		preview.text = joined
-	_measure_rows()
+	_show_caption()
 
 
 ## How many of the rows shown are wider than the preview, which clips them.
@@ -1092,8 +1052,8 @@ func _on_focus_pressed() -> void:
 	if context == null:
 		return
 	if context.binding != _binding or _pane == null or context.pane_key != _pane.key or _pick != Pick.PICKED:
-		_outcome = "Not sent: target changed"
-		_outcome_detail = "Nothing was sent: the card moved to another pane or terminal between your press and release."
+		_outcome = CardWords.TARGET_CHANGED
+		_outcome_detail = CardWords.SWITCH_MOVED_DETAIL
 		_outcome_identity = ""
 		_show_action()
 		return
@@ -1158,104 +1118,127 @@ func _on_write_finished(ticket: CommandTicket) -> void:
 	_show_action()
 
 
-## The switch, its note and the footer, and the heading's answer chip. Offered
-## only with a fleet that may write; enabled only for a picked pane that the
-## boundary would send to now, and never while a write of this card is in
-## flight. The button names the machine it switches whenever the office has
-## more than one.
+## The switch, its note and the footer, the heading's answer chip, answer
+## mode and the launch block: everything a refresh, a gesture or a write's end
+## can have moved.
+##
+## The stateful step comes first and is the card's: the launch block drops
+## the confirms that hold no more and fixes the kinds offered in their order
+## (_show_launch()), and the launch line notes which card first said a start
+## was over (CardActions.launch_line()). The picture after it is pure.
 func _show_action() -> void:
+	_show_launch()
+	var view := _view()
+	var launch := _actions.launch_line(view)
+	_launch_said = "" if launch == null else launch.text
+	var facts := _facts(view.now_msec)
+	_refusals(facts)
+	facts.launch_line = _launch_said
+	facts.launch_detail = "" if launch == null else launch.detail
+	_shows += 1
+	var mine := _shows
+	_write_answer(CardPicture.answer_of(facts))
+	_write_actions(CardPicture.actions_of(facts))
+	if _shows != mine:
+		_show_action()
+
+
+## Write the switch, its note, Monitor, `▾ Esc` and the footer. A card that
+## may not write shows none of the words under it: they keep what they said.
+func _write_actions(actions: CardPicture.Actions) -> void:
 	var button: Button = %FocusButton
 	var note: Label = %FocusNote
 	var outcome: Label = %Outcome
-	var offered := _pane != null and _fleet != null and not _fleet.read_only()
-	button.visible = offered and not _answering
-	note.visible = offered and not _answering
-	outcome.visible = offered
-	# The terminal monitor: offered for any pane shown with a fleet; read-only opens
-	# it view-only. The same on the one-line row.
+	button.visible = actions.focus
+	note.visible = actions.focus
+	outcome.visible = actions.offered
 	var monitor: Button = %MonitorButton
 	var line_monitor: Button = %CompactMonitor
-	monitor.visible = _pane != null and _fleet != null
-	line_monitor.visible = monitor.visible
-	# Escape in answer mode only leaves it: `▾ Esc` folds only out of it.
+	monitor.visible = actions.monitor
+	line_monitor.visible = actions.monitor
 	var fold: Button = %FoldButton
-	fold.visible = _pane != null and not _answering
+	fold.visible = actions.fold
 	var top: Control = %TopRow
-	top.visible = monitor.visible or fold.visible
-	_show_answer()
-	_show_launch()
-	var launch := _actions.launch_line(_view())
-	_launch_said = "" if launch == null else launch.text
-	if not offered:
-		button.disabled = true
+	top.visible = actions.top
+	button.disabled = actions.focus_off
+	if not actions.offered:
 		return
-	var reason := _fleet.can_operate(_pane.key)
-	var in_flight := _write_in_flight()
-	button.disabled = in_flight or _pick != Pick.PICKED or reason != CommandRefusal.Reason.NONE
-	var said := ""
-	var detail := ""
-	if _focus_ticket != null:
-		said = "Switching…"
-		detail = "The switch is on its way to herdr."
-	elif _input_ticket != null:
-		said = CardWords.input_progress(_input_ticket)
-		detail = (
-			"The start is on its way: the card reads the terminal again first, then herdr types the command."
-			if _input_ticket.context.kind == CommandContext.Kind.START
-			else "The answer is on its way: the card reads the terminal again first, then sends."
-		)
-		if _input_ticket.context.kind == CommandContext.Kind.SPLIT:
-			detail = "The split is on its way to herdr."
-		match _input_ticket.context.kind:
-			CommandContext.Kind.CLOSE:
-				detail = "The close is on its way to herdr."
-			CommandContext.Kind.SPACE:
-				detail = "The new space is on its way to herdr."
-			CommandContext.Kind.WORKTREE:
-				detail = "The new worktree is on its way to herdr; git runs there first."
-	elif not _outcome.is_empty() and not _foreign_outcome():
-		said = _outcome
-		detail = _outcome_detail
-	elif launch != null and not (_answering and _answer_says()):
-		said = launch.text
-		detail = launch.detail
-	elif _pick == Pick.FOLLOWING:
-		said = "Following herdr's focus"
-		detail = "This card follows herdr's own focus. Click a desk to pick it: only a desk you picked can switch herdr."
-	elif _pick == Pick.REPLACED:
-		said = "New terminal: pick again"
-		detail = "Another terminal has taken this pane's id since you picked it. Click the desk to pick it again."
-	elif _answering:
-		var off := _answer_off()
-		var typed := HerdrFleet.line_refusal(_reply_text())
-		if off != CommandRefusal.Reason.NONE:
-			said = "No answer: " + CommandRefusal.text(off)
-			detail = "The answer controls are off: " + CommandRefusal.detail(off)
-		elif not _reply_text().is_empty() and typed != CommandRefusal.Reason.NONE:
-			said = "Line: " + CommandRefusal.text(typed)
-			detail = "This line cannot be sent: " + CommandRefusal.detail(typed)
-	elif reason == CommandRefusal.Reason.IN_FLIGHT or reason == CommandRefusal.Reason.LOOK_FIRST:
-		# Every write to the pane waits, the switch and the answers alike.
-		said = "No writes: " + CommandRefusal.text(reason)
-		detail = "The switch and the answers are off: " + CommandRefusal.detail(reason)
-	elif reason != CommandRefusal.Reason.NONE:
-		said = "No switch: " + CommandRefusal.text(reason)
-		detail = "The switch is off: " + CommandRefusal.detail(reason)
-	outcome.text = said
-	outcome.tooltip_text = detail
-	var where := "herdr" if _machine.is_empty() else "herdr on " + _machine
-	button.text = "Switch herdr here" if _machine.is_empty() else "Switch herdr on " + _machine
-	button.tooltip_text = (
-		"Switches the shared view of %s to this pane: every terminal attached to it follows." % where
-		+ "\nIt also clears UNREAD for every pane on this tab, not just this one."
-	)
+	outcome.text = actions.footer
+	outcome.tooltip_text = actions.footer_tip
+	button.text = actions.focus_text
+	button.tooltip_text = actions.focus_tip
+
+
+## What the card shows this instant, as the picture's facts: what the office
+## showed, what the card remembers and what its nodes measure, at `now_msec`.
+## Nothing here asks the fleet about a write (_refusals() does), and nothing
+## is changed by asking.
+func _facts(now_msec: int) -> CardPicture.Facts:
+	var facts := CardPicture.Facts.new()
+	facts.pane = _pane
+	facts.machine = _machine
+	facts.dimmed = _dimmed
+	facts.pick = _pick
+	if _pane != null:
+		var state := StringName(_pane.state)
+		facts.state_caption = CardDetails.caption_of(art, state)
+		facts.state_badge = CardDetails.badge_of(art, state)
+	facts.connected = _fleet != null
+	facts.read_only = _fleet != null and _fleet.read_only()
+	facts.compact = _compact
+	facts.card = _card
+	facts.wide = _wide
+	facts.answering = _answering
+	facts.launch_shown = _block().visible
+	facts.narrow = size.x < details_beside_launch_from
+	facts.next = _next
+	facts.next_tip = _next_tip
+	facts.preview = _state
+	facts.preview_reason = _reason
+	facts.preview_failed = _read_failed
+	facts.text = _text
+	facts.source = _source
+	facts.cut = _cut
+	facts.rows_clipped = _rows_clipped
+	facts.read_at_msec = _read_at
+	facts.now_msec = now_msec
+	facts.switching = _focus_ticket != null
+	facts.input = _input_ticket
+	facts.outcome = _outcome
+	facts.outcome_detail = _outcome_detail
+	facts.outcome_identity = _outcome_identity
+	facts.reply = _reply_text()
+	return facts
+
+
+## The fleet's answers about a write, told to the picture's `facts`: why the
+## switch, a key and a line may not be pressed now, whether answer mode has
+## anything to press, and what the reply typed is refused for. The one place
+## the facts get a refusal from.
+func _refusals(facts: CardPicture.Facts) -> void:
+	facts.switch_refusal = _switch_refusal()
+	facts.keys_refusal = _input_refusal(CommandContext.Kind.KEYS)
+	facts.line_refusal = _input_refusal(CommandContext.Kind.LINE)
+	facts.answer_possible = _answer_possible()
+	facts.reply_refusal = HerdrFleet.line_refusal(facts.reply)
+	facts.line_bytes_max = HerdrFleet.line_bytes_max()
+
+
+## Why the switch may not go to the pane shown now, or NONE: no fleet or pane,
+## read-only, or what the boundary says of a write there.
+func _switch_refusal() -> CommandRefusal.Reason:
+	if _pane == null or _fleet == null:
+		return CommandRefusal.Reason.NOT_CONNECTED
+	if _fleet.read_only():
+		return CommandRefusal.Reason.READ_ONLY
+	return _fleet.can_operate(_pane.key)
 
 
 ## Whether the footer's outcome is a write to another terminal than the one
 ## bound now (the pane id was taken over since): never said as this one's. The
 ## look it owes still holds (keyed by the pane), and says so as "No writes".
 func _foreign_outcome() -> bool:
-	return not _outcome_identity.is_empty() and _pane != null and _outcome_identity != _pane.identity_key()
+	return CardPicture.foreign(_outcome_identity, _pane)
 
 
 ## Whether any write of this card is on its way. Every write control waits.
@@ -1287,14 +1270,15 @@ func _answer_possible() -> bool:
 ## Why an input of `kind` may not be pressed now, or NONE: this card's own
 ## state, what the boundary says about the pane (its state, an open write, a
 ## look still owed), and whether the preview shows what that input is checked
-## against.
+## against (CardActions.ladder()).
 func _input_refusal(kind: CommandContext.Kind) -> CommandRefusal.Reason:
-	var reason := _card_refusal()
-	if reason == CommandRefusal.Reason.NONE:
-		reason = _fleet.can_operate(_pane.key, kind)
-	if reason == CommandRefusal.Reason.NONE:
-		reason = _shown_refusal(kind)
-	return reason
+	var own := _card_refusal()
+	# A card that refuses by itself may have no fleet or pane: the fleet is not asked.
+	var seam := CommandRefusal.Reason.NONE
+	if own == CommandRefusal.Reason.NONE:
+		seam = _fleet.command_refusal(_pane.key, kind)
+	var frozen := CommandPreview.of(_shown_ticket, _shown_seq)
+	return CardActions.ladder(kind, own, seam, _state == PreviewState.SHOWN, frozen)
 
 
 ## No fleet or pane, read-only, a pane the viewer did not pick, or a write of
@@ -1314,31 +1298,8 @@ func _card_refusal() -> CommandRefusal.Reason:
 ## Whether the preview shows uncut text from the source `kind` is checked
 ## against: the whole `detection` text for keys, the recent output for a line.
 func _shown_refusal(kind: CommandContext.Kind) -> CommandRefusal.Reason:
-	if _state != PreviewState.SHOWN or _shown_ticket == null or _cut:
-		return CommandRefusal.Reason.UNSEEN
-	var wanted := CommandContext.SOURCE_DETECTION if kind == CommandContext.Kind.KEYS else CommandContext.SOURCE_RECENT
-	return CommandRefusal.Reason.NONE if _shown_ticket.context.source == wanted else CommandRefusal.Reason.UNSEEN
-
-
-## The reason worth saying when answer mode has nothing to press (NONE while
-## something may be): the keys' for a blocked agent, the line's for any other.
-func _answer_off() -> CommandRefusal.Reason:
-	var keys := _input_refusal(CommandContext.Kind.KEYS)
-	var line := _input_refusal(CommandContext.Kind.LINE)
-	if keys == CommandRefusal.Reason.NONE or line == CommandRefusal.Reason.NONE:
-		return CommandRefusal.Reason.NONE
-	var blocked := _pane != null and _pane.state == str(ArtContract.STATE_BLOCKED)
-	return keys if blocked else line
-
-
-## Whether answer mode has something of its own to say in the footer: why
-## nothing may be pressed, or why the typed line cannot go.
-func _answer_says() -> bool:
-	var typed := HerdrFleet.line_refusal(_reply_text())
-	return (
-		_answer_off() != CommandRefusal.Reason.NONE
-		or (not _reply_text().is_empty() and typed != CommandRefusal.Reason.NONE)
-	)
+	var frozen := CommandPreview.of(_shown_ticket, _shown_seq)
+	return CardActions.shown_refusal(kind, _state == PreviewState.SHOWN, frozen)
 
 
 func _enter_answer() -> void:
@@ -1356,25 +1317,33 @@ func _on_answer_button() -> void:
 		_enter_answer()
 
 
-## Everything answer mode shows, and which parts of the card it hides. Only
-## `visible`, `disabled`, text and tooltips change: the scene holds the layout.
+## Answer mode's chip, title, keys and "Send line", as the preview's state
+## leaves them (_set_state()).
 func _show_answer() -> void:
+	var facts := _facts(Time.get_ticks_msec())
+	_refusals(facts)
+	_shows += 1
+	var mine := _shows
+	_write_answer(CardPicture.answer_of(facts))
+	if _shows != mine:
+		_show_answer()
+
+
+## Write everything answer mode shows, and which parts of the card it hides.
+## Only `visible`, `disabled`, text and tooltips change: the scene holds the
+## layout.
+func _write_answer(answer: CardPicture.Answer) -> void:
 	var title: Label = %Title
 	var hint: Button = %AnswerButton
 	var header: Control = %Header
-	var answer: Control = %Answer
-	var possible := _answer_possible()
-	hint.visible = _answering or possible
-	hint.text = "Close" if _answering else "Answer"
-	hint.icon = null if _answering else _key_enter_icon
-	hint.tooltip_text = (
-		"Esc: leave answer mode. Nothing is sent."
-		if _answering
-		else "Enter: answer this agent. Opens the answer keys and the reply box; nothing is sent until you press one."
-	)
+	var controls: Control = %Answer
+	hint.visible = answer.chip
+	hint.text = answer.chip_text
+	hint.icon = _key_enter_icon if answer.chip_keyed else null
+	hint.tooltip_text = answer.chip_tip
 	header.visible = true
 	_show_more()
-	answer.visible = _answering
+	controls.visible = answer.open
 	# Answer mode is a modal (OfficeHud._fit_staff()) laid out top to bottom:
 	# who and where, the terminal across the whole panel, the keys and the
 	# reply under it, the actions and what became of the last write along the
@@ -1382,51 +1351,20 @@ func _show_answer() -> void:
 	var detail: BoxContainer = %Detail
 	var middle: BoxContainer = %Middle
 	var actions: BoxContainer = %Actions
-	detail.vertical = _answering
-	middle.vertical = _answering
-	actions.vertical = not _answering
-	# The header under it already says who and in what state; so does a card's.
-	title.visible = not _answering and not (_compact and _card)
-	title.text = HEADING
-	title.tooltip_text = ""
-	if _answering and _pane != null:
-		var who := "SHELL" if _pane.provider.is_empty() else _pane.provider.to_upper()
-		title.text = "%s · %s" % [who, CardDetails.caption_of(art, StringName(_pane.state))]
-		if not _machine.is_empty():
-			title.text += " · " + _machine
-		title.tooltip_text = "Answering: " + title.text
-	var on := "" if _machine.is_empty() else " on " + _machine
-	var keys := _input_refusal(CommandContext.Kind.KEYS)
-	var keys_off := "" if keys == CommandRefusal.Reason.NONE else "\nOff: " + CommandRefusal.detail(keys)
+	detail.vertical = answer.open
+	middle.vertical = answer.open
+	actions.vertical = not answer.open
+	title.visible = answer.title
+	title.text = answer.title_text
+	title.tooltip_text = answer.title_tip
 	for key: Button in _key_buttons():
-		key.disabled = keys != CommandRefusal.Reason.NONE
-		key.tooltip_text = _key_tooltip(_key_of(key), on) + keys_off
+		key.disabled = answer.keys_off
+		key.tooltip_text = answer.key_tip(_key_of(key))
 	var send_line: Button = %SendLine
-	var line := line_refusal()
-	send_line.disabled = line != CommandRefusal.Reason.NONE
-	send_line.tooltip_text = (
-		(
-			"Send one line to this agent%s: herdr types it and presses Enter (bracketed when the agent asked). %d of %d bytes."
-			% [on, _reply_text().to_utf8_buffer().size(), HerdrFleet.line_bytes_max()]
-		)
-		+ ("" if line == CommandRefusal.Reason.NONE else "\nOff: " + CommandRefusal.detail(line))
-	)
+	send_line.disabled = answer.line_off
+	send_line.tooltip_text = answer.line_tip
 	var best: Label = %BestEffort
-	best.text = CardWords.BEST_EFFORT
-
-
-static func _key_tooltip(key_name: String, on: String) -> String:
-	match key_name:
-		"enter":
-			return "Sends Enter%s: it confirms whatever the question has selected. Only by click." % on
-		"esc":
-			return "Sends Escape to the terminal%s. The Esc key on your keyboard never does." % on
-		"n":
-			return "Sends n%s. Only by click: the N key goes to the next agent." % on
-	return (
-		"Sends %s%s. Key %s in answer mode does the same, where your keyboard types %s there without Shift."
-		% [key_name, on, key_name, key_name]
-	)
+	best.text = answer.best_effort
 
 
 ## Every button that sends a key, in the scene's order.
@@ -1676,10 +1614,13 @@ func _show_launch() -> void:
 	_show_more()
 
 
-## What the card shows this instant, for the aiming family (CardActions.View).
+## What the card shows this instant, for the aiming family (CardActions.View):
+## values only, the fleet's answers about the pane among them, asked now for
+## the kinds the block's form may press. Built anew at every call, a press and
+## a release included: every answer in it was asked at that call. Only the
+## list of kinds the block still offers (its buttons) comes from the last look.
 func _view() -> CardActions.View:
 	var view := CardActions.View.new()
-	view.fleet = _fleet
 	view.pane = _pane
 	view.binding = _binding
 	view.form = _launch_form()
@@ -1690,6 +1631,8 @@ func _view() -> CardActions.View:
 	view.branch = _branch_text()
 	view.machine = _machine
 	view.now_msec = Time.get_ticks_msec()
+	if _fleet != null and _pane != null:
+		view.answers = _fleet.answers(_pane.key, _binding, CardActions.asked(view.form), _actions.launch_kinds)
 	return view
 
 
@@ -1744,10 +1687,7 @@ func _launch_speaks_for(ticket: CommandTicket) -> bool:
 ## (details_beside_launch_from), and answer mode's controls theirs always.
 func _show_more() -> void:
 	var more: Control = %More
-	var launch: Control = %Launch
-	more.visible = (
-		not _answering and not (_compact and _card) and not (launch.visible and size.x < details_beside_launch_from)
-	)
+	more.visible = CardPicture.more_of(_facts(Time.get_ticks_msec()))
 
 
 # --- the reply box --------------------------------------------------------------
@@ -1766,8 +1706,8 @@ func _composing() -> bool:
 
 ## "Send line" refused on the card itself, before anything reaches the fleet.
 func _refuse_line(reason: CommandRefusal.Reason) -> void:
-	_outcome = "Not sent: " + CommandRefusal.text(reason)
-	_outcome_detail = "Nothing was sent: " + CommandRefusal.detail(reason)
+	_outcome = CardWords.not_sent(reason)
+	_outcome_detail = CardWords.not_sent_detail(reason)
 	_outcome_identity = ""
 	_show_action()
 

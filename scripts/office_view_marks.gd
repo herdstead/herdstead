@@ -90,9 +90,10 @@ func _zones_in_view(view: Rect2) -> PackedStringArray:
 
 
 ## Every blocked desk of machine `machine`'s map as drawn: an agent that asks
-## (one blocked while herdr still starts it included), with its chip's
-## rectangle, or where its seat answers a click while it draws no chip, and how
-## long it has waited by the state log. None for a machine that is not
+## (one blocked while herdr still starts it included), with what its arrow
+## aims at (OfficeFloorView.arrow_target(): its chip's rectangle, or where its
+## seat answers a click while it draws no chip), in the view's coordinates,
+## and how long it has waited by the state log. None for a machine that is not
 ## answering: a lost connection counts nobody waiting (invariant 4).
 func _targets(frame: OfficeFrame, machine: String) -> Array[EdgeArrowModel.Target]:
 	var targets: Array[EdgeArrowModel.Target] = []
@@ -106,8 +107,8 @@ func _targets(frame: OfficeFrame, machine: String) -> Array[EdgeArrowModel.Targe
 			for pane in room.panes:
 				if not pane.asks() or pane.launching() or pane.provider.is_empty():
 					continue
-				var seat := floor_view.seat(pane.key)
-				if seat == null:
+				var aim := floor_view.arrow_target(pane.key)
+				if not aim.has_area():
 					continue
 				var target := EdgeArrowModel.Target.new()
 				target.zone_key = zone.key
@@ -115,8 +116,7 @@ func _targets(frame: OfficeFrame, machine: String) -> Array[EdgeArrowModel.Targe
 				target.words = OfficeZoneSign.words(zone)
 				target.machine = building.key
 				target.pane_key = pane.key
-				var chip := seat.node.chip_rect()
-				target.rect = chip if chip.has_area() else seat.node.target_rect()
+				target.rect = Rect2(floor_view.root.to_global(aim.position), aim.size)
 				target.wait = StateLog.wait_of(ledger.track(pane.key), now)
 				targets.append(target)
 	return targets

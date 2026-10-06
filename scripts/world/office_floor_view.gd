@@ -234,18 +234,85 @@ func furnishing() -> Array[CanvasItem]:
 	return found
 
 
-## Point at pane `key`'s desk (OfficePointer): its click area and, while it
-## shows, its chip. Empty, or a pane with no seat here, points at nothing.
-func point(key: String) -> void:
-	var desk: Seat = null if key.is_empty() else seats.get(key)
+## Where pane `key`'s signal is, in the floor's own coordinates (the root's):
+## where its desk answers a click, which is where its worker rests (a pantry
+## worker's own rectangle), together with its chip while it shows (a chip
+## that draws nothing, under the lens or with no wait to say, still shows).
+## What the pointer frames (point()) and the camera brings into view
+## (OfficeScene.reveal()). The one extent of a desk's signal: an arrow's aim
+## is another question (arrow_target()). No area for a pane with no seat
+## here; a seat's own always has one.
+func signal_extent(key: String) -> Rect2:
+	var desk: Seat = seats.get(key)
 	if desk == null:
-		pointer.clear()
-		return
+		return Rect2()
 	var bounds := desk.node.target_rect()
 	var chip := desk.node.chip_rect()
 	if chip.has_area():
 		bounds = bounds.merge(chip)
-	pointer.point_at(key, root.get_global_transform().affine_inverse() * bounds)
+	return _on_floor(bounds)
+
+
+## What an edge arrow aims at for pane `key`, in the floor's own coordinates:
+## its chip alone while it shows, else where its desk answers a click. Never
+## the two together, and meant so: the arrow stands while this rectangle is
+## off screen (EdgeArrowModel.of()), so a blocked desk whose seat is in view
+## and whose chip is not still has its arrow. No area for a pane with no seat
+## here; a seat's own always has one.
+func arrow_target(key: String) -> Rect2:
+	var desk: Seat = seats.get(key)
+	if desk == null:
+		return Rect2()
+	var chip := desk.node.chip_rect()
+	return _on_floor(chip if chip.has_area() else desk.node.target_rect())
+
+
+## The whole pod pane `key`'s desk stands at, as drawn (DeskMeasure.render_rect),
+## in the floor's own coordinates: what the framing a map opens on adds to the
+## desk's signal when both fit (OfficeCamera.reveal()). No area for a pane with
+## no seat here.
+func pod_extent(key: String) -> Rect2:
+	var desk: Seat = seats.get(key)
+	if desk == null:
+		return Rect2()
+	var table := desk.node.table
+	var drawn := table.geometry.render_rect
+	drawn.position += table.global_position
+	return _on_floor(drawn)
+
+
+## Where zone `key` opens, in the floor's own coordinates: as wide as its
+## cells, from the top of its sign's drawing (in the aisle row above the zone;
+## the aisle row's own top for a zone whose sign is not drawn) down to the
+## bottom of its cells. What the camera puts at the top of the world
+## (OfficeCamera.open_on()). No area for a zone the plan does not place.
+func zone_opening(key: String) -> Rect2:
+	var placed: ZonePlacement = null if plan == null else plan.zone(key)
+	if placed == null:
+		return Rect2()
+	var grid := float(FloorLayoutPolicy.GRID)
+	var left := placed.cells.position.x * grid
+	var top := (placed.cells.position.y - 1) * grid
+	var board := zone_sign(key)
+	var holder := null if board == null else board.get_parent() as Node2D
+	if holder != null:
+		top = root.to_local(holder.to_global(board.drawn_rect().position)).y
+	return Rect2(left, top, placed.cells.end.x * grid - left, placed.cells.end.y * grid - top)
+
+
+## Point at pane `key`'s desk (OfficePointer): its signal_extent(). Empty, or
+## a pane with no seat here, points at nothing.
+func point(key: String) -> void:
+	var extent := signal_extent(key)
+	if not extent.has_area():
+		pointer.clear()
+		return
+	pointer.point_at(key, extent)
+
+
+## `bounds`, which a station answers in global coordinates, in the floor's own.
+func _on_floor(bounds: Rect2) -> Rect2:
+	return root.get_global_transform().affine_inverse() * bounds
 
 
 func _furnishing_tint() -> Color:

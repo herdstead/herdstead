@@ -1020,54 +1020,39 @@ func shown_machine() -> String:
 
 
 ## Pan just enough for the desk of `key`, its badge included, to be on screen:
-## where it answers a click, which is where its worker rests (a pantry worker's
-## own rectangle), and the chip over a blocked one. With `whole_table`, the
-## framing a map opens on: the desk and its whole pod when that fits, else
-## the desk alone. The world is what the pan is measured in.
+## its signal as the floor view answers it (OfficeFloorView.signal_extent():
+## where it answers a click, which is where its worker rests, and the chip over
+## a blocked one). With `whole_table`, the framing a map opens on: the desk and
+## its whole pod when that fits, else the desk alone (OfficeCamera.reveal()).
+## Nothing for a pane with no seat on the shown map.
 func reveal(key: String, whole_table := false) -> void:
-	var seat := floor_view.seat(key)
-	if seat == null:
+	var extent := floor_view.signal_extent(key)
+	if not extent.has_area():
 		return
-	var bounds := seat.node.target_rect()
-	var chip := seat.node.chip_rect()
-	if chip.has_area():
-		bounds = bounds.merge(chip)
 	if whole_table:
-		var table := seat.node.table
-		var group := table.geometry.render_rect
-		group.position += table.global_position
-		if _fits(bounds.merge(group)):
-			bounds = bounds.merge(group)
-	camera.reveal(Rect2(world.to_local(bounds.position), bounds.size))
+		camera.reveal(_in_world(extent), _in_world(floor_view.pod_extent(key)))
+	else:
+		camera.reveal(_in_world(extent))
 
 
-## Pan to zone `key` of the shown map: the top of its sign's drawing (in the
-## aisle row above the zone) at the top of the world, or the aisle row's top
-## for a zone with no sign drawn yet; and as little sideways as brings the
-## zone's width in (its left edge when it is wider than the view). The camera
-## clamps the pan to the map. Nothing for a zone the plan does not place.
+## Pan to zone `key` of the shown map: its opening as the floor view answers
+## it (OfficeFloorView.zone_opening(): from the top of its sign's drawing) at
+## the top of the world, and as little sideways as brings the zone's width in
+## (OfficeCamera.open_on()). The camera clamps the pan to the map. Nothing for
+## a zone the plan does not place.
 ## (The sign's top, not the aisle row's, is the 14 units that let a two-pod-row
 ## zone's second far row fit a 308-tall view: PLAN_R2 §1.10.)
 func reveal_zone(key: String) -> void:
-	var placed: ZonePlacement = null if floor_view.plan == null else floor_view.plan.zone(key)
-	if placed == null:
-		return
-	var grid := float(FloorLayoutPolicy.GRID)
-	var shown := camera.free_rect().size
-	var left := placed.cells.position.x * grid
-	var right := placed.cells.end.x * grid
-	camera.pan.y = (placed.cells.position.y - 1) * grid + PLATE_HEIGHT
-	var board := floor_view.zone_sign(key)
-	var holder := null if board == null else board.get_parent() as Node2D
-	if holder != null:
-		camera.pan.y = world.to_local(holder.to_global(board.drawn_rect().position)).y
-	camera.pan.x = left if right - left > shown.x else minf(maxf(camera.pan.x, right - shown.x), left)
+	var opening := floor_view.zone_opening(key)
+	if opening.has_area():
+		camera.open_on(_in_world(opening))
 
 
-## Whether `bounds` (global) fits the view, the camera's headroom included.
-func _fits(bounds: Rect2) -> bool:
-	var room := camera.free_rect().size
-	return bounds.size.x <= room.x and bounds.size.y + OfficeCamera.REVEAL_HEADROOM <= room.y
+## `bounds`, which the floor view answers in its floor's coordinates, in the
+## world's, which the pan is measured in: the floor stands in the world, under
+## the plate (_build()).
+func _in_world(bounds: Rect2) -> Rect2:
+	return Rect2(floor_view.root.position + bounds.position, bounds.size)
 
 
 ## Give every pane of the frame when its state began (PaneModel.state_since),
