@@ -50,6 +50,7 @@ herdr machine list ─ Roster ┘        │      commands: CommandContext in, C
                                      ▼
    office.gd is the composition root: OfficeNavigator decides what to show, FloorPlanCache plans each machine's map, OfficeCamera pans
    (OfficeAttention writes the window title and its (N); OfficeAlerts only reads the state log: bounces the Dock when not in front, optional chime)
+   (OfficeNewPaneFollow asks the pure PickFollowsWrite (scripts/model) where the pick goes after a start, a split, a new space or a worktree the office sent, and carries the answer out: a selection only)
                           │                         │
                           ▼                         ▼
         OfficeFloorView + OfficeMachinePlate (scenes/world):   OfficeHud (scenes/ui):
@@ -74,7 +75,7 @@ herdr machine list ─ Roster ┘        │      commands: CommandContext in, C
    `can_operate` / `preview_shown` / `last_write` / `must_look`; start and split: `start_agent` / `split_pane` / `agent_kinds` / `next_agent_name` /
    `can_start` / `can_split` / `split_direction` / `launch_of` / `launch_outcome` and the static `prompt_state` / `prompt_refusal`; the three staff-panel verbs: `close_pane` / `create_space` / `create_worktree` /
    `can_close` / `can_space` / `can_worktree` / `close_scope` / `pane_cwd` / `worktree_context` and the static `branch_refusal`);
-   `office.gd` decides whether a shell's card can expand, keeps the selection on an agent it started, and auto-selects the new pane of a split, reading only `launch_of` / `last_write` / `agent_kinds` / `generation`; the terminal monitor likewise goes only through `read_screen` / `type_keys` / `type_text` /
+   `office.gd` decides whether a shell's card can expand, and the pure `PickFollowsWrite` (`scripts/model/pick_follows_write.gd`: no fleet object, no HUD, the clock a number) decides where the selection goes after a write the office sent — it keeps it on an agent the office started and auto-selects the new pane of a split, a new space or a worktree — from the values its adapter `OfficeNewPaneFollow` gathers; together they read only `launch_of` / `last_write` / `agent_kinds` / `generation`; the terminal monitor likewise goes only through `read_screen` / `type_keys` / `type_text` /
    `paste` / `input_refusal` / `screen_refusal` / `pane_size` / `queued_input`; the office's question reader (`OfficeQuestionReader`, the seats' chips)
    also only through `context_for` / `read_pane`. NEWS / EVENTS / OVERVIEW, the agent list's History group (`AgentHistory`), the top bar's `max` / hover durations, and the durations in the lens and the strategic view read the state log only through `state_log()` ("how long in this state" is computed in exactly one place, `StateLog.wait_of()`); the state log is fed only in the fleet layer, and models never call `Time.*`.
 2. **Raw JSON is read once, at the edge.** The art pack's manifest is read only by `from_manifest()` in `scripts/art/`; after that everything is typed fields.

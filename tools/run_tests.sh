@@ -96,11 +96,12 @@ MIN_CASES_LENS=20
 MIN_CASES_STRATEGIC=28
 MIN_CASES_ALERTS=19
 MIN_CASES_OVERVIEW=21
-MIN_CASES_LAUNCH=40
+MIN_CASES_LAUNCH=41
 MIN_CASES_PROMPT=12
-MIN_CASES_SPLIT=15
+MIN_CASES_SPLIT=16
 MIN_CASES_CLOSE=15
 MIN_CASES_SPACES=16
+MIN_CASES_PICK_FOLLOWS_WRITE=20
 
 # Unix socket paths stop at ~104 bytes on macOS: keep them short, under /tmp.
 WORK="$(mktemp -d /tmp/herdstead-test.XXXXXX)"
@@ -606,6 +607,8 @@ run_scene_suite test_strategic "STRATEGIC TESTS" "$MIN_CASES_STRATEGIC" -- --rea
 # In the background: the title's (N), the one Dock bounce, the chime; headless, so decided, never rung.
 run_scene_suite test_alerts "ALERTS TESTS" "$MIN_CASES_ALERTS" -- --read-only \
 	--socket="$WORK/alerts-nowhere.sock" --work="$WORK"
+# Where the pick goes after a start, a split, a new space or a worktree the office sent: pure, no office.
+run_scene_suite test_pick_follows_write "PICK FOLLOWS WRITE TESTS" "$MIN_CASES_PICK_FOLLOWS_WRITE"
 
 echo "RUN_TESTS: exit $status in $(( $(date +%s) - started ))s"
 exit "$status"

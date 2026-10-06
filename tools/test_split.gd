@@ -429,6 +429,46 @@ func test_a_new_pane_with_another_terminal_is_not_picked_and_the_footer_says_so(
 	_eq(_count("control-a", "pane.split"), 1, "never split again")
 
 
+## The office's own pick of the new pane is not the viewer's: it counts as no
+## navigation, it ends a press held on the world (the map is about to pan to
+## the new pod, so that press is no drag and no click any more), and the panel
+## opened on the pane split stays open on the new one. A panel the viewer
+## folded while the new pane was on its way stays folded on it.
+func test_the_offices_pick_of_the_new_pane_is_not_the_viewers() -> void:
+	var office := await _agent_card(["pane.read", "pane.split"])
+	var card := _card(office)
+	var navigations := office.navigator.nav_revision
+	await _after_a_poll("control-a")
+	_ctl("control-a", "next", {"action": "delay", "method": "session.snapshot", "seconds": 2.0})
+	await _click_control(_split_button(office))
+	await _until(func() -> bool: return card.outcome_text() == "New pane alpha:p4", "herdr made alpha:p4")
+	var at := office.hud.world_rect().get_center()
+	await _world_button(at, true)
+	_check(office.camera.dragging, "a press held on the world: a drag under way")
+	_eq(office.picked_key, p3, "the pane split is the pick still")
+	await _until(func() -> bool: return office.picked_key == p4, "the office picks the new pane")
+	_check(not office.camera.dragging, "its pick ended the press")
+	_eq(office.navigator.nav_revision, navigations, "and counted as no navigation")
+	_check(not office.hud.card_compact(), "the opened panel stays open")
+	await _until(func() -> bool: return _title(office) == "START AGENT", "on the new pane's card")
+	await _world_button(at, false)
+	await _pick_local(office, "alpha:p3")
+	var split := _split_button(office)
+	await _until(func() -> bool: return split.is_visible_in_tree() and not split.disabled, "alpha:p3 may split again")
+	await _after_a_poll("control-a")
+	_ctl("control-a", "next", {"action": "delay", "method": "session.snapshot", "seconds": 2.0})
+	await _click_control(split)
+	await _until(func() -> bool: return card.outcome_text() == "New pane alpha:p5", "herdr made alpha:p5")
+	await _tap(KEY_ESCAPE)
+	await _until(office.hud.card_compact, "Escape folds the panel while alpha:p5 is on its way")
+	var p5 := HerdrFleet.pane_key(HerdrFleet.LOCAL, "alpha:p5")
+	await _until(func() -> bool: return office.picked_key == p5, "folding is not moving on: alpha:p5 is picked")
+	await _frames(3)
+	_check(office.hud.card_compact(), "and the folded panel stays folded")
+	_eq(_count("control-a", "pane.split"), 2, "one split per click")
+	_eq(_count("control-a", "agent.start"), 0, "and nothing started")
+
+
 ## The block fits and says all of itself: at 480x320, opened on a working
 ## agent (Enter opens the card up; a working agent takes no answer), and at
 ## 800x480, the title NEW PANE BESIDE CLAUDE whole in at most two lines, the
@@ -566,6 +606,22 @@ func _kinds_enabled(office: OfficeDouble) -> Array:
 		if kind.is_visible_in_tree() and not kind.disabled:
 			shown.append(kind.text)
 	return shown
+
+
+## One half of a real left press at `at` (viewport pixels) on the world,
+## through `Input` as a mouse sends it: the office asks
+## `Input.is_mouse_button_pressed()` before it pans.
+func _world_button(at: Vector2, down: bool) -> void:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.button_mask = MOUSE_BUTTON_MASK_LEFT if down else 0
+	event.position = at
+	event.global_position = at
+	event.pressed = down
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
+	await physics_frame
+	await physics_frame
 
 
 ## Right after fake `which` answered a snapshot poll: the next is

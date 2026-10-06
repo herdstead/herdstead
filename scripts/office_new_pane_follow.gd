@@ -1,33 +1,25 @@
 class_name OfficeNewPaneFollow
 extends RefCounted
-## The new pane a split (or a new space or worktree) from the agent card made,
-## waited for until a snapshot shows it, then picked: a selection only, later,
-## never a write. The office hands every refresh's frame to follow() before its
-## navigator settles, and give_up() every frame; the card says why a pane it
-## made was not picked (OfficePaneInspector.new_pane_not_picked()).
+## The office's side of PickFollowsWrite, which decides where the viewer's pick
+## goes after a write the office sent: the new pane a split (or a new space or
+## worktree) from the agent card made, waited for until a snapshot shows it,
+## then picked; and the agent a start from the card became, which the pick is
+## carried on to. A selection only, later, never a write.
+##
+## Only wiring: each call gathers the facts (the navigator's pick and
+## nav_revision, the fleet's generation(), launch_of() and last_write(), the
+## card's answer mode, the clock), asks PickFollowsWrite once, keeps the memory
+## it answers with and carries the answer out. The office hands every refresh's
+## frame to follow() before its navigator settles and the selected pane to
+## follow_start() after, and calls give_up() every frame; the card says why a
+## pane it made was not picked (OfficePaneInspector.new_pane_not_picked()).
 
-
-## A pane a split made (HerdrFleet.pane_key) with its terminal, on its
-## machine's `generation`: picked when a snapshot shows it, while the viewer's
-## pick is still `from_key`, the pane split, the viewer has not navigated since
-## (`nav_revision`), out of answer mode, and until `until_msec`.
-class PendingPick:
-	var key := ""
-	var pane_id := ""
-	var terminal_id := ""
-	var from_key := ""
-	## OfficeNavigator.nav_revision then: any navigation the viewer asks for
-	## since (a zone picked, PageUp/PageDown, `N`, a counter, the list, NEWS,
-	## EVENTS, ...) is the viewer moving on. Panning (a drag, the wheel, the
-	## arrows) and herdr's focus moving are not.
-	var nav_revision := 0
-	var generation := 0
-	var until_msec := 0
-	## The pane is a new zone's shell (a space or a worktree the card made), on
-	## the same machine's map: picking it pans to that zone. Said for the record;
-	## the wait is the same.
-	var cross_floor := false
-
+## The card's words for a new pane that was not picked, by PickFollowsWrite's.
+const SAID: Dictionary[PickFollowsWrite.Why, OfficePaneInspector.Unpicked] = {
+	PickFollowsWrite.Why.UNSEEN: OfficePaneInspector.Unpicked.UNSEEN,
+	PickFollowsWrite.Why.MOVED_ON: OfficePaneInspector.Unpicked.MOVED_ON,
+	PickFollowsWrite.Why.OTHER_TERMINAL: OfficePaneInspector.Unpicked.OTHER_TERMINAL,
+}
 
 var _navigator: OfficeNavigator
 var _fleet: HerdrFleet
@@ -36,8 +28,8 @@ var _camera: OfficeCamera
 ## How long to wait for the new pane, in msec, read when a pick is queued (the
 ## office's pending_pick_msec, which a test lowers after the office is ready).
 var _wait_msec: Callable
-## The new pane waited for; null for none.
-var _pending: PendingPick
+## What PickFollowsWrite last answered with, handed back with the next question.
+var _memory := PickFollowsWrite.Memory.new()
 
 
 func _init(
@@ -54,59 +46,42 @@ func _init(
 ## spelling) with terminal `terminal_id` at the machine's `generation`: wait
 ## for a snapshot to show it (follow()). A selection only, later.
 func later(target_key: String, pane_id: String, terminal_id: String, generation: int) -> void:
-	var pending := PendingPick.new()
-	var machine := HerdrFleet.split_key(target_key)[0]
-	pending.key = HerdrFleet.pane_key(machine, pane_id)
-	pending.pane_id = pane_id
-	pending.terminal_id = terminal_id
-	pending.from_key = target_key
-	pending.nav_revision = _navigator.nav_revision
-	pending.generation = generation
 	var wait: int = _wait_msec.call()
-	pending.until_msec = Time.get_ticks_msec() + wait
-	_pending = pending
+	_memory = PickFollowsWrite.new_pane_made(
+		_memory, target_key, pane_id, terminal_id, generation, _navigator.nav_revision, Time.get_ticks_msec(), wait
+	)
 
 
 ## The card made a new space or worktree from pane `from_key`, whose root
 ## pane `pane_id` (herdr's spelling) has terminal `terminal_id`, at the
-## machine's `generation`: wait for a snapshot to show it, in its new zone
-## (follow() with `cross_floor`). A selection only, later.
+## machine's `generation`: wait for a snapshot to show it, in its new zone, as
+## for a split. A selection only, later.
 func later_space(
 	from_key: String, _workspace_id: String, pane_id: String, terminal_id: String, generation: int
 ) -> void:
 	later(from_key, pane_id, terminal_id, generation)
-	_pending.cross_floor = true
 
 
-## In a refresh, before the navigator settles: the new pane a split made is in
-## `frame`, with the terminal herdr named, on the same connection, and the
-## viewer is still where the split left them (the pane split picked, no
-## navigation since, out of answer mode): pick it, as a list pick does, and
-## stop waiting. The card then shows that shell; nothing is sent to it. Another
-## pick or connection: stop waiting. A navigation (the navigator's nav_revision
-## moved: another zone picked, PageUp/PageDown, `N`, ...), answer mode, or the
-## pane with another terminal: stop waiting, and the card says why it was not
-## picked. A new zone's shell (`cross_floor`: a space or a worktree) is picked
-## the same way, on the same map: the pick pans to its zone's pod. The office's
-## own pick (OfficeNavigator.follow_to()) does not count as the viewer moving.
+## In a refresh, before the navigator settles: when PickFollowsWrite.new_pane()
+## says the new pane is picked, pick it as a list pick does. The card then
+## shows that shell; nothing is sent to it. A new zone's shell (a space or a
+## worktree) is picked the same way, on the same map: the pick pans to its
+## zone's pod. The office's own pick (OfficeNavigator.follow_to()) does not
+## count as the viewer moving.
 func follow(frame: OfficeFrame) -> void:
-	var pending := _pending
-	if pending == null or give_up():
-		return
-	var machine := HerdrFleet.split_key(pending.key)[0]
-	if _navigator.picked_key != pending.from_key or _fleet.generation(machine) != pending.generation:
-		_pending = null
-		return
-	if _navigator.nav_revision != pending.nav_revision or _hud.inspector.answering():
-		_leave(OfficePaneInspector.Unpicked.MOVED_ON)
-		return
-	var pane := frame.pane(pending.key)
+	var answer := PickFollowsWrite.new_pane(
+		_memory,
+		frame,
+		_navigator.picked_key,
+		_navigator.nav_revision,
+		_fleet.generation(_memory.machine()),
+		_hud.inspector.answering(),
+		Time.get_ticks_msec()
+	)
+	_leave(answer)
+	var pane := answer.pane
 	if pane == null:
 		return
-	if pane.terminal_id != pending.terminal_id:
-		_leave(OfficePaneInspector.Unpicked.OTHER_TERMINAL)
-		return
-	_pending = null
 	_camera.cancel_press()
 	_hud.inspector.leave_answer()
 	_navigator.follow_to(frame, pane)
@@ -116,17 +91,28 @@ func follow(frame: OfficeFrame) -> void:
 		_hud.expand_card(pane.key)
 
 
-## Stop waiting for the new pane once its wait ran out: the card says no
-## snapshot showed it. True when it just gave up.
-func give_up() -> bool:
-	if _pending == null or Time.get_ticks_msec() < _pending.until_msec:
-		return false
-	_leave(OfficePaneInspector.Unpicked.UNSEEN)
-	return true
+## Every frame: stop waiting for the new pane once PickFollowsWrite.overdue()
+## says its wait ran out; the card says no snapshot showed it.
+func give_up() -> void:
+	_leave(PickFollowsWrite.overdue(_memory, Time.get_ticks_msec()))
 
 
-## Stop waiting for the new pane without picking it; the card says `why`.
-func _leave(why: OfficePaneInspector.Unpicked) -> void:
-	var left := _pending
-	_pending = null
-	_hud.inspector.new_pane_not_picked(left.from_key, left.pane_id, why)
+## In a refresh, once the selection is settled on `pane` (null for none): when
+## PickFollowsWrite.started() says the pick goes on to the agent this office
+## started there, the navigator picks it.
+func follow_start(pane: PaneModel) -> void:
+	var key := "" if pane == null else pane.key
+	var answer := PickFollowsWrite.started(
+		_memory, pane, _navigator.picked_key, _navigator.picked_identity, _fleet.launch_of(key), _fleet.last_write(key)
+	)
+	_memory = answer.memory
+	if answer.pane != null:
+		_navigator.pick_desk(answer.pane.key, answer.identity)
+
+
+## Keep what `answer` remembers, and when it ended a wait the card hears of,
+## the card says why.
+func _leave(answer: PickFollowsWrite.Answer) -> void:
+	_memory = answer.memory
+	if not answer.left_from.is_empty():
+		_hud.inspector.new_pane_not_picked(answer.left_from, answer.left_pane_id, SAID[answer.why])

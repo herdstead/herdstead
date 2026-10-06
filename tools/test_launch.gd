@@ -1436,6 +1436,33 @@ func test_the_pick_follows_a_start_into_its_first_session_only() -> void:
 	_check(not card.answer_offered(), "nothing to answer until then")
 
 
+## Carrying the pick over a start is a pick and nothing more: it counts as no
+## navigation, into the agent and into its first session, and a press the
+## viewer holds on the world meanwhile is still theirs (the office's pick of a
+## new pane ends one; this does not).
+func test_the_pick_carried_over_a_start_is_a_pick_and_nothing_more() -> void:
+	var office := await _shell_card("$ \n", ["pane.read", "agent.start"])
+	var card := _card(office)
+	var key := HerdrFleet.pane_key(HerdrFleet.LOCAL, "alpha:p2")
+	await _until(func() -> bool: return not _kind(office, 0).disabled, "CLAUDE may be pressed")
+	var navigations := office.navigator.nav_revision
+	await _click_control(_kind(office, 0))
+	await _until(card.answer_offered, "the pick followed the start into the agent")
+	_check(office.navigator.is_picked(office.frame.pane(key)), "the agent is the pick")
+	_eq(office.navigator.nav_revision, navigations, "carried: not a navigation")
+	var at := office.hud.world_rect().get_center()
+	await _world_button(at, true)
+	_check(office.camera.dragging, "a press held on the world: a drag under way")
+	await _reshape(office, {"agent_session": _session("first")})
+	await _until(card.answer_offered, "and into its first session")
+	_check(office.navigator.is_picked(office.frame.pane(key)), "the agent in its session is the pick")
+	_eq(office.navigator.nav_revision, navigations, "still not a navigation")
+	_check(office.camera.dragging, "the press under way is the viewer's still")
+	await _world_button(at + Vector2(60, 0), false)
+	_eq(office.picked_key, key, "its release, 60 px on, picks nothing")
+	_eq(_count("control-a", "agent.start"), 1, "one start, nothing more")
+
+
 ## The pick follows only this office's start: not an agent the viewer never
 ## picked in that terminal: one of another kind, one of the same kind herdr
 ## lists without the start's name (it exited, and the same kind was started by
@@ -1787,6 +1814,22 @@ func _shell_card(
 		var card := _card(office)
 		await _until(func() -> bool: return card.preview_text() == recent, "the shell's recent output is shown")
 	return office
+
+
+## One half of a real left press at `at` (viewport pixels) on the world,
+## through `Input` as a mouse sends it: the office asks
+## `Input.is_mouse_button_pressed()` before it pans.
+func _world_button(at: Vector2, down: bool) -> void:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.button_mask = MOUSE_BUTTON_MASK_LEFT if down else 0
+	event.position = at
+	event.global_position = at
+	event.pressed = down
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()
+	await physics_frame
+	await physics_frame
 
 
 ## The card's kind button `index` (`%Kind0` …).
