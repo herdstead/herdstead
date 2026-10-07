@@ -51,6 +51,20 @@ func _blocked_pair() -> void:
 		_ctl("control-b", "set_preview", {"pane_id": pane_id, "source": "detection", "text": QUESTION})
 
 
+## An office whose chips' reader is on and has read nothing yet: minimized from
+## before its first frame, both machines live. bee's map is the one shown, its
+## chips on screen, for as long as bee's snapshot is in and Local's is not, so
+## an office left to settle first may have read them already. The case says the
+## window is back (`office.pacer.note_minimized(false)`) once its scene is set.
+func _minimized_office(screen := Vector2(SCREEN)) -> OfficeDouble:
+	var office := await _office_with(false, true, false, screen, true)
+	office.pacer.note_minimized(true)
+	await _until(
+		func() -> bool: return office.fleet.size() == 2 and office.fleet.live_count() == 2, "both machines live"
+	)
+	return office
+
+
 ## The chips read what a blocked agent on screen asks, and nothing else: only
 ## the blocked panes of the floor shown (bee's alpha here, while the card reads
 ## Local's focus on fake A), the card's own payload (`detection`, 200 lines), one
@@ -137,13 +151,7 @@ func test_bubbles_read_nothing_while_minimized_covered_stale_or_off_screen() -> 
 		extra.terminal_id = "term-alpha-x%d" % index
 		_list(wide, "panes").append(extra)
 	_ctl("control-b", "set_snapshot", {"snapshot": wide})
-	# Minimized from before the office's first frame: bee's map is the one shown,
-	# its chips on screen, for as long as bee's snapshot is in and Local's is not.
-	var office := await _office_with(false, true, false, Vector2(480, 320), true)
-	office.pacer.note_minimized(true)
-	await _until(
-		func() -> bool: return office.fleet.size() == 2 and office.fleet.live_count() == 2, "both machines live"
-	)
+	var office := await _minimized_office(Vector2(480, 320))
 	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	var station := _station_of(office, HerdrFleet.pane_key(BEE, "alpha:p1"))
 	await _until(func() -> bool: return station.chip().visible, "the bubbles show")
@@ -248,9 +256,10 @@ func test_read_only_bubbles_read_nothing_and_say_so() -> void:
 ## shows the old one) until the spacing has passed and it is read afresh.
 func test_a_pane_is_read_at_most_every_ten_seconds_whatever_it_does() -> void:
 	_blocked_pair()
-	var office := await _office_with(false, true, true, Vector2(SCREEN), true)
+	var office := await _minimized_office()
 	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	await _bee_bubbles_on_screen(office)
+	office.pacer.note_minimized(false)
 	await _until_stats(
 		"control-b", func(_stats: Dictionary) -> bool: return _read_panes("control-b").has("alpha:p1"), "p1 is read"
 	)
@@ -291,9 +300,10 @@ func test_a_pane_is_read_at_most_every_ten_seconds_whatever_it_does() -> void:
 ## read waits for its ten seconds). The pointer leaving the chip takes it away.
 func test_hovering_a_bubble_shows_the_question_it_read() -> void:
 	_blocked_pair()
-	var office := await _office_with(false, true, true, Vector2(SCREEN), true)
+	var office := await _minimized_office()
 	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	await _bee_bubbles_on_screen(office)
+	office.pacer.note_minimized(false)
 	var p1 := HerdrFleet.pane_key(BEE, "alpha:p1")
 	await _until(func() -> bool: return not _question_of(office, p1).is_empty(), "p1's question is read")
 	var frame: NinePatchRect = _station_of(office, p1).chip().get_node("%Frame")
@@ -983,7 +993,7 @@ func test_the_reader_reads_a_blocked_agent_still_launching() -> void:
 	var asking := _changed(quiet, "alpha:p3", {"agent_status": "blocked", "launch_pending": true})
 	_ctl("control-b", "set_snapshot", {"snapshot": asking})
 	_ctl("control-b", "set_preview", {"pane_id": "alpha:p3", "source": "detection", "text": QUESTION})
-	var office := await _office_with(false, true, true, Vector2(SCREEN), true)
+	var office := await _minimized_office()
 	var key := HerdrFleet.pane_key(BEE, "alpha:p3")
 	await _until(
 		func() -> bool: return office.frame.pane(key) != null and office.frame.pane(key).starting, "still launching"
@@ -991,6 +1001,7 @@ func test_the_reader_reads_a_blocked_agent_still_launching() -> void:
 	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	var at := await _bubble_point(office, key)
 	_check(_station_of(office, key).chip().visible, "its seat shows a bubble")
+	office.pacer.note_minimized(false)
 	await _until(func() -> bool: return _read_panes("control-b").has("alpha:p3"), "the reader reads it")
 	_eq(_sequence("control-b"), PackedStringArray(["pane.read detection 200"]), "the card's own payload, nothing else")
 	await _until(func() -> bool: return _question_of(office, key) == "Do you want to proceed?", "the asking line kept")
@@ -1016,14 +1027,8 @@ func test_the_reader_reads_a_blocked_agent_still_launching() -> void:
 ## other pane before the look. Nothing is written either way.
 func test_the_strategic_view_stops_the_question_reads() -> void:
 	_blocked_pair()
-	# Minimized from before the office's first frame until the view is open, so
-	# no read begins before it: bee's map is the one shown, its chips on screen,
-	# for as long as bee's snapshot is in and Local's is not.
-	var office := await _office_with(false, true, false, Vector2(SCREEN), true)
-	office.pacer.note_minimized(true)
-	await _until(
-		func() -> bool: return office.fleet.size() == 2 and office.fleet.live_count() == 2, "both machines live"
-	)
+	# Minimized until the view is open, so no read begins before it.
+	var office := await _minimized_office()
 	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	await _bee_bubbles_on_screen(office)
 	await _tap(KEY_S)
