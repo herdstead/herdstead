@@ -1,0 +1,52 @@
+name: Set up CI tools
+description: Install Python, checksum-verified Godot and fonts/display packages on Ubuntu.
+
+# The caller's workflow env owns GODOT_VERSION and GODOT_LINUX_SHA512.
+# Only the download is cached; each runner imports its own checkout.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install Python dependencies
+      # requirements-dev.txt pulls in requirements.txt plus gdtoolkit (gdlint).
+      shell: bash
+      run: pip install -r tools/requirements-dev.txt
+
+    - name: Cache the Godot download
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/godot
+        # Bumping the version or checksum starts a new entry.
+        key: godot-${{ env.GODOT_VERSION }}-linux-x86_64-${{ env.GODOT_LINUX_SHA512 }}
+
+    - name: Install Godot ${{ env.GODOT_VERSION }}
+      shell: bash
+      run: |
+        archive="Godot_v${GODOT_VERSION}_linux.x86_64.zip"
+        cached="$HOME/.cache/godot/$archive"
+        mkdir -p "$HOME/.cache/godot"
+        # The cache is not trusted: a restored archive is checked like a
+        # download, and one that does not match is fetched again.
+        if [ -f "$cached" ] && ! echo "${GODOT_LINUX_SHA512}  $cached" | sha512sum -c --quiet -; then
+          rm -f "$cached"
+        fi
+        if [ ! -f "$cached" ]; then
+          curl -fsSL --retry 3 -o "$cached" \
+            "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/${archive}"
+        fi
+        echo "${GODOT_LINUX_SHA512}  $cached" | sha512sum -c -
+        unzip -q "$cached" -d "$RUNNER_TEMP/godot"
+        sudo install -m 755 "$RUNNER_TEMP/godot/Godot_v${GODOT_VERSION}_linux.x86_64" /usr/local/bin/godot
+        godot --version
+
+    - name: System packages
+      # The art tests require CJK fallback coverage on every shard. The
+      # display/software renderer packages also serve the quality job's captures.
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y xvfb libgl1 libglx-mesa0 libgl1-mesa-dri \
+          libxcursor1 libxinerama1 libxrandr2 libxi6 fonts-noto-cjk

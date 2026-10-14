@@ -88,6 +88,9 @@ make check      # full local gate: script load, packs, lint, docs, Python and al
 make check-quick            # the same gates, then only the art and world suites (about five minutes)
 make test-suite S=test_lens # one Godot suite, with only its own fake servers and no Python tests
 make test-suite S=test_client CASE=test_normal_path  # one exact case; diagnostic, not a full-suite check
+make test-list              # all Godot suite names, with no import or processes
+make test-list SHARD=1/4    # inspect the first CI shard
+make test-shard SHARD=1/4   # run that shard's whole suites and load checks; no Python tests
 make lint-changed           # changed GDScript working files vs HEAD, including staged and untracked
 make lint-changed BASE=origin/main  # include this branch's committed changes
 make test-tools # developer command contracts (no Godot required)
@@ -107,12 +110,16 @@ The focused commands are editing shortcuts, not substitutes for `make check` bef
 rejects unknown names before running anything and, without CASE, keeps the full run's case floors and error gates.
 CASE requires one suite and an exact discovered test_ method name, not a substring or glob; an unknown name fails before any case runs.
 Its summary says FILTERED and must report exactly the requested case. It does not run preceding cases or the closing whole-suite audit;
-rerun the suite afterwards. The full and quick gates ignore exported SUITES, CASE and TIER filters and run their declared coverage.
+rerun the suite afterwards. The full and quick gates ignore exported SUITES, CASE, TIER and SHARD filters and run their declared coverage.
 Every case logs its start, duration (including teardown) and check count. The runner keeps failure logs under build/test-results/
 and prints full-suite and failed-case rerun commands; after a crash or process timeout it also names the last unfinished case,
 not necessarily the cause of the timeout. Changed-file lint checks working
 contents (not a staged snapshot); changes to lint configuration or tool selection trigger a full GDScript check.
-CI also rebuilds art, smoke-tests the main scene, checks the exported PCK and captures screenshots; see the manual's
+CI distributes whole suites round-robin across four isolated runners, with all floors and closing audits intact.
+SHARD is 1-based and rejects empty shards; the same invocation list drives listing and execution. Run local shards sequentially,
+never concurrently in one checkout (they share Godot's import cache). A shard alone is not the full gate.
+CI's separate quality job also rebuilds art, runs Python contracts, smoke-tests the main scene, checks the exported PCK and captures screenshots;
+the aggregate `check` requires that job and every shard to succeed. See the manual's
 [CI section](docs/MANUAL.md#ci).
 
 Tests and CI never connect to a real herdr; they use `tools/fake_herdr.py` and `tools/fake_ssh.py`. The rules for

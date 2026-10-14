@@ -40,8 +40,19 @@
 # Every case logs its start and duration; failed or unfinished cases get their
 # own rerun commands beside the full-suite command and retained failure logs.
 #
+# SHARD=i/n partitions the full invocation list, round-robin, into n nonempty
+# groups of whole suites. It cannot combine with SUITES, CASE or TIER. Each
+# shard keeps the same floors, audits and fakes; Python contracts run separately.
+# --list prints the selected suite names without importing or starting anything.
+# Parallel shards need separate checkouts/runners, never a shared .godot cache.
+#
 # Needs Godot 4.6+ (StreamPeerUDS) and Python 3 with Pillow for asset checks.
 set -u
+
+if [ "$#" -gt 1 ] || { [ "$#" -eq 1 ] && [ "$1" != --list ]; }; then
+	echo "Usage: tools/run_tests.sh [--list] (SUITES, CASE, TIER or SHARD=i/n via environment)"
+	exit 2
+fi
 
 GODOT="${GODOT:-godot}"
 # Hard stop per Godot process, in case a case wedges despite its own waits.
@@ -139,6 +150,11 @@ test_office_navigator test_office_geometry test_office_frames test_office_quiet 
 test_office_reconcile test_office_walking test_office_rests test_lens test_pixel_people test_desk_signal"
 SUITES="${SUITES:-}"
 CASE="${CASE:-}"
+SHARD="${SHARD:-}"
+if [ -n "$SHARD" ] && { [ -n "$SUITES" ] || [ -n "$CASE" ] || [ -n "${TIER:-}" ]; }; then
+	echo "RUN_TESTS: SHARD cannot combine with SUITES, CASE or TIER"
+	exit 2
+fi
 if [ -n "$CASE" ] && { [ -z "$SUITES" ] || [ -n "${TIER:-}" ]; }; then
 	echo "RUN_TESTS: CASE requires one explicit suite and no TIER"
 	exit 2
@@ -447,6 +463,33 @@ WORK=""
 SELECTED=""
 LIST_ONLY=1
 run_suites
+if [ -n "$SHARD" ]; then
+	if ! [[ "$SHARD" =~ ^[1-9][0-9]*/[1-9][0-9]*$ ]]; then
+		echo "RUN_TESTS: SHARD must be i/n with positive decimal integers (no leading zeroes)"
+		exit 2
+	fi
+	shard_index="${SHARD%/*}"
+	shard_count="${SHARD#*/}"
+	read -r -a all_suites <<<"$SELECTED"
+	suite_count="${#all_suites[@]}"
+	# Bound lengths before integer comparisons: huge inputs must not overflow
+	# into valid shard numbers. No empty shards: empty SUITES means all suites.
+	if [ "${#shard_index}" -gt "${#suite_count}" ] || [ "${#shard_count}" -gt "${#suite_count}" ] \
+		|| [ "$shard_count" -gt "$suite_count" ] || [ "$shard_index" -gt "$shard_count" ]; then
+		echo "RUN_TESTS: SHARD requires 1 <= i <= n <= $suite_count (the number of suites)"
+		exit 2
+	fi
+	SELECTED=""
+	ordinal=0
+	for name in "${all_suites[@]}"; do
+		if [ "$((ordinal % shard_count + 1))" -eq "$shard_index" ]; then
+			SELECTED="$SELECTED $name"
+		fi
+		ordinal=$((ordinal + 1))
+	done
+	SUITES="${SELECTED# }"
+	read -r -a requested <<<"$SUITES"
+fi
 if [ -n "$SUITES" ]; then
 	for name in "${requested[@]}"; do
 		case "$SELECTED " in
@@ -454,11 +497,19 @@ if [ -n "$SUITES" ]; then
 			*) echo "RUN_TESTS: unknown suite '$name'"; exit 2 ;;
 		esac
 	done
-	echo "== suites:$SELECTED"
 fi
 for name in $SELECTED; do
 	[ -f "$ROOT/tools/$name.gd" ] || { echo "RUN_TESTS: missing tools/$name.gd"; exit 2; }
 done
+if [ "${1:-}" = --list ]; then
+	for name in $SELECTED; do printf '%s\n' "$name"; done
+	exit 0
+fi
+if [ -n "$SHARD" ]; then
+	echo "== shard $SHARD:$SELECTED"
+elif [ -n "$SUITES" ]; then
+	echo "== suites:$SELECTED"
+fi
 
 # Unix socket paths stop at ~104 bytes on macOS: keep them short, under /tmp.
 WORK="$(mktemp -d /tmp/herdstead-test.XXXXXX)" || exit 2

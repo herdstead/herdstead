@@ -751,31 +751,47 @@ make pack                                       # export the PCK, then run check
 ## CI
 
 `.github/workflows/ci.yml` runs on every push to main and every pull request (Ubuntu, never a real herdr). Each step calls
-a Makefile target where one exists. `make check` is the full local test gate; CI additionally rebuilds art, smoke-tests
-the main scene, checks the exported PCK and captures screenshots:
+a Makefile target where one exists. The quality job and four Godot shards run in separate checkouts on separate runners.
+They share `.github/actions/setup-ci/action.yml` for Python, Godot and the fonts/display packages. The Godot version and
+sha512 stay in the workflow's top-level `env`; `actions/cache` caches only the download, verified even on a cache hit,
+never the `.godot` import cache. This trades more concurrent runners for a shorter wait, not less coverage.
+
+The quality job runs:
 
 1. `make lint`: gdlint over `scripts/` and `tools/` (config in `gdlintrc`) and a gdformat check.
 2. `make docs-check`: every backticked repo path and `make` target in README.md, AGENTS.md, docs/MACHINES.md and
    docs/MANUAL.md exists.
 3. `make art`: rebuild every pack under `art/` and compare `assets/` with the commit (PNGs by pixel, since zlib output
    differs by platform; other files by byte).
-4. `make test-art`: the three Python contract tests.
-5. Download Godot from the official GitHub release (version and sha512 in the workflow's top-level `env`), cached with
-   `actions/cache` and verified against the sha512 even on a cache hit.
-6. `make import`, then `make check-scripts` loads every script and scene; warnings set to Error in `project.godot` fail
-   here.
-7. `make smoke`: run the main scene for one frame headless. These steps fail on `SCRIPT ERROR` / `Parse Error` in the log,
+4. `make test-art`: the three Python art contract tests.
+5. `make import`, then `make test-tools` and `make test-harness`: developer CLI and real-engine case-runner contracts,
+   including shard coverage, invalid selections, isolated fakes and retained failure logs. Python tests run once, not per shard.
+6. `make check-scripts`: load every script and scene; warnings set to Error in `project.godot` fail here.
+7. `make smoke`: run the main scene for one frame headless. Godot steps fail on `SCRIPT ERROR` / `Parse Error` in the log,
    because Godot still exits 0.
 8. `make check-packs`: validate every pack under `assets/` with `scripts/art/art_contract.gd`.
 9. `make pack`: export the PCK and run the same checks inside it with `tools/check_pack.gd` (manifest, font licences,
    every asset).
-10. `make test`: every test in `tools/run_tests.sh`, judged by its exit code. The load and pack checks already ran, so
-    this step sets `HERDSTEAD_SKIP_LOAD_CHECKS=1` to skip them (as `make check` does; a plain `make test` runs them).
-    This includes the developer command contracts (`make test-tools`): suite selection, fake-server isolation,
-    failure-log retention and changed-file lint. `make check` runs the Python tests once as prerequisites, then sets
-    `HERDSTEAD_SKIP_PYTHON_TESTS=1` for the Godot runner.
-11. `CAPTURE_SET=ci make capture` (with `xvfb` and software GL): the key set only, uploading every screenshot with
+10. `CAPTURE_SET=ci make capture` (with `xvfb` and software GL): the key set only, uploading every screenshot with
     `actions/upload-artifact`, pass or fail.
+
+The matrix jobs run `make test-shard SHARD=1/4` through `SHARD=4/4`. The runner distributes its actual invocation list
+round-robin, so every Godot suite runs exactly once. No second suite registry or timing file needs to stay in sync.
+Each shard imports its checkout and runs script/pack load checks, then its whole suites sequentially, with unchanged
+case floors, completion markers, script-error checks, timeouts and closing fake-herdr audits. A failed shard does not
+cancel the others. Every shard uploads its complete output and any retained failure logs as its own artifact.
+
+Use `make test-list` to see the full list, or add `SHARD=1/4` to see that shard without importing or starting processes.
+Shards are 1-based; zeroes, malformed values and counts that would leave any shard empty fail before work starts.
+The direct runner rejects SHARD combined with SUITES, CASE or TIER; the Make shard targets clear those diagnostic filters.
+Local shards must run sequentially, never in parallel against one checkout. Failure logs still print full-suite and exact-case
+reruns via `make test-suite`, which clears any inherited SHARD.
+
+The final job retains the `check` status name and requires both quality and every shard to succeed; failed, cancelled or
+skipped dependencies cannot turn the aggregate green. `make check` remains the full, sequential local gate before a push:
+it runs Python tests once, then sets `HERDSTEAD_SKIP_LOAD_CHECKS=1` and `HERDSTEAD_SKIP_PYTHON_TESTS=1` for the Godot runner.
+A plain `make test` retains load checks and the table/tool/harness contracts. Full and quick gates clear SHARD alongside
+the editing filters. One shard passing is not a replacement for either full gate.
 
 Screenshots are for looking at; there is no golden comparison. CI does not export the `.app` or publish releases.
 `tools/probe_herdr.gd` needs a real herdr and `make perf` needs a window and varies by machine, so neither runs in CI or
@@ -825,6 +841,7 @@ docs/                    this manual, WRITE_BOUNDARY, VISUAL_LANGUAGE, WORLD_MOD
                          MACHINES, preview.png and showroom.png (README screenshots), templates/ (generated guide canvases)
 Makefile                 every command; `make` lists them
 .github/workflows/ci.yml CI
+.github/actions/setup-ci/ shared CI tool installation (Python, verified Godot, fonts/display)
 ```
 
 The data side (`herdr_client`, `herdr_commands`, `machine_link`, `machine_roster`, `herdr_fleet`) knows nothing about

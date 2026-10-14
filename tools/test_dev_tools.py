@@ -34,6 +34,7 @@ class RunnerTests(unittest.TestCase):
             shutil.copyfile(ROOT / "tools" / name, tools / name)
         shutil.copyfile(ROOT / "tools/fake_herdr.py", tools / "server.py")
         shutil.copytree(ROOT / "tools/fixtures", tools / "fixtures")
+        shutil.copyfile(ROOT / "Makefile", self.root / "Makefile")
         # Existing files are not necessarily runnable suites (test_base.gd).
         for source in (ROOT / "tools").glob("*.gd"):
             (tools / source.name).touch()
@@ -71,6 +72,9 @@ with open(os.environ["ENGINE_CALLS"], "a") as out:
     out.write(json.dumps({"suite": script, "args": args, "fakes": alive}) + "\\n")
 mode = os.environ.get("ENGINE_RESULT", "ok")
 print("engine running " + script, flush=True)
+if script in ("check_scripts", "check_packs"):
+    print(script.removeprefix("check_").upper() + "_OK")
+    sys.exit(0)
 if mode == "timeout":
     print("CASE_START test_finished")
     print("PASS test_finished (0ms, 1 checks)")
@@ -108,14 +112,14 @@ sys.exit(7 if mode == "nonzero" else 0)
 ''')
         self.engine.chmod(0o755)
 
-    def run_suites(self, suites, mode="ok", case="", tier=""):
+    def run_suites(self, suites, mode="ok", case="", tier="", shard="", args=()):
         self.calls.unlink(missing_ok=True)
         self.fakes.unlink(missing_ok=True)
         environment = dict(os.environ, GODOT=str(self.engine), PYTHON=sys.executable,
-                           SUITES=suites, CASE=case, TIER=tier, HERDSTEAD_SKIP_LOAD_CHECKS="1",
+                           SUITES=suites, CASE=case, TIER=tier, SHARD=shard, HERDSTEAD_SKIP_LOAD_CHECKS="1",
                            ENGINE_CALLS=str(self.calls), FAKE_PIDS=str(self.fakes), ENGINE_RESULT=mode,
                            RUN_TIMEOUT="1" if mode == "timeout" else "10")
-        return subprocess.run(["bash", str(self.root / "tools/run_tests.sh")],
+        return subprocess.run(["bash", str(self.root / "tools/run_tests.sh"), *args],
                               capture_output=True, text=True, env=environment, timeout=30)
 
     def engine_calls(self):
@@ -123,6 +127,99 @@ sys.exit(7 if mode == "nonzero" else 0)
 
     def fake_pids(self):
         return [int(line) for line in self.fakes.read_text().splitlines()] if self.fakes.exists() else []
+
+    def test_shard_plans_partition_every_suite_once_without_starting_anything(self):
+        # A stale import must not make listing launch the engine either.
+        stamp = self.root / ".godot/herdstead-import.stamp"
+        stamp.unlink()
+        result = self.run_suites("", args=("--list",))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        suites = result.stdout.splitlines()
+        self.assertIn("test_client", suites)
+        self.assertIn("test_card_picture", suites)
+        self.assertEqual(len(suites), len(set(suites)))
+        for count in (1, 4, len(suites)):
+            seen = []
+            for index in range(1, count + 1):
+                with self.subTest(shard=f"{index}/{count}"):
+                    result = self.run_suites("", shard=f"{index}/{count}", args=("--list",))
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    names = result.stdout.splitlines()
+                    self.assertEqual(names, suites[index - 1::count])
+                    self.assertTrue(names, "empty shards must not silently run everything")
+                    seen.extend(names)
+                    self.assertEqual(self.engine_calls(), [])
+                    self.assertEqual(self.fake_pids(), [])
+                    self.assertFalse(stamp.exists())
+            self.assertCountEqual(seen, suites)
+        repeated = self.run_suites("", args=("--list",))
+        self.assertEqual(repeated.stdout.splitlines(), suites)
+        self.assertFalse((self.root / "build").exists(), "listing must not create a work or log directory")
+
+    def test_invalid_or_conflicting_shards_fail_before_side_effects(self):
+        for shard in ("1", " ", "0/4", "1/0", "5/4", "-1/4", "1/-4", "01/4", "1/04",
+                      "1/4/2", "1/4\n", "1/99999999999999999999", "18446744073709551617/4"):
+            with self.subTest(shard=shard):
+                result = self.run_suites("", shard=shard)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("SHARD", result.stdout)
+                self.assertEqual(self.engine_calls(), [])
+                self.assertEqual(self.fake_pids(), [])
+        for suites, case, tier in (("test_card_picture", "", ""), ("", "test_selected", ""),
+                                   ("", "", "quick")):
+            with self.subTest(suites=suites, case=case, tier=tier):
+                result = self.run_suites(suites, case=case, tier=tier, shard="1/4", args=("--list",))
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("SHARD", result.stdout)
+                self.assertEqual(self.engine_calls(), [])
+                self.assertEqual(self.fake_pids(), [])
+        result = self.run_suites("", args=("--list",))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        count = len(result.stdout.splitlines())
+        for index in (1, count + 1):
+            result = self.run_suites("", shard=f"{index}/{count + 1}", args=("--list",))
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertEqual(self.engine_calls(), [])
+            self.assertEqual(self.fake_pids(), [])
+
+    def test_make_shards_keep_whole_suites_load_checks_and_isolation_despite_exported_filters(self):
+        environment = dict(os.environ, GODOT=str(self.engine), PYTHON=sys.executable,
+                           SUITES="test_wrong", CASE="test_wrong", TIER="quick", SHARD="",
+                           HERDSTEAD_SKIP_LOAD_CHECKS="", ENGINE_CALLS=str(self.calls),
+                           FAKE_PIDS=str(self.fakes), ENGINE_RESULT="ok")
+        listed = subprocess.run(["make", "-s", "test-list"], cwd=self.root, capture_output=True,
+                                text=True, env=environment, timeout=30)
+        self.assertEqual(listed.returncode, 0, listed.stdout + listed.stderr)
+        suites = listed.stdout.splitlines()
+        for suite, fakes, cases in (("test_card_picture", 0, 27), ("test_launch_news", 2, 5)):
+            with self.subTest(suite=suite):
+                shard = f"SHARD={suites.index(suite) + 1}/{len(suites)}"
+                plan = subprocess.run(["make", "-s", "test-list", shard], cwd=self.root,
+                                      capture_output=True, text=True, env=environment, timeout=30)
+                self.assertEqual(plan.returncode, 0, plan.stdout + plan.stderr)
+                self.assertEqual(plan.stdout.splitlines(), [suite])
+                self.assertEqual(self.engine_calls(), [])
+                self.assertEqual(self.fake_pids(), [])
+                result = subprocess.run(["make", "-s", "test-shard", shard], cwd=self.root,
+                                        capture_output=True, text=True, env=environment, timeout=30)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertCountEqual([call["suite"] for call in self.engine_calls()],
+                                      ["check_scripts", "check_packs", suite])
+                self.assertIn(f"TESTS OK: {cases} cases", result.stdout)
+                self.assertNotIn("FILTERED", result.stdout)
+                self.assertNotIn("UNRELATED_PYTHON_TESTS", result.stdout)
+                self.assertEqual(len(self.fake_pids()), fakes)
+                for pid in self.fake_pids():
+                    with self.assertRaises(ProcessLookupError, msg=f"fake {pid} was not reaped"):
+                        os.kill(pid, 0)
+                self.calls.unlink()
+                self.fakes.unlink(missing_ok=True)
+        result = subprocess.run(["make", "-s", "test-shard"], cwd=self.root, capture_output=True,
+                                text=True, env=environment, timeout=30)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("SHARD", result.stdout + result.stderr)
+        self.assertEqual(self.engine_calls(), [])
+        self.assertEqual(self.fake_pids(), [])
 
     def test_a_pure_selection_runs_only_its_suites_without_python_or_servers(self):
         result = self.run_suites("test_card_picture\t test_pick_follows_write\n")
@@ -172,13 +269,12 @@ sys.exit(7 if mode == "nonzero" else 0)
                 self.assertIn("S=test_card_picture CASE=test_selected", result.stdout)
 
     def test_printed_reruns_override_exported_filters_for_full_and_exact_runs(self):
-        shutil.copyfile(ROOT / "Makefile", self.root / "Makefile")
         result = self.run_suites("test_card_picture", "script-error", case="test_selected")
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         prefix = "RUN_TESTS: rerun with "
         commands = [line.removeprefix(prefix) for line in result.stdout.splitlines() if line.startswith(prefix)]
         self.assertEqual(len(commands), 2, result.stdout)
-        environment = dict(os.environ, CASE="test_leaked", SUITES="test_wrong", TIER="quick",
+        environment = dict(os.environ, CASE="test_leaked", SUITES="test_wrong", TIER="quick", SHARD="1/4",
                            ENGINE_CALLS=str(self.calls), FAKE_PIDS=str(self.fakes), ENGINE_RESULT="ok")
         for command, summary in zip(commands, ("TESTS OK: 27 cases", "TESTS FILTERED OK: 1 cases")):
             with self.subTest(command=command):
@@ -231,18 +327,23 @@ sys.exit(7 if mode == "nonzero" else 0)
         self.assertIn("deliberate fake startup failure", logs[0].read_text())
 
     def test_every_failure_gate_keeps_logs_and_a_rerun_command(self):
-        for mode in ("script-error", "parse-error", "missing-marker", "too-few", "nonzero", "timeout"):
-            with self.subTest(mode=mode):
-                result = self.run_suites("test_card_picture", mode)
-                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIn("test-suite", result.stdout)
-                self.assertIn("S=test_card_picture", result.stdout)
-                logs = list((self.root / "build/test-results").glob("*/test_card_picture.log"))
-                self.assertEqual(len(logs), 1, result.stdout)
-                self.assertTrue(logs[0].read_text(), "the failed engine output survives cleanup")
-                if mode == "timeout":
-                    self.assertIn("killed after 1s", logs[0].read_text())
-                shutil.rmtree(logs[0].parent)
+        listed = self.run_suites("", args=("--list",))
+        self.assertEqual(listed.returncode, 0, listed.stdout + listed.stderr)
+        suites = listed.stdout.splitlines()
+        shard = f"{suites.index('test_card_picture') + 1}/{len(suites)}"
+        for selection, part in (("test_card_picture", ""), ("", shard)):
+            for mode in ("script-error", "parse-error", "missing-marker", "too-few", "nonzero", "timeout"):
+                with self.subTest(mode=mode, shard=part):
+                    result = self.run_suites(selection, mode, shard=part)
+                    self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertIn("test-suite", result.stdout)
+                    self.assertIn("S=test_card_picture", result.stdout)
+                    logs = list((self.root / "build/test-results").glob("*/test_card_picture.log"))
+                    self.assertEqual(len(logs), 1, result.stdout)
+                    self.assertTrue(logs[0].read_text(), "the failed engine output survives cleanup")
+                    if mode == "timeout":
+                        self.assertIn("killed after 1s", logs[0].read_text())
+                    shutil.rmtree(logs[0].parent)
 
 
 class PreviewTests(unittest.TestCase):

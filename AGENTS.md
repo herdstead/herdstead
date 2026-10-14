@@ -25,6 +25,8 @@ Commands live only in the `Makefile`; `make help` lists them all. A new everyday
 | The quick tier: the same gates, then only the art and world suites (`QUICK_SUITES` in `tools/run_tests.sh`); enough before a commit confined to art / world (see "Commits") | `make check-quick` |
 | One or more Godot suites with the full run's floors and error gates; only their own fakes, no Python tests or load stages | `make test-suite S="test_lens test_office_geometry"` |
 | One exact discovered case in one suite, for diagnosis only (not the suite's closing whole-run audit) | `make test-suite S=test_client CASE=test_normal_path` |
+| List Godot suites with no import or processes; optionally inspect a shard | `make test-list`, optionally `SHARD=1/4` |
+| Reproduce one CI shard: whole suites and load checks, no Python tests; never run shards concurrently in one checkout | `make test-shard SHARD=1/4` |
 | Load checks, table / developer-tool / harness contracts and every Godot suite | `make test` |
 | Developer command contracts without Godot | `make test-tools` |
 | Shared case-runner contracts through real Godot (selection, timing, teardown and script errors) | `make test-harness` |
@@ -44,6 +46,9 @@ Godot's exit code cannot be trusted: it is still 0 when a script fails. The gate
 Suite names are validated against the runner's actual invocations before any work starts. CASE matches one exact discovered test_ method;
 an unknown name fails before any case runs. Focused summaries say FILTERED and must report exactly that case; they never satisfy a full-suite floor.
 Full and quick gates clear editing filters and run their declared coverage. A focused rerun does not run preceding cases or the closing audit: run the suite afterwards.
+SHARD=i/n partitions the full invocation list round-robin into nonempty groups of whole suites; floors and closing audits stay intact.
+Direct runner calls cannot combine SHARD with SUITES, CASE or TIER. CI uses isolated checkouts; local shards must run sequentially because they share .godot.
+CI's `check` status requires both its quality job (including Python contracts) and all Godot shards to succeed; a shard alone is never the full gate.
 Cases log their start, duration (teardown included) and check count. The runner keeps failure logs under build/test-results/ and prints suite / case rerun commands;
 on a crash or process timeout it names the last unfinished case, not necessarily the timeout's cause.
 
