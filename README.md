@@ -81,6 +81,9 @@ Every command lives in the `Makefile`; `make help` lists them.
 ```sh
 make setup      # .venv with the Python and lint tools
 make import     # fill Godot's import cache after a fresh clone
+make preview    # real office, fake herdr, read-only and temporary settings (needs a display)
+make preview FIXTURE=snapshot_worktrees  # another synthetic session
+make preview-fixtures       # list the available snapshots
 make check      # full local gate: script load, packs, lint, docs, Python and all Godot tests
 make check-quick            # the same gates, then only the art and world suites (about five minutes)
 make test-suite S=test_lens # one Godot suite, with only its own fake servers and no Python tests
@@ -93,6 +96,12 @@ make test       # load checks, table/tool/harness contracts and all Godot suites
 make fmt        # format GDScript the way make lint expects
 make capture OUT=/abs/dir   # screenshots against a fake herdr (needs a display)
 ```
+
+`make preview` opens the real office, not the static showroom, using the existing snapshot_floors fixture by default.
+It imports stale assets, owns its fake server, disables real machine discovery and SSH, and isolates Godot's settings
+and avatar overrides (including during import). Close the window or press Ctrl-C to stop; preview preferences are
+discarded. The office starts in daylight without Dock bounces. Failure logs survive under build/preview-results/.
+It deliberately has no operator mode or arbitrary Godot-argument passthrough; use the write-boundary tests for writes.
 
 The focused commands are editing shortcuts, not substitutes for `make check` before a PR or push. Suite selection
 rejects unknown names before running anything and, without CASE, keeps the full run's case floors and error gates.

@@ -9,9 +9,11 @@ import io
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -241,6 +243,209 @@ sys.exit(7 if mode == "nonzero" else 0)
                 if mode == "timeout":
                     self.assertIn("killed after 1s", logs[0].read_text())
                 shutil.rmtree(logs[0].parent)
+
+
+class PreviewTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        tools = self.root / "tools"
+        tools.mkdir()
+        for name in ("preview.py", "import_if_stale.sh"):
+            if (ROOT / "tools" / name).exists():
+                shutil.copyfile(ROOT / "tools" / name, tools / name)
+        shutil.copytree(ROOT / "tools/fixtures", tools / "fixtures")
+        shutil.copyfile(ROOT / "tools/fake_herdr.py", tools / "server.py")
+        shutil.copyfile(ROOT / "Makefile", self.root / "Makefile")
+        for folder in ("scripts", "scenes", "assets"):
+            (self.root / folder).mkdir()
+        self.calls = self.root / "engine-calls.jsonl"
+        self.fakes = self.root / "fake-pids"
+        (tools / "fake_herdr.py").write_text(
+            'import os, runpy, sys\n'
+            'with open(os.environ["FAKE_PIDS"], "a") as out: out.write(str(os.getpid()) + "\\n")\n'
+            'if os.environ["ENGINE_RESULT"] == "fake-start-failure":\n'
+            '    sys.exit("deliberate fake startup failure")\n'
+            f'runpy.run_path({str(tools / "server.py")!r}, run_name="__main__")\n'
+        )
+        self.engine = self.root / "engine with spaces"
+        self.engine.write_text(f"#!{sys.executable}\n" + '''import json, os, signal, socket, subprocess, sys, time
+from pathlib import Path
+args = sys.argv[1:]
+mode = os.environ["ENGINE_RESULT"]
+stage = "import" if "--editor" in args else "office"
+keys = ("HOME", "XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "HERDR_SOCKET_PATH",
+        "HERDR_BIN_PATH", "HERDSTEAD_SOCKET_DIR", "HERDSTEAD_SSH", "__GODOT_SHELL_ENV_SET")
+record = {"stage": stage, "args": args, "pid": os.getpid(), "env": {key: os.getenv(key) for key in keys}}
+if mode == "hold-" + stage:
+    # An importer (or Avatar Studio) can spawn a child; stopping only the
+    # immediate process would leave it writing into a deleted private HOME.
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+    record["child"] = child.pid
+    def stop(*_):
+        child.terminate()
+        child.wait()
+        sys.exit(0)
+    signal.signal(signal.SIGTERM, stop)
+if stage == "office":
+    user = args[args.index("--") + 1:]
+    path = next(arg.removeprefix("--socket=") for arg in user if arg.startswith("--socket="))
+    with socket.socket(socket.AF_UNIX) as conn:
+        conn.settimeout(2)
+        conn.connect(path)
+        method = "pane.focus" if mode == "write" else "ping" if mode == "no-snapshot" else "session.snapshot"
+        conn.sendall((json.dumps({"id": "preview", "method": method, "params": {}}) + "\\n").encode())
+        response = json.loads(conn.makefile().readline())
+        if method == "session.snapshot":
+            record["snapshot"] = response["result"]["snapshot"]
+    saved = Path(os.environ["XDG_DATA_HOME"]) / "godot/app_userdata/Herdstead/herdstead.cfg"
+    saved.parent.mkdir(parents=True, exist_ok=True)
+    saved.write_text("preview preference")
+    if mode != "missing-marker":
+        print("OFFICE_START: read-only herdr client on " + path, flush=True)
+with open(os.environ["ENGINE_CALLS"], "a") as out:
+    out.write(json.dumps(record) + "\\n")
+if mode == "fake-died" and stage == "office":
+    os.kill(int(Path(os.environ["FAKE_PIDS"]).read_text().splitlines()[-1]), signal.SIGTERM)
+    time.sleep(60)
+if mode == "hold-" + stage:
+    time.sleep(60)
+if mode == "import-error" and stage == "import":
+    print("SCRIPT ERROR: deliberate import error")
+if stage == "office":
+    if mode == "script-error":
+        print("SCRIPT ERROR: deliberate office error")
+    if mode == "parse-error":
+        print("Parse Error: deliberate office error")
+    sys.exit(7 if mode == "nonzero" else 0)
+''')
+        self.engine.chmod(0o755)
+        # These must be untouched even when inherited explicitly. No real
+        # service or user directory participates in this test.
+        self.original = self.root / "operator"
+        self.original.mkdir()
+        (self.original / "herdstead.cfg").write_text("keep my preference")
+        self.env = dict(os.environ, GODOT=str(self.engine), PYTHON=sys.executable,
+                        ENGINE_CALLS=str(self.calls), FAKE_PIDS=str(self.fakes), ENGINE_RESULT="ok",
+                        DISPLAY=":fixture", HOME=str(self.original), XDG_DATA_HOME=str(self.original),
+                        XDG_CONFIG_HOME=str(self.original), XDG_CACHE_HOME=str(self.original),
+                        HERDR_SOCKET_PATH=str(self.original / "herdr.sock"),
+                        HERDR_BIN_PATH=str(self.original / "herdr"),
+                        HERDSTEAD_SOCKET_DIR=str(self.original), HERDSTEAD_SSH=str(self.original / "ssh"),
+                        HERDSTEAD_ROOT=str(self.original), __GODOT_SHELL_ENV_SET="0")
+
+    def preview(self, *args, mode="ok"):
+        self.calls.unlink(missing_ok=True)
+        self.fakes.unlink(missing_ok=True)
+        return subprocess.run([sys.executable, str(self.root / "tools/preview.py"), *args],
+                              cwd=self.root, capture_output=True, text=True,
+                              env=dict(self.env, ENGINE_RESULT=mode), timeout=20)
+
+    def records(self):
+        return [json.loads(line) for line in self.calls.read_text().splitlines()] if self.calls.exists() else []
+
+    def assert_cleaned(self):
+        pids = [int(pid) for pid in self.fakes.read_text().splitlines()] if self.fakes.exists() else []
+        for record in self.records():
+            pids.append(record["pid"])
+            if "child" in record:
+                pids.append(record["child"])
+            self.assertNotEqual(record["env"]["HOME"], str(self.original))
+            self.assertFalse(Path(record["env"]["HOME"]).exists(), "private settings must be discarded")
+            self.assertFalse(Path(record["env"]["HERDR_SOCKET_PATH"]).exists(), "socket must be removed")
+        for pid in pids:
+            with self.assertRaises(ProcessLookupError, msg=f"preview child {pid} survived"):
+                os.kill(pid, 0)
+        self.assertEqual(list(self.original.iterdir()), [self.original / "herdstead.cfg"])
+        self.assertEqual((self.original / "herdstead.cfg").read_text(), "keep my preference")
+
+    def test_make_preview_uses_the_real_office_with_private_settings_and_selected_fixture(self):
+        result = subprocess.run(["make", "preview", "FIXTURE=snapshot_worktrees"], cwd=self.root,
+                                capture_output=True, text=True, env=self.env, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        records = self.records()
+        self.assertEqual([record["stage"] for record in records], ["import", "office"])
+        office = records[-1]
+        self.assertIn("--read-only", office["args"][office["args"].index("--") + 1:])
+        expected = json.loads((ROOT / "tools/fixtures/snapshot_worktrees.json").read_text())["snapshot"]
+        self.assertEqual(office["snapshot"], expected)
+        for record in records:
+            env = record["env"]
+            for key in ("HOME", "XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME",
+                        "HERDR_SOCKET_PATH", "HERDR_BIN_PATH", "HERDSTEAD_SOCKET_DIR", "HERDSTEAD_SSH"):
+                self.assertTrue(env[key], key)
+                self.assertNotEqual(env[key], self.env[key], key + " leaked from operator")
+            self.assertEqual(env["__GODOT_SHELL_ENV_SET"], "1")
+        self.assertIn("PREVIEW_OK", result.stdout)
+        self.assert_cleaned()
+        # A warm start must not invoke the importer again, and omitting
+        # FIXTURE must actually serve the documented default, not the prior run.
+        (self.root / ".godot/global_script_class_cache.cfg").touch()
+        result = self.preview()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual([record["stage"] for record in self.records()], ["office"])
+        expected = json.loads((ROOT / "tools/fixtures/snapshot_floors.json").read_text())["snapshot"]
+        self.assertEqual(self.records()[0]["snapshot"], expected)
+        self.assert_cleaned()
+
+    def test_fixture_listing_and_invalid_options_start_nothing(self):
+        result = self.preview("--list-fixtures")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("snapshot_floors", result.stdout)
+        self.assertIn("snapshot_worktrees", result.stdout)
+        for args in (("--fixture=no_such_fixture",), ("--fixture=../snapshot_basic",), ("--socket=/somewhere",)):
+            with self.subTest(args=args):
+                result = self.preview(*args)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertEqual(self.records(), [])
+        self.assertFalse(self.fakes.exists())
+
+    def test_import_office_and_fake_failures_keep_logs_and_stop_every_child(self):
+        for mode, detail in (("import-error", "deliberate import error"),
+                             ("fake-start-failure", "deliberate fake startup failure"),
+                             ("script-error", "deliberate office error"),
+                             ("parse-error", "deliberate office error"),
+                             ("missing-marker", "OFFICE_START"), ("nonzero", "7"),
+                             ("no-snapshot", "before requesting the fixture snapshot"),
+                             ("write", "outside the read-only three"),
+                             ("fake-died", "fake herdr stopped")):
+            with self.subTest(mode=mode):
+                result = self.preview(mode=mode)
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn(detail, result.stdout + result.stderr)
+                self.assertIn("PREVIEW_FAILED", result.stdout + result.stderr)
+                self.assertNotIn("PREVIEW_OK", result.stdout)
+                logs = list((self.root / "build/preview-results").glob("*/*.log"))
+                self.assertTrue(logs, "a diagnostic log must survive cleanup")
+                self.assert_cleaned()
+                shutil.rmtree(self.root / "build/preview-results")
+
+    def test_interrupting_import_or_office_reaps_children_and_discards_private_settings(self):
+        for stage, stop in (("import", signal.SIGTERM), ("office", signal.SIGTERM),
+                            ("office", signal.SIGINT)):
+            with self.subTest(stage=stage, signal=stop):
+                self.calls.unlink(missing_ok=True)
+                self.fakes.unlink(missing_ok=True)
+                process = subprocess.Popen([sys.executable, str(self.root / "tools/preview.py")],
+                                           cwd=self.root, env=dict(self.env, ENGINE_RESULT="hold-" + stage),
+                                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+                try:
+                    deadline = time.monotonic() + 10
+                    while process.poll() is None and time.monotonic() < deadline:
+                        if any(record["stage"] == stage for record in self.records()):
+                            break
+                        time.sleep(0.05)
+                    process.send_signal(stop)
+                    output, _ = process.communicate(timeout=10)
+                    self.assertTrue(any("child" in record for record in self.records()), output)
+                    self.assertNotEqual(process.returncode, 0, output)
+                    self.assertNotIn("PREVIEW_OK", output)
+                    self.assert_cleaned()
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                        process.communicate()
 
 
 class LintChangedTests(unittest.TestCase):

@@ -37,6 +37,7 @@ Commands live only in the `Makefile`; `make help` lists them all. A new everyday
 | Export the pixel-people artist templates (canvases, guide layers, key-colour legend; the output directory must be empty) | `make people-templates OUT=/abs/new-dir` |
 | Cut pixel-people part skins from a pixelized frame, or only check the existing skins (the reference frame and the pixelize parameters come from `reference` in `tools/people_skins.py`) | `make people-skins`; to cut, add `CUT=/abs/frame.png PARTS=head,torso`; optionally `FACING=front`, `DROP=1` (drop texels outside the part and print each one; refused by default), `WEAR=hair_short` (hair / hat drawn in the image but not cut, for alignment) |
 | Screenshots (showroom + office under a fake herdr, 2x and 4x; 4x in a 1920×1280 window) | `make capture OUT=/abs/dir` |
+| Open the real office without herdr or SSH, read-only with disposable settings; a display is required | `make preview`, optionally `FIXTURE=snapshot_worktrees`; `make preview-fixtures` lists the existing snapshots |
 | Run | `make run`, or `godot --path . -- --socket=…` (flags in the [manual](docs/MANUAL.md)); add `--read-only` to watch without writing. **Operator is the default**: when running, capturing or measuring beside someone else's herdr session, always point `--socket=` at a fake herdr or add `--read-only` |
 
 Godot's exit code cannot be trusted: it is still 0 when a script fails. The gates read the log for `SCRIPT ERROR` / `Parse Error` and for each stage's `… OK` marker. The scripts already do this; do not bypass them.

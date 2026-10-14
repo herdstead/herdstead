@@ -7,6 +7,7 @@
 #   OUT=/tmp/shots         where `make capture` writes its PNGs
 #   RUNS=5 FIGURES=1       rounds of `make perf`, and its standalone figure scenarios
 #   WALKS=1                `make perf` also times the stress floor's people walking
+#   FIXTURE=snapshot_floors  the fake session for `make preview` (preview-fixtures lists them)
 
 GODOT ?= godot
 PYTHON ?= $(shell [ -x .venv/bin/python ] && echo .venv/bin/python || echo python3)
@@ -15,6 +16,7 @@ GDFORMAT ?= $(shell [ -x .venv/bin/gdformat ] && echo .venv/bin/gdformat || echo
 OUT ?= build/captures
 RUNS ?= 3
 BASE ?= HEAD
+FIXTURE ?= snapshot_floors
 # The one test entry point, for `test` and for `check`.
 RUN_TESTS = GODOT=$(GODOT) PYTHON=$(PYTHON) bash tools/run_tests.sh
 
@@ -22,7 +24,7 @@ RUN_TESTS = GODOT=$(GODOT) PYTHON=$(PYTHON) bash tools/run_tests.sh
 PACKS := $(notdir $(patsubst %/manifest.json,%,$(wildcard assets/*/manifest.json)))
 
 .DEFAULT_GOAL := help
-.PHONY: help setup import imported run people people-templates people-skins wall-templates table-templates pixel-sources test test-art test-tools test-harness test-suite check check-quick check-scripts check-packs smoke docs-check lint lint-changed fmt art capture walk-strips perf pack export clean
+.PHONY: help setup import imported run preview preview-fixtures people people-templates people-skins wall-templates table-templates pixel-sources test test-art test-tools test-harness test-suite check check-quick check-scripts check-packs smoke docs-check lint lint-changed fmt art capture walk-strips perf pack export clean
 
 help:  ## List these targets
 	@grep -hE '^[a-z][a-z-]*:.*##' $(MAKEFILE_LIST) \
@@ -45,6 +47,12 @@ imported:
 run:  ## Run the live office against your own herdr
 	$(GODOT) --path .
 
+preview:  ## Open the real office offline with fake herdr and temporary settings (read-only); FIXTURE=snapshot_floors
+	GODOT="$(GODOT)" $(PYTHON) tools/preview.py --fixture "$(FIXTURE)"
+
+preview-fixtures:  ## List the snapshot names available to make preview
+	$(PYTHON) tools/preview.py --list-fixtures
+
 test:  ## Every Godot test: script check, client, machines, incremental office
 	SUITES= CASE= TIER= $(RUN_TESTS)
 
@@ -53,7 +61,7 @@ test-art:  ## The three Python art contract tests (packs, table, pixel people)
 	$(PYTHON) tools/test_table_assets.py -v
 	$(PYTHON) tools/test_pixel_people.py -v
 
-test-tools:  ## Developer CLI contracts: suite selection, isolated fakes, failure logs and changed-file lint
+test-tools:  ## Developer CLI contracts: suite selection, offline preview, isolated fakes, logs and changed-file lint
 	$(PYTHON) tools/test_dev_tools.py -v
 
 test-harness:  ## Case discovery, exact selection and failure attribution through the real Godot engine
