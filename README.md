@@ -84,17 +84,24 @@ make import     # fill Godot's import cache after a fresh clone
 make check      # full local gate: script load, packs, lint, docs, Python and all Godot tests
 make check-quick            # the same gates, then only the art and world suites (about five minutes)
 make test-suite S=test_lens # one Godot suite, with only its own fake servers and no Python tests
+make test-suite S=test_client CASE=test_normal_path  # one exact case; diagnostic, not a full-suite check
 make lint-changed           # changed GDScript working files vs HEAD, including staged and untracked
 make lint-changed BASE=origin/main  # include this branch's committed changes
 make test-tools # developer command contracts (no Godot required)
-make test       # load checks, table/tool Python tests and all Godot suites
+make test-harness # shared case-runner contracts through the real Godot engine
+make test       # load checks, table/tool/harness contracts and all Godot suites
 make fmt        # format GDScript the way make lint expects
 make capture OUT=/abs/dir   # screenshots against a fake herdr (needs a display)
 ```
 
 The focused commands are editing shortcuts, not substitutes for `make check` before a PR or push. Suite selection
-rejects unknown names before running anything and keeps the full run's case floors and error gates. The test runner
-keeps failure logs under build/test-results/; a failing Godot suite also prints its rerun command. Changed-file lint checks working
+rejects unknown names before running anything and, without CASE, keeps the full run's case floors and error gates.
+CASE requires one suite and an exact discovered test_ method name, not a substring or glob; an unknown name fails before any case runs.
+Its summary says FILTERED and must report exactly the requested case. It does not run preceding cases or the closing whole-suite audit;
+rerun the suite afterwards. The full and quick gates ignore exported SUITES, CASE and TIER filters and run their declared coverage.
+Every case logs its start, duration (including teardown) and check count. The runner keeps failure logs under build/test-results/
+and prints full-suite and failed-case rerun commands; after a crash or process timeout it also names the last unfinished case,
+not necessarily the cause of the timeout. Changed-file lint checks working
 contents (not a staged snapshot); changes to lint configuration or tool selection trigger a full GDScript check.
 CI also rebuilds art, smoke-tests the main scene, checks the exported PCK and captures screenshots; see the manual's
 [CI section](docs/MANUAL.md#ci).

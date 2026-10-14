@@ -22,7 +22,7 @@
 #
 # HERDSTEAD_SKIP_LOAD_CHECKS=1 skips the two load stages for a caller that ran
 # them already. HERDSTEAD_SKIP_PYTHON_TESTS=1 likewise skips the Python checks
-# when `make check` has just run test-art and test-tools.
+# when `make check` has just run test-art, test-tools and test-harness.
 #
 # SUITES="test_office_geometry test_lens" runs only the Godot suites named (by
 # their script's name under tools/), each with its floor, marker and log gates
@@ -33,6 +33,12 @@
 # people, walking, the lens), none of the HUD or the write boundary; `make
 # check-quick` runs it. A suite left out is not checked: the full run (`make
 # check`, CI) is still the gate before a push.
+#
+# CASE=test_name requires one explicit suite and runs just that exact case.
+# Its FILTERED summary must name one case, never satisfy a full-suite floor.
+# This is a diagnostic shortcut, not the suite's closing whole-run audit.
+# Every case logs its start and duration; failed or unfinished cases get their
+# own rerun commands beside the full-suite command and retained failure logs.
 #
 # Needs Godot 4.6+ (StreamPeerUDS) and Python 3 with Pillow for asset checks.
 set -u
@@ -132,6 +138,11 @@ QUICK_SUITES="test_art test_office_incremental test_office_layout test_office_ma
 test_office_navigator test_office_geometry test_office_frames test_office_quiet test_day_light
 test_office_reconcile test_office_walking test_office_rests test_lens test_pixel_people test_desk_signal"
 SUITES="${SUITES:-}"
+CASE="${CASE:-}"
+if [ -n "$CASE" ] && { [ -z "$SUITES" ] || [ -n "${TIER:-}" ]; }; then
+	echo "RUN_TESTS: CASE requires one explicit suite and no TIER"
+	exit 2
+fi
 if [ "${TIER:-}" = "quick" ]; then
 	SUITES="$QUICK_SUITES"
 elif [ -n "${TIER:-}" ]; then
@@ -144,6 +155,10 @@ if [ -n "$SUITES" ]; then
 	read -r -a requested <<<"${SUITES//$'\n'/ }"
 	if [ "${#requested[@]}" -eq 0 ]; then
 		echo "RUN_TESTS: empty suite selection"
+		exit 2
+	fi
+	if [ -n "$CASE" ] && [ "${#requested[@]}" -ne 1 ]; then
+		echo "RUN_TESTS: CASE requires exactly one suite"
 		exit 2
 	fi
 	SUITES="${requested[*]}"
@@ -220,13 +235,20 @@ bounded() {
 	return "$result"
 }
 
-# Fail the run when a suite reports fewer cases than its floor, whatever it
-# reports about them.
+# Full suites keep their floors. A focused run instead proves exactly one
+# requested case started, and exactly one finished in its FILTERED summary.
 cases_floor() {
-	local log="$1" marker="$2" floor="$3"
+	local log="$1" marker="$2" floor="$3" selected="$4"
 	local line count
 	line="$(grep -m1 "^$marker \(OK\|FAILED\):" "$log" || true)"
 	count="$(printf '%s' "$line" | sed -n 's/^.*: \([0-9][0-9]*\) cases.*$/\1/p')"
+	if [ -n "$selected" ]; then
+		if [ "$count" != 1 ] || [ "$(sed -n 's/^CASE_START //p' "$log")" != "$selected" ]; then
+			echo "RUN_TESTS: $marker must run exactly '$selected'; reported ${count:-no} cases"
+			return 1
+		fi
+		return 0
+	fi
 	if [ -z "$count" ] || [ "$count" -lt "$floor" ]; then
 		echo "RUN_TESTS: $marker ran ${count:-no} cases, fewer than the $floor it must run"
 		return 1
@@ -252,6 +274,14 @@ start_fake() {
 	fi
 }
 
+# Keep the full-suite command too: a focused rerun cannot reproduce a closing
+# audit's preceding cases or prove the rest of the suite still passes.
+rerun_command() {
+	# An explicit empty CASE also clears a filter exported by the caller.
+	printf 'RUN_TESTS: rerun with GODOT=%q PYTHON=%q make -C %q test-suite S=%q CASE=%q\n' \
+		"$GODOT" "$PYTHON" "$ROOT" "$1" "$2"
+}
+
 # run_suites is the one list: first collect its selected names without side
 # effects, then run it. Selection never depends on parsing this shell source
 # or on a second registry that could drift from the actual invocations.
@@ -263,6 +293,12 @@ run_scene_suite() {
 		SELECTED="$SELECTED $script"
 		return 0
 	fi
+	if [ -n "$CASE" ]; then
+		# Pure suites have no user-argument separator yet; connected ones do.
+		[ "$#" -ne 0 ] || set -- --
+		set -- "$@" "--case=$CASE"
+		marker="$marker FILTERED"
+	fi
 	local log="$WORK/$script.log"
 	echo "== $script"
 	bounded "$GODOT" --headless --path "$ROOT" --script "tools/$script.gd" "$@" 2>&1 | tee "$log"
@@ -271,7 +307,7 @@ run_scene_suite() {
 		echo "RUN_TESTS: Godot reported a script error during $marker"
 		[ "$suite_status" -eq 0 ] && suite_status=1
 	fi
-	if ! cases_floor "$log" "$marker" "$floor"; then
+	if ! cases_floor "$log" "$marker" "$floor" "$CASE"; then
 		[ "$suite_status" -eq 0 ] && suite_status=1
 	fi
 	if ! grep -q "^$marker OK" "$log"; then
@@ -284,8 +320,23 @@ run_scene_suite() {
 		[ "$suite_status" -eq 0 ] && suite_status=1
 	fi
 	if [ "$suite_status" -ne 0 ]; then
-		printf 'RUN_TESTS: rerun with GODOT=%q PYTHON=%q make -C %q test-suite S=%q\n' \
-			"$GODOT" "$PYTHON" "$ROOT" "$script"
+		rerun_command "$script" ""
+		local unfinished failed name
+		unfinished="$(awk '
+			$1 == "CASE_START" { active = $2 }
+			($1 == "PASS" || $1 == "FAIL") && $2 == active { active = "" }
+			END { print active }
+		' "$log")"
+		# This names where execution stopped, not the cause of a process timeout.
+		[ -z "$unfinished" ] || echo "RUN_TESTS: last unfinished case: $unfinished"
+		if [ -n "$CASE" ]; then
+			rerun_command "$script" "$CASE"
+		else
+			failed="$(awk '/^FAIL / { print $2 }' "$log")"
+			for name in $failed $unfinished; do
+				rerun_command "$script" "$name"
+			done
+		fi
 	fi
 	[ "$status" -eq 0 ] && status=$suite_status
 }
@@ -416,12 +467,12 @@ trap 'exit 130' INT TERM
 status=0
 LIST_ONLY=0
 
-# A focused run is Godot-only. Full checks ran both Python targets already;
-# plain `make test` retains the table tests and also checks these CLI tools.
+# A focused run is Godot-only. Full checks ran the Python targets already;
+# plain `make test` retains the table, CLI and real-engine harness contracts.
 if [ -z "$SUITES" ] && [ "${HERDSTEAD_SKIP_PYTHON_TESTS:-}" != 1 ]; then
-	for script in test_table_assets test_dev_tools; do
+	for script in test_table_assets test_dev_tools test_harness; do
 		echo "== $script"
-		"$PYTHON" "$ROOT/tools/$script.py" -v 2>&1 | tee "$WORK/$script.log"
+		GODOT="$GODOT" "$PYTHON" "$ROOT/tools/$script.py" -v 2>&1 | tee "$WORK/$script.log"
 		[ "${PIPESTATUS[0]}" -eq 0 ] || exit 1
 	done
 fi

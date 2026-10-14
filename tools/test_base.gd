@@ -115,26 +115,54 @@ func case_names() -> PackedStringArray:
 	return names
 
 
-## Run every discovered case, print the summary and quit. Discovering nothing is
-## a harness error, not a green run: that is the whole point of discovery.
+## Run every discovered case, or the one exact --case= name, then quit. A focused
+## run has a distinct summary: it cannot stand in for a full suite's case floor.
+## Discovering nothing, or selecting no case, is a harness error, not a green run.
 func run_cases() -> void:
 	var names := case_names()
 	if names.is_empty():
 		print("TEST_HARNESS_ERROR: no test_ case found in %s" % get_script().resource_path)
 		quit(2)
 		return
+	var selected := ""
+	for argument in OS.get_cmdline_user_args():
+		if argument != "--case" and not argument.begins_with("--case="):
+			continue
+		var candidate := argument.trim_prefix("--case=")
+		if not selected.is_empty() or not names.has(candidate):
+			print("TEST_HARNESS_ERROR: use one --case=<exact test_ name>; got '%s'" % argument)
+			print("Available cases: " + ", ".join(names))
+			quit(2)
+			return
+		selected = candidate
+	if not selected.is_empty():
+		print("TEST_FILTER: %s (1 of %d discovered cases)" % [selected, names.size()])
+		names = PackedStringArray([selected])
 	var started := Time.get_ticks_msec()
 	var errors := ScriptErrorLog.new()
 	OS.add_logger(errors)
 	for name: String in names:
 		current = name
 		var before := failures.size()
+		var checks_before := checks
+		var case_started := Time.get_ticks_msec()
+		print("CASE_START " + name)
 		await call(name)
 		_after_case()
 		# Whatever ran while this case did, its teardown included.
 		for error in errors.take():
 			_fail("script error: " + error)
-		print("%s %s" % ["PASS" if failures.size() == before else "FAIL", name])
+		print(
+			(
+				"%s %s (%dms, %d checks)"
+				% [
+					"PASS" if failures.size() == before else "FAIL",
+					name,
+					Time.get_ticks_msec() - case_started,
+					checks - checks_before,
+				]
+			)
+		)
 	OS.remove_logger(errors)
 	# run_tests.sh greps this line for the marker and reads the case count off
 	# it, so a file that silently loses its cases fails the run.
@@ -142,7 +170,7 @@ func run_cases() -> void:
 		(
 			"%s %s: %d cases, %d checks, %d failures, %.1fs%s"
 			% [
-				_marker(),
+				_marker() + (" FILTERED" if not selected.is_empty() else ""),
 				"OK" if failures.is_empty() else "FAILED",
 				names.size(),
 				checks,

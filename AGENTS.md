@@ -24,8 +24,10 @@ Commands live only in the `Makefile`; `make help` lists them all. A new everyday
 | Full local gate, before a PR or push (CI also rebuilds art, runs smoke / export checks and captures) | `make check` |
 | The quick tier: the same gates, then only the art and world suites (`QUICK_SUITES` in `tools/run_tests.sh`); enough before a commit confined to art / world (see "Commits") | `make check-quick` |
 | One or more Godot suites with the full run's floors and error gates; only their own fakes, no Python tests or load stages | `make test-suite S="test_lens test_office_geometry"` |
-| Load checks, table / developer-tool Python tests and every Godot suite | `make test` |
+| One exact discovered case in one suite, for diagnosis only (not the suite's closing whole-run audit) | `make test-suite S=test_client CASE=test_normal_path` |
+| Load checks, table / developer-tool / harness contracts and every Godot suite | `make test` |
 | Developer command contracts without Godot | `make test-tools` |
+| Shared case-runner contracts through real Godot (selection, timing, teardown and script errors) | `make test-harness` |
 | Lint changed GDScript working files, including staged and untracked paths (config changes check all); editing shortcut only | `make lint-changed`, optionally `BASE=origin/main` to include committed branch changes |
 | Format GDScript (`make lint` checks it) | `make fmt` |
 | Run the main scene headless for one frame; fail on any script error in the log (the same step as CI) | `make smoke` |
@@ -38,7 +40,11 @@ Commands live only in the `Makefile`; `make help` lists them all. A new everyday
 | Run | `make run`, or `godot --path . -- --socket=…` (flags in the [manual](docs/MANUAL.md)); add `--read-only` to watch without writing. **Operator is the default**: when running, capturing or measuring beside someone else's herdr session, always point `--socket=` at a fake herdr or add `--read-only` |
 
 Godot's exit code cannot be trusted: it is still 0 when a script fails. The gates read the log for `SCRIPT ERROR` / `Parse Error` and for each stage's `… OK` marker. The scripts already do this; do not bypass them.
-Suite names are validated against the runner's actual invocations before any work starts. The runner keeps failure logs under build/test-results/; a failing Godot suite also prints its rerun command.
+Suite names are validated against the runner's actual invocations before any work starts. CASE matches one exact discovered test_ method;
+an unknown name fails before any case runs. Focused summaries say FILTERED and must report exactly that case; they never satisfy a full-suite floor.
+Full and quick gates clear editing filters and run their declared coverage. A focused rerun does not run preceding cases or the closing audit: run the suite afterwards.
+Cases log their start, duration (teardown included) and check count. The runner keeps failure logs under build/test-results/ and prints suite / case rerun commands;
+on a crash or process timeout it names the last unfinished case, not necessarily the timeout's cause.
 
 ## Code map
 

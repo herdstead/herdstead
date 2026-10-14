@@ -22,7 +22,7 @@ RUN_TESTS = GODOT=$(GODOT) PYTHON=$(PYTHON) bash tools/run_tests.sh
 PACKS := $(notdir $(patsubst %/manifest.json,%,$(wildcard assets/*/manifest.json)))
 
 .DEFAULT_GOAL := help
-.PHONY: help setup import imported run people people-templates people-skins wall-templates table-templates pixel-sources test test-art test-tools test-suite check check-quick check-scripts check-packs smoke docs-check lint lint-changed fmt art capture walk-strips perf pack export clean
+.PHONY: help setup import imported run people people-templates people-skins wall-templates table-templates pixel-sources test test-art test-tools test-harness test-suite check check-quick check-scripts check-packs smoke docs-check lint lint-changed fmt art capture walk-strips perf pack export clean
 
 help:  ## List these targets
 	@grep -hE '^[a-z][a-z-]*:.*##' $(MAKEFILE_LIST) \
@@ -46,7 +46,7 @@ run:  ## Run the live office against your own herdr
 	$(GODOT) --path .
 
 test:  ## Every Godot test: script check, client, machines, incremental office
-	$(RUN_TESTS)
+	SUITES= CASE= TIER= $(RUN_TESTS)
 
 test-art:  ## The three Python art contract tests (packs, table, pixel people)
 	$(PYTHON) tools/test_assets.py -v
@@ -56,16 +56,20 @@ test-art:  ## The three Python art contract tests (packs, table, pixel people)
 test-tools:  ## Developer CLI contracts: suite selection, isolated fakes, failure logs and changed-file lint
 	$(PYTHON) tools/test_dev_tools.py -v
 
-# The Godot tests run last; load checks and Python tests just ran as prerequisites.
-check: check-scripts check-packs lint docs-check test-art test-tools  ## Full local gate: load, packs, lint, docs, Python and every Godot suite
-	HERDSTEAD_SKIP_LOAD_CHECKS=1 HERDSTEAD_SKIP_PYTHON_TESTS=1 $(RUN_TESTS)
+test-harness:  ## Case discovery, exact selection and failure attribution through the real Godot engine
+	GODOT=$(GODOT) $(PYTHON) tools/test_harness.py -v
 
-check-quick: check-scripts check-packs lint docs-check test-art test-tools  ## The quick tier: the same gates, then only the art and world suites (QUICK_SUITES in tools/run_tests.sh); not a substitute for check before a push
-	HERDSTEAD_SKIP_LOAD_CHECKS=1 HERDSTEAD_SKIP_PYTHON_TESTS=1 TIER=quick $(RUN_TESTS)
+# The Godot suites run last; load and Python checks just ran as prerequisites.
+# Editing filters cannot silently narrow either gate, even when exported.
+check: check-scripts check-packs lint docs-check test-art test-tools test-harness  ## Full local gate: load, packs, lint, docs, Python and every Godot suite
+	HERDSTEAD_SKIP_LOAD_CHECKS=1 HERDSTEAD_SKIP_PYTHON_TESTS=1 SUITES= CASE= TIER= $(RUN_TESTS)
 
-test-suite:  ## One or more Godot suites as the full run starts them, with their floors: make test-suite S="test_lens test_office_geometry"
+check-quick: check-scripts check-packs lint docs-check test-art test-tools test-harness  ## The quick tier: the same gates, then only the art and world suites (QUICK_SUITES in tools/run_tests.sh); not a substitute for check before a push
+	HERDSTEAD_SKIP_LOAD_CHECKS=1 HERDSTEAD_SKIP_PYTHON_TESTS=1 SUITES= CASE= TIER=quick $(RUN_TESTS)
+
+test-suite:  ## Godot suites with their full floors: S="test_lens test_office_geometry"; one exact case: S=test_client CASE=test_normal_path (diagnostic only)
 	@test -n "$(S)" || { echo "make test-suite S=<script names under tools/, without .gd>"; exit 2; }
-	HERDSTEAD_SKIP_LOAD_CHECKS=1 SUITES="$(S)" $(RUN_TESTS)
+	HERDSTEAD_SKIP_LOAD_CHECKS=1 SUITES="$(S)" CASE="$(CASE)" TIER= $(RUN_TESTS)
 
 check-scripts: imported  ## Prove every script and scene still loads
 	$(GODOT) --headless --path . --script tools/check_scripts.gd

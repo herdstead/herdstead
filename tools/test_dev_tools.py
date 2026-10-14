@@ -70,6 +70,9 @@ with open(os.environ["ENGINE_CALLS"], "a") as out:
 mode = os.environ.get("ENGINE_RESULT", "ok")
 print("engine running " + script, flush=True)
 if mode == "timeout":
+    print("CASE_START test_finished")
+    print("PASS test_finished (0ms, 1 checks)")
+    print("CASE_START test_waiting", flush=True)
     print("waiting in " + script, flush=True)
     time.sleep(30)
 if mode == "script-error":
@@ -82,17 +85,32 @@ marker, count = {
     "test_launch_news": ("LAUNCH NEWS TESTS", 5),
     "test_refusal_ladder": ("REFUSAL LADDER TESTS", 23),
 }[script]
+selected = [arg.removeprefix("--case=") for arg in args if arg.startswith("--case=")]
+if selected and mode != "ignore-case":
+    marker += " FILTERED"
+    count = 0 if mode == "zero-cases" else 2 if mode == "extra-cases" else 1
+    name = "test_wrong" if mode == "wrong-case" else selected[0]
+    print("CASE_START " + name)
+    print(f"PASS {name} (0ms, 1 checks)")
+if mode == "failed-cases":
+    for name in ("test_first_failure", "test_second_failure"):
+        print("CASE_START " + name)
+        print(f"FAIL {name} (2ms, 1 checks)")
+    print("CASE_START test_finished")
+    print("PASS test_finished (0ms, 1 checks)")
+    print(f"{marker} FAILED: {count} cases, 3 checks, 2 failures, 0.0s")
+    sys.exit(1)
 if mode != "missing-marker":
     print(f"{marker} OK: {count - (mode == 'too-few')} cases, 1 checks, 0 failures, 0.0s")
 sys.exit(7 if mode == "nonzero" else 0)
 ''')
         self.engine.chmod(0o755)
 
-    def run_suites(self, suites, mode="ok"):
+    def run_suites(self, suites, mode="ok", case="", tier=""):
         self.calls.unlink(missing_ok=True)
         self.fakes.unlink(missing_ok=True)
         environment = dict(os.environ, GODOT=str(self.engine), PYTHON=sys.executable,
-                           SUITES=suites, TIER="", HERDSTEAD_SKIP_LOAD_CHECKS="1",
+                           SUITES=suites, CASE=case, TIER=tier, HERDSTEAD_SKIP_LOAD_CHECKS="1",
                            ENGINE_CALLS=str(self.calls), FAKE_PIDS=str(self.fakes), ENGINE_RESULT=mode,
                            RUN_TIMEOUT="1" if mode == "timeout" else "10")
         return subprocess.run(["bash", str(self.root / "tools/run_tests.sh")],
@@ -119,6 +137,67 @@ sys.exit(7 if mode == "nonzero" else 0)
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
                 self.assertEqual(self.engine_calls(), [])
                 self.assertEqual(self.fake_pids(), [])
+
+    def test_case_selection_reaches_pure_and_connected_suites_as_a_user_argument(self):
+        for suite, fakes in (("test_card_picture", 0), ("test_launch_news", 2)):
+            with self.subTest(suite=suite):
+                result = self.run_suites(suite, case="test_selected")
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                calls = self.engine_calls()
+                self.assertEqual(len(calls), 1)
+                args = calls[0]["args"]
+                self.assertEqual(args.count("--"), 1)
+                self.assertIn("--case=test_selected", args[args.index("--") + 1:])
+                self.assertEqual(len(self.fake_pids()), fakes)
+                self.assertIn("FILTERED OK: 1 cases", result.stdout)
+                self.assertNotIn("UNRELATED_PYTHON_TESTS", result.stdout)
+
+    def test_case_selection_requires_one_explicit_suite_before_starting_anything(self):
+        for suites, tier in (("", ""), ("test_card_picture test_launch_news", ""),
+                             ("test_card_picture", "quick")):
+            with self.subTest(suites=suites, tier=tier):
+                result = self.run_suites(suites, case="test_selected", tier=tier)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertEqual(self.engine_calls(), [])
+                self.assertEqual(self.fake_pids(), [])
+
+    def test_filtered_success_must_report_exactly_the_requested_case(self):
+        for mode in ("ignore-case", "zero-cases", "extra-cases", "wrong-case",
+                     "script-error", "parse-error", "missing-marker", "nonzero"):
+            with self.subTest(mode=mode):
+                result = self.run_suites("test_card_picture", mode, case="test_selected")
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("S=test_card_picture CASE=test_selected", result.stdout)
+
+    def test_printed_reruns_override_exported_filters_for_full_and_exact_runs(self):
+        shutil.copyfile(ROOT / "Makefile", self.root / "Makefile")
+        result = self.run_suites("test_card_picture", "script-error", case="test_selected")
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        prefix = "RUN_TESTS: rerun with "
+        commands = [line.removeprefix(prefix) for line in result.stdout.splitlines() if line.startswith(prefix)]
+        self.assertEqual(len(commands), 2, result.stdout)
+        environment = dict(os.environ, CASE="test_leaked", SUITES="test_wrong", TIER="quick",
+                           ENGINE_CALLS=str(self.calls), FAKE_PIDS=str(self.fakes), ENGINE_RESULT="ok")
+        for command, summary in zip(commands, ("TESTS OK: 27 cases", "TESTS FILTERED OK: 1 cases")):
+            with self.subTest(command=command):
+                rerun = subprocess.run(["bash", "-c", command], capture_output=True, text=True,
+                                       env=environment, timeout=30)
+                self.assertEqual(rerun.returncode, 0, rerun.stdout + rerun.stderr)
+                self.assertIn(summary, rerun.stdout)
+                self.assertNotIn("test_leaked", rerun.stdout)
+
+    def test_failed_cases_and_the_unfinished_case_have_exact_rerun_commands(self):
+        result = self.run_suites("test_card_picture", "failed-cases")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("S=test_card_picture CASE=test_first_failure", result.stdout)
+        self.assertIn("S=test_card_picture CASE=test_second_failure", result.stdout)
+        self.assertNotIn("CASE=test_finished", result.stdout)
+        self.assertNotIn("last unfinished case:", result.stdout)
+        result = self.run_suites("test_card_picture", "timeout")
+        self.assertEqual(result.returncode, 124, result.stdout + result.stderr)
+        self.assertIn("last unfinished case: test_waiting", result.stdout)
+        self.assertIn("S=test_card_picture CASE=test_waiting", result.stdout)
+        self.assertNotIn("CASE=test_finished", result.stdout)
 
     def test_connected_suites_have_their_own_pair_and_leave_no_processes(self):
         for mode in ("ok", "nonzero"):
