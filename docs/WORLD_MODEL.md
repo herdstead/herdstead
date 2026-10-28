@@ -99,14 +99,15 @@ The grid is fixed at **32 world units**. **The map is lanes** (`FloorLayoutPolic
 corridor (2) and the other side wall: **5L + 3 cells** for L lanes; lane i covers columns 1 + 5i to 4 + 5i, the
 aisle after it is column 5 + 5i, and the main corridor is columns 5L and 5L + 1. A lane holds the narrowest pod (2
 columns, 3 cells) right of its zone's pad. Down it: the top wall (2 cells),
-the entry band (2), then the zones from row 5. A map's first plan picks L = max(2, ⌊(width − 3) / 5⌋) from the
+the entry band (1, the walking lane, which is also the first zones' aisle row), then the zones from row 3. A map's first plan picks L = max(2, ⌊(width − 3) / 5⌋) from the
 viewport width available at that moment (the default 1920×960 window at 2x: 936 units, 29 cells: five lanes, 28 cells);
 after that, window or zoom changes only change how much is visible, and nothing reflows. L is raised only when a zone
 needs more lanes than the map has. Never fewer than two lanes (13 cells): the smallest window (480×320 units) keeps the
 top wall's window and its picture.
 
 **A zone** (a workspace, `ZonePlacement`) stands in k adjacent lanes under an **aisle row** of its own
-(`zone_aisle_cells`, 1; the first zones' aisle row is row 4, right under the entry band): it is 5k − 1 cells wide
+(`zone_aisle_cells`, 1; the first zones' aisle row is row 2, the entry band's walking lane: `map_top_aisle_cells` 0,
+S3 BAND): it is 5k − 1 cells wide
 (the aisle columns between its lanes are its own) and whole **pod rows** deep; its **slot** is its aisle row and its
 rectangle. Inside it a pad column (`zone_pad_left_cells`, 1) keeps its tables off its left partition; the rows are as
 deep as a table's measured reservation (`OfficeZoneLayout.pod_row_cells()`, 6 cells on the pods), with no
@@ -128,7 +129,7 @@ key) order:
    over, down and right, aisle row included, are free of every held slot (the ones grown earlier in the pass
    included); otherwise it alone releases its slot and moves;
 3. the zones that move and the new ones, in order, take the **top-most, then left-most** gap their whole slot fits in
-   over k adjacent lanes (from row 5); a new mezzanine first tries directly below its source's slot, in the same
+   over k adjacent lanes (zones from row 3, their slots from row 2); a new mezzanine first tries directly below its source's slot, in the same
    lanes; only on its first placement (grouping is display, never in the geometry signature, so a group forming or
    breaking later moves nothing).
 
@@ -143,7 +144,7 @@ fallback).
 Inside a zone the row allocator is today's: next-fit on the zone's first layout, gap reuse afterwards, growth
 left-anchored, a table wider than the zone first was taking a row of its own (and widening the zone by lanes), rows
 never shrinking. **The map keeps its largest extents**: its width is 5L + 3, its height the larger of the last plan's
-and the lowest slot's bottom (at least `min_height_cells`, 11). Removing a zone leaves a gap a later zone may take;
+and the lowest slot's bottom (at least `min_height_cells`, 9). Removing a zone leaves a gap a later zone may take;
 removing the last or lowest zone, or emptying a lane, never shrinks the map. The keep-outs (`FloorPlan.aisles`, drawn
 as plain floor) are every zone's aisle row and every inter-lane aisle column where no zone spans both lanes; no
 reservation, zone or furniture stands on them or on a walkway.
@@ -238,11 +239,14 @@ non-finite numbers, illegal widths and illegal columns at creation and on update
 at least 64. The plate, lens and chip Labels are sized again once the display face is on: a Label is 23 units tall
 before its font applies.
 
-Below the top outer wall is a **64-unit entry band** of two cell rows (`entry_cells` 2; three, with a fixture row
-for the pantry's spots, before D2, 2026-10-27): the first is inside the outer wall's drawing clearance, the second
-is the walking lane (y = 112, `OfficeShell.WALKING_LANE` 48 into the band), the lift door's threshold on it. The main
-corridor on the right is 64 wide, and each side outer wall takes 32. A map of one zone of one pod row is therefore
-2 + 2 + 1 + 6 = 11 cells deep (a pod row is 6); an empty map is 11 too, the least a map is.
+Below the top outer wall is a **32-unit entry band** of one cell row (`entry_cells` 1): the walking lane (y = 80,
+`OfficeShell.WALKING_LANE` 16 into the band), the lift door's threshold on it, and the first zones' aisle row, where
+their signs hang. (Three rows with a fixture row for the pantry's spots before D2, 2026-10-27; two, a drawing-clearance
+row over the walking lane, and a top aisle row of its own under them, before S3 BAND, 2026-10-28: the top wall now
+draws behind a person standing in front of it, see "Collision and walking", so a map opens with the wall's face and
+the first pod row whole at 960×480.) The main corridor on the right is 64 wide, and each side outer wall takes 32. A
+map of one zone of one pod row is therefore 2 + 1 + 6 = 9 cells deep (a pod row is 6); an empty map is 9 too, the
+least a map is.
 
 `FloorPlan.floor_cells` is the one half-open integer rectangle. The base floor covers every cell of it, including
 under walls, in lane gaps and in gaps left by deletions; walkways draw over that full floor. Each zone's carpet
@@ -264,7 +268,8 @@ over floor rather than over the backdrop (`OfficeFloorView.apron_cells()` from t
 `set_apron()` only refills its cells). It is drawn only: no wall, walkway or furniture, never in the plan's cells, the
 walk graph, a seat's click or the camera's reach. Below and beyond the floor's depth the backdrop stays.
 
-Cap plus face make a 64-unit drawing band, the same band the people's clearance check uses. Bricks are placed with
+Cap plus face make a 64-unit drawing band. A person in front of the top wall may overlap it (the wall is Ground,
+drawn behind them); the side walls' drawing is the band the people's clearance check uses. Bricks are placed with
 `set_cell()` by semantic ID; no Terrain autotiling, and no `TileMapPattern` deciding where walls and openings go.
 Walkway tiles are laid on the corridors only (the entry band and the main corridor); lane aisles and aisle rows are
 plain wood.
@@ -276,8 +281,10 @@ keep `WINDOW_CLEARANCE` (64) from it. A picture hangs centred in every second ga
 clears every window, the door, the pantry counter and the wall's end cells: one at 23 cells, five at 53. Pictures are
 drawn in the shell, have no footprint and are not on the walk graph; the shell's key includes them, so a widening that
 moves the door and the windows redraws the shell. The pantry's `COFFEE` sign hangs the same way, centred over the
-counter's drawing with its foot at `SIGN_FOOT` (52) (`OfficeShell.pantry_sign()`): on the cream face, no wider than the
-counter, and among `OfficeShell.wall_covers()`, so no picture or top-run plant comes near it.
+counter's drawing with its foot at `SIGN_FOOT` (32) (`OfficeShell.pantry_sign()`): on the cream face, its hangers from
+the face's top (`FACE_TOP`, 12), 5 above the coffee machine on the counter (opaque to opaque; at least 4 is pinned by
+`tools/test_office_service.gd`), no wider than the counter, and among `OfficeShell.wall_covers()`, so no picture or
+top-run plant comes near it.
 
 **Partitions.** Each zone stands inside low cream partitions, a U open at the top (`OfficeShell.partition_pieces()`):
 `partition_v` (6 × 32, foot (3, 32)) down each side at x0 + 3 and x1 − 3, one per cell row but the last;
@@ -298,7 +305,8 @@ labels, which stand where the pod's drawing ends and end at y1 − 24: a tab lab
 deep (`tab_face` gives up the display
 face's lowest descent row; the labels are upper case).
 The zone's **sign** (`scenes/world/zone_sign.tscn`) hangs from the top-left post, at its foot, and draws over the aisle
-row at zone y − 18 .. − 2: a `panel`, the workspace's number (a mezzanine's `3A`), its label and a 3-unit accent stripe
+row at zone y − 14 .. + 2 (S3 BAND: 4 lower than before, its foot 2 over the zone's top, so the first zone's board keeps
+4 clear of the pantry counter's front in the walking lane over it; pinned by `tools/test_office_service.gd`): a `panel`, the workspace's number (a mezzanine's `3A`), its label and a 3-unit accent stripe
 (the worktree group's, `OfficeZoneSign.accent_of()`). The panel is as wide as what it says
 (`PAD` 4, the stripe, `GAP` 3, the number, `GAP`, the label, `PAD`), at most `MAX_WIDTH` (160) and never past the drawn
 left edge of the zone's top-right post (`OfficeShell.right_post()`), the label cut with a forced ellipsis to fit; its
@@ -314,13 +322,15 @@ The shell, the partitions, the signs, the plants and the side tables are **furni
 state, focus, selection or connection. Structural changes (a tab opened or closed, a table grown, a zone moved) may
 move them; furniture has no herdr data behind it and does not stand for repos or agent counts. Standing furniture is
 optional: its drawing, grown by `WALL_RUN_GAP` (8), must not cover a pod, a zone's slot (its partitions, posts and
-sign), the door, a window, a picture or the pantry counter; its footprint must not intrude on a walkway or aisle
-(`OfficeFloorValidation.walkways()`: the entry band below its first row, which is the wall's drawing clearance where
-nobody walks, the main corridor and every aisle); and the map must still pass the entrance-to-station path check with
+sign; for the top-wall run every zone's rectangle and sign: its drawing reaches over the walking lane's top, the first
+zones' aisle row, but never down to a sign), the door, a window, a picture or the pantry counter; its footprint must not
+intrude on a walkway or aisle (`OfficeFloorValidation.walkways()`: the entry band's last row, the walking lane, the main
+corridor and every aisle); and the map must still pass the entrance-to-station path check with
 it placed. If it does not fit, it is left out. Its candidates (`OfficeDecorPlanner`), keyed by grid step, never by tab,
 zone or state:
 
-- **the top-wall run**: plants `top/%03d` at the top wall's foot (foot y `TOP_RUN_FOOT` 76, in the clearance row),
+- **the top-wall run**: plants `top/%03d` at the top wall's foot (foot y `TOP_RUN_FOOT` 64, the wall's foot line: the
+  footprint in the wall's cells, the drawing over its face; a walker in the lane is drawn in front of it),
   `TOP_RUN_PITCH` (160) apart from `TOP_RUN_FROM` (72), the plant of its step (`plant_at(step)`); a step whose plant
   would meet the door, a window, a picture or the pantry counter stands empty (at 23 cells one stands, at 232). The
   grid meets a window gap only at some widths (it does at 23, 33, 43, 53 and 63 cells, never at 5L + 3 with L odd, nor
@@ -356,13 +366,15 @@ band is a walkway, and the counter stands in it on purpose. **It is a corner noo
 nobody walks to it or stands at it, it has no spots, and an idle agent sits at their seat with a mug.
 
 Only maps with at least one desk have it. Every position is a pure function of the plan's geometry. The counter's left
-edge touches the left outer wall; it meets the floor at y = 106 (`COUNTER_FOOT` = 42 from the band's top), its
-footprint 92..106, 6 short of the walking lane's node centres (y = 112), and the feet a person is inflated by (4 deep)
-keep the lane walkable in front of it.
+edge touches the left outer wall; it meets the floor at y = 78 (`COUNTER_FOOT` = 14 from the band's top), its
+footprint 64..78, from the wall's foot line: against the wall, its coffee machine over the face (5 under the `COFFEE`
+sign) and its front 4 above the first zone's sign board (both gaps opaque to opaque, pinned by
+`tools/test_office_service.gd`). Inflated by the feet (to 82) it blocks the walking lane's two nodes in front of it;
+the lane starts beside it, and nothing needs those two.
 
 - **The counter is an obstacle like any furniture**: its footprint, inflated by the feet, is the walk graph's one
-  `FIXTURE` obstacle, with no entries (see "Collision and walking"). A band of fewer than two cells (no walking lane
-  under the wall's clearance), or one whose bay left of the main corridor is narrower than the counter (64), has none;
+  `FIXTURE` obstacle, with no entries (see "Collision and walking"). A band too shallow to hold the walking lane, or
+  one whose bay left of the main corridor is narrower than the counter (64), has none;
   no real map is so narrow. When the map widens, the lift door moves with the main corridor; the counter stays.
 - **Windows** (`OfficeShell.window_xs()`, a pure function; the floor view only draws what it returns): on a map with a
   pantry, windows are `WINDOW_SPACING` (128) apart, centred on the top wall between the pantry's right drawing edge and
@@ -471,8 +483,9 @@ kept is the plan and the view, not the people's nodes or animation clocks across
     while no sign is drawn) down to the bottom of its cells.
   - `sign_extent(key)`: the zone's sign as drawn (the aisle row above it while no sign is drawn), and `wall_face()`:
     the top wall's face, `OfficeShell.wall_face()` (every drawing on or against the top wall, `wall_covers()`, and
-    every picture, `frames()`, merged; its top is the lift door's, map y 8, the windows' at 12). Only for the framing
-    a map opens on.
+    every picture, `frames()`, merged, from `OfficeShell.FACE_TOP`: map y 12, the lift door's opaque top and the
+    windows' drawn top; the door's sprite rows above it are transparent, measured). Only for the framing a map opens
+    on.
 
   Each consumer converts once, through the nodes' own transforms: the pointer draws in the floor's coordinates and
   converts nothing; `OfficeScene.reveal()` / `reveal_zone()` add where the floor's root stands in the world (under
@@ -486,10 +499,14 @@ kept is the plan and the view, not the people's nodes or animation clocks across
   at the top of the world with no headroom, sideways only as far as its width needs, its left edge when it is wider
   than the view. **A map opens with its back wall in view** (S3 CAMERA, 2026-10-28; `OfficeNavigator._open()`, once
   per map per run): it is revealed on the selection's whole pod, or opened on its first zone, as before, and then
-  lifted (`open_with_wall()`: `with_wall()`) no lower than the top wall's face when the face and what the opening is
-  for (the selected desk's `signal_extent()`, or the first zone's `sign_extent()`) fit the view together, top to
-  bottom; whatever lies below gives way (at 960×480 the first pod row's near seats and the tab labels under them go
-  under the bottom panel). A view that already shows the face is not moved, and sideways is the first rule's. Where
+  placed (`open_with_wall()`: `with_wall()`) at the top wall's face, its top at the view's top, when the face and what
+  the opening is for (the selected desk's `signal_extent()`, or the first zone's `sign_extent()`) fit the view
+  together, top to bottom; whatever lies below gives way. Since S3 BAND (the band one row) the face and the whole first
+  pod row fit at 960×480, the near seats' chips and the tab labels included (the near plates at rest are cut); at
+  480×320 (zoom4, `-min`) the face and a far desk's signal fit, so the opening shows the wall and the selected desk's
+  signal whole and the pod's near chairs give way. The face's top is taken even where the first rule's pan stood
+  higher (S3 BAND: no strip above the wall, the machine plate's foot, under the bar; on a tall window the plate is
+  above the opening), and sideways is the first rule's. Where
   they do not fit (a near seat or a second-row desk selected in a short view), what the opening is for wins: the
   first rule's pan stands, because the wall is furniture and the selection is a signal. Only the first arrival lifts
   (the navigator's one-shot `pan_opens`): a zone picked (a card's place, PageUp / PageDown, `--space`), a desk
@@ -502,9 +519,11 @@ kept is the plan and the view, not the people's nodes or animation clocks across
 - **The walk graph (`OfficeWalkGraph`, `scripts/layout/`) is the one graph the layout validator checks and the people
   walk.** Nodes are cell centres (offset `(16, 16)`, 32 apart); edges join 4-neighbours. Every obstacle is inflated by
   the real person: walls, table footprints and standing furniture by the feet rectangle and offset of
-  `PixelPerson.footprint()`; Ground walls also by the whole canvas of `PixelPerson.drawing_rect(art.people)` (32 × 48,
-  feet at `(16, 46)`), because a wall always draws behind a person, so the person's canvas must not reach into the
-  wall's drawing band. A node is blocked when its centre lies inside an obstacle; an edge is blocked when the segment
+  `PixelPerson.footprint()`; the side walls also by the whole canvas of `PixelPerson.drawing_rect(art.people)` (32 × 48,
+  feet at `(16, 46)`), because a wall always draws behind a person, so a canvas reaching into a side wall's drawing
+  would stand in it. **The top wall draws behind a person standing in front of it** (S3 BAND, 2026-10-28): that is
+  where its face is seen, so it is inflated by the feet only, and a walker in the lane under it (feet at y 80) reaches
+  over its face up to y 34, drawn in front of the door, the windows and the pictures. A node is blocked when its centre lies inside an obstacle; an edge is blocked when the segment
   between two centres enters an obstacle. Touching an edge does not count (`Rect2.intersects()` excludes the edges).
   Checking edges and not only nodes is what stops a thin obstacle between two clear centres from being walked through
   (the native `AStarGrid2D` connects those; a test keeps this regression). **Every edge has the same length, so a
@@ -517,25 +536,28 @@ kept is the plan and the view, not the people's nodes or animation clocks across
   built. Searches reuse scratch arrays allocated once per graph plus a visit stamp; nothing floor-sized is allocated
   per route.
 - **Obstacle entries.** A route may enter an obstacle only along the obstacle's own **entries** (`Obstacle.entries`,
-  pairs of end points): a table's are the far seat legs that run into its footprint; the top wall's drawing
-  clearance's is the threshold leg; the pantry counter and a partition have none. When a segment is checked (`clear()`), the part of it inside an obstacle must lie
+  pairs of end points): a table's are the far seat legs that run into its footprint; a side wall's drawing would have
+  the threshold leg, were the leg to cross one (it does not on a planned map); the pantry counter and a partition have
+  none. When a segment is checked (`clear()`), the part of it inside an obstacle must lie
   wholly on one of that obstacle's entries. Entries are the legs of this plan, at this table's current place (a
   straightened route that merges with a leg counts the same way: only the part inside the obstacle matters). Nothing
   is exempt by tab name. The validator and the people use the same check, so every segment of every live route avoids
   every obstacle except through these entries (a test checks this every frame).
-- **Lift door and threshold.** The door's foot `(door x, 84)` is inside the outer wall's drawing clearance (the entry
-  band's first row is blocked; the first walkable centre is at y = 112, the walking lane's). A fixed threshold leg runs straight down from
-  the door's foot to the first walkable centre below it: the entry into the wall's *drawing* clearance, entering no
-  solid obstacle. Routes in start with the door's foot and the threshold leg; routes out end with them. The validator
+- **Lift door and threshold.** The door's foot `(door x, 84)` stands in the walking lane's cell row, 4 below its centre.
+  A fixed threshold leg runs from the door's foot to the first walkable centre in its column from that row down, the
+  lane's node `(door x, 80)`: 4 units up, entering no obstacle (the door is drawn on Ground, so a person on the leg
+  draws over it). Routes in start with the door's foot and the threshold leg; routes out end with them. The validator
   checks reachability from the threshold leg's end (not the whole entry band, which would make "walking connectivity
   equals the validator's" true by construction) and checks the threshold leg itself. Reachability is the door's
   distance field: one whole-floor BFS from the threshold per graph (the validator builds it first). A route in is read
   back from the goal along it; a ghost's route out is read from its start along it; neither searches again.
-- **The walking lane and the counter.** The entry band's second row is the walking lane (y = 112): every node on it
-  from the left wall to the main corridor is walked, the threshold among them. The pantry counter's footprint (92..106),
-  inflated by the feet, is the one `FIXTURE` obstacle (no entries) and ends at 110, short of the lane's centres, so
-  the lane runs in front of it. (Before D2, 2026-10-27, a fixture row at 112 was a barrier with the pantry spots' legs
-  as its entries, and the lane was at 144.)
+- **The walking lane and the counter.** The entry band's one row is the walking lane (y = 80), right under the top
+  wall: every node on it from beside the counter to the main corridor is walked, the threshold among them, and the
+  first zones are entered from it (it is their aisle row). The pantry counter's footprint (64..78), inflated by the
+  feet, is the one `FIXTURE` obstacle (no entries) and ends at 82, over the lane's two leftmost nodes, which nothing
+  needs. (Before D2, 2026-10-27, a fixture row at 112 was a barrier with the pantry spots' legs as its entries, and the
+  lane was at 144; before S3 BAND, 2026-10-28, the lane was the band's second row, at 112, under the wall's drawing
+  clearance, and the counter's footprint 92..106 ended short of it.)
 - **Partitions.** Each zone's partitions (`ZonePlacement.partitions()`: bands `PARTITION_THICKNESS` (6) thick inside
   its left, right and bottom edges) are obstacles of their own kind, `PARTITION`, inflated by the **feet only** (they
   draw no taller than a person's legs, so the wall's drawing rule does not apply). They block the edges across them and
@@ -670,10 +692,11 @@ Besides the client / machine / incremental-update tests, `tools/run_tests.sh` ch
   plate.
 - A standing person walking into a table is stopped by its footprint collider; a seated person's feet collider is
   off.
-- The entry band is two cells deep (the threshold on the walking lane at y 112); the pantry counter, the only fixture,
+- The entry band is one cell deep (the threshold on the walking lane at y 80, the door's foot 4 below it); the
+  pantry counter, the only fixture,
   appears only on maps with desks, at a position that is a pure function of plan geometry (stable under growth and
   widening), with no spots; a band too narrow for it has none; it is the walk graph's one `FIXTURE` obstacle, with no
-  entries, and ends short of the lane at every shipped width; the validator refuses one moved out of its corner; the
+  entries, against the wall and off the lane's nodes but the two in front of it at every shipped width; the validator refuses one moved out of its corner; the
   furniture is dropped before the pantry. The door's field reaches every approach across the band; `route_between()`
   picks the cheaper end (compared against a reference BFS every time); an entry can only be used along its own length.
 - Zones take the top-most, left-most fit in whole lanes; a removed zone leaves a gap the next fitting zone reuses; the

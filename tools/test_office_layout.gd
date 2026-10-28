@@ -353,7 +353,8 @@ func test_empty_floor_and_empty_tab_have_real_bounds() -> void:
 	var empty := _plan(_floor([]))
 	# D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to; the band is two cells (SEATED-Q2).
 	# The smallest floor is 11 cells deep (min_height_cells 12 -> 11).
-	_check(empty.floor_cells.size.y >= 11, "empty workspace has a real floor")
+	# S3 BAND (2026-10-28): the band is one row: the smallest floor is 9 cells deep (min_height_cells 11 -> 9).
+	_check(empty.floor_cells.size.y >= 9, "empty workspace has a real floor")
 	_check(empty.entry_cells.has_area(), "empty workspace has an entrance")
 	_eq(empty.desks.size(), 0, "no invented room")
 	_eq(empty.render_bounds.size, Vector2(empty.floor_cells.size * 32), "same authority for bounds")
@@ -654,11 +655,23 @@ func test_actual_actor_measurements_constrain_paths_and_wall_projection() -> voi
 		"large body cannot pass narrow approach"
 	)
 	rules.actor_footprint = PixelPerson.footprint()
-	rules.actor_draw_rect = Rect2(-16, -300, 32, 302)
+	# S3 BAND (2026-10-28): the top wall draws behind a person in front of it. A
+	# canvas reaching far beside the feet cannot keep off the side walls; one
+	# however tall plans, and walks the lane right under the top wall: there only
+	# the feet are kept off.
+	rules.actor_draw_rect = Rect2(-300, -46, 316, 48)
 	_check(
 		not OfficeFloorLayout.plan(MapModel.of(floor_model), null, rules).problems.is_empty(),
-		"tall actor cannot float over Ground walls"
+		"wide actor cannot stand in the side walls' drawing"
 	)
+	rules.actor_draw_rect = Rect2(-16, -300, 32, 302)
+	var tall := OfficeFloorLayout.plan(MapModel.of(floor_model), null, rules)
+	_eq(tall.problems, PackedStringArray(), "tall actor plans: the top wall keeps off the feet only")
+	if tall.plan != null:
+		var graph := OfficeWalkGraph.build(tall.plan, rules.actor_footprint, rules.actor_draw_rect)
+		var lane := Vector2i(tall.plan.main_corridor_cells.position.x - 1, tall.plan.entry_cells.position.y)
+		_check(graph.walkable(lane), "and walks the lane right under the top wall")
+		_check(not graph.walkable(lane - Vector2i(0, 1)), "but never the wall's own cells")
 	var missing_entry := _plan(_floor([]))
 	missing_entry.entry_cells = Rect2i()
 	_check(not OfficeFloorLayout.validate(missing_entry).is_empty(), "empty floor still requires an entrance")
@@ -678,7 +691,8 @@ func test_decorations_are_validated_and_thin_obstacles_block_graph_edges() -> vo
 	var rules := FloorLayoutPolicy.new()
 	var value := _plan(_floor([_room("a", 2)]), null, rules)
 	var signature := value.geometry_signature()
-	var prop := _decoration("clear", Rect2(600, 300, 12, 8))
+	# S3 BAND (2026-10-28): the band is one row: the map is 9 cells (288) deep, so the clear spot moves up from y 300.
+	var prop := _decoration("clear", Rect2(600, 200, 12, 8))
 	value.decorations.append(prop)
 	_eq(OfficeFloorLayout.validate(value, rules), PackedStringArray(), "unobstructed decoration accepted")
 	_check(value.geometry_signature() != signature, "decorations participate in geometry signature")
@@ -1028,7 +1042,7 @@ func test_pruning_releases_only_the_floors_that_went_away() -> void:
 
 
 ## A map of one workspace plans exactly as that workspace does, under its key,
-## and its plan places that one zone in real lanes: from lane 0, row 5, under
+## and its plan places that one zone in real lanes: from lane 0, row 3, under
 ## its aisle row, as many lanes wide as its widest table needs (the map widens
 ## first when it has fewer), whole pod rows deep; every desk names the zone it
 ## stands in, stands right of its pad, and the zone holds every desk.
@@ -1058,11 +1072,12 @@ func test_a_one_zone_plan_places_its_zone_over_its_rows() -> void:
 	_eq(_rows(plan).size(), 3, "a pod row for each table")
 	# D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to; the band is two cells (SEATED-Q2).
 	# Zones start a row higher: row 5 (wall 2, band 2, top aisle 1), not 6.
-	_eq(zone.cells, Rect2i(1, 5, 14, pod * _rows(plan).size()), "from row 5, 14 cells wide, whole pod rows deep")
-	_eq(zone.slot(), Rect2i(1, 4, 14, pod * _rows(plan).size() + 1), "under its aisle row")
+	# S3 BAND (2026-10-28): the band is one row: row 3 (wall 2, band 1, the zone's aisle row the band's lane).
+	_eq(zone.cells, Rect2i(1, 3, 14, pod * _rows(plan).size()), "from row 3, 14 cells wide, whole pod rows deep")
+	_eq(zone.slot(), Rect2i(1, 2, 14, pod * _rows(plan).size() + 1), "under its aisle row")
 	_eq(zone.initial_width_cells, 14, "first laid out that wide")
 	for index in _rows(plan).size():
-		_eq(_rows(plan)[index].band_cells, Rect2i(1, 5 + index * pod, 14, pod), "row %d is its band" % index)
+		_eq(_rows(plan)[index].band_cells, Rect2i(1, 3 + index * pod, 14, pod), "row %d is its band" % index)
 	var desks := 0
 	for row in zone.rows:
 		desks += row.desks.size()
@@ -1093,7 +1108,8 @@ func test_a_lane_holds_the_narrowest_pod_and_a_zone_stands_one_row() -> void:
 		"a pod of c columns, c + 1 cells, spans ceil((c + 3) / 5) lanes"
 	)
 	# D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to; the band is two cells (SEATED-Q2).
-	_eq(policy.version, 4, "the lane unit is a new plan geometry (3), and the two-cell band another (4)")
+	# S3 BAND (2026-10-28): the band is one row.
+	_eq(policy.version, 5, "the lane unit is a new plan geometry (3), the two-cell band (4), the one-row band (5)")
 	_eq(_lane_shape(1), [4, 1, 1], "one tab of two panes: a zone of one lane on the four-lane map")
 	_eq(_lane_shape(2), [4, 2, 1], "two tabs: two lanes, one row")
 	_eq(_lane_shape(3), [4, 3, 1], "three tabs: three lanes, one row")
@@ -1691,8 +1707,14 @@ func test_the_seat_and_standing_legs_are_validated() -> void:
 
 
 ## The lift door stands on the outer wall over the main corridor's left lane,
-## wherever the floor's width puts that corridor, and its threshold leg runs
-## straight down to the first cell centre clear of the wall's drawing.
+## wherever the floor's width puts that corridor, and its threshold leg runs to
+## the walking lane's node in its column, 4 up from its foot: the top wall
+## draws behind a person in front of it, so only the feet keep off the wall and
+## the door's foot and the lane's node share a cell row, outside every wall
+## obstacle; the side walls keep the whole canvas off, so no leg crosses their
+## drawing. S3 BAND (2026-10-28): the top wall draws behind a person in front of
+## it (the door's foot was inside the wall's drawing clearance, the leg the one
+## way through it, and no step beside it was clear).
 func test_the_lift_door_stands_over_the_main_corridor() -> void:
 	for width: int in [20, 32, 45]:
 		var rules := _real_rules(width)
@@ -1702,20 +1724,29 @@ func test_the_lift_door_stands_over_the_main_corridor() -> void:
 		_eq(door, Vector2(corridor.position.x * 32 + 16, OfficeShell.DOOR_FOOT), "%d cells: over the left lane" % width)
 		var graph := _graph_of(plan, rules)
 		_eq(graph.door, door, "%d cells: the graph walks in at it" % width)
-		_eq(graph.threshold, Vector2(door.x, 112), "%d cells: to the first cell centre clear of the wall" % width)
-		var clearance := graph.obstacles.filter(
+		_eq(graph.threshold, Vector2(door.x, 80), "%d cells: to the walking lane's node in its column" % width)
+		_eq(door.y - graph.threshold.y, 4.0, "%d cells: 4 up, in the cell row of the door's foot" % width)
+		var walls := graph.obstacles.filter(
 			func(each: OfficeWalkGraph.Obstacle) -> bool:
 				return (
-					each.kind == OfficeWalkGraph.Kind.WALL_DRAWING and Rect2(door, Vector2.ZERO).intersects(each.rect)
+					each.kind in [OfficeWalkGraph.Kind.WALL, OfficeWalkGraph.Kind.WALL_DRAWING]
+					and Rect2(door, Vector2.ZERO).intersects(each.rect)
 				)
 		)
-		_check(not clearance.is_empty(), "%d cells: the door's foot is inside the wall's drawing clearance" % width)
-		_check(not graph.inside(door), "%d cells: where the threshold leg lets it stand" % width)
-		_check(graph.clear(door, graph.threshold), "and the leg is the way in through that clearance")
-		_check(
-			not graph.clear(door + Vector2(8, 0), graph.threshold + Vector2(8, 0)),
-			"%d cells: which no step beside it is" % width
+		_eq(walls, [], "%d cells: the door's foot is in no wall obstacle: the top wall keeps off the feet only" % width)
+		var drawings := graph.obstacles.filter(
+			func(each: OfficeWalkGraph.Obstacle) -> bool: return each.kind == OfficeWalkGraph.Kind.WALL_DRAWING
 		)
+		_eq(drawings.size(), 2, "%d cells: the canvas is kept off two walls' drawing" % width)
+		for each: OfficeWalkGraph.Obstacle in drawings:
+			_check(each.rect.size.y > each.rect.size.x, "%d cells: a side wall's, standing: %s" % [width, each.rect])
+		_check(not graph.inside(door), "%d cells: where the threshold leg starts" % width)
+		_check(graph.clear(door, graph.threshold), "%d cells: and the leg is clear" % width)
+		for each: OfficeWalkGraph.Obstacle in graph.obstacles:
+			if each.kind != OfficeWalkGraph.Kind.TABLE:
+				_eq(each.entries, PackedVector2Array(), "%d cells: no wall needs the leg as an entry" % width)
+		var side := OfficeWalkGraph.cell_of(Vector2(48, 80))
+		_check(not graph.walkable(Vector2i(0, side.y)), "%d cells: the side wall's cell is not walked" % width)
 
 
 ## route_between() walks from whichever end is cheaper in all, the lead it has

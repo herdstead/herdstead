@@ -467,10 +467,14 @@ func test_a_floor_planned_wider_keeps_its_plan_when_the_window_narrows() -> void
 func test_the_gap_between_the_card_and_next_takes_no_click() -> void:
 	# api with 27 more agents, so a pod reaches the middle of the screen,
 	# under the panel's preview (the fixture's own pods stand in its left third).
-	var office := await _live_office(_wide_api(27))
+	# S3 BAND (2026-10-28): the band is one row: the pods stand 64 higher, so at
+	# 800x480 api's near row (308 at no pan) is above the preview (374..450) at
+	# every pan; at 800x400, the shortest screen with the docked panel, the
+	# preview comes up to it.
+	var office := await _live_office(_wide_api(27), Vector2(800, 400))
 	await _frames(4)
 	var hud := office.hud
-	_check(hud.inspector.docked(), "800x480 is tall enough for the docked panel")
+	_check(hud.inspector.docked(), "800x400 is tall enough for the docked panel")
 	var screen: Control = hud.inspector.get_node("%Preview")
 	_check(screen.is_visible_in_tree(), "its preview shows")
 	var hole := screen.get_global_rect()
@@ -844,8 +848,12 @@ func test_actor_clearance_changes_invalidate_failed_planning() -> void:
 	var attempts := office.layout_attempt_count()
 	var pivot := office.art.people.pivot
 	# Keep the theme ID and snapshot unchanged, but change a real policy input.
-	# A canvas this tall cannot clear the back wall; it must not hit the cache.
-	office.art.people.pivot = Vector2(pivot.x, 300)
+	# A canvas drawn this far left of its feet cannot keep off the left wall's
+	# drawing anywhere left of x 332, so lane 0 is cut off; it must not hit the
+	# cache. S3 BAND (2026-10-28): the top wall draws behind a person in front of
+	# it, so a canvas 300 tall no longer fails a plan (it was this case's story);
+	# the side walls keep the canvas rule, and this canvas is kept off one.
+	office.art.people.pivot = Vector2(300, pivot.y)
 	_feed(office, fixture)
 	_eq(office.layout_attempt_count(), attempts + 1, "changed actor clearance is planned once")
 	_check(not office.layout_problems().is_empty(), "the new actor clearance is actually rejected")
@@ -855,7 +863,7 @@ func test_actor_clearance_changes_invalidate_failed_planning() -> void:
 	office.test_screen = Vector2(1400, 480)
 	_feed(office, fixture)
 	_eq(office.layout_attempt_count(), attempts + 2, "failed policy reset retries with a new initial width")
-	_check(not office.layout_problems().is_empty(), "a wider floor still cannot clear the tall canvas")
+	_check(not office.layout_problems().is_empty(), "a wider floor still cannot clear the far-reaching canvas")
 	_feed(office, fixture)
 	_eq(office.layout_attempt_count(), attempts + 2, "the failed reset is cached at its new width")
 	office.art.people.pivot = pivot
@@ -1045,9 +1053,11 @@ func test_a_zone_call_shows_the_planned_density() -> void:
 		# 12 far seats (this run's print), not the planned density; a zone call is no longer the view the
 		# map opens on, so the case makes one: the page keys to b and back to a, which opens a at its
 		# sign as before.
+		# S3 BAND (2026-10-28): the band is one row: the wall's face and the whole first pod row fit
+		# the view, so the map opens on all 24 (this run's print).
 		var opened := _seats_in_view(office)
 		print("DENSITY %d pod row(s): %d seats wholly in view as the map opens" % [rows, opened])
-		_eq(opened, 12, "%d pod row(s): the map opens on the wall and the far seats" % rows)
+		_eq(opened, 24, "%d pod row(s): the map opens on the wall and every seat of the first row" % rows)
 		await _visit_zone(office, HerdrFleet.pane_key(LOCAL, "b"))
 		await _visit_zone(office, HerdrFleet.pane_key(LOCAL, "a"))
 		await _frames(3)
@@ -1059,6 +1069,39 @@ func test_a_zone_call_shows_the_planned_density() -> void:
 		var wanted := 24
 		print("DENSITY %d pod row(s): %d seats wholly in %s (plan: %d)" % [rows, seen, room, wanted])
 		_check(seen >= wanted, "%d pod row(s): at least %d seats wholly in view, %d" % [rows, wanted, seen])
+		_done(office)
+
+
+## S3 BAND (2026-10-28): the band is one row, so at the default window (960x480,
+## 254 deep) the density fixture opens with the top wall's face whole and all
+## 24 seats of its first pod row (the planned density) wholly in view, each desk's signal (its seat and
+## its chip: every agent here is blocked, so the near seats' chips show under
+## their chairs) enclosed by the world's room. From geometry, not pixels. Fails
+## on the two-row band (12 of 24, the near seats under the panel).
+func test_the_density_fixture_opens_with_the_wall_and_every_seat() -> void:
+	for rows: int in [2, 1]:
+		var snapshot := _density(rows)
+		for pane: Dictionary in _list(snapshot, "panes"):
+			pane["agent_status"] = "blocked"
+		var office := await _live_office(snapshot, Vector2(960, 480))
+		office.settle()
+		await _frames(2)
+		var room := office.hud.world_rect()
+		var to_screen := office.floor_view.root.get_global_transform()
+		var face := to_screen * office.floor_view.wall_face()
+		face.position -= office.camera.position
+		_check(room.encloses(face), "%d pod row(s): the wall's face whole: %s in %s" % [rows, face, room])
+		var seen := 0
+		var chips := 0
+		for key: String in office.floor_view.seats:
+			var desk := to_screen * office.floor_view.signal_extent(key)
+			desk.position -= office.camera.position
+			seen += int(room.encloses(desk))
+			chips += int(office.floor_view.seats[key].node.chip_rect().has_area())
+		print("DENSITY %d pod row(s): %d of %d signals wholly in view with the wall" % [rows, seen, chips])
+		_eq(office.floor_view.seats.size(), 24 * rows, "%d pod row(s): 24 seats a pod row" % rows)
+		_eq(chips, 24 * rows, "%d pod row(s): every seat shows its chip" % rows)
+		_eq(seen, 24, "%d pod row(s): every seat of the first pod row wholly in view as the map opens" % rows)
 		_done(office)
 
 
@@ -1172,7 +1215,10 @@ func test_one_workspace_is_drawn_as_a_zone() -> void:
 	if board != null:
 		_eq(board.position, zone.sign_at, "hung at its post")
 		var aisle := Rect2(Vector2(zone.slot().position) * 32.0, Vector2(zone.cells.size.x * 32.0, 32.0))
-		_check(aisle.encloses(board.drawn_rect()), "over the aisle row: %s in %s" % [board.drawn_rect(), aisle])
+		# S3 BAND (2026-10-28): the board hangs 4 lower, its foot 2 into the zone (4 clear of the pantry counter).
+		var drawn := board.drawn_rect()
+		_check(drawn.position.y >= aisle.position.y, "over the aisle row: %s in %s" % [drawn, aisle])
+		_eq(drawn.end.y - aisle.end.y, 2.0, "its board's foot 2 into the zone")
 		var number: Label = board.get_node("%Number")
 		var title: Label = board.get_node("%Title")
 		_eq([number.text, title.text], ["1", "API"], "naming the workspace by its number and its label")

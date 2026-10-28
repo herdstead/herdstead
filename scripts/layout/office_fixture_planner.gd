@@ -1,10 +1,11 @@
 class_name OfficeFixturePlanner
 extends RefCounted
 ## The entry band's one service fixture for a candidate map: the pantry counter
-## at the band's left end, against the top wall, its foot in the wall's drawing
-## clearance (OfficeShell.COUNTER_FOOT) and its front just short of the walking
-## lane's node centres (OfficeShell.WALKING_LANE), so the lane is walked in
-## front of it. A corner nook: furniture, with no spots, and nobody walks to it.
+## at the band's left end, against the top wall: its footprint from the wall's
+## foot line (OfficeShell.COUNTER_FOOT), in the band's one row, the walking
+## lane (OfficeShell.WALKING_LANE), whose nodes in front of it it blocks: the
+## lane starts beside it. A corner nook: furniture, with no spots, and nobody
+## walks to it.
 ## There is no reception.
 ##
 ## Not decor: the entry band is a walkway for the decor rules, and the counter
@@ -33,7 +34,7 @@ func _init(pen: OfficeDraw) -> void:
 func furnish(next: FloorPlan) -> void:
 	next.pantry = null
 	var grid := float(FloorLayoutPolicy.GRID)
-	# A band without a walking lane under the wall's clearance has no room.
+	# A band too shallow to hold the walking lane has no room.
 	if next.desks.is_empty() or next.entry_cells.size.y * grid < OfficeShell.WALKING_LANE + grid / 2.0:
 		return
 	var band_top := next.entry_cells.position.y * grid
