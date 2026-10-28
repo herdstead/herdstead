@@ -365,3 +365,165 @@ func test_the_contract_asks_for_every_cell() -> void:
 	)
 	art.portraits = null
 	_check(ArtContract.problems(art).has("portraits: the shared portraits did not load"), "and a missing family")
+
+
+# --- the node (S3 PORTRAIT P2, 2026-10-28: the card shows the seat's person as a portrait) ---
+
+
+## A portrait node shown on its own, under `root`, in `art`'s portraits, freed
+## by the case.
+func _portrait_node(art: ArtPack, provider: String, pane: String) -> PixelPortrait:
+	var holder := Node2D.new()
+	root.add_child(holder)
+	return OfficeDraw.seat_portrait(holder, null, art, provider, pane)
+
+
+## A pack whose people resolve against a fresh saved-looks file under --work, so
+## nobody's saved looks take part.
+func _pack() -> ArtPack:
+	var art := ArtPack.from_manifest("res://assets/daylight/manifest.json")
+	if art != null:
+		art.agent_catalog = AgentCatalog.new(_save_path())
+		art.people.agent_catalog = art.agent_catalog
+	return art
+
+
+## Every layer is a Sprite2D dressed as the family's dress() says (its origin at
+## the portrait's bottom-centre pivot, scaled back by the density, NEAREST), and
+## the nine are regions of one sheet: the premise of one draw call per portrait.
+func test_the_node_dresses_every_layer_from_one_sheet() -> void:
+	var art := _pack()
+	_check(art != null, "the pack loads")
+	if art == null:
+		return
+	var node := _portrait_node(art, "claude", PANE_P8)
+	_eq(node.get_node("Layers").get_child_count(), PixelPortraits.LAYERS.size(), "nine layer sprites")
+	var order: Array[String] = []
+	for child in node.get_node("Layers").get_children():
+		order.append(str(child.name))
+	var named: Array[String] = []
+	for layer in PixelPortraits.LAYERS:
+		named.append(PixelPortraits.SPRITES[layer].get_file())
+	_eq(order, named, "in the layers' order, bottom to top")
+	var sheets: Array[int] = []
+	var drawn := 0
+	for layer in PixelPortraits.LAYERS:
+		var sprite := node.sprite_of(layer)
+		_eq(sprite.centered, false, "%s: not centred" % layer)
+		_eq(
+			sprite.offset, -art.portraits.pivot * PixelPortraits.PORTRAIT_DENSITY, "%s: offset -pivot x density" % layer
+		)
+		_eq(sprite.scale, Vector2.ONE / PixelPortraits.PORTRAIT_DENSITY, "%s: scaled back by the density" % layer)
+		_eq(sprite.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST, "%s: sampled NEAREST" % layer)
+		var region := sprite.texture as AtlasTexture
+		_eq(sprite.texture, art.portraits.part_texture(layer, node.look), "%s: the family's texture" % layer)
+		if region != null:
+			drawn += 1
+			if not sheets.has(region.atlas.get_instance_id()):
+				sheets.append(region.atlas.get_instance_id())
+	_check(drawn >= 6, "most layers draw something: %d" % drawn)
+	_eq(sheets.size(), 1, "every drawn layer is a region of the one sheet")
+	_eq(node.look.key(), art.portraits.look_of("claude", PANE_P8).key(), "the pane's portrait")
+	_eq(node.provider, "claude", "for the provider asked")
+	node.get_parent().free()
+
+
+## A second look on the same node keeps the same nine sprites and swaps their
+## textures; a layer the look leaves at none (or the hair under a hood) gets a
+## null texture.
+func test_a_new_look_swaps_textures_on_the_same_sprites() -> void:
+	var art := _pack()
+	_check(art != null, "the pack loads")
+	if art == null:
+		return
+	var node := _portrait_node(art, "claude", PANE_P7)
+	var holder: Node2D = node.get_parent()
+	var ids: Array[int] = []
+	for layer in PixelPortraits.LAYERS:
+		ids.append(node.sprite_of(layer).get_instance_id())
+	var capped := node.look
+	_eq(capped.look.headwear, &"cap", "claude on p7 wears a cap")
+	_check(node.sprite_of(PixelPortraits.HAIR).texture != null, "and its hair shows under the brim")
+	var again := OfficeDraw.seat_portrait(holder, node, art, "claude", PANE_P8)
+	_eq(again, node, "the same node")
+	_eq(holder.get_child_count(), 1, "no second portrait")
+	var now: Array[int] = []
+	for layer in PixelPortraits.LAYERS:
+		now.append(node.sprite_of(layer).get_instance_id())
+	_eq(now, ids, "the same nine sprites")
+	_eq(node.look.look.headwear, &"hood", "claude on p8 wears a hood")
+	_check(node.look.key() != capped.key(), "a new look")
+	_check(node.sprite_of(PixelPortraits.HAIR).texture == null, "a hood: the hair layer draws nothing")
+	_eq(
+		node.sprite_of(PixelPortraits.HEADWEAR).texture,
+		art.portraits.part_texture(PixelPortraits.HEADWEAR, node.look),
+		"the hood's own cell"
+	)
+	_eq(node.look.neckwear, &"headphones", "claude on p8 wears headphones")
+	OfficeDraw.seat_portrait(holder, node, art, "claude", "")
+	_eq(node.look.neckwear, AvatarLook.NONE, "with no pane, no headphones")
+	_check(node.sprite_of(PixelPortraits.NECKWEAR).texture == null, "and the neckwear layer draws nothing")
+	_check(node.sprite_of(PixelPortraits.MARKS).texture == null, "nor the marks")
+	holder.free()
+
+
+## Identity: for every agent pane of the floors fixture, the person seated at its
+## station (OfficeStation's PixelPerson) and its card portrait (the same
+## seat_portrait() call the card makes) are one person on the seven slots a
+## portrait shows, and again for a provider whose look the user pinned.
+func test_the_card_portrait_and_the_seated_person_are_one_person() -> void:
+	var art := _pack()
+	_check(art != null, "the pack loads")
+	if art == null:
+		return
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://tools/fixtures/snapshot_floors.json"))
+	var file: Dictionary = parsed if parsed is Dictionary else {}
+	var snapshot := HerdrSnapshot.from_wire(_dict(file, "snapshot"))
+	_check(snapshot != null, "the floors fixture reads")
+	if snapshot == null:
+		return
+	var shown: Array[StringName] = [
+		AvatarLook.SKIN,
+		AvatarLook.HAIR_STYLE,
+		AvatarLook.HAIR_COLOUR,
+		AvatarLook.TOP,
+		AvatarLook.HEADWEAR,
+		AvatarLook.HEADWEAR_COLOUR,
+		AvatarLook.GLASSES,
+	]
+	var pen := OfficeDraw.new(art)
+	var ground := Node2D.new()
+	root.add_child(ground)
+	var table := pen.table(ground, ground, "Table0", Vector2.ZERO, 160.0, [80.0])
+	var station := pen.station(ground, table, 0, "far")
+	var holder := Node2D.new()
+	ground.add_child(holder)
+	var portrait: PixelPortrait = null
+	for pinned: bool in [false, true]:
+		if pinned:
+			_catalog_with('{"schema_version": 2, "looks": {"claude": {"top": "lilac", "glasses": "round"}}}')
+			art.agent_catalog = people.agent_catalog
+			art.people.agent_catalog = people.agent_catalog
+		var compared := 0
+		for pane in snapshot.panes:
+			if pane.agent.is_empty():
+				continue
+			var key := HerdrFleet.pane_key("local", pane.pane_id)
+			station.pane_key = key
+			station.furnish(pane.agent, StringName(pane.agent_status))
+			var seated := station.actor()
+			portrait = OfficeDraw.seat_portrait(holder, portrait, art, pane.agent, key)
+			_check(seated != null, "%s has a seated person" % pane.pane_id)
+			if seated == null:
+				continue
+			for slot in shown:
+				_eq(
+					portrait.look.look.slot(slot),
+					seated.look.slot(slot),
+					"%s%s: the portrait's %s is the seat's" % [pane.pane_id, " (pinned)" if pinned else "", slot]
+				)
+			if pinned and pane.agent == "claude":
+				_eq([portrait.look.look.top, portrait.look.look.glasses], [&"lilac", &"round"], "the pins show")
+			compared += 1
+		_check(compared >= 9, "every agent pane of the fixture compared: %d" % compared)
+	ground.free()

@@ -1505,12 +1505,15 @@ func test_hud_updates_in_place() -> void:
 	var nodes := _hud_nodes(office)
 	_check(nodes.size() > 40, "the HUD is a real scene, not a handful of nodes: %d" % nodes.size())
 	_eq(_label(hud.inspector, "%CardName").text, "refactor the fleet", "the inspector names the selected pane")
-	var portrait: PixelPerson = hud.inspector.portrait()
-	_check(portrait != null and portrait.is_playing(), "and its portrait is animating")
+	# S3 PORTRAIT P2 (2026-10-28): the card shows the seat's person as a portrait, a still, so
+	# "animating / frozen / moving again" became the window's tint (greyed while dropped).
+	var portrait: PixelPortrait = hud.inspector.portrait()
+	var window: Control = hud.inspector.get_node("%PortraitWindow")
+	_check(portrait != null and window.modulate == Color.WHITE, "and its portrait shows, untinted")
 	_feed(office, fixture)
 	office.refresh()
 	_eq(_hud_nodes(office), nodes, "a refresh with the same data creates and frees nothing")
-	_eq(hud.inspector.portrait(), portrait, "and the portrait keeps playing across it")
+	_eq(hud.inspector.portrait(), portrait, "and the portrait stays across it")
 	# A status change is new text in the same labels, never a new node.
 	_feed(office, _with(fixture, "api:p1", {"agent_status": "blocked"}))
 	_eq(_label(hud.inspector, "%Caption").text, "NEEDS INPUT", "a status change reaches the inspector")
@@ -1522,17 +1525,17 @@ func test_hud_updates_in_place() -> void:
 	office.attention._update_duration()
 	_eq(hud.inspector.duration_label(), duration, "the time-in-state never makes a label of its own")
 	_eq(_hud_nodes(office), nodes, "which is still no new node")
-	# The portrait freezes with its machine and moves again when it is back:
-	# the same person throughout, only paused and played.
+	# The portrait greys with its machine and clears when it is back, the same node throughout.
 	_set_online(office, false)
-	_check(not portrait.is_playing(), "a dropped machine freezes the card's portrait")
-	_eq(hud.inspector.portrait(), portrait, "the same portrait, frozen")
+	_eq(window.modulate, office.art.stale_tint, "a dropped machine greys the card's portrait")
+	_eq(hud.inspector.portrait(), portrait, "the same portrait, greyed")
 	_set_online(office, true)
-	_check(portrait.is_playing(), "and it moves again when the machine is back")
-	_eq(_hud_nodes(office), nodes, "freezing and thawing it create no node")
+	_eq(window.modulate, Color.WHITE, "and it clears when the machine is back")
+	_eq(_hud_nodes(office), nodes, "greying and clearing it create no node")
 	_set_online(office, false)
 	_set_online(office, true)
-	_check(portrait.is_playing(), "a second drop and return leave it moving")
+	_eq(window.modulate, Color.WHITE, "a second drop and return leave it clear")
+	_eq(hud.inspector.portrait(), portrait, "and the same portrait")
 	_eq(_hud_nodes(office), nodes, "and create no node either")
 	_done(office)
 

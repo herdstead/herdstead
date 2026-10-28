@@ -1,0 +1,35 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/people/pixel_portrait.gd" id="1_portrait"]
+
+[node name="PixelPortrait" type="Node2D"]
+script = ExtResource("1_portrait")
+
+[node name="Layers" type="Node2D" parent="."]
+
+[node name="Top" type="Sprite2D" parent="Layers"]
+centered = false
+
+[node name="Head" type="Sprite2D" parent="Layers"]
+centered = false
+
+[node name="Face" type="Sprite2D" parent="Layers"]
+centered = false
+
+[node name="Brows" type="Sprite2D" parent="Layers"]
+centered = false
+
+[node name="Marks" type="Sprite2D" parent="Layers"]
+centered = false
+
+[node name="Neckwear" type="Sprite2D" parent="Layers"]
+centered = false
+
+[node name="Glasses" type="Sprite2D" parent="Layers"]
+centered = false
+
+[node name="Hair" type="Sprite2D" parent="Layers"]
+centered = false
+
+[node name="Headwear" type="Sprite2D" parent="Layers"]
+centered = false

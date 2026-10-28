@@ -7,6 +7,7 @@ const TABLE_SCENE := preload("res://scenes/world/table.tscn")
 const DECOR_SCENE := preload("res://scenes/world/decor.tscn")
 const STATION_SCENE := preload("res://scenes/world/station.tscn")
 const PERSON_SCENE := preload("res://scenes/people/pixel_person.tscn")
+const PORTRAIT_SCENE := preload("res://scenes/people/pixel_portrait.tscn")
 ## A tab's name on the floor under its table (tab_label()): the display face's
 ## own size, and the band it stands in.
 const TAB_LABEL_PIXELS := 8
@@ -552,8 +553,8 @@ func station(sorted: Node2D, at_table: OfficeTable, column: int, side: String) -
 ## `actor` when there is one, else a new person, instanced once and kept (its
 ## feet disabled: no floor holds them). The same face and hair as at the seat
 ## (vary_by(key)), dressed in `pack`'s people as `provider`; re-dressing the same
-## node is new textures, never a new person. The agent card's portrait and the
-## top bar's faces both come from here.
+## node is new textures, never a new person. The top bar's faces come from
+## here.
 static func seat_face(holder: Node2D, actor: PixelPerson, pack: ArtPack, provider: String, key: String) -> PixelPerson:
 	var person := actor
 	if person == null:
@@ -564,6 +565,24 @@ static func seat_face(holder: Node2D, actor: PixelPerson, pack: ArtPack, provide
 	person.vary_by(key)
 	person.configure(pack.people, provider, AvatarLook.facing(AvatarLook.STAND, AvatarLook.FRONT))
 	return person
+
+
+## The seat's person for pane `key` as a portrait (PixelPortrait), in `holder`
+## at its bottom centre: `kept` when there is one, else a new one, instanced
+## once and kept. The same person as at the seat by construction (the portraits
+## resolve the look by the seat's own call, PixelPortraits.look_of()), plus the
+## portrait's own extras for the pane; re-dressing the same node is new
+## textures, never a new portrait. The agent card's portrait comes from here.
+static func seat_portrait(
+	holder: Node2D, kept: PixelPortrait, pack: ArtPack, provider: String, key: String
+) -> PixelPortrait:
+	var shown := kept
+	if shown == null:
+		shown = PORTRAIT_SCENE.instantiate()
+		holder.add_child(shown)
+	shown.provider = provider
+	shown.show_look(pack.portraits, pack.portraits.look_of(provider, key))
+	return shown
 
 
 ## A standing, front-facing person shown as a portrait at `at`, `zoom` times

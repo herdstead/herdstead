@@ -404,8 +404,7 @@ func dress(pack: ArtPack) -> void:
 	var hint: Button = %AnswerButton
 	if not _answering:
 		hint.icon = _key_enter_icon
-	# A pack swap is a new people family and animation library, so the portrait
-	# is dressed again.
+	# A pack swap is a new portraits family, so the portrait is dressed again.
 	_details().forget_look()
 
 
@@ -691,8 +690,8 @@ func _share_left() -> void:
 		left.custom_minimum_size = Vector2(least, left.custom_minimum_size.y)
 
 
-## The portrait's person while there is one; null in the empty state.
-func portrait() -> PixelPerson:
+## The portrait while there is one; null in the empty state.
+func portrait() -> PixelPortrait:
 	return _details().portrait()
 
 

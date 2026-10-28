@@ -227,7 +227,8 @@ over the page shown. Every run starts on AGENT, the agent card. The card and HUD
 fit is in the tooltip.
 
 **Docked on a screen at least 400 units tall.** The panel is always open there, 120 units high whatever its page, so a tab
-never moves the world: the portrait, the pane's name, the state in a pill of its colour and its wait, who and where
+never moves the world: the portrait (the seat's person, head and shoulders, still, framed in the state's colour; greyed
+when its machine is dropped), the pane's name, the state in a pill of its colour and its wait, who and where
 (`CLAUDE · api / main`); a live preview of the terminal's last 6 rows (herdr's `detection` when blocked, the tail of
 `recent_unwrapped` otherwise); START AGENT or NEW PANE (its title beside the kinds or the button) over Close · New space ·
 branch · Worktree on one line; the pane's details (when the card is at least 1000 units wide, from a 1040-wide screen); and at the right end one column:
@@ -820,7 +821,7 @@ scenes/ui/               HUD scenes: hud.tscn (layout lives here), bar (portrait
                          history_list / history_row; event list / event row; news in its top row),
                          overview, strategic, terminal_monitor
 scenes/world/            world prefabs: table (a pod), station, decor, chip, machine_plate, zone_sign
-scenes/people/           pixel_person.tscn and the showroom cells
+scenes/people/           pixel_person.tscn, pixel_portrait.tscn and the showroom cells
 scripts/office.gd        OfficeScene, the composition root
 scripts/herdr_client.gd  read-only socket client (ping, session.snapshot, events.subscribe)
 scripts/herdr_commands.gd  HerdrCommands, the write boundary; not constructed under --read-only
@@ -842,7 +843,7 @@ scripts/ui/              HUD scripts: hud, theme, bar (portrait card, portrait f
                          card_words, card_actions, launch_block; history_list / history_row), monitor, NEWS, EVENTS,
                          OVERVIEW, strategic view
 scripts/art/             typed art pack models; the only readers of manifest JSON
-scripts/people/          PixelPerson prefab script
+scripts/people/          PixelPerson and PixelPortrait prefab scripts
 tools/                   builders, contract tests, fake herdr / fake ssh, test suites (test_*.gd), capture and perf
 tools/fixtures/          snapshots, monitor screen dumps, herdr_methods.json
 docs/                    this manual, WRITE_BOUNDARY, VISUAL_LANGUAGE, WORLD_MODEL, ASSET_SPEC, ARTIST_BRIEF,

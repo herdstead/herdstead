@@ -43,6 +43,19 @@ const HAIR := &"hair"
 const HEADWEAR := &"headwear"
 ## The layers, bottom to top. A manifest has to draw exactly these.
 const LAYERS: Array[StringName] = [TOP, HEAD, FACE, BROWS, MARKS, NECKWEAR, GLASSES, HAIR, HEADWEAR]
+## The Sprite2D that shows each layer in scenes/people/pixel_portrait.tscn
+## (PixelPortrait), in the same order.
+const SPRITES: Dictionary[StringName, String] = {
+	TOP: "Layers/Top",
+	HEAD: "Layers/Head",
+	FACE: "Layers/Face",
+	BROWS: "Layers/Brows",
+	MARKS: "Layers/Marks",
+	NECKWEAR: "Layers/Neckwear",
+	GLASSES: "Layers/Glasses",
+	HAIR: "Layers/Hair",
+	HEADWEAR: "Layers/Headwear",
+}
 const PRODUCT_KEYS: Array[String] = [
 	"schema_version",
 	"density",

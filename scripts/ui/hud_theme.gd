@@ -648,6 +648,26 @@ static func _portraits(theme: Theme, art: ArtPack) -> void:
 			theme.set_stylebox("panel", window, framed)
 	theme.set_type_variation(&"PortraitFaceBare", "Panel")
 	theme.set_stylebox("panel", &"PortraitFaceBare", StyleBoxEmpty.new())
+	# A portrait's window (PixelPortrait): the warm ground the portrait stands on
+	# (PortraitWindow, `cream`, no edge), and over the portrait's edge a frame in
+	# the state's colour (PortraitFrame<State>: 1 unit, 2 under the pointer,
+	# …Lit), or `ink` on a dropped machine's card (PortraitFrameStale). The frame
+	# draws no centre: the portrait shows through it.
+	theme.set_type_variation(&"PortraitWindow", "Panel")
+	theme.set_stylebox("panel", &"PortraitWindow", _flat(art.color(ArtContract.CREAM)))
+	var frames: Dictionary[String, StringName] = {"Stale": ArtContract.INK}
+	frames.merge(edges)
+	for state: String in frames:
+		for lit: bool in [false, true]:
+			if lit and state == "Stale":
+				continue
+			var frame := StringName("PortraitFrame%s%s" % [state, "Lit" if lit else ""])
+			theme.set_type_variation(frame, "Panel")
+			var edge := _flat(Color.TRANSPARENT)
+			edge.draw_center = false
+			edge.set_border_width_all(2 if lit else 1)
+			edge.border_color = art.color(frames[state])
+			theme.set_stylebox("panel", frame, edge)
 	# The face and the words: side by side on a card, a 2-unit gap between;
 	# one over the other on a tile, none (PortraitCard.set_tall()).
 	var gaps: Dictionary[StringName, int] = {&"PortraitBody": 2, &"PortraitBodyTall": 0}
