@@ -9,11 +9,12 @@ focus_mode = 0
 theme_type_variation = &"PortraitCardIdle"
 script = ExtResource("1")
 card_size = Vector2(86, 28)
-tile_size = Vector2(50, 48)
+tile_size = Vector2(50, 66)
 face_width = 20.0
 tile_face_width = 26.0
 card_face = Vector2(20, 28)
-tile_face = Vector2(24, 24)
+tile_face = Vector2(42, 42)
+tile_face_alone = Vector2(24, 42)
 card_body = Vector4(0, 0, 4, 0)
 tile_body = Vector4(1, 0, 1, 0)
 
@@ -80,6 +81,23 @@ mouse_filter = 2
 [node name="FaceHolder" type="Node2D" parent="Body/FaceBox/Face/FaceAnchor"]
 unique_name_in_owner = true
 position = Vector2(0, 37)
+
+[node name="PortraitHolder" type="Node2D" parent="Body/FaceBox/Face/FaceAnchor"]
+unique_name_in_owner = true
+visible = false
+position = Vector2(0, 40)
+
+[node name="FaceFrame" type="Panel" parent="Body/FaceBox"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_type_variation = &"PortraitFrameIdle"
 
 [node name="Badge" type="Sprite2D" parent="Body/FaceBox"]
 unique_name_in_owner = true

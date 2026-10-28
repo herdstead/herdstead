@@ -601,7 +601,11 @@ static func _attention(theme: Theme, art: ArtPack) -> void:
 ## selected card wears a 1-unit `paper` ring just inside its edge, so the
 ## state's colour still shows (PortraitSelected).
 ## A card a hovered HUD line points at wears a 1-unit `paper` ring 2 units in,
-## inside the selection's, so the state's edge always shows (PortraitPointed). A card's place is a flat button
+## inside the selection's, so the state's edge always shows (PortraitPointed).
+## On a tile the rings lie on the cream window, where `paper` does not read: the
+## selection is `ink` (PortraitSelectedTile) and the pointed ring `slate`
+## (PortraitPointedTile), both far from cream and from every state's edge, and
+## from each other. A card's place is a flat button
 ## (PortraitPlaceButton): nothing until the pointer is on it, then a 1-unit
 ## `paper` line under it, as a link.
 ## A card's words are labels of their own (LABEL_HEADINGS), not the button's
@@ -627,10 +631,10 @@ static func _portraits(theme: Theme, art: ArtPack) -> void:
 				box.set_content_margin_all(0)
 				theme.set_stylebox(look, name, box)
 	# A tile (a tall bar's card) wears no frame of its own: its words stand on
-	# the bar's ground, and its face window wears the state (PortraitFace<State>:
-	# `ink` with the state's 1-unit edge, 2 units under the pointer, …Lit), as
-	# B2 draws it. On a card the window draws nothing (PortraitFaceBare): the
-	# card's own frame is round it.
+	# the bar's ground, and its face window is a portrait's (PortraitWindow and
+	# PortraitFrame<State>[Lit] below, over the portrait's edge), as B2 draws
+	# it. On a card the window draws nothing (PortraitFaceBare): the card's own
+	# frame is round it.
 	theme.set_type_variation(&"PortraitTile", "Button")
 	theme.set_constant("outline_size", &"PortraitTile", 0)
 	for look: String in BUTTON_STATES + ["hover_pressed"]:
@@ -638,21 +642,14 @@ static func _portraits(theme: Theme, art: ArtPack) -> void:
 		bare.draw_center = false
 		bare.set_content_margin_all(0)
 		theme.set_stylebox(look, &"PortraitTile", bare)
-	for state: String in edges:
-		for lit: bool in [false, true]:
-			var window := StringName("PortraitFace%s%s" % [state, "Lit" if lit else ""])
-			theme.set_type_variation(window, "Panel")
-			var framed := _flat(art.color(ArtContract.INK))
-			framed.set_border_width_all(2 if lit else 1)
-			framed.border_color = art.color(edges[state])
-			theme.set_stylebox("panel", window, framed)
 	theme.set_type_variation(&"PortraitFaceBare", "Panel")
 	theme.set_stylebox("panel", &"PortraitFaceBare", StyleBoxEmpty.new())
-	# A portrait's window (PixelPortrait): the warm ground the portrait stands on
-	# (PortraitWindow, `cream`, no edge), and over the portrait's edge a frame in
-	# the state's colour (PortraitFrame<State>: 1 unit, 2 under the pointer,
-	# …Lit), or `ink` on a dropped machine's card (PortraitFrameStale). The frame
-	# draws no centre: the portrait shows through it.
+	# A portrait's window (PixelPortrait: a tile's, the agent card's): the warm
+	# ground the portrait stands on (PortraitWindow, `cream`, no edge), and over
+	# the portrait's edge a frame in the state's colour (PortraitFrame<State>:
+	# 1 unit, 2 under a tile's pointer, …Lit), or `ink` on a dropped machine's
+	# card (PortraitFrameStale). The frame draws no centre: the portrait shows
+	# through it.
 	theme.set_type_variation(&"PortraitWindow", "Panel")
 	theme.set_stylebox("panel", &"PortraitWindow", _flat(art.color(ArtContract.CREAM)))
 	var frames: Dictionary[String, StringName] = {"Stale": ArtContract.INK}
@@ -682,6 +679,17 @@ static func _portraits(theme: Theme, art: ArtPack) -> void:
 	theme.set_stylebox("panel", &"PortraitSelected", ring)
 	theme.set_type_variation(&"PortraitPointed", "Panel")
 	theme.set_stylebox("panel", &"PortraitPointed", ring)
+	var tile_rings: Dictionary[StringName, StringName] = {
+		&"PortraitSelectedTile": ArtContract.INK,
+		&"PortraitPointedTile": ArtContract.SLATE,
+	}
+	for look: StringName in tile_rings:
+		theme.set_type_variation(look, "Panel")
+		var line := _flat(Color.TRANSPARENT)
+		line.draw_center = false
+		line.set_border_width_all(1)
+		line.border_color = art.color(tile_rings[look])
+		theme.set_stylebox("panel", look, line)
 	theme.set_type_variation(&"PortraitPlaceButton", "Button")
 	for look: String in BUTTON_STATES + ["hover_pressed"]:
 		var line := _flat(Color.TRANSPARENT)

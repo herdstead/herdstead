@@ -1028,7 +1028,9 @@ func test_a_zone_call_shows_the_planned_density() -> void:
 		# 116 docked panel.
 		# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the docked panel 120 tall, the room 276 -> 272
 		# (the plan's density unchanged).
-		_eq(office.hud.world_rect(), Rect2(16, 68, 936, 272), "the world's room at 1920×960, 2x")
+		# S3 PORTRAIT P3 (2026-10-28): the tall band 70, the tile's window a 42×42 portrait: the room from under the 70
+		# band, 68 -> 86 and 272 -> 254 (this run's print; the plan's density unchanged).
+		_eq(office.hud.world_rect(), Rect2(16, 86, 936, 254), "the world's room at 1920×960, 2x")
 		var plan := office.layout_plan()
 		var a := plan.zone(HerdrFleet.pane_key(LOCAL, "a"))
 		var b := plan.zone(HerdrFleet.pane_key(LOCAL, "b"))

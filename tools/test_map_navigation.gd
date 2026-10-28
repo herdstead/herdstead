@@ -316,9 +316,11 @@ func test_the_world_starts_at_the_left_inset_and_a_first_plan_takes_the_rails_wi
 	# rooms 241 -> 276 high; the 480x320 one (not docked) is unchanged.
 	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the docked panel 120 tall and the two rows 54, each
 	# room 4 shorter (the cells and lanes unchanged).
+	# S3 PORTRAIT P3 (2026-10-28): the tall band 70, the tile's window a 42×42 portrait: the two docked rooms start
+	# under the 70 band, 18 lower and 18 shorter (this run's print; the cells and lanes unchanged: they follow the width).
 	for step: Array in [
-		[Vector2(800, 480), Rect2(16, 68, 776, 272), 23, 4],
-		[Vector2(960, 480), Rect2(16, 68, 936, 272), 28, 5],
+		[Vector2(800, 480), Rect2(16, 86, 776, 254), 23, 4],
+		[Vector2(960, 480), Rect2(16, 86, 936, 254), 28, 5],
 		[Vector2(480, 320), Rect2(16, 48, 456, 198), 13, 2],
 	]:
 		var screen: Vector2 = step[0]
@@ -609,7 +611,9 @@ func test_pointing_at_another_machines_pane_outlines_its_card() -> void:
 	_check(not pointer.visible, "and no desk on Local's map is framed")
 	var ring: Panel = bar.card_for(hive).get_node("%Pointed")
 	_check(ring.visible, "by its ring")
-	_eq(ring.theme_type_variation, &"PortraitPointed", "in the theme's look")
+	# S3 PORTRAIT P3 round 2 (2026-10-28): on a tile the rings lie on the cream window, where `paper` did not read:
+	# the suite's 800x480 bar is tall, so the ring wears the tile's look (`slate`); a card keeps PortraitPointed.
+	_eq(ring.theme_type_variation, &"PortraitPointedTile", "in the theme's look")
 	await _pointer_to(hud_row.get_global_rect().get_center())
 	_eq(_pointed_cards(office), [], "a line about a pane on the shown map outlines no card")
 	_eq([pointer.key, pointer.visible], [_pane("hud:p1"), true], "it frames the desk")

@@ -144,7 +144,7 @@ MIN_CASES_TOP_BAR=27
 # The portrait strip that replaced the top bar's counters (S3 BAR-a); 12: an
 # unchanged strip lays nothing out (ruling 1); 15: B2's tiles on a tall bar, their
 # small state mark, the short bar's cards kept, and the right end's words (S3 TILES).
-MIN_CASES_PORTRAIT_BAR=15
+MIN_CASES_PORTRAIT_BAR=17
 MIN_CASES_STATE_LOG=22
 MIN_CASES_NEWS_EVENTS=16
 # LENS 22 -> 24: plates always show on a map with few occupied seats, per

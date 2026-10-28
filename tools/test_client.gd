@@ -1812,12 +1812,14 @@ func test_hud_free_area() -> void:
 	# above the 116-unit docked panel.
 	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the docked panel 120 tall (was 116), the world 4
 	# shorter: 276 -> 272, 1600x960 756 -> 752, the panel's top 4 higher (360 -> 356).
+	# S3 PORTRAIT P3 (2026-10-28): the tall band 70, the tile's window a 42×42 portrait: the bar 18 taller (52 -> 70), the
+	# world's origin 18 lower (68 -> 86) and its room 18 shorter (272 -> 254, 1600x960 752 -> 734; this run's print).
 	_eq(
 		hud.world_rect(),
-		Rect2(16, 68, 776, 272),
+		Rect2(16, 86, 776, 254),
 		"16 in from the left as the bottom panel is, to the right edge, below the bar, above the docked panel"
 	)
-	_eq(hud.placed(hud.bar), Rect2(0, 0, 800, 52), "the bar spans the top, 52 tall on a tall screen")
+	_eq(hud.placed(hud.bar), Rect2(0, 0, 800, 70), "the bar spans the top, 70 tall on a tall screen")
 	# S3 PANEL-a2 (2026-10-28): the agent list and the attention records retire: the right column (the agent list's drawer)
 	# is gone, so where it would have opened is no longer pinned; that nothing stands there is.
 	_check(hud.get_node_or_null("Screen/RightColumn") == null, "no right column: nothing takes the world's right edge")
@@ -1830,7 +1832,7 @@ func test_hud_free_area() -> void:
 	hud.fit(Vector2(1600, 960))
 	# S3 BAR-b (2026-10-27): the SPACES rail is gone; the world starts 16 in and first plans take its width.
 	# S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151), the world 35 taller: 721 -> 756.
-	_eq(hud.world_rect(), Rect2(16, 68, 1576, 752), "a bigger window is more office, not a bigger HUD")
+	_eq(hud.world_rect(), Rect2(16, 86, 1576, 734), "a bigger window is more office, not a bigger HUD")
 	_eq(hud.world_rect().position.x, hud.placed(hud.staff).position.x, "the world's left edge is the bottom panel's")
 	await _frames(2)
 	var lines: Control = hud.bar.get_node("%Lines")

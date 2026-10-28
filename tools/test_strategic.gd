@@ -764,7 +764,10 @@ func test_the_stress_fit_at_2x_4x_and_min() -> void:
 	# 207 -> 242 high; the minimum's (not docked) is unchanged.
 	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the docked panel 120 and the two rows 54 tall: each
 	# room 4 shorter (242 -> 238, 168 -> 164); the same columns and cells.
-	_eq(rooms[WIDE], Vector2(920, 238), "the room at 2x, above the docked panel")
+	# S3 PORTRAIT P3 (2026-10-28): the tall band 70, the tile's window a 42×42 portrait: the bar 18 taller at 2x:
+	# the room 238 -> 220 (this run's print); the minimum's (the short band) unchanged; the same columns and cells
+	# (the 400 panes still 13 columns of 12-unit cells at 2x: re-measured, the row did not flip).
+	_eq(rooms[WIDE], Vector2(920, 220), "the room at 2x, above the docked panel")
 	_eq(rooms[SMALL], Vector2(440, 164), "the room at 4x and the minimum")
 	var eighty := _rows_of(10)
 	var four_hundred := _rows_of(50)

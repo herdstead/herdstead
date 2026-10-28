@@ -28,6 +28,10 @@ const TILE_METRICS := [50.0, 26.0, 40.0, 24.0, 2.0]
 const ROOMS: Array[float] = [524.0, 364.0, 204.0, 208.0]
 ## Which of ROOMS are a tall bar's.
 const TALL_ROOMS := 3
+## How far apart (8-bit RGB, summed) a tile's ring stays from what it lies on
+## or beside: more than twice `paper` on `cream`'s 41, the measured miss (S3
+## PORTRAIT P3 round 2, 2026-10-28).
+const RING_APART := 100
 
 
 func _initialize() -> void:
@@ -521,57 +525,83 @@ func test_the_zone_tag_wears_its_groups_carpet_family() -> void:
 
 
 ## A card's face is the seat's person: the same look (every slot) for the same
-## pane and provider, standing and facing front, and it stands still. Its foot
-## stands at the face window's middle, 37 under the window's top, on a tile
-## and on a card alike (the head's top one unit under the window: the BAR-a
-## measure), so a tile shows the head and the shoulders.
+## pane and provider, standing and facing front, and it stands still. On a
+## tile it is the portrait (PixelPortrait: a still, no AnimationPlayer), its
+## bottom centre at the clip's bottom centre, so the 40×40 portrait is the
+## clip, whole; on a card the small person, its foot at the clip's middle, 37
+## under its top (the BAR-a measure).
 ## S3 TILES (2026-10-28): the strip's cards are B2's tiles on tall screens: the
 ## holder is checked per form.
+## S3 PORTRAIT P3 (2026-10-28): the tall band 70, the tile's window a 42×42
+## portrait: on a tile the face is the portrait (was the small person, its
+## foot 37 under a 46×22 clip's top), so the look is the portrait's
+## (`portrait().look.look`), it is placed by its bottom centre, and the clip is
+## 40×40, the portrait's own size (measured: Rect2(5, 1, 40, 40) of the tile).
 func test_the_face_is_the_seats_person_and_stands_still() -> void:
 	var office := await _live_office(fixture, Vector2(1920, 480))
-	var checked := 0
-	for card in office.hud.bar.cards():
-		if not office.floor_view.seats.has(card.key):
-			continue
-		var seated := _worker(office.floor_view.seats[card.key].node)
-		var face := card.person()
-		_check(face != null and seated != null, "%s: a person on the card and at the seat" % card.key)
-		if face == null or seated == null:
-			continue
-		checked += 1
-		for slot in AvatarLook.SLOTS:
-			_eq(face.look.slot(slot), seated.look.slot(slot), "%s: the same %s" % [card.key, slot])
-		_eq(face.look.context, AvatarLook.STAND, "%s stands" % card.key)
-		var player: AnimationPlayer = face.get_node("AnimationPlayer")
-		_check(not player.is_playing(), "%s's face stands still" % card.key)
-	_eq(checked, 9, "every agent of the fixture")
-	await _frames(10)
-	var still := office.hud.bar.cards()[0].person().get_node("AnimationPlayer") as AnimationPlayer
-	_check(not still.is_playing(), "and stays still")
 	for screen: Vector2 in [Vector2(1920, 480), Vector2(1920, 320)]:
 		office.test_screen = screen
 		office.refresh()
 		await _frames(2)
-		var form := "tile" if office.hud.bar.is_tall() else "card"
-		_eq(form, "tile" if screen.y >= office.hud.staff_tall_from else "card", "%s: its band's form" % screen)
+		var tall := office.hud.bar.is_tall()
+		var form := "tile" if tall else "card"
+		_eq(tall, screen.y >= office.hud.staff_tall_from, "%s: its band's form" % screen)
+		var checked := 0
 		for card in office.hud.bar.cards():
-			var window: Control = card.get_node("%Face")
-			var foot := card.person().get_global_transform().origin
-			var wanted := Vector2(window.get_global_rect().get_center().x, window.get_global_rect().position.y + 37.0)
-			_eq(foot, wanted, "%s's %s: the foot at the window's middle, 37 under its top" % [card.key, form])
+			if not office.floor_view.seats.has(card.key):
+				continue
+			var seated := _worker(office.floor_view.seats[card.key].node)
+			var face: Node2D = card.portrait() if tall else card.person()
+			_check(face != null and seated != null, "%s: a %s face and a person at the seat" % [card.key, form])
+			if face == null or seated == null:
+				continue
+			checked += 1
+			var look: AvatarLook = card.portrait().look.look if tall else card.person().look
+			for slot in AvatarLook.SLOTS:
+				_eq(look.slot(slot), seated.look.slot(slot), "%s's %s: the same %s" % [card.key, form, slot])
+			_eq(look.context, AvatarLook.STAND, "%s's %s stands" % [card.key, form])
+			_eq(look.orientation, AvatarLook.FRONT, "%s's %s faces front" % [card.key, form])
+			var clip := (card.get_node("%Face") as Control).get_global_rect()
+			var at := face.get_global_transform().origin
+			if tall:
+				_eq(
+					at,
+					Vector2(clip.get_center().x, clip.end.y),
+					"%s's portrait: at the clip's bottom centre" % card.key
+				)
+				var top := card.portrait().sprite_of(&"top")
+				_eq(top.get_global_transform() * top.get_rect(), clip, "%s's portrait: the clip, whole" % card.key)
+				_eq(face.find_children("*", "AnimationPlayer", true, false).size(), 0, "%s: a still" % card.key)
+			else:
+				_eq(
+					at, Vector2(clip.get_center().x, clip.position.y + 37.0), "%s's person: 37 under the top" % card.key
+				)
+				var player: AnimationPlayer = face.get_node("AnimationPlayer")
+				_check(not player.is_playing(), "%s's person stands still" % card.key)
+		_eq(checked, 9, "every agent of the fixture as a %s" % form)
 		var first: Control = office.hud.bar.cards()[0].get_node("%Face")
-		_eq(first.size, Vector2(46, 22) if form == "tile" else Vector2(18, 26), "the %s's face window" % form)
+		_eq(first.size, Vector2(40, 40) if tall else Vector2(18, 26), "the %s's face window" % form)
+	await _frames(10)
+	var still := office.hud.bar.cards()[0].person().get_node("AnimationPlayer") as AnimationPlayer
+	_check(not still.is_playing(), "and stays still")
 	_done(office)
 
 
-## Each group's frame is its own: a tile's face window wears it
-## (PortraitFace<State>) and the tile none (PortraitTile), a card wears it
-## itself (PortraitCard<State>) round a bare window; only the selected pane's
-## card wears the paper ring, 1 in from the frame, and it follows the
-## selection; the pointed ring 2 in, under the face, on either form.
+## Each group's frame is its own: on a tile the frame over the portrait wears
+## it (`%FaceFrame`, PortraitFrame<State>) on the cream window (PortraitWindow)
+## and the tile none (PortraitTile), a card wears it itself
+## (PortraitCard<State>) round a bare window; only the selected pane's card
+## wears the paper ring, 1 in from the frame, and it follows the selection;
+## the pointed ring 2 in, on either form: under the face on a card, over the
+## portrait on a tile.
 ## S3 TILES (2026-10-28): the strip's cards are B2's tiles on tall screens: on
 ## a tile the frame and the rings are the face window's (B2: the words stand on
 ## the bar's ground), so the looks and the ring rects are checked per form.
+## S3 PORTRAIT P3 (2026-10-28): the tall band 70, the tile's window a 42×42
+## portrait: the portrait fills the window, so the state's frame is an overlay
+## of its own over it (`%FaceFrame`, P2's PortraitFrame<State>; the window's
+## PortraitFace<State> is retired) and the pointed ring lies over the portrait
+## (D-RINGS: under it, the shoulders and long hair would hide it).
 func test_a_card_frame_says_the_state_and_the_selected_one_its_ring() -> void:
 	var office := await _live_office(fixture, Vector2(1920, 480))
 	var bar := office.hud.bar
@@ -587,10 +617,14 @@ func test_a_card_frame_says_the_state_and_the_selected_one_its_ring() -> void:
 		_check(card != null, "%s has a card" % pane_id)
 		if card != null:
 			_eq(card.theme_type_variation, &"PortraitTile", "%s: the tile wears no frame" % pane_id)
+			var window := card.get_node("%FaceBox") as Control
+			var frame := card.get_node("%FaceFrame") as Control
+			_eq(window.theme_type_variation, &"PortraitWindow", "%s: its window is the cream ground" % pane_id)
+			_check(frame.visible, "%s: a frame over the portrait" % pane_id)
 			_eq(
-				(card.get_node("%FaceBox") as Control).theme_type_variation,
-				StringName("PortraitFace" + looks[pane_id]),
-				"%s: its window wears the state" % pane_id
+				frame.theme_type_variation,
+				StringName("PortraitFrame" + looks[pane_id]),
+				"%s: the frame over its portrait wears the state" % pane_id
 			)
 	# Before any pick the office's selection is herdr's focus (the list's highlight).
 	var active := office.navigator.active_key
@@ -613,6 +647,7 @@ func test_a_card_frame_says_the_state_and_the_selected_one_its_ring() -> void:
 		var card := bar.card_for(_pane(pane_id))
 		_eq(card.theme_type_variation, StringName("PortraitCard" + looks[pane_id]), "%s: the card wears it" % pane_id)
 		_eq((card.get_node("%FaceBox") as Control).theme_type_variation, &"PortraitFaceBare", "round a bare window")
+		_check(not (card.get_node("%FaceFrame") as Control).visible, "%s: no frame over the small person" % pane_id)
 	await _rings_nest(bar, picked, picked.get_global_rect(), "card")
 	office.test_screen = Vector2(1920, 480)
 	office.refresh()
@@ -624,8 +659,10 @@ func test_a_card_frame_says_the_state_and_the_selected_one_its_ring() -> void:
 
 
 ## On `card`, whose frame is `frame`: the selection's ring 1 in, the pointed
-## ring 2 in and under the face, both showing at once (S3 BAR-b ruling 1,
-## 2026-10-27: the state's edge, the selection and the pointing all show).
+## ring 2 in, both showing at once (S3 BAR-b ruling 1, 2026-10-27: the state's
+## edge, the selection and the pointing all show); the pointed ring under the
+## face on a card, over the portrait on a tile (S3 PORTRAIT P3, 2026-10-28:
+## D-RINGS, the portrait fills the tile's window).
 func _rings_nest(bar: OfficeBar, card: PortraitCard, frame: Rect2, form: String) -> void:
 	var ring := card.get_node("%Selected") as Control
 	_check(ring.visible, "%s: selected" % form)
@@ -635,11 +672,29 @@ func _rings_nest(bar: OfficeBar, card: PortraitCard, frame: Rect2, form: String)
 	var pointed := card.get_node("%Pointed") as Control
 	_check(pointed.visible and ring.visible, "%s: pointed at and selected together" % form)
 	_eq(pointed.get_global_rect(), frame.grow(-2.0), "%s: the pointed ring inside the selection's" % form)
-	_eq(pointed.theme_type_variation, &"PortraitPointed", "%s: in its own look" % form)
+	# S3 PORTRAIT P3 round 2 (2026-10-28): on a tile the rings lie on the cream window: `paper` on cream did not
+	# read (9, 12, 20 apart), so a tile's selection is `ink` and its pointed ring `slate`; a card keeps `paper` on its
+	# dark ground.
+	var art := ArtPack.from_manifest(MANIFESTS[0])
+	var tall := card.is_tall()
+	var looks: Array[StringName] = [&"PortraitSelected", &"PortraitPointed"]
+	var colours: Array[StringName] = [ArtContract.PAPER, ArtContract.PAPER]
+	if tall:
+		looks = [&"PortraitSelectedTile", &"PortraitPointedTile"]
+		colours = [ArtContract.INK, ArtContract.SLATE]
+	var drawn_rings: Array[Control] = [ring, pointed]
+	for index in drawn_rings.size():
+		var drawn := drawn_rings[index]
+		_eq(drawn.theme_type_variation, looks[index], "%s: %s in its own look" % [form, drawn.name])
+		var line := drawn.get_theme_stylebox("panel") as StyleBoxFlat
+		_eq(line.border_color, art.color(colours[index]), "%s: %s in %s" % [form, drawn.name, colours[index]])
 	var face := card.get_node("%Face") as Control
 	var under := face if pointed.get_parent() == face.get_parent() else card.get_node("%Body") as Control
 	_eq(pointed.get_parent(), under.get_parent(), "%s: the ring and the face's box are siblings" % form)
-	_check(pointed.get_index() < under.get_index(), "%s: drawn under the face: the head's top stays whole" % form)
+	if card.is_tall():
+		_check(pointed.get_index() > face.get_index(), "tile: drawn over the portrait")
+	else:
+		_check(pointed.get_index() < under.get_index(), "card: drawn under the face: the head's top stays whole")
 	bar.point(PackedStringArray())
 	await _frames(1)
 
@@ -715,12 +770,19 @@ func test_an_unchanged_strip_lays_nothing_out() -> void:
 	_eq(bar.layouts(), count, "attention's beat writes the waits, and lays nothing out")
 	var nodes := _strip_nodes(bar)
 	_check(bar.is_tall(), "the suite's 800×480: tiles")
+	var tiles := _faces(bar)
 	office.test_screen = Vector2(800, 320)
 	office.refresh()
 	await _frames(2)
 	_check(not bar.is_tall(), "800×320: cards")
 	_eq(bar.layouts(), count + 1, "a tall bar turned short: laid out once")
 	_eq(_strip_nodes(bar), nodes, "every card, pooled card and fold on the same node")
+	var cards := _faces(bar)
+	for key: String in cards:
+		var person: int = cards[key][2]
+		_check(person != 0, "%s: its card's person is dressed" % key)
+		if tiles.has(key):
+			_eq(cards[key].slice(0, 2), tiles[key].slice(0, 2), "%s: its hidden portrait as it was" % key)
 	office.test_screen = Vector2(SCREEN)
 	office.refresh()
 	await _frames(2)
@@ -728,6 +790,10 @@ func test_an_unchanged_strip_lays_nothing_out() -> void:
 	_eq(bar.layouts(), count + 2, "and back: once more")
 	_eq(_strip_nodes(bar), nodes, "still the same nodes")
 	_eq(_strip_picture(bar), before, "showing what they showed")
+	var back := _faces(bar)
+	for key: String in back:
+		if cards.has(key):
+			_eq(back[key], cards[key], "%s: no face dressed again: the same nodes in the same looks" % key)
 	count = bar.layouts()
 	_feed(office, _with(fixture, "infra:p1", {"agent_status": "working"}))
 	await _frames(2)
@@ -834,21 +900,28 @@ func test_a_tile_wears_its_states_dot_and_it_never_bobs() -> void:
 
 ## A short bar (a screen under `staff_tall_from`) keeps BAR-a's horizontal
 ## card exactly: 86×28, the face window 18×26 at (1, 1), the words 60×24 at
-## (22, 2), the face alone 20×28, folds 40×28 and tallies 24×28, the frame
-## on the card, no mark. A tall one shows the tiles: 50×48, the face window
-## 48×24 at (1, 0) over the name and the place rows (48×12 each), the face
-## alone 26×48, folds 40×48 and tallies 24×48. The same nodes either way.
+## (22, 2), the face alone 20×28 (the same window), folds 40×28 and tallies
+## 24×28, the frame on the card, no mark. A tall one shows the tiles: 50×66,
+## the portrait's 40×40 clip at (5, 1) (its 42×42 window centred at (4, 0))
+## over the name and the place rows (48×12 each, from y 42), the face alone
+## 26×66 with the clip 22×40 at (2, 1) (the portrait cropped to its middle),
+## folds 40×66 and tallies 24×66. The same nodes either way.
 ## S3 TILES (2026-10-28): the strip's cards are B2's tiles on tall screens.
+## S3 PORTRAIT P3 (2026-10-28): the tall band 70, the tile's window a 42×42
+## portrait: the tall row was 50×48, the clip 46×22 at (2, 1), the words at
+## y 24, the face alone 26×48 and folds 48 tall (measured on this tree: the
+## print of the first run); 640 wide added so a face-only tile is measured.
 func test_short_screens_keep_the_horizontal_card() -> void:
 	var office := await _live_office()
 	var bar := office.hud.bar
 	var forms: Dictionary[float, Array] = {
-		320.0: [Vector2(86, 28), Vector2(20, 28), Rect2(1, 1, 18, 26), Rect2(22, 2, 60, 24), 28.0],
-		480.0: [Vector2(50, 48), Vector2(26, 48), Rect2(2, 1, 46, 22), Rect2(1, 24, 48, 24), 48.0],
+		320.0: [Vector2(86, 28), Vector2(20, 28), Rect2(1, 1, 18, 26), Rect2(22, 2, 60, 24), 28.0, Rect2(1, 1, 18, 26)],
+		480.0: [Vector2(50, 66), Vector2(26, 66), Rect2(5, 1, 40, 40), Rect2(1, 42, 48, 24), 66.0, Rect2(2, 1, 22, 40)],
 	}
 	var nodes := _strip_nodes(bar)
+	var alone := 0
 	for height: float in [320.0, 480.0, 320.0]:
-		for width: float in [800.0, 1920.0]:
+		for width: float in [640.0, 800.0, 1920.0]:
 			office.test_screen = Vector2(width, height)
 			office.refresh()
 			await _frames(2)
@@ -862,7 +935,10 @@ func test_short_screens_keep_the_horizontal_card() -> void:
 				var words: Control = card.get_node("%Text")
 				_eq(card.size, wanted[1] if card.face_only() else wanted[0], "%s %s: its size" % [where, card.key])
 				var window := face.get_global_rect()
-				_eq(Rect2(window.position - at, window.size), wanted[2], "%s %s: the face window" % [where, card.key])
+				var clip: Rect2 = wanted[5] if card.face_only() else wanted[2]
+				_eq(Rect2(window.position - at, window.size), clip, "%s %s: the face window" % [where, card.key])
+				if card.face_only() and card.is_tall():
+					alone += 1
 				if not card.face_only():
 					var text := words.get_global_rect()
 					_eq(Rect2(text.position - at, text.size), wanted[3], "%s %s: the words" % [where, card.key])
@@ -876,6 +952,7 @@ func test_short_screens_keep_the_horizontal_card() -> void:
 			for fold in bar.folds():
 				if fold.visible:
 					_eq(fold.size, Vector2(24.0 if fold.tallied() else 40.0, tall_as), "%s %s" % [where, fold.name])
+	_check(alone > 0, "a face-only tile was measured: %d" % alone)
 	var kept := _strip_nodes(bar)
 	_check(nodes.all(func(id: int) -> bool: return kept.has(id)), "every node the strip had is kept through every form")
 	_done(office)
@@ -959,6 +1036,180 @@ func test_the_right_end_says_machines_and_panes_and_keeps_its_switches() -> void
 	_done(two)
 
 
+## A tile shows the seat's person as a portrait (PixelPortrait, the pane's
+## PixelPortraits.look_of()), and the small person's holder is hidden; a card
+## shows the small person, and the portrait's holder is hidden. One card node
+## makes both faces with its first pane and keeps them through every flip (a
+## flip makes no node); after that it dresses only the face its form shows,
+## and the hidden one only when it shows again: a pane change on a tile leaves
+## the hidden person as it was, and a flip back dresses nothing.
+## S3 PORTRAIT P3 (2026-10-28): the tall band 70, the tile's window a 42×42
+## portrait (Part P3.2: the tile shows the portrait, the card keeps the person).
+func test_a_tile_shows_the_seats_portrait_and_a_card_its_person() -> void:
+	var hud := await _bare_hud(Vector2(960, 320))
+	var art := ArtPack.from_manifest(MANIFESTS[0])
+	var model := PortraitBarModel.new()
+	model.counts = {
+		PortraitBarModel.Group.BLOCKED: 1,
+		PortraitBarModel.Group.DONE: 0,
+		PortraitBarModel.Group.WORKING: 0,
+		PortraitBarModel.Group.IDLE: 0
+	}
+	model.cards = [_made("Local:a", PortraitBarModel.Group.BLOCKED, "a", "api")]
+	hud.bar.show_portraits(model, _totals(1, 1))
+	await _frames(2)
+	var card := hud.bar.card_for("Local:a")
+	_check(card != null and not card.is_tall(), "960×320: a card")
+	if card == null:
+		hud.free()
+		return
+	var small: Node2D = card.get_node("%FaceHolder")
+	var still: Node2D = card.get_node("%PortraitHolder")
+	_check(card.person() != null and card.person().is_visible_in_tree(), "a card shows the small person")
+	_check(not still.visible, "the portrait's holder hidden")
+	var portrait := card.portrait()
+	_check(portrait != null and not portrait.is_visible_in_tree(), "the portrait made with the card, hidden")
+	var person := card.person()
+	var person_look := person.look
+	var portrait_look := portrait.look
+	hud.fit(Vector2(960, 480))
+	await _frames(2)
+	_check(card.is_tall() and hud.bar.card_for("Local:a") == card, "960×480: the same node as a tile")
+	_check(card.portrait() == portrait and portrait.is_visible_in_tree(), "a tile shows the same portrait")
+	_check(portrait.look == portrait_look, "dressed once, with the card: the flip dresses nothing")
+	_check(not small.visible and not person.is_visible_in_tree(), "the small person's holder hidden")
+	_eq(portrait.get_parent(), still, "in the portrait's holder")
+	_eq(still.get_child_count(), 1, "one portrait")
+	_eq(portrait.look.key(), art.portraits.look_of("claude", "Local:a").key(), "the pane's portrait")
+	_check(card.person() == person and person.look == person_look, "the hidden person kept, not dressed again")
+	model.cards = [_made("Local:b", PortraitBarModel.Group.BLOCKED, "b", "api")]
+	hud.bar.show_portraits(model, _totals(1, 1))
+	await _frames(2)
+	_eq(hud.bar.card_for("Local:b"), card, "another pane on the same tile")
+	_check(card.portrait() == portrait, "on the same portrait")
+	_eq(portrait.look.key(), art.portraits.look_of("claude", "Local:b").key(), "dressed as that pane")
+	_check(portrait.look != portrait_look, "dressed once more")
+	_check(person.look == person_look, "the hidden person still Local:a's: not dressed while hidden")
+	portrait_look = portrait.look
+	hud.fit(Vector2(960, 320))
+	await _frames(2)
+	_check(not card.is_tall() and card.person() == person, "a card again, the same person")
+	_check(person.is_visible_in_tree() and not still.visible, "shown, the portrait hidden")
+	_check(person.look != person_look, "the person dressed as the pane it shows now")
+	var wanted := AvatarLook.facing(AvatarLook.STAND, AvatarLook.FRONT)
+	_eq(person.look.key(), art.people.look_for("claude", wanted, "Local:b").key(), "Local:b's person")
+	_check(portrait.look == portrait_look, "the hidden portrait not dressed again")
+	person_look = person.look
+	hud.fit(Vector2(960, 480))
+	await _frames(2)
+	_check(card.portrait() == portrait and portrait.look == portrait_look, "a tile again: not dressed again")
+	_check(person.look == person_look, "nor the person")
+	_eq(still.get_child_count(), 1, "still one portrait")
+	_eq(small.get_child_count(), 1, "and one person")
+	hud.free()
+
+
+## On a tile everything the HUD draws lies over the portrait, which fills the
+## window (D-RINGS): the cream ground (`%FaceBox`, PortraitWindow), the clip
+## with the portrait, the state's frame (`%FaceFrame`), the pointed ring, the
+## selection's ring, the mark, in that order. With the pointer on a selected,
+## pointed-at tile whose portrait's long hair falls to its bottom row (and
+## whose shoulders fill the foot of its sides, as every portrait's do), the
+## frame is the state's 2-unit edge round the window (…Lit), the selection's
+## 1-unit ring lies on its inner unit, the pointed ring 1 unit inside that,
+## all over the hair and the shoulders: none is hidden by the portrait. On the
+## cream window the selection is `ink` and the pointed ring `slate`: each at
+## least RING_APART from cream, from every state's frame colour and from the
+## other ring.
+## S3 PORTRAIT P3 round 2 (2026-10-28): on a tile the rings lie on the cream window: the rings were `paper`, 41
+## apart from cream (9 + 12 + 20, measured on the capture): the selected tile did not look selected.
+## S3 PORTRAIT P3 (2026-10-28): the tall band 70, the tile's window a 42×42
+## portrait (Part P3.2, D-RINGS: a frame drawn last would cover the selection;
+## rings under the portrait would hide under the shoulders and long hair).
+func test_the_frame_and_rings_draw_over_the_portrait() -> void:
+	var hud := await _bare_hud(Vector2(960, 480))
+	var art := ArtPack.from_manifest(MANIFESTS[0])
+	var key := ""
+	for index in 200:
+		var look := art.portraits.look_of("claude", "Local:p%d" % index)
+		var hatless := art.portraits.part_texture(&"headwear", look) == null
+		if look.look.slot(&"hair_style") == &"long" and hatless:
+			key = "Local:p%d" % index
+			break
+	_check(not key.is_empty(), "a pane with long hair and no hat: %s" % key)
+	var model := PortraitBarModel.new()
+	model.counts = {
+		PortraitBarModel.Group.BLOCKED: 0,
+		PortraitBarModel.Group.DONE: 0,
+		PortraitBarModel.Group.WORKING: 1,
+		PortraitBarModel.Group.IDLE: 0
+	}
+	model.cards = [_made(key, PortraitBarModel.Group.WORKING, "long", "api")]
+	model.selected = key
+	hud.bar.show_portraits(model, _totals(1, 1))
+	await _frames(2)
+	var card := hud.bar.card_for(key)
+	_check(card != null and card.is_tall(), "a tile")
+	if card == null:
+		hud.free()
+		return
+	var window := card.get_node("%FaceBox") as Control
+	var clip := card.get_node("%Face") as Control
+	var frame := card.get_node("%FaceFrame") as Control
+	var pointed := card.get_node("%Pointed") as Control
+	var ring := card.get_node("%Selected") as Control
+	var mark := card.badge()
+	var order: Array[Node] = [clip, frame, pointed, ring, mark]
+	for node in order:
+		_eq(node.get_parent(), window, "%s lies in the window" % node.name)
+	for index in order.size() - 1:
+		_check(
+			order[index].get_index() < order[index + 1].get_index(),
+			"%s drawn under %s" % [order[index].name, order[index + 1].name]
+		)
+	_eq(window.theme_type_variation, &"PortraitWindow", "the cream ground under the portrait")
+	_eq(window.size, Vector2(42, 42), "the window 42×42")
+	var hair := card.portrait().sprite_of(&"hair")
+	var top := card.portrait().sprite_of(&"top")
+	_check(hair.texture != null and top.texture != null, "the long hair and the shoulders are drawn")
+	var falls := hair.texture.get_image().get_used_rect()
+	var shoulders := top.texture.get_image().get_used_rect()
+	_eq(falls.end.y, 80, "the hair falls to the portrait's bottom row, under the rings' bottom lines: %s" % falls)
+	_eq([shoulders.position.x, shoulders.end.x, shoulders.end.y], [0, 80, 80], "the shoulders fill the sides' foot")
+	hud.bar.point(PackedStringArray([key]))
+	await _hover(card)
+	await _frames(1)
+	_check(pointed.visible and ring.visible and frame.visible, "pointed, selected and framed at once")
+	_eq(frame.theme_type_variation, &"PortraitFrameWorkingLit", "under the pointer the frame is the lit one")
+	var edge := frame.get_theme_stylebox("panel") as StyleBoxFlat
+	_eq(frame.get_global_rect(), window.get_global_rect(), "the frame round the whole window")
+	_eq(edge.border_width_left, 2, "a 2-unit edge")
+	_eq(edge.border_color, art.color(ArtContract.WORKING), "in the state's colour")
+	_check(not edge.draw_center, "the portrait shows through it")
+	_eq(ring.get_global_rect(), window.get_global_rect().grow(-1.0), "the selection on the edge's inner unit")
+	_eq(pointed.get_global_rect(), window.get_global_rect().grow(-2.0), "the pointed ring inside it")
+	var against: Array[StringName] = [
+		ArtContract.CREAM, ArtContract.BLOCKED, ArtContract.UNREAD, ArtContract.WORKING, ArtContract.MUTED
+	]
+	var lines: Array[Color] = []
+	for drawn: Control in [ring, pointed]:
+		var line := drawn.get_theme_stylebox("panel") as StyleBoxFlat
+		_eq(line.border_width_left, 1, "%s: 1 unit" % drawn.name)
+		lines.append(line.border_color)
+		for key_name: StringName in against:
+			var apart := _apart(line.border_color, art.color(key_name))
+			_check(apart >= RING_APART, "%s reads on %s: %d apart" % [drawn.name, key_name, apart])
+	_check(_apart(lines[0], lines[1]) >= RING_APART, "the two rings apart: %d" % _apart(lines[0], lines[1]))
+	var portrait := clip.get_global_rect()
+	_check(portrait.encloses(pointed.get_global_rect()), "the pointed ring lies over the portrait itself")
+	_eq(ring.get_global_rect(), portrait, "the selection on the portrait's outermost unit")
+	hud.bar.point(PackedStringArray())
+	await _pointer_to(Vector2(480, 300))
+	await _frames(1)
+	_eq(frame.theme_type_variation, &"PortraitFrameWorking", "the pointer gone: the 1-unit frame")
+	hud.free()
+
+
 # --- helpers ------------------------------------------------------------------
 
 
@@ -988,6 +1239,28 @@ func _strip_picture(bar: OfficeBar) -> Array:
 		if fold.visible:
 			picture.append([fold.name, fold.count_text(), fold.theme_type_variation, fold.get_global_rect()])
 	return picture
+
+
+## How far apart `a` and `b` are: the summed 8-bit RGB differences.
+func _apart(a: Color, b: Color) -> int:
+	return absi(a.r8 - b.r8) + absi(a.g8 - b.g8) + absi(a.b8 - b.b8)
+
+
+## Each shown card's faces by pane: the portrait's node and its look, the
+## person's node and its look, as instance ids (0 for none yet). A face dressed
+## again has a new look (PixelPortraits.look_of(), PixelPeople.look_for()).
+func _faces(bar: OfficeBar) -> Dictionary[String, Array]:
+	var faces: Dictionary[String, Array] = {}
+	for card in bar.cards():
+		var portrait := card.portrait()
+		var person := card.person()
+		faces[card.key] = [
+			portrait.get_instance_id() if portrait != null else 0,
+			portrait.look.get_instance_id() if portrait != null else 0,
+			person.get_instance_id() if person != null else 0,
+			person.look.get_instance_id() if person != null else 0,
+		]
+	return faces
 
 
 ## Every node in the strip, shown or pooled, cards and folds, left to right.

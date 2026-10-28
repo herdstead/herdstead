@@ -97,7 +97,7 @@ CORNER_MARK = 8
 # The registration ticks' side, in texels.
 TICK = 2
 # What the HUD's frame says per state: the palette key of its edge (HudTheme's
-# PortraitFace<State>: blocked, done is unread, working, idle is muted).
+# PortraitFrame<State>: blocked, done is unread, working, idle is muted).
 STATE_EDGES = (("blocked", "blocked"), ("done", "unread"), ("working", "working"), ("idle", "muted"))
 # The people's per-pane variation (PixelPeople.pick, VARIATION_SCHEME).
 VARIATION_SCHEME = "herdstead.look/1"

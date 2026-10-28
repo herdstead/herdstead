@@ -1,8 +1,8 @@
 class_name PixelPortrait
 extends Node2D
 ## One portrait: scenes/people/pixel_portrait.tscn, the seat's person as a
-## head-and-shoulders picture for the HUD (the agent card's; the top bar's
-## tiles later). The origin is the portrait's bottom centre.
+## head-and-shoulders picture for the HUD (the agent card's and the tall top
+## bar's tiles'). The origin is the portrait's bottom centre.
 ##
 ## Nine layer sprites (Top, Head, Face, Brows, Marks, Neckwear, Glasses, Hair,
 ## Headwear, bottom to top; PixelPortraits.SPRITES) each show one cell of the

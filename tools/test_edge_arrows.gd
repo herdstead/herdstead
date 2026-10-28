@@ -834,7 +834,7 @@ func test_no_arrows_for_another_machine_or_a_disconnected_one() -> void:
 
 
 ## Hovering an edge arrow, with a real pointer, outlines its zone's blocked
-## agents' cards in the top bar (PortraitPointed; S3 BAR-b, 2026-10-27: it
+## agents' cards in the top bar (PortraitPointed, PortraitPointedTile on a tall bar; S3 BAR-b, 2026-10-27: it
 ## outlined the zone's SPACES row), whether or not the zone is in view;
 ## leaving puts them back. It only points: nothing is selected, panned or picked.
 func test_hovering_an_arrow_outlines_its_zones_blocked_cards() -> void:
@@ -849,7 +849,9 @@ func test_hovering_an_arrow_outlines_its_zones_blocked_cards() -> void:
 	await _pointer_to(arrow.get_global_rect().get_center())
 	_eq(_cards_pointed(office), [_pane("hud:p1")], "the arrow under the pointer outlines 1A's blocked card, alone")
 	_check(ring.visible, "by its ring")
-	_eq(ring.theme_type_variation, &"PortraitPointed", "in the theme's look")
+	# S3 PORTRAIT P3 round 2 (2026-10-28): on a tile the rings lie on the cream window, where `paper` did not read:
+	# the suite's 800x480 bar is tall, so the ring wears the tile's look (`slate`); a card keeps PortraitPointed.
+	_eq(ring.theme_type_variation, &"PortraitPointedTile", "in the theme's look")
 	_eq([office.camera.pan, office.navigator.nav_revision], [pan, revision], "nothing panned or navigated")
 	await _pointer_to(office.hud.world_rect().get_center())
 	_eq(_cards_pointed(office), [], "leaving restores it")

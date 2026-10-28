@@ -12,7 +12,7 @@ script = ExtResource("1")
 fold_width = 40.0
 tally_width = 24.0
 card_height = 28.0
-tile_height = 48.0
+tile_height = 66.0
 
 [node name="Lines" type="VBoxContainer" parent="."]
 unique_name_in_owner = true

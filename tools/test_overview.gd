@@ -167,7 +167,9 @@ func test_the_panes_button_opens_the_overview_and_x_closes_it() -> void:
 	var placed := hud.placed(hud.overview)
 	# S3 PANEL-a1 (2026-10-27): the docked bottom panel, the 52-unit bar band on tall screens, no drawer tab: 8 under
 	# the 52-unit bar.
-	_eq([placed.position.x, placed.position.y, placed.end.x], [16.0, 60.0, 784.0], "under the bar, 16 in")
+	# S3 PORTRAIT P3 (2026-10-28): the tall band 70, the tile's window a 42×42 portrait: 8 under the 70-unit bar
+	# (60 -> 78, the full check's print).
+	_eq([placed.position.x, placed.position.y, placed.end.x], [16.0, 78.0, 784.0], "under the bar, 16 in")
 	_eq(placed.end.y, hud.world_rect().end.y, "down to the world's bottom edge")
 	# S3 PANEL-a1 (2026-10-27): the docked bottom panel, the 52-unit bar band on tall screens, no drawer tab: the
 	# world runs to 8 from the
