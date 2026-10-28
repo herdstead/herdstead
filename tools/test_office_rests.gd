@@ -264,6 +264,11 @@ func test_bubbles_and_papers_match_a_rebuild() -> void:
 
 ## The framing a floor opens on shows the selected desk, the whole of its
 ## table and, the desk's agent being blocked, the chip over it.
+## S3 CAMERA (2026-10-28): a map opens with its back wall in view: at 800x480
+## the wall's face and the far desk fit the 254-deep view together, so the
+## view is lifted to the wall (pan 40) and the table's near half gives way
+## under the bottom panel. The desk and its chip stay whole in view, and the
+## table's top edge; the whole table is no longer.
 func test_the_first_framing_shows_the_desk_its_table_and_its_bubble() -> void:
 	var office := await _live_office(_focused_on(_with(fixture, "api:p2", {"agent_status": "blocked"}), "api:p2"))
 	office.settle()
@@ -273,9 +278,12 @@ func test_the_first_framing_shows_the_desk_its_table_and_its_bubble() -> void:
 	var visible := Rect2(office.camera.pan, room)
 	var table := station.table.geometry.render_rect
 	table.position += station.table.global_position
-	for box: Rect2 in [station.target_rect(), station.chip_rect(), table]:
+	var table_top := Rect2(table.position, Vector2(table.size.x, 1))
+	for box: Rect2 in [station.target_rect(), station.chip_rect(), table_top]:
 		var shown := Rect2(office.world.to_local(box.position), box.size)
 		_check(visible.encloses(shown), "in view: %s in %s" % [shown, visible])
+	var drawn := Rect2(office.world.to_local(table.position), table.size)
+	_check(not visible.encloses(drawn), "the table's near half gives way to the wall: %s in %s" % [drawn, visible])
 	_done(office)
 
 
@@ -369,7 +377,10 @@ func test_hovering_a_bubble_shows_a_tooltip() -> void:
 	var office := await _live_office(_with(whole, "api:p2", {"agent_status": "blocked"}))
 	var key := _pane("api:p2")
 	var station := _station(office, key)
-	office.reveal(key)
+	# S3 CAMERA (2026-10-28): a map opens with its back wall in view, the near
+	# seats of its first pod row under the bottom panel: the whole pod is
+	# framed, so api:p3's seat below the chip is on screen.
+	office.reveal(key, true)
 	await _text_tick()
 	var bubble := station.chip()
 	_eq(station.side, "far", "api:p2 sits on the far side, under its badge")

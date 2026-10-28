@@ -555,6 +555,48 @@ func test_opening_pans_to_the_top_and_as_little_sideways() -> void:
 	)
 
 
+## S3 CAMERA (2026-10-28): with_wall() is the third rule, for a map's first
+## arrival only: the planned pan lifted to the wall's top when the wall and
+## what is kept fit the view together, top to bottom; never lowered, never
+## moved sideways, and left alone when they do not fit or either is empty.
+func test_a_map_opens_with_the_wall_when_it_fits() -> void:
+	var wall := Rect2(0, 40, 800, 80)
+	var desk := Rect2(65, 230, 30, 58)
+	var room := Vector2(936, 254)
+	_eq(OfficeCamera.with_wall(Vector2(0, 98), wall, desk, room), Vector2(0, 40), "lifted to the wall's top")
+	_eq(OfficeCamera.with_wall(Vector2(64, 98), wall, desk, room), Vector2(64, 40), "sideways as planned")
+	_eq(OfficeCamera.with_wall(Vector2(0, 0), wall, desk, room), Vector2(0, 0), "a view that shows it is not lowered")
+	_eq(OfficeCamera.with_wall(Vector2(0, 40), wall, desk, room), Vector2(0, 40), "exactly at it")
+	_eq(
+		OfficeCamera.with_wall(Vector2(0, 98), wall, desk, Vector2(936, 248)),
+		Vector2(0, 40),
+		"exactly as tall as the view, the wall's top to the desk's bottom: lifted"
+	)
+	_eq(
+		OfficeCamera.with_wall(Vector2(0, 98), wall, desk, Vector2(936, 247)),
+		Vector2(0, 98),
+		"a unit taller than the view: the desk wins, as planned"
+	)
+	_eq(
+		OfficeCamera.with_wall(Vector2(0, 98), wall, Rect2(0, 60, 10, 10), Vector2(936, 79)),
+		Vector2(0, 98),
+		"a wall taller than the view, whatever is kept: as planned"
+	)
+	_eq(OfficeCamera.with_wall(Vector2(0, 98), Rect2(), desk, room), Vector2(0, 98), "no wall: as planned")
+	_eq(OfficeCamera.with_wall(Vector2(0, 98), wall, Rect2(), room), Vector2(0, 98), "nothing kept: as planned")
+	_check(
+		OfficeCamera.with_wall(Vector2(0, 98), wall, desk, room) != OfficeCamera.revealed(Vector2(0, 98), desk, room),
+		"not the rule a desk is revealed by"
+	)
+	_check(
+		(
+			OfficeCamera.with_wall(Vector2(0, 174), wall, desk, room)
+			!= OfficeCamera.opened(Vector2(0, 174), Rect2(32, 174, 288, 210), room)
+		),
+		"nor the one a zone is opened by"
+	)
+
+
 ## The floor's answers, handed to the camera's rules as the office hands them
 ## (in the world's coordinates: by where the floor's root stands in it), pan a
 ## 512x308 view exactly where 6413cec's reveal() and reveal_zone() panned it:

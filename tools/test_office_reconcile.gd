@@ -1040,14 +1040,19 @@ func test_a_zone_call_shows_the_planned_density() -> void:
 		var lanes := [0, 4, 0, 4] if rows == 2 else [0, 2, 2, 2]
 		_eq([a.first_lane, a.lanes, b.first_lane, b.lanes], lanes, "%d: each zone one row wide" % rows)
 		_eq([a.rows.size(), b.rows.size()], [1, 1], "%d: one pod row each" % rows)
+		# S3 CAMERA (2026-10-28): a map opens with its back wall in view: the view the map opens on is
+		# lifted to the wall's face, and the pods' near seats go under the bottom panel, so it shows the
+		# 12 far seats (this run's print), not the planned density; a zone call is no longer the view the
+		# map opens on, so the case makes one: the page keys to b and back to a, which opens a at its
+		# sign as before.
+		var opened := _seats_in_view(office)
+		print("DENSITY %d pod row(s): %d seats wholly in view as the map opens" % [rows, opened])
+		_eq(opened, 12, "%d pod row(s): the map opens on the wall and the far seats" % rows)
+		await _visit_zone(office, HerdrFleet.pane_key(LOCAL, "b"))
 		await _visit_zone(office, HerdrFleet.pane_key(LOCAL, "a"))
 		await _frames(3)
 		var room := office.hud.world_rect()
-		var seen := 0
-		for key: String in office.floor_view.seats:
-			var rect := office.floor_view.seats[key].node.target_rect()
-			if room.encloses(Rect2(rect.position - office.camera.position, rect.size)):
-				seen += 1
+		var seen := _seats_in_view(office)
 		# Z1 (2026-10-27): a four-tab workspace stands its pods in one row across the map,
 		# so the second workspace stands under it; 36 was the two-lane era's target; FRAME-Q3,
 		# ruled by the orchestrator.
@@ -1055,6 +1060,18 @@ func test_a_zone_call_shows_the_planned_density() -> void:
 		print("DENSITY %d pod row(s): %d seats wholly in %s (plan: %d)" % [rows, seen, room, wanted])
 		_check(seen >= wanted, "%d pod row(s): at least %d seats wholly in view, %d" % [rows, wanted, seen])
 		_done(office)
+
+
+## How many seats' click rects (target_rect(), no chip) are wholly inside the
+## world's room on screen.
+func _seats_in_view(office: OfficeDouble) -> int:
+	var room := office.hud.world_rect()
+	var seen := 0
+	for key: String in office.floor_view.seats:
+		var rect := office.floor_view.seats[key].node.target_rect()
+		if room.encloses(Rect2(rect.position - office.camera.position, rect.size)):
+			seen += 1
+	return seen
 
 
 ## Two workspaces `a` and `b`, each with tabs of 8, 4, 8 and 4 working claude

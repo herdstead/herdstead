@@ -369,11 +369,39 @@ func zone_opening(key: String) -> Rect2:
 	var grid := float(FloorLayoutPolicy.GRID)
 	var left := placed.cells.position.x * grid
 	var top := (placed.cells.position.y - 1) * grid
+	var board := _drawn_sign(key)
+	if board.has_area():
+		top = board.position.y
+	return Rect2(left, top, placed.cells.end.x * grid - left, placed.cells.end.y * grid - top)
+
+
+## Zone `key`'s sign as drawn, in the floor's own coordinates (the aisle row
+## above the zone while no sign is drawn): what a map opening on that zone
+## keeps in view beside the top wall (OfficeCamera.with_wall()). No area for a
+## zone the plan does not place.
+func sign_extent(key: String) -> Rect2:
+	var opening := zone_opening(key)
+	var board := _drawn_sign(key)
+	if board.has_area() or not opening.has_area():
+		return board
+	return Rect2(opening.position, Vector2(opening.size.x, FloorLayoutPolicy.GRID))
+
+
+## Zone `key`'s sign as drawn, in the floor's own coordinates; no area while
+## none is drawn.
+func _drawn_sign(key: String) -> Rect2:
 	var board := zone_sign(key)
 	var holder := null if board == null else board.get_parent() as Node2D
-	if holder != null:
-		top = root.to_local(holder.to_global(board.drawn_rect().position)).y
-	return Rect2(left, top, placed.cells.end.x * grid - left, placed.cells.end.y * grid - top)
+	if holder == null:
+		return Rect2()
+	return Rect2(root.to_local(holder.to_global(board.drawn_rect().position)), board.drawn_rect().size)
+
+
+## The top wall's face (OfficeShell.wall_face()), in the floor's own
+## coordinates: what a map opens with in view when it fits
+## (OfficeCamera.with_wall()). No area before a plan.
+func wall_face() -> Rect2:
+	return Rect2() if plan == null else OfficeShell.wall_face(plan, _pen)
 
 
 ## Point at pane `key`'s desk (OfficePointer): its signal_extent(). Empty, or

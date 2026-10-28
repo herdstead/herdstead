@@ -54,6 +54,11 @@ var pan_whole_table := false
 ## none. Set by a zone picked, and on the first arrival at a map this run when
 ## the selection is not seated there (its first zone in section() order).
 var pan_zone := ""
+## One-shot, with pan_to or pan_zone: they were asked by a map's first arrival
+## (_open()), so the office opens the map on them with its top wall in view
+## (OfficeScene._open_with_wall()). False for every other ask: a zone picked,
+## a desk followed or located, a new pane the office picks.
+var pan_opens := false
 ## `--space=<number>`: a Local zone to pick once Local has it; -1 when done.
 var wanted_space := -1
 ## Machine key -> where the viewer left its map panned, for the maps left this run.
@@ -158,8 +163,9 @@ func show_machine(frame: OfficeFrame, key: String, pan: Vector2) -> void:
 ## The first arrival at machine `key`'s map this run, once it has a zone (a map
 ## first shown empty is opened when its first zone arrives, by settle()): it
 ## opens on the selection's whole pod when the selection is seated there, else
-## on its first zone in section() order (pan_zone); a zone the viewer picked
-## there opens on that zone instead. Once per map per run.
+## on its first zone in section() order (pan_zone), either with its top wall in
+## view where they fit together (pan_opens); a zone the viewer picked there
+## opens on that zone instead, as a pick does. Once per map per run.
 func _open(frame: OfficeFrame, key: String) -> void:
 	var building := frame.building_of(key)
 	if _opened.has(key) or building == null or building.zones.is_empty():
@@ -170,8 +176,9 @@ func _open(frame: OfficeFrame, key: String) -> void:
 	var holding := frame.find_zone(frame.zone_of(active_key))
 	if holding != null and holding.building.key == key:
 		_ask_pan(active_key, true)
-		return
-	pan_zone = section(building.zones)[0].key
+	else:
+		pan_zone = section(building.zones)[0].key
+	pan_opens = true
 
 
 ## The machine whose map is shown; empty before the first.
@@ -191,6 +198,14 @@ func take_pan_zone() -> String:
 	var key := pan_zone
 	pan_zone = ""
 	return key
+
+
+## pan_opens, forgotten: the office asks once, with take_pan_zone() and
+## take_pan_to().
+func take_pan_opens() -> bool:
+	var opens := pan_opens
+	pan_opens = false
+	return opens
 
 
 ## Where the viewer left machine `key`'s map; zero for a map not left before in this run.
@@ -240,6 +255,7 @@ func pick_machine(key: String) -> void:
 	_picked_zone = ""
 	pan_zone = ""
 	pan_to = ""
+	pan_opens = false
 	reveal_on_arrival = ""
 	_asked = true
 	nav_revision += 1
@@ -443,6 +459,7 @@ func _pick_zone(key: String) -> void:
 	_picked_zone = key
 	pan_zone = key
 	pan_to = ""
+	pan_opens = false
 	reveal_on_arrival = ""
 
 
@@ -472,6 +489,7 @@ func _navigated_to_pane(key: String) -> void:
 	reveal_on_arrival = key
 	pan_zone = ""
 	pan_to = ""
+	pan_opens = false
 	_picked_zone = ""
 
 
@@ -480,3 +498,4 @@ func _ask_pan(key: String, whole: bool) -> void:
 	pan_to = key
 	pan_whole_table = whole
 	pan_zone = ""
+	pan_opens = false

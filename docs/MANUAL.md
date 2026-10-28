@@ -140,7 +140,8 @@ machine (your pick, else herdr's focus, Local first); otherwise the first machin
 empty map. A place click pans to its zone, its sign at the top of the world. While you have picked nothing, or the pane
 you picked is gone, herdr's focus moving pans to the new desk as far as it takes (and to another machine's map if it is
 there); a chip or an edge arrow you click at the same moment wins, and the next move of the focus is followed again. A map
-seen for the first time opens on the selected pane's pod, else on its first zone; each map keeps where you left it
+seen for the first time opens on the selected pane's pod, else on its first zone, with the back wall (its windows
+and the COFFEE sign) in view above them whenever the window is tall enough to show both; each map keeps where you left it
 panned.
 
 **Disconnected is not idle.** When a socket goes away or the event stream breaks, the office keeps the last picture,

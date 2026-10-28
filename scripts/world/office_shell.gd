@@ -184,6 +184,21 @@ static func wall_covers(plan: FloorPlan, pen: OfficeDraw) -> Array[Rect2]:
 	return covers
 
 
+## The top wall's face as a map opens on it (OfficeCamera.with_wall()): every
+## drawing on or against the top wall (wall_covers(): the lift door, the
+## windows, the pantry counter and its sign) and every framed picture
+## (frames()), merged; empty when there is none. Placed by the plan's geometry
+## and the pack's sprite sizes alone.
+static func wall_face(plan: FloorPlan, pen: OfficeDraw) -> Rect2:
+	var face := Rect2()
+	var pieces := wall_covers(plan, pen)
+	for foot in frames(plan, pen):
+		pieces.append(drawn(pen, ArtContract.PROP_WALL_FRAME, foot))
+	for piece in pieces:
+		face = piece if not face.has_area() else face.merge(piece)
+	return face
+
+
 ## Where the sign over the pantry counter hangs: its foot at SIGN_FOOT on the
 ## top wall's face, centred over the counter's drawing; none on a map without
 ## a pantry. The sign is no wider than the counter, so it stays inside the

@@ -133,6 +133,31 @@ func open_on(opening: Rect2) -> void:
 	pan = opened(pan, opening, free_rect().size)
 
 
+## The framing a map opens on, after reveal() or open_on() placed the view on
+## what it opens for: up to the top wall's face (`wall`, in the world's own
+## coordinates) when the face and `kept` (the selected desk's signal, or the
+## first zone's sign) fit the view together (with_wall()). _process() clamps the
+## pan to the map on the next frame.
+func open_with_wall(wall: Rect2, kept: Rect2) -> void:
+	pan = with_wall(pan, wall, kept, free_rect().size)
+
+
+## The pan a map opens on, from `planned` (the pan reveal() or open_on() chose
+## for it): no lower than the top of `wall` when `wall` and `kept` fit a view of
+## `room` together, top to bottom, so the face shows whole and whatever lies
+## below `kept` gives way; `planned` unchanged when it already shows the face
+## from its top, when they do not fit (what the opening is for wins over
+## furniture), or when either has no area. Sideways as `planned`. Not clamped
+## to any map. A third rule, and only for a map's first arrival: a desk
+## revealed and a zone opened later keep revealed() and opened().
+static func with_wall(planned: Vector2, wall: Rect2, kept: Rect2, room: Vector2) -> Vector2:
+	if not wall.has_area() or not kept.has_area():
+		return planned
+	if maxf(wall.end.y, kept.end.y) - wall.position.y > room.y:
+		return planned
+	return Vector2(planned.x, minf(planned.y, wall.position.y))
+
+
 ## Whether `bounds` fits a view of `room`, REVEAL_HEADROOM above it included.
 static func fits(bounds: Rect2, room: Vector2) -> bool:
 	return bounds.size.x <= room.x and bounds.size.y + REVEAL_HEADROOM <= room.y
