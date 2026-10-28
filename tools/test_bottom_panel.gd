@@ -97,6 +97,8 @@ func _after_case() -> void:
 ## tall screens, no drawer tab; the line gained the top row, the opened panel
 ## holds its whole 12-row column (149, was 128 with 3 units of it clipped), and
 ## the world runs to the right edge).
+## S3 SKIN (2026-10-28): the bottom panel wears the wood frame: two rows 54 (was 50), opened 153 (was 149),
+## the world 4 shorter in both.
 func test_the_panel_is_two_rows_at_the_smallest_screen_and_opens_to_its_whole_preview() -> void:
 	await _bare_hud(Vector2i(480, 320))
 	var frame := _frame_of(fixture)
@@ -108,8 +110,8 @@ func test_the_panel_is_two_rows_at_the_smallest_screen_and_opens_to_its_whole_pr
 	var preview: Control = hud.inspector.get_node("%Preview")
 	var top: Control = hud.staff.get_node("%TopRow")
 	_check(hud.card_compact(), "the panel is folded")
-	_eq(hud.placed(hud.staff), Rect2(16, 266, 448, 50), "two rows along the bottom, 4 up")
-	_eq(hud.staff.size, Vector2(448, 50), "and really that size")
+	_eq(hud.placed(hud.staff), Rect2(16, 262, 448, 54), "two rows along the bottom, 4 up")
+	_eq(hud.staff.size, Vector2(448, 54), "and really that size")
 	_check(top.is_visible_in_tree(), "the top row")
 	_check(line.is_visible_in_tree() and not detail.is_visible_in_tree(), "over its compact line, not its details")
 	_eq(
@@ -120,23 +122,23 @@ func test_the_panel_is_two_rows_at_the_smallest_screen_and_opens_to_its_whole_pr
 	_check(next.is_visible_in_tree(), "NEXT is on it")
 	_check(hud.staff.get_global_rect().encloses(next.get_global_rect()), "inside the panel")
 	_check(not preview.is_visible_in_tree(), "the preview is out of it")
-	_eq(hud.world_rect(), Rect2(16, 48, 456, 202), "the world stops above it and runs to the right edge")
+	_eq(hud.world_rect(), Rect2(16, 48, 456, 198), "the world stops above it and runs to the right edge")
 	var rooms: Array[bool] = []
 	hud.room_changed.connect(func() -> void: rooms.append(true))
 	hud.expand_card()
 	await _frames(2)
 	_check(not hud.card_compact(), "opened up")
-	_eq(hud.staff.size, Vector2(448, 149), "the panel stands at its full height")
+	_eq(hud.staff.size, Vector2(448, 153), "the panel stands at its full height")
 	_check(detail.is_visible_in_tree() and not line.is_visible_in_tree(), "with its details")
 	_check(hud.staff.get_global_rect().encloses(preview.get_global_rect()), "the preview inside it")
 	_eq((preview as Label).text.split("\n").size(), OfficePaneInspector.PREVIEW_ROWS, "all twelve rows")
-	_eq(hud.world_rect(), Rect2(16, 48, 456, 103), "the world gives it the room")
+	_eq(hud.world_rect(), Rect2(16, 48, 456, 99), "the world gives it the room")
 	_eq(rooms.size(), 1, "said once")
 	hud.compact_card()
 	await _frames(2)
 	_check(hud.card_compact() and line.is_visible_in_tree(), "folded back to its line")
-	_eq(hud.staff.size, Vector2(448, 50), "two rows again")
-	_eq(hud.world_rect(), Rect2(16, 48, 456, 202), "and the world has its room back")
+	_eq(hud.staff.size, Vector2(448, 54), "two rows again")
+	_eq(hud.world_rect(), Rect2(16, 48, 456, 198), "and the world has its room back")
 	_eq(rooms.size(), 2, "said once more")
 
 
@@ -150,6 +152,8 @@ func test_the_panel_is_two_rows_at_the_smallest_screen_and_opens_to_its_whole_pr
 ## tall screens, no drawer tab; the card form is gone, a tall screen docks).
 ## S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151),
 ## the world 35 taller: the panel's rect and the world's room under it.
+## S3 SKIN (2026-10-28): the bottom panel wears the wood frame: docked 120 (was 116), two rows 54 (was 50),
+## opened 153 (was 149); each room 4 shorter.
 func test_tall_screens_dock_the_panel_and_short_ones_fold_it() -> void:
 	await _bare_hud(Vector2i(800, 480))
 	var frame := _frame_of(fixture)
@@ -161,15 +165,15 @@ func test_tall_screens_dock_the_panel_and_short_ones_fold_it() -> void:
 	var fold: Button = hud.inspector.get_node("%FoldButton")
 	var preview: Label = hud.inspector.get_node("%Preview")
 	_check(not hud.card_compact() and hud.inspector.docked(), "800x480: docked")
-	_eq(hud.placed(hud.staff), Rect2(16, 360, 768, 116), "along the bottom, 4 up")
-	_eq(hud.staff.get_global_rect(), Rect2(16, 360, 768, 116), "and really there")
+	_eq(hud.placed(hud.staff), Rect2(16, 356, 768, 120), "along the bottom, 4 up")
+	_eq(hud.staff.get_global_rect(), Rect2(16, 356, 768, 120), "and really there")
 	_check(detail.is_visible_in_tree() and not line.is_visible_in_tree(), "the details, not the line")
 	_check(preview.is_visible_in_tree(), "the preview in it")
 	_eq(preview.text.split("\n").size(), CardPicture.DOCKED_ROWS, "six rows of it")
 	_check(not open.is_visible_in_tree(), "no `Open`")
 	_check(not fold.is_visible_in_tree(), "and no `▾ Esc`: nothing to fold")
 	_check(not hud.card_expanded(), "Escape has nothing to fold")
-	_eq(hud.world_rect(), Rect2(16, 68, 776, 276), "the world above it, from the 52-unit bar")
+	_eq(hud.world_rect(), Rect2(16, 68, 776, 272), "the world above it, from the 52-unit bar")
 	var rooms: Array[bool] = []
 	hud.room_changed.connect(func() -> void: rooms.append(true))
 	root.size = Vector2i(480, 320)
@@ -177,18 +181,18 @@ func test_tall_screens_dock_the_panel_and_short_ones_fold_it() -> void:
 	await _frames(3)
 	_eq(rooms.size(), 1, "a short window folds it: said once")
 	_check(hud.card_compact() and not hud.inspector.docked(), "480x320: folded, not docked")
-	_eq(hud.staff.size, Vector2(448, 50), "two rows")
+	_eq(hud.staff.size, Vector2(448, 54), "two rows")
 	_check(open.is_visible_in_tree() and open.icon != null, "`Open`, with the pack's Enter icon")
 	_eq(open.text, "", "the icon alone below 640 wide")
 	await _tap(open)
 	_check(not hud.card_compact() and not hud.inspector.answering(), "a click on `Open` only opens the panel")
-	_eq(hud.staff.size, Vector2(448, 149), "at its full height")
+	_eq(hud.staff.size, Vector2(448, 153), "at its full height")
 	_check(fold.is_visible_in_tree(), "`▾ Esc` is in the actions")
 	_check(hud.staff.get_global_rect().encloses(fold.get_global_rect()), "inside the panel")
 	_eq(rooms.size(), 2, "said once")
 	await _tap(fold)
 	_check(hud.card_compact(), "`▾ Esc` folds it back")
-	_eq(hud.world_rect(), Rect2(16, 48, 456, 202), "and the world has its room back")
+	_eq(hud.world_rect(), Rect2(16, 48, 456, 198), "and the world has its room back")
 	_eq(rooms.size(), 3, "said once more")
 	root.size = Vector2i(800, 480)
 	hud.fit(Vector2(800, 480))
@@ -434,13 +438,15 @@ func test_nobody_next_is_an_opaque_pill() -> void:
 ## the world 35 taller: the room and the column's bottom, 35 lower.
 ## S3 PANEL-a2 (2026-10-28): the agent list and the attention records retire: the right column (the drawer) is gone,
 ## so its bottom edge is now read off the OVERVIEW, which stops at the same edge (OfficeHud._column_bottom()).
+## S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the docked panel 120 tall, the room and the
+## OVERVIEW's bottom 4 higher.
 func test_a_hidden_panel_takes_no_room_and_a_shown_one_does() -> void:
 	await _bare_hud()
 	var changes: Array[bool] = []
 	hud.room_changed.connect(func() -> void: changes.append(true))
-	var shown := Rect2(16, 68, 776, 276)
+	var shown := Rect2(16, 68, 776, 272)
 	_eq(hud.world_rect(), shown, "shown, the world stops above the docked panel")
-	_eq(hud.overview.offset_bottom, -136.0, "and so does the OVERVIEW")
+	_eq(hud.overview.offset_bottom, -140.0, "and so does the OVERVIEW")
 	hud.staff.visible = false
 	hud.fit(Vector2(800, 480))
 	_eq(hud.world_rect(), Rect2(16, 68, 776, 396), "hidden, the room comes back to the bottom gap")
@@ -451,7 +457,7 @@ func test_a_hidden_panel_takes_no_room_and_a_shown_one_does() -> void:
 	hud.staff.visible = true
 	hud.fit(Vector2(800, 480))
 	_eq(hud.world_rect(), shown, "shown again, the world stops above it")
-	_eq(hud.overview.offset_bottom, -136.0, "and so does the OVERVIEW")
+	_eq(hud.overview.offset_bottom, -140.0, "and so does the OVERVIEW")
 	_eq(changes.size(), 2, "said once more")
 
 
@@ -546,6 +552,59 @@ func test_inspector_keeps_complete_identity_in_compact_details() -> void:
 	)
 
 
+## The bottom panel wears the pack's wood frame with brass corners
+## (`ui.panel_wood`, a nine-patch): it names it (`frame_id`), wears the
+## `HdPanelWood` variation whose content margins are the wood's, draws the wood
+## texture with the wood's margins at the pack's density, and its top row starts
+## where the wood ends; the panel grew by the wood's extra margins, so its
+## content is as tall as it was. Its pages draw no frame, and the HUD's other panels (the
+## world tip) keep the dark one. S3 SKIN (2026-10-28).
+func test_the_bottom_panel_wears_the_wood_frame() -> void:
+	var wood := art.ui_sprite(ArtContract.UI_PANEL_WOOD)
+	_check(wood != null and wood.nine_patched(), "the pack's wood is a nine-patch")
+	var margins := [float(wood.patch_left), float(wood.patch_top), float(wood.patch_right), float(wood.patch_bottom)]
+	for size: Vector2i in [Vector2i(800, 480), Vector2i(480, 320)]:
+		await _bare_hud(size)
+		var staff := hud.staff
+		_eq(staff.frame_id, ArtContract.UI_PANEL_WOOD, "%s: the bottom panel names the wood" % size)
+		_eq(staff.theme_type_variation, &"HdPanelWood", "%s: and wears its variation" % size)
+		var box := staff.get_theme_stylebox("panel")
+		_eq(
+			[box.content_margin_left, box.content_margin_top, box.content_margin_right, box.content_margin_bottom],
+			margins,
+			"%s: its content inside the wood's margins" % size
+		)
+		var drawn := staff.get_node("PanelFrame") as HdPanel.Frame
+		_eq(drawn.box.texture, art.sprite_texture(wood), "%s: the frame drawn is the wood" % size)
+		_eq(drawn.density, art.density, "%s: at the pack's density" % size)
+		_eq(
+			[
+				drawn.box.texture_margin_left,
+				drawn.box.texture_margin_top,
+				drawn.box.texture_margin_right,
+				drawn.box.texture_margin_bottom
+			],
+			margins.map(func(units: float) -> float: return units * art.density),
+			"%s: its patches the wood's, in texels" % size
+		)
+		var top: Control = staff.get_node("%TopRow")
+		_eq(
+			top.get_global_rect().position - staff.get_global_rect().position,
+			Vector2(wood.patch_left, wood.patch_top),
+			"%s: the top row starts where the wood ends" % size
+		)
+		# The slot grew by exactly the wood's extra margins: the content is as tall as under the dark panel
+		# (108 docked: the top row, its gap and A1's 82-unit body; 42 for the two rows).
+		var body: Control = staff.get_node("Body")
+		_eq(body.size.y, 108.0 if size.y >= 400 else 42.0, "%s: the content as tall as before the wood" % size)
+		for page: HdPanel in [hud.history_list, hud.event_list]:
+			_eq(page.theme_type_variation, &"HdPanelBare", "%s: %s draws no frame of its own" % [size, page.name])
+		var tip: HdPanel = hud.get_node("%WorldTip")
+		_eq(tip.frame_id, ArtContract.UI_HUD_PANEL, "%s: the world tip keeps the dark panel" % size)
+		_eq(tip.theme_type_variation, &"HdPanel", "%s: and its margins" % size)
+		hud.free()
+
+
 # --- tabs and pages ---------------------------------------------------------------
 
 
@@ -577,22 +636,24 @@ func test_the_tabs_show_one_page_and_never_move_the_world_on_a_tall_screen() -> 
 ## On a short screen HISTORY and EVENTS open the folded panel to its full
 ## height (said once), switching between them moves nothing, and AGENT folds
 ## it back to its two rows (said once).
+## S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the opened panel 153 tall (was 149), the two
+## rows 54 (was 50), the world 4 shorter.
 func test_history_and_events_open_the_folded_panel_on_a_short_screen() -> void:
 	await _bare_hud(Vector2i(480, 320))
 	var rooms: Array[bool] = []
 	hud.room_changed.connect(func() -> void: rooms.append(true))
 	_check(hud.card_compact(), "folded to start with")
 	await _tap_tab(OfficeBottomPanel.Page.HISTORY)
-	_eq(hud.staff.size, Vector2(448, 149), "HISTORY opens it")
+	_eq(hud.staff.size, Vector2(448, 153), "HISTORY opens it")
 	_check(hud.history_list.is_visible_in_tree(), "on its page")
-	_eq(hud.world_rect(), Rect2(16, 48, 456, 103), "the world gives it the room")
+	_eq(hud.world_rect(), Rect2(16, 48, 456, 99), "the world gives it the room")
 	_eq(rooms.size(), 1, "said once")
 	await _tap_tab(OfficeBottomPanel.Page.EVENTS)
-	_eq(hud.staff.size, Vector2(448, 149), "EVENTS keeps it open")
+	_eq(hud.staff.size, Vector2(448, 153), "EVENTS keeps it open")
 	_eq(rooms.size(), 1, "and says nothing")
 	await _tap_tab(OfficeBottomPanel.Page.AGENT)
 	_check(hud.card_compact(), "AGENT folds it back")
-	_eq(hud.staff.size, Vector2(448, 50), "to its two rows")
+	_eq(hud.staff.size, Vector2(448, 54), "to its two rows")
 	_eq(rooms.size(), 2, "said once more")
 
 
@@ -941,12 +1002,13 @@ func test_picks_show_the_agent_page_but_a_log_rows_pick_keeps_its_page() -> void
 ## S3 PANEL-a2 (2026-10-28): the agent list and the attention records retire: the drawer and its ▶ are gone, and `A`
 ## shows the HISTORY page (D-AKEY's alternative, the lane's brief) where it opened the drawer, so this case drives a
 ## live office (the key is the office's) instead of a bare HUD.
+## S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the docked panel 120 tall, each room 4 shorter.
 func test_there_is_no_drawer_and_a_shows_the_history_page() -> void:
 	var office := await _live_office()
 	var hud_now := office.hud
 	_check(hud_now.get_node_or_null("%DrawerTab") == null, "no `%DrawerTab` in the HUD")
 	_check(hud_now.get_node_or_null("Screen/RightColumn") == null, "no right column (the drawer) in the HUD")
-	_eq(hud_now.world_rect(), Rect2(16, 68, 776, 276), "the world runs to the right edge")
+	_eq(hud_now.world_rect(), Rect2(16, 68, 776, 272), "the world runs to the right edge")
 	_eq(hud_now.plan_width(), 776.0, "a first plan is made for it")
 	var rooms: Array[bool] = []
 	hud_now.room_changed.connect(func() -> void: rooms.append(true))
@@ -954,7 +1016,7 @@ func test_there_is_no_drawer_and_a_shows_the_history_page() -> void:
 	await _frames(2)
 	_eq(hud_now.page(), OfficeBottomPanel.Page.HISTORY, "`A` shows the HISTORY page")
 	_check(hud_now.history_list.is_visible_in_tree(), "and it is in sight")
-	_eq(hud_now.world_rect(), Rect2(16, 68, 776, 276), "the docked panel stays where it is")
+	_eq(hud_now.world_rect(), Rect2(16, 68, 776, 272), "the docked panel stays where it is")
 	await _office_key(office, KEY_A)
 	await _frames(2)
 	_eq(hud_now.page(), OfficeBottomPanel.Page.AGENT, "`A` again shows the AGENT page")
@@ -975,7 +1037,7 @@ func test_there_is_no_drawer_and_a_shows_the_history_page() -> void:
 	await _frames(2)
 	_eq(short_hud.page(), OfficeBottomPanel.Page.HISTORY, "480x320: `A` shows HISTORY")
 	_check(not short_hud.card_compact(), "and opens the panel for it")
-	_eq(short_hud.world_rect(), Rect2(16, 48, 456, 103), "the world gives it the room")
+	_eq(short_hud.world_rect(), Rect2(16, 48, 456, 99), "the world gives it the room")
 	await _office_key(short, KEY_A)
 	await _frames(2)
 	_check(short_hud.card_compact(), "`A` again folds it back to the card's line")
@@ -1114,13 +1176,15 @@ func test_the_docked_next_says_the_fixtures_words_whole_at_960() -> void:
 ## Docked on a wide card (960x480, 1280x720) the left column is exactly
 ## `left_wide_width`, the room the fixture's longest name and seat line take
 ## whole, read-only and as an operator, and the preview takes everything else:
-## with a shell's START block shown it is at least 124 units at 960x480 and 350
+## with a shell's START block shown it is at least 120 units at 960x480 and 346
 ## at 1280x720. A narrower card (800x480) keeps the left column's share.
 ## S3 PANEL-a2 round 2 (2026-10-28, R1): A1's `left_wide_ratio` 0.64 left the column 230 at 960 (318 at 1280)
 ## and the operator preview 110 (248) once NEXT took 308; read-only, the column was 193 and `CLAUDE · 数据
 ## pipeline / etl` was cut.
+## S3 SKIN (2026-10-28): the bottom panel wears the wood frame: its 6-unit margins leave the card 4 narrower,
+## so the preview's rest is 4 less (124 -> 120, 350 -> 346) and the 800-wide column's share 1 less (133 -> 132).
 func test_the_docked_left_column_holds_the_names_and_the_preview_takes_the_rest() -> void:
-	var preview_least: Dictionary[Vector2i, float] = {Vector2i(960, 480): 124.0, Vector2i(1280, 720): 350.0}
+	var preview_least: Dictionary[Vector2i, float] = {Vector2i(960, 480): 120.0, Vector2i(1280, 720): 346.0}
 	var frame := _frame_of(fixture)
 	for screen: Vector2i in preview_least:
 		await _bare_hud(screen)
@@ -1170,10 +1234,10 @@ func test_the_docked_left_column_holds_the_names_and_the_preview_takes_the_rest(
 	var narrow: Control = hud.inspector.get_node("%Left")
 	hud.inspector.show_pane(frame.pane(_key_of("api:p1")), "", false)
 	await _frames(2)
-	_eq(narrow.size.x, 133.0, "800 wide, read-only: the left column keeps its share, as before")
+	_eq(narrow.size.x, 132.0, "800 wide, read-only: the left column keeps its share, as before")
 
 
-## The docked panel is 116 tall at 640x480, 700x480 and 760x480 (where NEXT
+## The docked panel is 120 tall at 640x480, 700x480 and 760x480 (where NEXT
 ## gives the card its room below `staff_docked_next_from` and comes back), at
 ## 800x480 and at 960x480, and no state of the card puts a write control outside it: START
 ## with three kinds and with eight (the title gives way), its confirm armed
@@ -1182,7 +1246,9 @@ func test_the_docked_left_column_holds_the_names_and_the_preview_takes_the_rest(
 ## shown button and the branch box stand inside the card's columns, and the
 ## launch block needs no more height than the body has. S3 PANEL-a1 round 2
 ## (2026-10-28, R1): round 1's panel was 151 tall.
-func test_every_docked_state_keeps_its_write_controls_in_the_116_panel() -> void:
+## S3 SKIN (2026-10-28): the bottom panel wears the wood frame: 6-unit margins, 4 taller (116 -> 120), the
+## body still 82; the world 4 shorter (276 -> 272). Renamed from `..._in_the_116_panel`.
+func test_every_docked_state_keeps_its_write_controls_in_the_120_panel() -> void:
 	var writes := [
 		"%Kind0",
 		"%Kind1",
@@ -1209,10 +1275,10 @@ func test_every_docked_state_keeps_its_write_controls_in_the_116_panel() -> void
 		Vector2i(640, 480), Vector2i(700, 480), Vector2i(760, 480), Vector2i(800, 480), Vector2i(960, 480)
 	]:
 		await _bare_hud(size)
-		_eq(hud.placed(hud.staff).size.y, 116.0, "%s: the docked panel 116 tall" % size)
+		_eq(hud.placed(hud.staff).size.y, 120.0, "%s: the docked panel 120 tall" % size)
 		var next_button: Control = hud.inspector.get_node("%NextButton")
 		_eq(next_button.is_visible_in_tree(), size.x >= 760, "%s: NEXT beside the card from 760" % size)
-		_eq(hud.world_rect().size.y, 276.0, "%s: the world 276 tall over it" % size)
+		_eq(hud.world_rect().size.y, 272.0, "%s: the world 272 tall over it" % size)
 		var frame := _frame_of(fixture)
 		var card := hud.inspector
 		var block: LaunchBlock = card.get_node("%Launch")

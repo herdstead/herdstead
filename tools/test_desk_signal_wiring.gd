@@ -60,25 +60,31 @@ extends "res://tools/office_test_base.gd"
 ## (332 = 608 - 276, 92 = 608 - 516); every pointer frame and the 480x320
 ## window (not docked) are unchanged. The arrows' places along their edges come
 ## from the print; at the 800x480 bottom web:p2's near chip is in view now.
+## S3 SKIN (2026-10-28): the bottom panel wears the wood frame: 120 tall docked, 54 in two
+## rows, the world 4 shorter everywhere (272 at 480 high, 512 at 720, 198 at
+## 480x320). Re-pinned from the run's print: every pan that brings a desk down
+## into view is 4 more, the far corner 4 lower (336 = 608 - 272, 96 = 608 - 512,
+## 858 at 480x320), headroom pans unchanged; every pointer frame unchanged; every
+## arrow keeps its chips, count and edge, only its place along the edge moves.
 
 ## The pan after reveal(key) and reveal(key, true) from no pan, then the same
 ## two from the far corner of the map, before the camera's next frame clamps
 ## it: an 800x480 window (the world at (16, 68), 776x276 of it in view, a
 ## four-lane map 736 wide, 608 deep with its plate; 776x241 before S3 PANEL-a1 round 2).
 const REVEAL_800: Dictionary[String, Array] = {
-	"api:p1": [Vector2(0, 12), Vector2(0, 76), Vector2(0, 198), Vector2(0, 198)],
-	"api:p2": [Vector2(0, 12), Vector2(0, 76), Vector2(0, 198), Vector2(0, 198)],
-	"api:p3": [Vector2(0, 76), Vector2(0, 76), Vector2(0, 264), Vector2(0, 198)],
-	"api:p4": [Vector2(0, 12), Vector2(0, 76), Vector2(0, 198), Vector2(0, 198)],
-	"data:p1": [Vector2(0, 236), Vector2(0, 300), Vector2(0, 332), Vector2(0, 332)],
-	"data:p2": [Vector2(0, 300), Vector2(0, 300), Vector2(0, 332), Vector2(0, 332)],
-	"infra:p1": [Vector2(0, 236), Vector2(0, 300), Vector2(0, 332), Vector2(0, 332)],
-	"infra:p2": [Vector2(0, 236), Vector2(0, 300), Vector2(0, 332), Vector2(0, 332)],
-	"infra:p3": [Vector2(0, 300), Vector2(0, 300), Vector2(0, 332), Vector2(0, 332)],
-	"notes:p1": [Vector2(0, 236), Vector2(0, 300), Vector2(0, 332), Vector2(0, 332)],
-	"web:p1": [Vector2(0, 12), Vector2(0, 76), Vector2(0, 200), Vector2(0, 198)],
-	"web:p2": [Vector2(0, 76), Vector2(0, 76), Vector2(0, 264), Vector2(0, 198)],
-	"web:p3": [Vector2(0, 12), Vector2(0, 76), Vector2(0, 198), Vector2(0, 198)],
+	"api:p1": [Vector2(0, 16), Vector2(0, 80), Vector2(0, 198), Vector2(0, 198)],
+	"api:p2": [Vector2(0, 16), Vector2(0, 80), Vector2(0, 198), Vector2(0, 198)],
+	"api:p3": [Vector2(0, 80), Vector2(0, 80), Vector2(0, 264), Vector2(0, 198)],
+	"api:p4": [Vector2(0, 16), Vector2(0, 80), Vector2(0, 198), Vector2(0, 198)],
+	"data:p1": [Vector2(0, 240), Vector2(0, 304), Vector2(0, 336), Vector2(0, 336)],
+	"data:p2": [Vector2(0, 304), Vector2(0, 304), Vector2(0, 336), Vector2(0, 336)],
+	"infra:p1": [Vector2(0, 240), Vector2(0, 304), Vector2(0, 336), Vector2(0, 336)],
+	"infra:p2": [Vector2(0, 240), Vector2(0, 304), Vector2(0, 336), Vector2(0, 336)],
+	"infra:p3": [Vector2(0, 304), Vector2(0, 304), Vector2(0, 336), Vector2(0, 336)],
+	"notes:p1": [Vector2(0, 240), Vector2(0, 304), Vector2(0, 336), Vector2(0, 336)],
+	"web:p1": [Vector2(0, 16), Vector2(0, 80), Vector2(0, 200), Vector2(0, 198)],
+	"web:p2": [Vector2(0, 80), Vector2(0, 80), Vector2(0, 264), Vector2(0, 198)],
+	"web:p3": [Vector2(0, 16), Vector2(0, 80), Vector2(0, 198), Vector2(0, 198)],
 }
 ## The same in the smallest window, 480x320: 456x202 in view, and the 416-wide
 ## map fits across, so a reveal pans only up and down (S3 BAR-b, 2026-10-27:
@@ -86,37 +92,37 @@ const REVEAL_800: Dictionary[String, Array] = {
 ## narrowest plan stays two lanes (13 cells, FRAME-Q2); its 33 rows (40 with one
 ## 9-cell lane) move every zone under api and web up.
 const REVEAL_480: Dictionary[String, Array] = {
-	"api:p1": [Vector2(0, 86), Vector2(0, 150), Vector2(0, 198), Vector2(0, 198)],
-	"api:p2": [Vector2(0, 86), Vector2(0, 150), Vector2(0, 198), Vector2(0, 198)],
-	"api:p3": [Vector2(0, 150), Vector2(0, 150), Vector2(0, 264), Vector2(0, 198)],
-	"api:p4": [Vector2(0, 86), Vector2(0, 150), Vector2(0, 198), Vector2(0, 198)],
-	"data:p1": [Vector2(0, 758), Vector2(0, 822), Vector2(0, 854), Vector2(0, 854)],
-	"data:p2": [Vector2(0, 822), Vector2(0, 822), Vector2(0, 854), Vector2(0, 854)],
-	"infra:p1": [Vector2(0, 534), Vector2(0, 598), Vector2(0, 648), Vector2(0, 646)],
-	"infra:p2": [Vector2(0, 534), Vector2(0, 598), Vector2(0, 646), Vector2(0, 646)],
-	"infra:p3": [Vector2(0, 598), Vector2(0, 598), Vector2(0, 712), Vector2(0, 646)],
-	"notes:p1": [Vector2(0, 758), Vector2(0, 822), Vector2(0, 854), Vector2(0, 854)],
-	"web:p1": [Vector2(0, 310), Vector2(0, 374), Vector2(0, 424), Vector2(0, 422)],
-	"web:p2": [Vector2(0, 374), Vector2(0, 374), Vector2(0, 488), Vector2(0, 422)],
-	"web:p3": [Vector2(0, 310), Vector2(0, 374), Vector2(0, 422), Vector2(0, 422)],
+	"api:p1": [Vector2(0, 90), Vector2(0, 154), Vector2(0, 198), Vector2(0, 198)],
+	"api:p2": [Vector2(0, 90), Vector2(0, 154), Vector2(0, 198), Vector2(0, 198)],
+	"api:p3": [Vector2(0, 154), Vector2(0, 154), Vector2(0, 264), Vector2(0, 198)],
+	"api:p4": [Vector2(0, 90), Vector2(0, 154), Vector2(0, 198), Vector2(0, 198)],
+	"data:p1": [Vector2(0, 762), Vector2(0, 826), Vector2(0, 858), Vector2(0, 858)],
+	"data:p2": [Vector2(0, 826), Vector2(0, 826), Vector2(0, 858), Vector2(0, 858)],
+	"infra:p1": [Vector2(0, 538), Vector2(0, 602), Vector2(0, 648), Vector2(0, 646)],
+	"infra:p2": [Vector2(0, 538), Vector2(0, 602), Vector2(0, 646), Vector2(0, 646)],
+	"infra:p3": [Vector2(0, 602), Vector2(0, 602), Vector2(0, 712), Vector2(0, 646)],
+	"notes:p1": [Vector2(0, 762), Vector2(0, 826), Vector2(0, 858), Vector2(0, 858)],
+	"web:p1": [Vector2(0, 314), Vector2(0, 378), Vector2(0, 424), Vector2(0, 422)],
+	"web:p2": [Vector2(0, 378), Vector2(0, 378), Vector2(0, 488), Vector2(0, 422)],
+	"web:p3": [Vector2(0, 314), Vector2(0, 378), Vector2(0, 422), Vector2(0, 422)],
 }
 ## The same in a 1280x720 window: the world at (16, 68), 1256x516 of a
 ## seven-lane map 608 deep in view, so the pan only ever reaches 92 down
 ## (1256x481 and 127 before S3 PANEL-a1 round 2).
 const REVEAL_1280: Dictionary[String, Array] = {
-	"api:p1": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 92), Vector2(0, 92)],
-	"api:p2": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 92), Vector2(0, 92)],
-	"api:p3": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 92), Vector2(0, 92)],
-	"api:p4": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 92), Vector2(0, 92)],
-	"data:p1": [Vector2(0, 0), Vector2(0, 60), Vector2(0, 92), Vector2(0, 92)],
-	"data:p2": [Vector2(0, 60), Vector2(0, 60), Vector2(0, 92), Vector2(0, 92)],
-	"infra:p1": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 92), Vector2(0, 92)],
-	"infra:p2": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 92), Vector2(0, 92)],
-	"infra:p3": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 92), Vector2(0, 92)],
-	"notes:p1": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 92), Vector2(0, 92)],
-	"web:p1": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 92), Vector2(0, 92)],
-	"web:p2": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 92), Vector2(0, 92)],
-	"web:p3": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 92), Vector2(0, 92)],
+	"api:p1": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 96), Vector2(0, 96)],
+	"api:p2": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 96), Vector2(0, 96)],
+	"api:p3": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 96), Vector2(0, 96)],
+	"api:p4": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 96), Vector2(0, 96)],
+	"data:p1": [Vector2(0, 0), Vector2(0, 64), Vector2(0, 96), Vector2(0, 96)],
+	"data:p2": [Vector2(0, 64), Vector2(0, 64), Vector2(0, 96), Vector2(0, 96)],
+	"infra:p1": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 96), Vector2(0, 96)],
+	"infra:p2": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 96), Vector2(0, 96)],
+	"infra:p3": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 96), Vector2(0, 96)],
+	"notes:p1": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 96), Vector2(0, 96)],
+	"web:p1": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 96), Vector2(0, 96)],
+	"web:p2": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 96), Vector2(0, 96)],
+	"web:p3": [Vector2(0, 0), Vector2(0, 0), Vector2(0, 96), Vector2(0, 96)],
 }
 ## The pointer's frame around each desk, in the floor's own coordinates, on the
 ## 800x480 window's four-lane map (the 480x320 window planned the same one
@@ -173,9 +179,9 @@ const POINTER_1280: Dictionary[String, Rect2] = {
 const ZONES_800: Dictionary[String, Array] = {
 	"api": [Vector2(0, 174), Vector2(0, 174), Vector2(0, 174), Vector2(0, 174)],
 	"web": [Vector2(0, 174), Vector2(0, 174), Vector2(0, 174), Vector2(0, 174)],
-	"infra": [Vector2(0, 398), Vector2(0, 332), Vector2(0, 398), Vector2(0, 332)],
-	"notes": [Vector2(0, 398), Vector2(0, 332), Vector2(0, 398), Vector2(0, 332)],
-	"data": [Vector2(0, 398), Vector2(0, 332), Vector2(0, 398), Vector2(0, 332)],
+	"infra": [Vector2(0, 398), Vector2(0, 336), Vector2(0, 398), Vector2(0, 336)],
+	"notes": [Vector2(0, 398), Vector2(0, 336), Vector2(0, 398), Vector2(0, 336)],
+	"data": [Vector2(0, 398), Vector2(0, 336), Vector2(0, 398), Vector2(0, 336)],
 }
 const ZONES_480: Dictionary[String, Array] = {
 	"api": [Vector2(0, 174), Vector2(0, 174), Vector2(0, 174), Vector2(0, 174)],
@@ -185,36 +191,36 @@ const ZONES_480: Dictionary[String, Array] = {
 	"data": [Vector2(0, 846), Vector2(0, 846), Vector2(0, 846), Vector2(0, 846)],
 }
 const ZONES_1280: Dictionary[String, Array] = {
-	"api": [Vector2(0, 174), Vector2(0, 92), Vector2(0, 174), Vector2(0, 92)],
-	"web": [Vector2(0, 174), Vector2(0, 92), Vector2(0, 174), Vector2(0, 92)],
-	"infra": [Vector2(0, 174), Vector2(0, 92), Vector2(0, 174), Vector2(0, 92)],
-	"notes": [Vector2(0, 174), Vector2(0, 92), Vector2(0, 174), Vector2(0, 92)],
-	"data": [Vector2(0, 398), Vector2(0, 92), Vector2(0, 398), Vector2(0, 92)],
+	"api": [Vector2(0, 174), Vector2(0, 96), Vector2(0, 174), Vector2(0, 96)],
+	"web": [Vector2(0, 174), Vector2(0, 96), Vector2(0, 174), Vector2(0, 96)],
+	"infra": [Vector2(0, 174), Vector2(0, 96), Vector2(0, 174), Vector2(0, 96)],
+	"notes": [Vector2(0, 174), Vector2(0, 96), Vector2(0, 174), Vector2(0, 96)],
+	"data": [Vector2(0, 398), Vector2(0, 96), Vector2(0, 398), Vector2(0, 96)],
 }
 ## REVEAL_800 and ZONES_800 in a window narrowed to 640x480 after the map was planned at 800 (616x276 of the map in
 ## view, as with the retired drawer open; 616x241 before S3 PANEL-a1 round 2): see test_a_relayout_moves_no_answer.
 ## S3 PANEL-a2 (2026-10-28): the agent list and the attention records retire: these were REVEAL_DRAWER and ZONES_DRAWER, the same numbers.
 const REVEAL_NARROW: Dictionary[String, Array] = {
-	"api:p1": [Vector2(0, 12), Vector2(0, 76), Vector2(65, 198), Vector2(64, 198)],
-	"api:p2": [Vector2(0, 12), Vector2(0, 76), Vector2(97, 198), Vector2(64, 198)],
-	"api:p3": [Vector2(0, 76), Vector2(0, 76), Vector2(97, 264), Vector2(64, 198)],
-	"api:p4": [Vector2(0, 12), Vector2(0, 76), Vector2(120, 198), Vector2(120, 198)],
-	"data:p1": [Vector2(0, 236), Vector2(0, 300), Vector2(120, 332), Vector2(120, 332)],
-	"data:p2": [Vector2(0, 300), Vector2(0, 300), Vector2(120, 332), Vector2(120, 332)],
-	"infra:p1": [Vector2(0, 236), Vector2(0, 300), Vector2(65, 332), Vector2(64, 332)],
-	"infra:p2": [Vector2(0, 236), Vector2(0, 300), Vector2(120, 332), Vector2(120, 332)],
-	"infra:p3": [Vector2(0, 300), Vector2(0, 300), Vector2(120, 332), Vector2(120, 332)],
-	"notes:p1": [Vector2(0, 236), Vector2(0, 300), Vector2(120, 332), Vector2(120, 332)],
-	"web:p1": [Vector2(0, 12), Vector2(0, 76), Vector2(120, 200), Vector2(120, 198)],
-	"web:p2": [Vector2(0, 76), Vector2(0, 76), Vector2(120, 264), Vector2(120, 198)],
-	"web:p3": [Vector2(0, 12), Vector2(0, 76), Vector2(120, 198), Vector2(120, 198)],
+	"api:p1": [Vector2(0, 16), Vector2(0, 80), Vector2(65, 198), Vector2(64, 198)],
+	"api:p2": [Vector2(0, 16), Vector2(0, 80), Vector2(97, 198), Vector2(64, 198)],
+	"api:p3": [Vector2(0, 80), Vector2(0, 80), Vector2(97, 264), Vector2(64, 198)],
+	"api:p4": [Vector2(0, 16), Vector2(0, 80), Vector2(120, 198), Vector2(120, 198)],
+	"data:p1": [Vector2(0, 240), Vector2(0, 304), Vector2(120, 336), Vector2(120, 336)],
+	"data:p2": [Vector2(0, 304), Vector2(0, 304), Vector2(120, 336), Vector2(120, 336)],
+	"infra:p1": [Vector2(0, 240), Vector2(0, 304), Vector2(65, 336), Vector2(64, 336)],
+	"infra:p2": [Vector2(0, 240), Vector2(0, 304), Vector2(120, 336), Vector2(120, 336)],
+	"infra:p3": [Vector2(0, 304), Vector2(0, 304), Vector2(120, 336), Vector2(120, 336)],
+	"notes:p1": [Vector2(0, 240), Vector2(0, 304), Vector2(120, 336), Vector2(120, 336)],
+	"web:p1": [Vector2(0, 16), Vector2(0, 80), Vector2(120, 200), Vector2(120, 198)],
+	"web:p2": [Vector2(0, 80), Vector2(0, 80), Vector2(120, 264), Vector2(120, 198)],
+	"web:p3": [Vector2(0, 16), Vector2(0, 80), Vector2(120, 198), Vector2(120, 198)],
 }
 const ZONES_NARROW: Dictionary[String, Array] = {
 	"api": [Vector2(0, 174), Vector2(0, 174), Vector2(32, 174), Vector2(32, 174)],
 	"web": [Vector2(24, 174), Vector2(24, 174), Vector2(120, 174), Vector2(120, 174)],
-	"infra": [Vector2(0, 398), Vector2(0, 332), Vector2(32, 398), Vector2(32, 332)],
-	"notes": [Vector2(0, 398), Vector2(0, 332), Vector2(120, 398), Vector2(120, 332)],
-	"data": [Vector2(24, 398), Vector2(24, 332), Vector2(120, 398), Vector2(120, 332)],
+	"infra": [Vector2(0, 398), Vector2(0, 336), Vector2(32, 398), Vector2(32, 336)],
+	"notes": [Vector2(0, 398), Vector2(0, 336), Vector2(120, 398), Vector2(120, 336)],
+	"data": [Vector2(24, 398), Vector2(24, 336), Vector2(120, 398), Vector2(120, 336)],
 }
 
 
@@ -350,7 +356,8 @@ func test_a_desk_is_revealed_where_it_was_at_800x480() -> void:
 	var office := await _office()
 	_eq(office.world.position, Vector2(16, 68), "the world stands at the HUD's free corner")
 	# S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151), the world 35 taller: 241 -> 276 deep.
-	_eq(office.camera.free_rect(), Rect2(16, 68, 776, 276), "with 776x276 of it in view")
+	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: 120 tall docked, the world 4 shorter (276 -> 272).
+	_eq(office.camera.free_rect(), Rect2(16, 68, 776, 272), "with 776x272 of it in view")
 	_eq(office.floor_view.root.position, Vector2(0, OfficeScene.PLATE_HEIGHT), "and the floor under the plate")
 	_reveals(office, REVEAL_800, "800x480")
 	_done(office)
@@ -362,8 +369,10 @@ func test_a_desk_is_revealed_where_it_was_at_800x480() -> void:
 ## FRAME-Q2), 416 wide as one lane of 9 was, 33 rows deep instead of 40.
 func test_a_desk_is_revealed_where_it_was_in_the_smallest_window() -> void:
 	var office := await _office(Vector2(480, 320))
-	_eq(office.camera.free_rect(), Rect2(16, 48, 456, 202), "456x202 of the world in view")
-	_eq(_far(office), Vector2(0, 854), "the pan goes nowhere sideways")
+	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the two rows 54 tall, the world 4 shorter (202 ->
+	# 198), the far corner 4 lower.
+	_eq(office.camera.free_rect(), Rect2(16, 48, 456, 198), "456x198 of the world in view")
+	_eq(_far(office), Vector2(0, 858), "the pan goes nowhere sideways")
 	_reveals(office, REVEAL_480, "480x320")
 	# A reveal starts from the pan as it is and leaves it between units when
 	# nothing has to move; only the camera's next frame rounds, and only its
@@ -388,7 +397,8 @@ func test_a_desk_is_revealed_where_it_was_in_a_wide_window() -> void:
 	var office := await _office(Vector2(1280, 720))
 	_eq(office.world.position, Vector2(16, 68), "the world stands where it does in every tall window")
 	# S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151), the world 35 taller: 481 -> 516 deep.
-	_eq(office.camera.free_rect(), Rect2(16, 68, 1256, 516), "with 1256x516 of it in view")
+	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: 120 tall docked, the world 4 shorter (516 -> 512).
+	_eq(office.camera.free_rect(), Rect2(16, 68, 1256, 512), "with 1256x512 of it in view")
 	_reveals(office, REVEAL_1280, "1280x720")
 	_done(office)
 
@@ -503,9 +513,11 @@ func test_the_arrows_stand_where_they_stood() -> void:
 	var office := await _office()
 	# S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151), the world 35 taller: the places along
 	# the taller edge from the print (0.5083 -> 0.5104, 0.3608 -> 0.3320).
+	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the world 4 shorter; the places along the edge from
+	# the print, the same chips on the same edges.
 	var below := [
-		_arrow("web", "web:p2", 1, EdgeArrowModel.Edge.BOTTOM, "0.5104"),
-		_arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.BOTTOM, "0.3320")
+		_arrow("web", "web:p2", 1, EdgeArrowModel.Edge.BOTTOM, "0.5101"),
+		_arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.BOTTOM, "0.3354")
 	]
 	_eq(await _arrows_at(office, Vector2.ZERO), below, "800x480, at the top: web's near chip and infra's below")
 	# S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151), the world 35 taller: the far corner is
@@ -513,7 +525,7 @@ func test_the_arrows_stand_where_they_stood() -> void:
 	# (place 0.5075 -> 0.5093). The bottom is the bottom: no pan restores both chips above here.
 	_eq(
 		await _arrows_at(office, _far(office)),
-		[_arrow("web", "web:p1", 1, EdgeArrowModel.Edge.TOP, "0.5093")],
+		[_arrow("web", "web:p1", 1, EdgeArrowModel.Edge.TOP, "0.5091")],
 		"800x480, at the bottom: web's far chip above, its near one and infra's in view"
 	)
 	# S3 PANEL-a1 (2026-10-27): the docked bottom panel, the 52-unit bar band on tall screens, no drawer tab: the
@@ -522,24 +534,24 @@ func test_the_arrows_stand_where_they_stood() -> void:
 		await _arrows_at(office, Vector2(0, 150)),
 		# S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151), the world 35 taller: the place
 		# along the taller edge from the print (0.2528 -> 0.1888).
-		[_arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.BOTTOM, "0.1888")],
+		[_arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.BOTTOM, "0.1967")],
 		"800x480, in the middle: web's chips in view, infra's below"
 	)
 	_done(office)
 	office = await _office(Vector2(480, 320))
 	below = [
-		_arrow("web", "web:p1", 2, EdgeArrowModel.Edge.BOTTOM, "0.4097"),
-		_arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.BOTTOM, "0.4442")
+		_arrow("web", "web:p1", 2, EdgeArrowModel.Edge.BOTTOM, "0.4120"),
+		_arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.BOTTOM, "0.4454")
 	]
 	var above := [
-		_arrow("web", "web:p1", 2, EdgeArrowModel.Edge.TOP, "0.4332"),
-		_arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.TOP, "0.3772")
+		_arrow("web", "web:p1", 2, EdgeArrowModel.Edge.TOP, "0.4346"),
+		_arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.TOP, "0.3797")
 	]
 	_eq(await _arrows_at(office, Vector2.ZERO), below, "480x320, at the top")
 	_eq(await _arrows_at(office, Vector2(0, 856)), above, "480x320, at the bottom")
 	_eq(
 		await _arrows_at(office, Vector2(0, 524)),
-		[_arrow("web", "web:p1", 1, EdgeArrowModel.Edge.TOP, "0.2964")],
+		[_arrow("web", "web:p1", 1, EdgeArrowModel.Edge.TOP, "0.2979")],
 		"480x320, in the middle: one of web's two chips is above the view"
 	)
 	_done(office)
@@ -568,13 +580,15 @@ func test_an_arrow_follows_its_chip_to_the_unit() -> void:
 	_eq([far_chip, far_seat], [Rect2(81, 504, 30, 16), Rect2(81, 520, 30, 40)], "web:p1's chip over its seat")
 	var edge := far_chip.end.y - room.position.y
 	_eq(edge, 472.0, "the pan that puts the view's top at the chip's bottom")
-	var infra_below := _arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.BOTTOM, "0.2174")
+	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the world 4 shorter (202 -> 198); the places from
+	# the print, the same chips on the same edges.
+	var infra_below := _arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.BOTTOM, "0.2277")
 	_eq(await _arrows_at(office, Vector2(0, edge - 1)), [infra_below], "one unit of web:p1's chip in view: no arrow")
 	_eq(
 		await _arrows_at(office, Vector2(0, edge)),
 		[
-			_arrow("web", "web:p1", 1, EdgeArrowModel.Edge.TOP, "0.1993"),
-			_arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.BOTTOM, "0.2150")
+			_arrow("web", "web:p1", 1, EdgeArrowModel.Edge.TOP, "0.1997"),
+			_arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.BOTTOM, "0.2254")
 		],
 		"the chip just out of view, its seat still in: the arrow"
 	)
@@ -582,8 +596,8 @@ func test_an_arrow_follows_its_chip_to_the_unit() -> void:
 	_eq(
 		await _arrows_at(office, Vector2(0, edge + 1)),
 		[
-			_arrow("web", "web:p1", 1, EdgeArrowModel.Edge.TOP, "0.2020"),
-			_arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.BOTTOM, "0.2124")
+			_arrow("web", "web:p1", 1, EdgeArrowModel.Edge.TOP, "0.2025"),
+			_arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.BOTTOM, "0.2230")
 		],
 		"a unit further: the arrow, a little along"
 	)
@@ -593,26 +607,26 @@ func test_an_arrow_follows_its_chip_to_the_unit() -> void:
 	edge = near_chip.end.y - room.position.y
 	_eq(
 		await _arrows_at(office, Vector2(0, edge - 1)),
-		[_arrow("web", "web:p1", 1, EdgeArrowModel.Edge.TOP, "0.3454")],
+		[_arrow("web", "web:p1", 1, EdgeArrowModel.Edge.TOP, "0.3470")],
 		"one unit of web:p2's chip in view: only web:p1 counts"
 	)
 	_eq(
 		await _arrows_at(office, Vector2(0, edge)),
-		[_arrow("web", "web:p1", 2, EdgeArrowModel.Edge.TOP, "0.3461")],
+		[_arrow("web", "web:p1", 2, EdgeArrowModel.Edge.TOP, "0.3477")],
 		"web:p2's chip just out of view: both count"
 	)
 	var infra_chip := office.floor_view.seat(_pk("infra:p1")).node.chip_rect()
 	edge = infra_chip.end.y - room.position.y
 	_eq(
 		await _arrows_at(office, Vector2(0, edge - 1)),
-		[_arrow("web", "web:p1", 2, EdgeArrowModel.Edge.TOP, "0.4013")],
+		[_arrow("web", "web:p1", 2, EdgeArrowModel.Edge.TOP, "0.4026")],
 		"one unit of infra:p1's chip in view: web's arrow alone"
 	)
 	_eq(
 		await _arrows_at(office, Vector2(0, edge)),
 		[
-			_arrow("web", "web:p1", 2, EdgeArrowModel.Edge.TOP, "0.4016"),
-			_arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.TOP, "0.1993")
+			_arrow("web", "web:p1", 2, EdgeArrowModel.Edge.TOP, "0.4029"),
+			_arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.TOP, "0.1997")
 		],
 		"infra:p1's chip just out of view: its arrow too"
 	)
@@ -644,8 +658,10 @@ func test_a_relayout_moves_no_answer() -> void:
 	_check(office.floor_view.plan == plan, "the narrower window plans nothing again")
 	# S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151), the world 35 taller: the room
 	# 241 -> 276 deep, the far corner 35 less (367 -> 332).
-	_eq(office.camera.free_rect(), Rect2(16, 68, 616, 276), "the world's room stops 8 short of the narrower edge")
-	_eq(_far(office), Vector2(120, 332), "the far corner is 120 further right")
+	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the world 4 shorter, the far corner 4 lower (336 =
+	# 608 - 272); places from the print.
+	_eq(office.camera.free_rect(), Rect2(16, 68, 616, 272), "the world's room stops 8 short of the narrower edge")
+	_eq(_far(office), Vector2(120, 336), "the far corner is 120 further right")
 	for key: String in REVEAL_800:
 		_eq(REVEAL_NARROW[key].slice(0, 2), REVEAL_800[key].slice(0, 2), "%s: from no pan, as at 800" % key)
 	for key: String in ZONES_800:
@@ -664,8 +680,8 @@ func test_a_relayout_moves_no_answer() -> void:
 		# S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151), the world 35 taller: places from
 		# the print (0.5805 -> 0.6001, 0.3702 -> 0.3433).
 		[
-			_arrow("web", "web:p2", 1, EdgeArrowModel.Edge.BOTTOM, "0.6001"),
-			_arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.BOTTOM, "0.3433")
+			_arrow("web", "web:p2", 1, EdgeArrowModel.Edge.BOTTOM, "0.5977"),
+			_arrow("infra", "infra:p1", 1, EdgeArrowModel.Edge.BOTTOM, "0.3465")
 		],
 		"640 wide, at the top: web's near chip and infra's below, along the narrower view"
 	)
@@ -673,7 +689,7 @@ func test_a_relayout_moves_no_answer() -> void:
 		await _arrows_at(office, Vector2(0, 300)),
 		# S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151), the world 35 taller: the place from
 		# the print (0.5997 -> 0.6041).
-		[_arrow("web", "web:p1", 1, EdgeArrowModel.Edge.TOP, "0.6041")],
+		[_arrow("web", "web:p1", 1, EdgeArrowModel.Edge.TOP, "0.6036")],
 		"640 wide, 300 down (the bottom before the panel docked): web's far chip above"
 	)
 	_done(office)

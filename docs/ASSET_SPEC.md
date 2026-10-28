@@ -302,6 +302,7 @@ margins are part of the spec. Values are units (as in `pack.json`); a density-2 
 | `plant`, `plant_b` | 32×48 | 16,46 |
 | `wall_frame` | 40×32 | 20,30 |
 | `pantry` | 64×48 | 32,46 |
+| `pantry_sign` | 40×20 | 20,20 |
 | `side_table` | 32×32 | 16,30 |
 | `partition_v` | 6×32 | 3,32 |
 | `partition_post` | 6×12 | 3,12 |
@@ -322,6 +323,9 @@ fixed by where the side table stands (see [the visual language](VISUAL_LANGUAGE.
   top-wall step, a lane gap's piece number), never by state, tab or time.
 - `wall_frame` hangs on the top wall: no footprint, drawn in the shell, foot at `OfficeShell.FRAME_FOOT` (48);
   its position depends only on the windows (`OfficeShell.frames()`).
+- `pantry_sign` (the `COFFEE` sign) hangs on the top wall over the pantry counter: no footprint, no `item` block,
+  drawn in the shell, foot at `OfficeShell.SIGN_FOOT` (52), centred over the counter (`OfficeShell.pantry_sign()`);
+  no wider than the counter, so it stays off the windows. Furniture: wood, brass and cream, no state colour.
 - **The partition kit** bounds a zone, a U open at the top (`OfficeShell.partition_pieces()`): `partition_v` down
   each side (one per cell row, foot at the row's bottom), `partition_corner_bl / _br` at the bottom corners,
   `partition_h` along the bottom between them, and a `partition_post` at each top corner (the zone's sign hangs
@@ -423,6 +427,11 @@ the provider is the pack's own few-texel mark at the seat.
   triangle the text face lacks is the pack's too.
 - `panel`: 32×32 NinePatch, margin 4 on each side, for the world's light panels (the chip, the zone signs, the
   showroom's notes); `hud_panel`: the same shape for the dark HUD's panels.
+- `panel_wood`: 32×32 NinePatch, margin 6 on each side, the bottom panel's frame (`OfficeBottomPanel`, through
+  `HdPanel.frame_id`; its content margins are the `HdPanelWood` theme variation): wood rails (an outline, a highlight,
+  the plank, a shade, an outline; light from the top-left on every rail) and a brass plate with a rivet in each
+  corner cell, round the dark fill `ink`. The rails and the middle are stretched, so each is one colour along its
+  length.
 - `selection_seat`: 32×48 transparent corner marks round a seated figure, pivot 16,46.
 - `mark_<provider>`: the provider's mark at a seat, one per agent in `data/agent_catalog.json` (see "Provider marks").
 - `carpet_<family>`: a zone's carpet, five families (see "Zone carpets").

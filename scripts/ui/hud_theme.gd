@@ -95,6 +95,13 @@ const SECTION_PANELS: Dictionary[StringName, StringName] = {
 ## How much of the office shows through the dim under the answer-mode panel
 ## (`ModalDim`, `deep` at this opacity): enough to see which desk it is about.
 const MODAL_DIM := 0.55
+## The frames HdPanel draws, by the theme variation that carries each one's
+## content margins: the HUD's dark panel, and the bottom panel's wood with
+## brass corners (OfficeBottomPanel; S3 SKIN).
+const PANEL_FRAMES: Dictionary[StringName, StringName] = {
+	&"HdPanel": ArtContract.UI_HUD_PANEL,
+	&"HdPanelWood": ArtContract.UI_PANEL_WOOD,
+}
 ## The agent card's state pill (CardDetails.pill_of()): a state's own colour,
 ## the quiet one `slate`.
 const STATE_PILLS: Dictionary[StringName, StringName] = {
@@ -522,18 +529,32 @@ static func _edge_arrows(theme: Theme, art: ArtPack) -> void:
 	theme.set_constant("gap", "EdgeArrows", 4)
 
 
-## The panel type HdPanel draws itself: the stylebox is empty on purpose and
-## carries only the pack's nine-patch margins, in units, so children start
-## where the drawn frame ends.
+## The theme variation that carries the content margins of HdPanel frame
+## `frame`: `HdPanelWood` for the bottom panel's wood, `HdPanel` for the
+## HUD's dark panel and anything else.
+static func panel_variation(frame: StringName) -> StringName:
+	for variation: StringName in PANEL_FRAMES:
+		if PANEL_FRAMES[variation] == frame:
+			return variation
+	return &"HdPanel"
+
+
+## The panel types HdPanel draws itself (PANEL_FRAMES): each stylebox is empty
+## on purpose and carries only its frame's nine-patch margins, in units, so
+## children start where the drawn frame ends. A pack without the wood keeps the
+## dark panel's margins there, as HdPanel.dress() then draws the dark panel.
 static func _panel(theme: Theme, art: ArtPack) -> void:
-	theme.set_type_variation("HdPanel", "PanelContainer")
-	var spec := art.hud_panel()
-	var empty := StyleBoxEmpty.new()
-	empty.content_margin_left = spec.patch_left
-	empty.content_margin_top = spec.patch_top
-	empty.content_margin_right = spec.patch_right
-	empty.content_margin_bottom = spec.patch_bottom
-	theme.set_stylebox("panel", "HdPanel", empty)
+	for variation: StringName in PANEL_FRAMES:
+		theme.set_type_variation(variation, "PanelContainer")
+		var spec := art.ui_sprite(PANEL_FRAMES[variation])
+		if spec == null or not spec.nine_patched():
+			spec = art.hud_panel()
+		var empty := StyleBoxEmpty.new()
+		empty.content_margin_left = spec.patch_left
+		empty.content_margin_top = spec.patch_top
+		empty.content_margin_right = spec.patch_right
+		empty.content_margin_bottom = spec.patch_bottom
+		theme.set_stylebox("panel", variation, empty)
 	theme.set_type_variation("HdPanelBare", "PanelContainer")
 	theme.set_stylebox("panel", "HdPanelBare", StyleBoxEmpty.new())
 

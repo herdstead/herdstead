@@ -314,10 +314,12 @@ func test_the_world_starts_at_the_left_inset_and_a_first_plan_takes_the_rails_wi
 	# screen and above the docked panel.
 	# S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151), the world 35 taller: the two docked
 	# rooms 241 -> 276 high; the 480x320 one (not docked) is unchanged.
+	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the docked panel 120 tall and the two rows 54, each
+	# room 4 shorter (the cells and lanes unchanged).
 	for step: Array in [
-		[Vector2(800, 480), Rect2(16, 68, 776, 276), 23, 4],
-		[Vector2(960, 480), Rect2(16, 68, 936, 276), 28, 5],
-		[Vector2(480, 320), Rect2(16, 48, 456, 202), 13, 2],
+		[Vector2(800, 480), Rect2(16, 68, 776, 272), 23, 4],
+		[Vector2(960, 480), Rect2(16, 68, 936, 272), 28, 5],
+		[Vector2(480, 320), Rect2(16, 48, 456, 198), 13, 2],
 	]:
 		var screen: Vector2 = step[0]
 		var office := await _live_office(fixture, screen)

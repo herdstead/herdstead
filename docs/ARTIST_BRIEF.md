@@ -50,6 +50,7 @@ pod family, not here):
 | `plant`, `plant_b` | 32×48 each | 16,46 | 64×96 | 32,92 |
 | `wall_frame` | 40×32 | 20,30 | 80×64 | 40,60 |
 | `pantry` | 64×48 | 32,46 | 128×96 | 64,92 |
+| `pantry_sign` | 40×20 | 20,20 | 80×40 | 40,40 |
 | `side_table` | 32×32 | 16,30 | 64×64 | 32,60 |
 | `partition_v` | 6×32 | 3,32 | 12×64 | 6,64 |
 | `partition_post` | 6×12 | 3,12 | 12×24 | 6,24 |
@@ -101,9 +102,11 @@ uses in `pack.json`'s `states` (§4).
 **17 UI images**: 9 icons of 16×16 (`working`, `blocked`, `unread`, `idle`, `unknown`, `offline`,
 `starting`, `branch`, `connected`), pivot 8,16, except `connected` at 8,8; `panel` and `hud_panel`
 32×32, pivot 0,0, nine-patch margins `[4,4,4,4]` (`panel` light, for the world's chips and signs and the tools;
-`hud_panel` dark, for every HUD panel); `selection_seat` 32×48, pivot 16,46 (four corner marks round a seat).
-(All in units; 2x PNG: icons 32×32, `panel` and `hud_panel` 64×64 (margins of 8 texels; the middle is
-stretched, so it must be one flat colour), `selection_seat` 64×96.)
+`hud_panel` dark, for every HUD panel); `panel_wood` 32×32, pivot 0,0, margins `[6,6,6,6]` (the bottom panel's
+wood rails and brass corner plates round the dark fill `ink`; the rails one colour along their length, as they are
+stretched); `selection_seat` 32×48, pivot 16,46 (four corner marks round a seat).
+(All in units; 2x PNG: icons 32×32, `panel`, `hud_panel` and `panel_wood` 64×64 (margins of 8 texels, the wood's
+12; the middle is stretched, so it must be one flat colour), `selection_seat` 64×96.)
 The five zone carpets `carpet_sage` / `_sky` / `_terra` / `_teal` / `_lilac`: 32×32, pivot 0,0, nine-patch margins
 `[2,2,2,2]` (64×64 at 2x): a flat fill in `carpet_<family>` inside a one-unit edge in `carpet_<family>_edge`, nothing
 else (the middle is stretched); muted and darker than the wood, never near a state colour.

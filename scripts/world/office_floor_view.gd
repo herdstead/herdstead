@@ -658,6 +658,10 @@ func _outer_wall(next: FloorPlan) -> void:
 	_windows.clear()
 	for at in OfficeShell.window_xs(next, _pen):
 		_windows.append(_pen.prop(_shell, _window_id(), Vector2(at, OfficeShell.WINDOW_FOOT)))
+	# The pantry's sign hangs on the wall like a picture: in the shell, no
+	# footprint, dimmed and frozen with the rest of it.
+	for at in OfficeShell.pantry_sign(next):
+		_pen.prop(_shell, ArtContract.PROP_PANTRY_SIGN, at).name = "PantrySign"
 
 
 ## Night falls or lifts on this floor by `amount` (DayLight.night_at()): the

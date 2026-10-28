@@ -226,7 +226,7 @@ The bottom of the screen is the bottom panel: a row of tabs, **AGENT | HISTORY |
 over the page shown. Every run starts on AGENT, the agent card. The card and HUD are in English; a sentence that does not
 fit is in the tooltip.
 
-**Docked on a screen at least 400 units tall.** The panel is always open there, 116 units high whatever its page, so a tab
+**Docked on a screen at least 400 units tall.** The panel is always open there, 120 units high whatever its page, so a tab
 never moves the world: the portrait (the seat's person, head and shoulders, still, framed in the state's colour; greyed
 when its machine is dropped), the pane's name, the state in a pill of its colour and its wait, who and where
 (`CLAUDE · api / main`); a live preview of the terminal's last 6 rows (herdr's `detection` when blocked, the tail of
@@ -281,7 +281,7 @@ out.
 Only for an agent seat you picked yourself. `Enter` or **Answer ⏎** in the card header opens it; opening sends nothing.
 A click on a blocked agent's chip, NEXT or `N` opens it too, once the question shows; nothing opens it by itself.
 
-Answer mode is a modal: the bottom panel, at most 640×272 units and with its tabs hidden, stands in the middle of the room under the bar over
+Answer mode is a modal: the bottom panel, at most 640×276 units and with its tabs hidden, stands in the middle of the room under the bar over
 the dimmed office, laid out top to bottom: who and where, the terminal across the whole panel, the answer keys in one
 row, the reply box, and along the foot Monitor, Close and what became of the last answer. NEXT stays at its right end on
 a wide enough screen. The world keeps the room the opened panel left it. The dim only darkens: clicks go

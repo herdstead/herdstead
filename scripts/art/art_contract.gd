@@ -135,6 +135,9 @@ const PROP_WALL_FRAME := &"wall_frame"
 ## The entry band's counter (docs/VISUAL_LANGUAGE.md): a corner nook, furniture
 ## only. Nobody walks to it; an idle agent sits at their seat with a mug.
 const PROP_PANTRY := &"pantry"
+## The sign over the pantry counter (OfficeShell.pantry_sign()): its word is
+## the art's, furniture on the top wall, bound to nothing (docs/VISUAL_LANGUAGE.md).
+const PROP_PANTRY_SIGN := &"pantry_sign"
 ## A zone's low partitions (OfficeShell.partition_pieces()): the side runs,
 ## the posts at the open top corners, the bottom corners and the bottom run.
 const PROP_PARTITION_V := &"partition_v"
@@ -162,6 +165,7 @@ const PROP_IDS: Array[StringName] = [
 	PROP_PLANT_B,
 	PROP_WALL_FRAME,
 	PROP_PANTRY,
+	PROP_PANTRY_SIGN,
 	PROP_PARTITION_V,
 	PROP_PARTITION_POST,
 	PROP_PARTITION_CORNER_BL,
@@ -182,6 +186,9 @@ const UI_PANEL := &"panel"
 ## The dark HUD's panels (HdPanel); `panel` stays the world's and the tools'
 ## light one (the blocked chip, the Avatar Studio, the showroom's notes).
 const UI_HUD_PANEL := &"hud_panel"
+## The bottom panel's frame (OfficeBottomPanel's HdPanel.frame_id): wood with
+## brass corners round the HUD panel's own dark fill.
+const UI_PANEL_WOOD := &"panel_wood"
 ## The corner marks round a selected seat, and round a worker resting away.
 const UI_SELECTION_SEAT := &"selection_seat"
 const UI_BRANCH := &"branch"
@@ -294,7 +301,7 @@ static func problems(pack: ArtPack) -> PackedStringArray:
 	for mark in mark_ids():
 		if pack.ui_sprite(mark) == null:
 			found.append("ui: no provider mark named " + mark)
-	var nine_patches: Array[StringName] = [UI_PANEL, UI_HUD_PANEL]
+	var nine_patches: Array[StringName] = [UI_PANEL, UI_HUD_PANEL, UI_PANEL_WOOD]
 	nine_patches.append_array(CARPETS)
 	for image in nine_patches:
 		var framed := pack.ui_sprite(image)
@@ -344,6 +351,7 @@ static func ui_ids() -> Array[StringName]:
 	var result: Array[StringName] = [
 		UI_PANEL,
 		UI_HUD_PANEL,
+		UI_PANEL_WOOD,
 		UI_SELECTION_SEAT,
 		UI_BRANCH,
 		UI_STARTING,

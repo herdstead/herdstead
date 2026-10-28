@@ -48,6 +48,10 @@ const LANE_GAP_FOOT := 8.0
 ## not hung. FRAME_FOOT hangs it on the wall's cream face (y 12..57).
 const FRAME_FOOT := 48.0
 const FRAME_GAP := 8.0
+## The sign over the pantry counter (pantry_sign()): its foot on the top
+## wall's cream face (y 12..57), so the whole sign hangs on the face, above the
+## counter's drawing. Furniture, bound to nothing (docs/VISUAL_LANGUAGE.md).
+const SIGN_FOOT := 52.0
 
 ## The entry band, measured from its top. Its first cell row is inside the top
 ## wall's drawing clearance (a person's whole canvas stays off the wall); the
@@ -168,14 +172,30 @@ static func window_gaps(plan: FloorPlan, pen: OfficeDraw) -> Array[float]:
 
 
 ## What stands on or against the top wall before any picture or plant: the
-## lift door's drawing, every window's and the pantry counter's.
+## lift door's drawing, every window's, the pantry counter's and its sign's.
 static func wall_covers(plan: FloorPlan, pen: OfficeDraw) -> Array[Rect2]:
 	var covers: Array[Rect2] = [drawn(pen, ArtContract.PROP_DOOR, door(plan))]
 	for x in window_xs(plan, pen):
 		covers.append(drawn(pen, ArtContract.PROP_WINDOW, Vector2(x, WINDOW_FOOT)))
 	for fixture in plan.fixtures():
 		covers.append(fixture.draw_rect)
+	for foot in pantry_sign(plan):
+		covers.append(drawn(pen, ArtContract.PROP_PANTRY_SIGN, foot))
 	return covers
+
+
+## Where the sign over the pantry counter hangs: its foot at SIGN_FOOT on the
+## top wall's face, centred over the counter's drawing; none on a map without
+## a pantry. The sign is no wider than the counter, so it stays inside the
+## stretch the windows leave the pantry (window_xs()) and off every zone's sign
+## (they hang in the zones' aisle rows, under the entry band). Placed by the
+## counter alone; it reads nothing of herdr. Pure: the floor view hangs exactly
+## this, and the tests read it.
+static func pantry_sign(plan: FloorPlan) -> Array[Vector2]:
+	var found: Array[Vector2] = []
+	if plan.pantry != null:
+		found.append(Vector2(plan.pantry.draw_rect.get_center().x, SIGN_FOOT))
+	return found
 
 
 ## Where prop `id` draws with its foot at `at`.

@@ -87,7 +87,7 @@ MIN_CASES_OFFICE_SERVICE=16
 # name takes a vacant neighbour's slot (S3 SEATTAGS, 2026-10-27). 33 -> 34:
 # a plate at rest stands clear of its pod's tab label and partition (round 2).
 MIN_CASES_OFFICE_GEOMETRY=34
-MIN_CASES_OFFICE_FRAMES=5
+MIN_CASES_OFFICE_FRAMES=6
 MIN_CASES_OFFICE_QUIET=8
 MIN_CASES_DAY_LIGHT=8
 MIN_CASES_OFFICE_RECONCILE=23
@@ -123,7 +123,10 @@ MIN_CASES_EDGE_ARROWS=20
 # 29 -> 30 (Q-A1-4): the docked NEXT says the fixture's words whole at 960.
 # 30 -> 31 (S3 PANEL-a2 round 2, R1): a wide docked card's left column holds
 # the names and the preview takes the rest.
-MIN_CASES_BOTTOM_PANEL=33
+# 31 -> 32 (S3 SKIN, 2026-10-28): the bottom panel wears the wood frame.
+# 32 -> 34 (S3 PORTRAIT P2, 2026-10-28): the card's portrait in its 42 window,
+# and its frame by state, stale when dropped.
+MIN_CASES_BOTTOM_PANEL=34
 MIN_CASES_FRAME_LOOP=9
 MIN_CASES_PIXEL_PEOPLE=53
 # The portraits family (S3 PORTRAIT P1, 2026-10-28): the manifest against the

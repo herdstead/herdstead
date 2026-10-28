@@ -13,12 +13,12 @@
 script = ExtResource("1")
 tip_gap = Vector2(12, 16)
 staff_bottom = -4.0
-staff_docked_top = -120.0
-staff_opened_top = -153.0
-staff_compact_top = -54.0
+staff_docked_top = -124.0
+staff_opened_top = -157.0
+staff_compact_top = -58.0
 staff_inset = 16.0
 staff_modal_width = 640.0
-staff_modal_height = 272.0
+staff_modal_height = 276.0
 staff_modal_gap = 8.0
 staff_tall_from = 400.0
 staff_next_from = 640.0

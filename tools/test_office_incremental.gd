@@ -1223,11 +1223,12 @@ func test_a_room_change_moves_the_world_at_once() -> void:
 	office.refresh()
 	# S3 PANEL-a2 (2026-10-28): the agent list and the attention records retire: the room change was the drawer opening (616 wide at
 	# 800x480); now it is the panel opening for HISTORY at 480x320 (202 -> 103 tall), the one left.
-	_eq(office.camera.free_rect().size, Vector2(456, 202), "the room to the right edge, above the panel's two rows")
+	# S3 SKIN (2026-10-28): wood frame: the two rows 54 tall and the opened panel 153, so the room 4 shorter: 202 -> 198, 103 -> 99.
+	_eq(office.camera.free_rect().size, Vector2(456, 198), "the room to the right edge, above the panel's two rows")
 	office.hud.show_page(OfficeBottomPanel.Page.HISTORY)
 	await _frames(1)
 	_eq(office.camera.free_rect(), office.hud.world_rect(), "the camera's room is the HUD's new one")
-	_eq(office.camera.free_rect().size.y, 103.0, "down to the panel opened for HISTORY")
+	_eq(office.camera.free_rect().size.y, 99.0, "down to the panel opened for HISTORY")
 	_eq(office.world.position, office.camera.free_rect().position, "the world stands in it")
 	_eq(office.plate.size.x, office.camera.free_rect().size.x, "and the plate spans it")
 	_done(office)

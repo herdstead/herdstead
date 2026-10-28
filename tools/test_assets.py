@@ -1181,6 +1181,57 @@ class PixelSourceTests(unittest.TestCase):
             self.assertIn(name, built["ui"], f"the built pack carries {name}")
             self.assertTrue((ROOT / f"assets/daylight/ui/{name}.png").is_file(), "and its picture")
 
+    def test_the_wood_frame_and_the_pantry_sign_keep_their_contract(self):
+        """S3 SKIN (2026-10-28): the bottom panel's wood frame and the COFFEE sign over the pantry.
+
+        `panel_wood` is a 32x32-unit nine-patch with 6-unit margins (12 texels at the pack's density): what HdPanel
+        stretches is one colour along its length (every row of the top and bottom bands between the corner cells,
+        every column of the side bands, and the middle, which is the HUD panel's own dark fill `ink`, as
+        `hud_panel`'s middle is), the outer edge is `deep` all round, and the corner cells carry brass. `pantry_sign`
+        is a 40x20-unit prop on a bottom-centre foot with no `item` block (placed by code, never from a pool). Both
+        are hard-alpha palette art with no state colour: furniture, never a signal.
+        """
+        manifest = json.loads((ROOT / "art/daylight/pack.json").read_text())
+        palette = {key: tuple(bytes.fromhex(value)) for key, value in manifest["palette"].items()}
+        d = manifest["density"] if "density" in manifest else 2
+        self.assertEqual(manifest["ui"]["panel_wood"],
+                         {"path": "ui/panel_wood.png", "size": [32, 32], "pivot": [0, 0], "nine_patch": [6, 6, 6, 6]})
+        self.assertEqual(manifest["props"]["pantry_sign"],
+                         {"path": "props/pantry_sign.png", "size": [40, 20], "pivot": [20, 20]})
+        signals = {palette[key] for key in ("working", "blocked", "unread", "task_light")}
+        known = set(palette.values())
+        with Image.open(ROOT / "art/daylight/ui/panel_wood.png") as image:
+            wood = image.convert("RGBA")
+        with Image.open(ROOT / "art/daylight/ui/hud_panel.png") as image:
+            dark = image.convert("RGBA")
+        size, patch = 32 * d, 6 * d
+        self.assertEqual(wood.size, (size, size))
+        inner = range(patch, size - patch)
+        # Every row between the corner cells (the top and bottom bands, the side bands' and the middle's rows) and
+        # every column between them is one colour along what HdPanel stretches.
+        for at in range(size):
+            self.assertEqual(len({wood.getpixel((x, at)) for x in inner}), 1, f"row {at} along the stretch")
+            self.assertEqual(len({wood.getpixel((at, y)) for y in inner}), 1, f"column {at} along the stretch")
+        self.assertEqual(wood.getpixel((size // 2, size // 2))[:3], palette["ink"], "the middle is the dark fill")
+        self.assertEqual(wood.getpixel((size // 2, size // 2)), dark.getpixel((size // 2, size // 2)),
+                         "the HUD panel's own middle")
+        edge = {wood.getpixel((x, 0)) for x in range(size)} | {wood.getpixel((x, size - 1)) for x in range(size)}
+        edge |= {wood.getpixel((0, y)) for y in range(size)} | {wood.getpixel((size - 1, y)) for y in range(size)}
+        self.assertEqual(edge, {palette["deep"] + (255,)}, "a `deep` outline all round")
+        for cx, cy in ((0, 0), (size - patch, 0), (0, size - patch), (size - patch, size - patch)):
+            cell = {wood.getpixel((cx + i, cy + j))[:3] for i in range(patch) for j in range(patch)}
+            self.assertTrue({palette["brass"], palette["brass_light"], palette["brass_dark"]} <= cell,
+                            f"the corner cell at {cx},{cy} carries the brass ramp")
+        with Image.open(ROOT / "art/daylight/props/pantry_sign.png") as image:
+            board = image.convert("RGBA")
+        self.assertEqual(board.size, (40 * d, 20 * d))
+        for name, picture in (("panel_wood", wood), ("pantry_sign", board)):
+            alpha = {value for _, value in picture.getchannel("A").getcolors()}
+            self.assertLessEqual(alpha, {0, 255}, f"{name}: hard alpha")
+            colours = {colour[:3] for _, colour in picture.getcolors(4096) if colour[3]}
+            self.assertLessEqual(colours, known, f"{name}: palette colours only")
+            self.assertFalse(colours & signals, f"{name}: no state colour")
+
     def test_the_idle_mug_ships_as_drawn_and_is_the_desk_mugs_picture(self):
         """D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to.
 

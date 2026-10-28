@@ -319,6 +319,11 @@
       "pivot": [32, 46],
       "item": {"place": "floor", "footprint": [64, 14]}
     },
+    "pantry_sign": {
+      "path": "props/pantry_sign.png",
+      "size": [40, 20],
+      "pivot": [20, 20]
+    },
     "side_table": {
       "path": "props/side_table.png",
       "size": [32, 32],
@@ -506,6 +511,12 @@
         4,
         4
       ]
+    },
+    "panel_wood": {
+      "path": "ui/panel_wood.png",
+      "size": [32, 32],
+      "pivot": [0, 0],
+      "nine_patch": [6, 6, 6, 6]
     },
     "selection_seat": {
       "path": "ui/selection_seat.png",

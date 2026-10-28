@@ -9,8 +9,9 @@
 [node name="BottomPanel" type="PanelContainer"]
 offset_right = 768.0
 offset_bottom = 146.0
-theme_type_variation = &"HdPanel"
+theme_type_variation = &"HdPanelWood"
 script = ExtResource("1")
+frame_id = &"panel_wood"
 
 [node name="Body" type="VBoxContainer" parent="."]
 layout_mode = 2

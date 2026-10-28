@@ -1810,9 +1810,11 @@ func test_hud_free_area() -> void:
 	# (8 in), from 16 under the 52-unit bar to 16 above the 151-unit docked panel.
 	# S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151), the world 35 taller: 241 -> 276, 16
 	# above the 116-unit docked panel.
+	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the docked panel 120 tall (was 116), the world 4
+	# shorter: 276 -> 272, 1600x960 756 -> 752, the panel's top 4 higher (360 -> 356).
 	_eq(
 		hud.world_rect(),
-		Rect2(16, 68, 776, 276),
+		Rect2(16, 68, 776, 272),
 		"16 in from the left as the bottom panel is, to the right edge, below the bar, above the docked panel"
 	)
 	_eq(hud.placed(hud.bar), Rect2(0, 0, 800, 52), "the bar spans the top, 52 tall on a tall screen")
@@ -1822,13 +1824,13 @@ func test_hud_free_area() -> void:
 	# 480 high is tall enough to dock the bottom panel (staff_tall_from): 151 high.
 	# S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151), the world 35 taller: 116 high now, its
 	# top 35 lower (325 -> 360).
-	_eq(hud.placed(hud.staff), Rect2(16, 360, 768, 116), "the docked panel spans the bottom, 16 in, 4 up")
+	_eq(hud.placed(hud.staff), Rect2(16, 356, 768, 120), "the docked panel spans the bottom, 16 in, 4 up")
 	await _frames(2)
 	_check(hud.staff.get_global_rect().encloses(hud.news.get_global_rect()), "NEWS stands inside it, in its top row")
 	hud.fit(Vector2(1600, 960))
 	# S3 BAR-b (2026-10-27): the SPACES rail is gone; the world starts 16 in and first plans take its width.
 	# S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151), the world 35 taller: 721 -> 756.
-	_eq(hud.world_rect(), Rect2(16, 68, 1576, 756), "a bigger window is more office, not a bigger HUD")
+	_eq(hud.world_rect(), Rect2(16, 68, 1576, 752), "a bigger window is more office, not a bigger HUD")
 	_eq(hud.world_rect().position.x, hud.placed(hud.staff).position.x, "the world's left edge is the bottom panel's")
 	await _frames(2)
 	var lines: Control = hud.bar.get_node("%Lines")

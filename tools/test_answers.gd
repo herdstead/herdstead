@@ -1342,7 +1342,9 @@ func test_answer_mode_fits_the_smallest_screen() -> void:
 	var top: Control = office.hud.staff.get_node("%TopRow")
 	_check(not top.is_visible_in_tree() and not office.hud.news.is_visible_in_tree(), "its tabs and NEWS hidden")
 	# S3 BAR-b (2026-10-27): the SPACES rail is gone; the world starts 16 in and first plans take its width.
-	_eq(office.hud.world_rect().size, Vector2(456, 103), "the world above it keeps a desk's room")
+	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the opened panel 153 tall (was 149), the world
+	# above it 4 shorter (103 -> 99).
+	_eq(office.hud.world_rect().size, Vector2(456, 99), "the world above it keeps a desk's room")
 	_eq(office.hud.world_rect().position.x, 16.0, "16 in from the left, where the rail stood")
 	_fits(card, "answer mode")
 	_panels_apart(office, "answer mode")

@@ -762,8 +762,10 @@ func test_the_stress_fit_at_2x_4x_and_min() -> void:
 	# in 5 (4).
 	# S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151), the world 35 taller: the room at 2x
 	# 207 -> 242 high; the minimum's (not docked) is unchanged.
-	_eq(rooms[WIDE], Vector2(920, 242), "the room at 2x, above the docked panel")
-	_eq(rooms[SMALL], Vector2(440, 168), "the room at 4x and the minimum")
+	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the docked panel 120 and the two rows 54 tall: each
+	# room 4 shorter (242 -> 238, 168 -> 164); the same columns and cells.
+	_eq(rooms[WIDE], Vector2(920, 238), "the room at 2x, above the docked panel")
+	_eq(rooms[SMALL], Vector2(440, 164), "the room at 4x and the minimum")
 	var eighty := _rows_of(10)
 	var four_hundred := _rows_of(50)
 	var cases := [
@@ -1390,7 +1392,9 @@ func _caption_seen(office: OfficeDouble, key: String) -> bool:
 ## needed; the panel opened is the one smaller room left.
 func _narrow(office: OfficeDouble) -> void:
 	await _click_tab(office, OfficeBottomPanel.Page.HISTORY)
-	_eq(office.hud.world_rect().size, Vector2(456, 103), "the minimum's world, the panel opened for HISTORY")
+	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the opened panel 153 tall (was 149): the minimum's
+	# world 103 -> 99.
+	_eq(office.hud.world_rect().size, Vector2(456, 99), "the minimum's world, the panel opened for HISTORY")
 
 
 func _many_zones(count: int) -> Dictionary:

@@ -389,3 +389,65 @@ func _wall_frames(office: OfficeDouble) -> Array[Vector2]:
 		if sprite != null and sprite.texture == texture:
 			found.append(sprite.position)
 	return found
+
+
+## The pantry's COFFEE sign (S3 SKIN, 2026-10-28): a map with a pantry hangs
+## exactly one, centred over the counter's drawing at SIGN_FOOT, all of it on
+## the top wall's cream face and inside the counter's width (so off every
+## window and the lift door), among the wall's covers (so no picture or top-run
+## plant comes near it), and clear of every zone's sign slot; a map without a
+## pantry (an empty floor) hangs none. The floor view draws it in the shell on
+## the ground (behind everyone, as the pictures are), never in the sorted root.
+func test_the_pantry_sign_hangs_over_the_counter_on_the_wall() -> void:
+	var board := art.prop_sprite(ArtContract.PROP_PANTRY_SIGN)
+	_check(board != null, "the pack has the sign")
+	var counted := 0
+	for width in WIDTHS:
+		var model := _floor([_room("a", 2), _room("b", 2, 1)])
+		var plan := _planned(model, width)
+		if plan == null:
+			continue
+		var said := "%d cells asked, %d wide" % [width, plan.floor_cells.size.x]
+		var feet := OfficeShell.pantry_sign(plan)
+		if plan.pantry == null:
+			_eq(feet, [] as Array[Vector2], "%s: no pantry, no sign" % said)
+			continue
+		counted += 1
+		_eq(
+			feet,
+			[Vector2(plan.pantry.draw_rect.get_center().x, OfficeShell.SIGN_FOOT)],
+			"%s: one, over the counter" % said
+		)
+		var drawn := OfficeShell.drawn(pen, ArtContract.PROP_PANTRY_SIGN, feet[0])
+		print("PANTRY_SIGN %s: %s over the counter's %s" % [said, drawn, plan.pantry.draw_rect])
+		_check(drawn.position.y >= FACE_TOP and drawn.end.y <= FACE_FOOT, "%s: on the cream face: %s" % [said, drawn])
+		_check(
+			drawn.position.x >= plan.pantry.draw_rect.position.x and drawn.end.x <= plan.pantry.draw_rect.end.x,
+			"%s: within the counter's width: %s in %s" % [said, drawn, plan.pantry.draw_rect]
+		)
+		_check(drawn.end.y <= plan.pantry.draw_rect.position.y, "%s: above the counter's drawing" % said)
+		_check(drawn in OfficeShell.wall_covers(plan, pen), "%s: among the wall's covers" % said)
+		_check(
+			not drawn.intersects(OfficeShell.drawn(pen, ArtContract.PROP_DOOR, OfficeShell.door(plan))),
+			"%s: off the door" % said
+		)
+		for x in OfficeShell.window_xs(plan, pen):
+			var window := OfficeShell.drawn(pen, ArtContract.PROP_WINDOW, Vector2(x, OfficeShell.WINDOW_FOOT))
+			_check(not drawn.intersects(window), "%s: off the window at %d" % [said, x])
+		for zone in plan.zones:
+			var grid := float(FloorLayoutPolicy.GRID)
+			var slot := Rect2(zone.slot().position * grid, zone.slot().size * grid)
+			_check(not drawn.intersects(slot), "%s: off %s's sign slot" % [said, zone.zone_key])
+		var view := _view(plan, model)
+		await process_frame
+		var hung := view.ground.get_node("Shell").get_node_or_null("PantrySign") as Sprite2D
+		_check(hung != null, "%s: the shell hangs it" % said)
+		if hung != null:
+			_eq(hung.texture, art.sprite_texture(board), "%s: the pack's sign" % said)
+			_eq(hung.transform * hung.get_rect(), drawn, "%s: where the plan puts it" % said)
+		_eq(view.sorted.find_children("PantrySign", "", true, false).size(), 0, "%s: not in the sorted root" % said)
+	_check(counted > 0, "the maps hang a sign: %d" % counted)
+	var empty := _planned(_floor([]), 32)
+	if empty != null:
+		_eq(empty.pantry, null, "an empty floor has no pantry")
+		_eq(OfficeShell.pantry_sign(empty), [] as Array[Vector2], "and no sign")

@@ -1393,9 +1393,11 @@ func test_the_launch_block_fits_the_smallest_screen_and_keeps_pane_details_when_
 	await _until(func() -> bool: return _kinds_enabled(office).size() == 3, "its kinds are on")
 	await _frames(3)
 	_check(launch.is_visible_in_tree() and not more.is_visible_in_tree(), "the block in PANE's place")
-	_eq(office.hud.placed(office.hud.staff).size, Vector2(448, 149), "the panel at 480x320, opened")
+	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: opened 153 tall (was 149: 4 of wood), the world
+	# above it 103 -> 99.
+	_eq(office.hud.placed(office.hud.staff).size, Vector2(448, 153), "the panel at 480x320, opened")
 	# S3 BAR-b (2026-10-27): the SPACES rail is gone; the world starts 16 in and first plans take its width.
-	_eq(office.hud.world_rect().size, Vector2(456, 103), "the world above it keeps a desk's room")
+	_eq(office.hud.world_rect().size, Vector2(456, 99), "the world above it keeps a desk's room")
 	_launch_fits(card, "480x320")
 	_panels_apart(office, "480x320, opened")
 	_ctl(

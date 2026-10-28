@@ -488,7 +488,9 @@ func test_the_smallest_screen_uses_the_compact_columns() -> void:
 	_eq(scroll.horizontal_scroll_mode, ScrollContainer.SCROLL_MODE_DISABLED, "no sideways scroll")
 	# S3 PANEL-a1 (2026-10-27): the docked bottom panel, the 52-unit bar band on tall screens, no drawer tab: above
 	# the two-row panel.
-	_eq(office.hud.placed(overview), Rect2(16, 40, 448, 210), "above the folded bottom panel")
+	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the two rows 54 tall (was 50): the OVERVIEW above
+	# them 4 shorter (210 -> 206).
+	_eq(office.hud.placed(overview), Rect2(16, 40, 448, 206), "above the folded bottom panel")
 	_check(overview.get_global_rect().end.x <= 464.0, "inside the screen's gutter")
 	# The heading: no room for the summary beside the chips, so it goes (its
 	# words are the title's tooltip) and nothing passes under anything.

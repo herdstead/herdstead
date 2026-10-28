@@ -31,6 +31,16 @@ class Frame:
 		draw_style_box(box, Rect2(Vector2.ZERO, panel.size * float(density)))
 
 
+## The pack's nine-patch this panel wears: the HUD's dark panel, or another
+## frame such as the bottom panel's wood (ArtContract.UI_PANEL_WOOD). Its
+## content margins come from the theme variation HudTheme names for it, which
+## a framed panel takes here: a scene sets this after _init() has set `HdPanel`.
+@export var frame_id: StringName = ArtContract.UI_HUD_PANEL:
+	set(value):
+		frame_id = value
+		if _frame == null or _frame.visible:
+			theme_type_variation = HudTheme.panel_variation(value)
+
 ## The pack whose panel texture is drawn; null until dress() is called.
 var art: ArtPack
 
@@ -56,21 +66,26 @@ func _init() -> void:
 	resized.connect(_frame.queue_redraw)
 
 
-## Whether the frame is drawn, and the content kept inside it (`HdPanel`), or
-## neither (`HdPanelBare`: no frame, no margins). The bottom panel's pages
-## draw none of their own (OfficeBottomPanel draws the one frame).
+## Whether the frame is drawn, and the content kept inside it (the frame's
+## variation, HudTheme.panel_variation()), or neither (`HdPanelBare`: no
+## frame, no margins). The bottom panel's pages draw none of their own
+## (OfficeBottomPanel draws the one frame).
 func set_framed(on: bool) -> void:
 	_frame.visible = on
-	theme_type_variation = &"HdPanel" if on else &"HdPanelBare"
+	theme_type_variation = HudTheme.panel_variation(frame_id) if on else &"HdPanelBare"
 
 
-## Take the pack's panel texture, its nine-patch margins and its sampling.
-## Called again on a theme switch; nothing in the tree is rebuilt for it.
+## Take the pack's texture for `frame_id`, its nine-patch margins and its
+## sampling. Called again on a theme switch; nothing in the tree is rebuilt for
+## it. A pack without that frame draws the HUD's dark panel (and says so).
 func dress(pack: ArtPack) -> void:
 	art = pack
 	_frame.texture_filter = pack.filter
 	_frame.density = pack.density
-	var spec := pack.hud_panel()
+	var spec := pack.ui_sprite(frame_id)
+	if spec == null or not spec.nine_patched():
+		push_error("HdPanel: the pack has no nine-patch named %s; the HUD panel is drawn instead" % frame_id)
+		spec = pack.hud_panel()
 	var box := StyleBoxTexture.new()
 	box.texture = pack.sprite_texture(spec)
 	# Texture margins are texture pixels; the manifest names them in units.

@@ -545,14 +545,16 @@ func test_arrows_folded_for_a_short_world_come_back_as_it_grows() -> void:
 	await _frames(2)
 	var least := _standing(hud, "480x320")
 	print("EDGE_SHORT: 480x320 %s: %s" % [hud.world_rect().size, least.said()])
-	_eq(hud.world_rect().size, Vector2(456, 202), "the minimum, the panel folded: 456x202")
+	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the two rows 54 and the opened panel 153 tall: 202
+	# -> 198, 103 -> 99 (the same arrows fold and come back).
+	_eq(hud.world_rect().size, Vector2(456, 198), "the minimum, the panel folded: 456x198")
 	_check(hud.edge_arrows_compact(), "compact")
 	_eq([least.ways.size(), least.folded], [4, 4], "the minimum: four compact arrows, four in the note")
 	hud.show_page(OfficeBottomPanel.Page.HISTORY)
 	await _frames(2)
 	var short := _standing(hud, "480x320, the panel opened")
 	print("EDGE_SHORT: 480x320 opened %s: %s" % [hud.world_rect().size, short.said()])
-	_eq(hud.world_rect().size, Vector2(456, 103), "the panel opened for HISTORY: 103 tall")
+	_eq(hud.world_rect().size, Vector2(456, 99), "the panel opened for HISTORY: 99 tall")
 	_eq([short.ways.size(), short.folded], [0, 8], "a 103-tall world folds them all into the note: " + short.said())
 	hud.show_page(OfficeBottomPanel.Page.AGENT)
 	hud.fit(Vector2(960, 640))

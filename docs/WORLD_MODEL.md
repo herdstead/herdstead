@@ -275,7 +275,9 @@ keep `WINDOW_CLEARANCE` (64) from it. A picture hangs centred in every second ga
 (`OfficeShell.frames()`: the second, the fourth, ...), foot at `FRAME_FOOT` (48), where it, grown by `FRAME_GAP` (8),
 clears every window, the door, the pantry counter and the wall's end cells: one at 23 cells, five at 53. Pictures are
 drawn in the shell, have no footprint and are not on the walk graph; the shell's key includes them, so a widening that
-moves the door and the windows redraws the shell.
+moves the door and the windows redraws the shell. The pantry's `COFFEE` sign hangs the same way, centred over the
+counter's drawing with its foot at `SIGN_FOOT` (52) (`OfficeShell.pantry_sign()`): on the cream face, no wider than the
+counter, and among `OfficeShell.wall_covers()`, so no picture or top-run plant comes near it.
 
 **Partitions.** Each zone stands inside low cream partitions, a U open at the top (`OfficeShell.partition_pieces()`):
 `partition_v` (6 × 32, foot (3, 32)) down each side at x0 + 3 and x1 − 3, one per cell row but the last;

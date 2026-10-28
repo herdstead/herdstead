@@ -553,12 +553,14 @@ func test_the_smallest_screen_keeps_news_staff_and_columns_apart() -> void:
 	office.refresh()
 	await _frames(3)
 	var hud := office.hud
-	_eq(hud.placed(hud.staff), Rect2(16, 266, 448, 50), "the panel's two rows along the bottom")
+	# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: two rows 54 (was 50), opened 153 (was 149), each
+	# world 4 shorter.
+	_eq(hud.placed(hud.staff), Rect2(16, 262, 448, 54), "the panel's two rows along the bottom")
 	var panels: Array[Rect2] = [hud.placed(hud.bar), hud.placed(hud.staff)]
 	for i in panels.size():
 		for j in range(i + 1, panels.size()):
 			_check(not panels[i].intersects(panels[j]), "%s and %s stand apart" % [panels[i], panels[j]])
-	_eq(hud.world_rect(), Rect2(16, 48, 456, 202), "the world between them")
+	_eq(hud.world_rect(), Rect2(16, 48, 456, 198), "the world between them")
 	var strip := hud.news.get_global_rect()
 	_check(hud.staff.get_global_rect().encloses(strip), "NEWS inside the panel")
 	_check(hud.news.get_combined_minimum_size().x <= strip.size.x, "asking for no more than its width")
@@ -580,11 +582,11 @@ func test_the_smallest_screen_keeps_news_staff_and_columns_apart() -> void:
 	hud.expand_card()
 	await _frames(3)
 	_check(hud.news.is_visible_in_tree(), "opened up, NEWS stays in the top row")
-	_eq(hud.placed(hud.staff), Rect2(16, 167, 448, 149), "the panel at full height")
-	_eq(hud.world_rect(), Rect2(16, 48, 456, 103), "the world above it")
+	_eq(hud.placed(hud.staff), Rect2(16, 163, 448, 153), "the panel at full height")
+	_eq(hud.world_rect(), Rect2(16, 48, 456, 99), "the world above it")
 	hud.compact_card()
 	await _frames(2)
-	_eq(hud.placed(hud.staff), Rect2(16, 266, 448, 50), "folded back to its two rows")
+	_eq(hud.placed(hud.staff), Rect2(16, 262, 448, 54), "folded back to its two rows")
 	_done(office)
 
 

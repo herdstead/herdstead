@@ -1026,7 +1026,9 @@ func test_a_zone_call_shows_the_planned_density() -> void:
 		# bar, 151 docked panel.
 		# S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151), the world 35 taller: 241 -> 276, a
 		# 116 docked panel.
-		_eq(office.hud.world_rect(), Rect2(16, 68, 936, 276), "the world's room at 1920×960, 2x")
+		# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the docked panel 120 tall, the room 276 -> 272
+		# (the plan's density unchanged).
+		_eq(office.hud.world_rect(), Rect2(16, 68, 936, 272), "the world's room at 1920×960, 2x")
 		var plan := office.layout_plan()
 		var a := plan.zone(HerdrFleet.pane_key(LOCAL, "a"))
 		var b := plan.zone(HerdrFleet.pane_key(LOCAL, "b"))
