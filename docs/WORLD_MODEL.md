@@ -456,7 +456,8 @@ kept is the plan and the view, not the people's nodes or animation clocks across
   pans it in first.
 - **Where a desk's signal is, is answered once, by `OfficeFloorView`, in the floor's own coordinates** (its root's: a
   station's rectangles are global, and the floor view converts them in one place). Four answers, each an empty
-  `Rect2()` for a pane with no seat on the map or a zone the plan does not place:
+  `Rect2()` for a pane with no seat on the map or a zone the plan does not place (and two for the framing a map opens
+  on, below):
   - `signal_extent(key)`: where the desk answers a click (`OfficeStation.target_rect()`: the seat's rectangle, where
     every worker sits) merged with its chip while it shows (`chip_rect()`; a chip that draws
     nothing, under the lens or with no wait to say, still shows). The pointer's dashed frame (`point()`, which
@@ -468,19 +469,34 @@ kept is the plan and the view, not the people's nodes or animation clocks across
   - `pod_extent(key)`: the desk's whole pod as drawn (`DeskMeasure.render_rect`), for the framing a map opens on.
   - `zone_opening(key)`: as wide as the zone's cells, from the top of its sign's drawing (the aisle row's own top
     while no sign is drawn) down to the bottom of its cells.
+  - `sign_extent(key)`: the zone's sign as drawn (the aisle row above it while no sign is drawn), and `wall_face()`:
+    the top wall's face, `OfficeShell.wall_face()` (every drawing on or against the top wall, `wall_covers()`, and
+    every picture, `frames()`, merged; its top is the lift door's, map y 8, the windows' at 12). Only for the framing
+    a map opens on.
 
   Each consumer converts once, through the nodes' own transforms: the pointer draws in the floor's coordinates and
   converts nothing; `OfficeScene.reveal()` / `reveal_zone()` add where the floor's root stands in the world (under
   the plate), because the pan is measured in the world; `OfficeViewMarks` takes the target to global coordinates
-  (`root.to_global()`), which the view it is compared with is in. `office.gd` holds no desk or zone geometry: its two
+  (`root.to_global()`), which the view it is compared with is in. `office.gd` holds no desk or zone geometry: its
   methods only hand an answer to the camera.
-- **The camera pans by two rules, each a pure static of `OfficeCamera`, and they stay two.** A desk is *revealed*
+- **The camera pans by two rules, each a pure static of `OfficeCamera`, and they stay two; a map's first arrival adds a
+  third on top of them.** A desk is *revealed*
   (`reveal()`: `framing()`, then `revealed()`): the least pan that shows its extent with `REVEAL_HEADROOM` (32) above
   it, and its pod too only when the two together fit the view with that headroom (`fits()`), else the desk alone. A zone is *opened* (`open_on()`: `opened()`): its opening's top
   at the top of the world with no headroom, sideways only as far as its width needs, its left edge when it is wider
-  than the view. Neither clamps: `_process()` clamps the pan to the map and rounds the camera's position on the next
-  frame. `tools/test_desk_signal.gd` pins the answers and both rules without an office;
-  `tools/test_desk_signal_wiring.gd` pins the live office's pans, pointer frames and arrows.
+  than the view. **A map opens with its back wall in view** (S3 CAMERA, 2026-10-28; `OfficeNavigator._open()`, once
+  per map per run): it is revealed on the selection's whole pod, or opened on its first zone, as before, and then
+  lifted (`open_with_wall()`: `with_wall()`) no lower than the top wall's face when the face and what the opening is
+  for (the selected desk's `signal_extent()`, or the first zone's `sign_extent()`) fit the view together, top to
+  bottom; whatever lies below gives way (at 960×480 the first pod row's near seats and the tab labels under them go
+  under the bottom panel). A view that already shows the face is not moved, and sideways is the first rule's. Where
+  they do not fit (a near seat or a second-row desk selected in a short view), what the opening is for wins: the
+  first rule's pan stands, because the wall is furniture and the selection is a signal. Only the first arrival lifts
+  (the navigator's one-shot `pan_opens`): a zone picked (a card's place, PageUp / PageDown, `--space`), a desk
+  followed, located or picked for a new pane keep `revealed()` / `opened()` exactly. None of the three clamps:
+  `_process()` clamps the pan to the map and rounds the camera's position on the next frame.
+  `tools/test_desk_signal.gd` pins the answers and the three rules without an office;
+  `tools/test_desk_signal_wiring.gd` pins the live office's pans, openings, pointer frames and arrows.
 - People are `CharacterBody2D`: standing, the feet collider is on and `move_and_slide()` is stopped by furniture;
   seated, it is off.
 - **The walk graph (`OfficeWalkGraph`, `scripts/layout/`) is the one graph the layout validator checks and the people

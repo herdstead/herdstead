@@ -183,8 +183,8 @@ MIN_CASES_LAUNCH_NEWS=5
 # the floor view's answers and the camera's pan rules, pure; DESK SIGNAL WIRING
 # is the live office's reveal, zone opening, pointer and arrows against the
 # numbers 6413cec left, through the paths that commit already had.
-MIN_CASES_DESK_SIGNAL=12
-MIN_CASES_DESK_SIGNAL_WIRING=10
+MIN_CASES_DESK_SIGNAL=13
+MIN_CASES_DESK_SIGNAL_WIRING=12
 MIN_CASES_PICK_FOLLOWS_WRITE=20
 
 # The quick tier (TIER=quick): every suite that an art, world or geometry

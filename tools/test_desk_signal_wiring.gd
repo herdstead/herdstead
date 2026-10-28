@@ -75,6 +75,8 @@ extends "res://tools/office_test_base.gd"
 ## print; at the 800x480 bottom web:p2's near chip is no longer in view, so the
 ## arrow above counts both of web's chips (2, was 1): the meaning moved back to
 ## what it was before S3 PANEL-a1 round 2 (reported, not only re-pinned).
+## S3 CAMERA (2026-10-28): a map opens with its back wall in view; the opening's own cases and
+## OPENED added below; no existing number here moved.
 
 ## The pan after reveal(key) and reveal(key, true) from no pan, then the same
 ## two from the far corner of the map, before the camera's next frame clamps
@@ -233,6 +235,23 @@ const ZONES_NARROW: Dictionary[String, Array] = {
 	"infra": [Vector2(0, 398), Vector2(0, 354), Vector2(32, 398), Vector2(32, 354)],
 	"notes": [Vector2(0, 398), Vector2(0, 354), Vector2(120, 398), Vector2(120, 354)],
 	"data": [Vector2(24, 398), Vector2(24, 354), Vector2(120, 398), Vector2(120, 354)],
+}
+
+## S3 CAMERA (2026-10-28): a map opens with its back wall in view. The first
+## arrival at a map (OfficeNavigator._open()) frames the selection's pod, or its
+## first zone at its sign, as before, and then lifts the view to the top wall's
+## face (OfficeCamera.with_wall()) when the face and what the opening is for (the
+## selected desk's signal, the first zone's sign) fit the view together; the
+## bottom gives way. A view that already shows the face is not moved.
+## Each screen: the pan with herdr's focus on api:p1 (its pod), then with no
+## focus (the first zone, api). From the run's print; before this rule:
+## (0, 98) and (0, 174) at 960x480 and 800x480, (0, 0) and (0, 114) at
+## 1280x720, (0, 0) and (0, 174) at 960x640.
+const OPENED: Dictionary[Vector2, Array] = {
+	Vector2(960, 480): [Vector2(0, 40), Vector2(0, 40)],
+	Vector2(800, 480): [Vector2(0, 40), Vector2(0, 40)],
+	Vector2(1280, 720): [Vector2(0, 0), Vector2(0, 40)],
+	Vector2(960, 640): [Vector2(0, 0), Vector2(0, 40)],
 }
 
 
@@ -722,3 +741,124 @@ func test_a_relayout_moves_no_answer() -> void:
 		"640 wide, 300 down (the bottom before the panel docked): web's far chip above"
 	)
 	_done(office)
+
+
+# --- a map opened -----------------------------------------------------------------
+
+
+## The part of the world on screen, in the world's coordinates.
+func _view(office: OfficeDouble) -> Rect2:
+	return Rect2(office.camera.position, office.camera.free_rect().size)
+
+
+## `bounds`, in the floor's own coordinates, in the world's.
+func _floor_in_world(office: OfficeDouble, bounds: Rect2) -> Rect2:
+	return Rect2(office.floor_view.root.position + bounds.position, bounds.size)
+
+
+## Zone `key`'s sign as drawn, in the world's coordinates.
+func _sign_in_world(office: OfficeDouble, key: String) -> Rect2:
+	var board := office.floor_view.zone_sign(key)
+	var holder: Node2D = board.get_parent()
+	var drawn := board.drawn_rect()
+	var at := office.floor_view.root.to_local(holder.to_global(drawn.position))
+	return _floor_in_world(office, Rect2(at, drawn.size))
+
+
+## The zones of the shown map's first row, by key.
+func _first_row(office: OfficeDouble) -> Array[String]:
+	var plan := office.floor_view.plan
+	var top := 1 << 30
+	for zone in plan.zones:
+		top = mini(top, zone.cells.position.y)
+	var found: Array[String] = []
+	for zone in plan.zones:
+		if zone.cells.position.y == top:
+			found.append(zone.zone_key)
+	return found
+
+
+## Whether the view the office opened on shows the top wall's face (every
+## window and the pantry sign whole, from the shell's own geometry), every sign
+## of the first zone row, and `kept` (in the world's coordinates).
+func _opens_on_the_wall(office: OfficeDouble, kept: Rect2, where: String) -> void:
+	var view := _view(office)
+	var plan := office.floor_view.plan
+	var xs := OfficeShell.window_xs(plan, office.pen)
+	_check(not xs.is_empty(), "%s: the map has windows" % where)
+	for x in xs:
+		var window := OfficeShell.drawn(office.pen, ArtContract.PROP_WINDOW, Vector2(x, OfficeShell.WINDOW_FOOT))
+		_check(view.encloses(_floor_in_world(office, window)), "%s: the window at %d is whole in %s" % [where, x, view])
+	var feet := OfficeShell.pantry_sign(plan)
+	_eq(feet.size(), 1, "%s: the map has a pantry sign" % where)
+	for foot in feet:
+		var board := _floor_in_world(office, OfficeShell.drawn(office.pen, ArtContract.PROP_PANTRY_SIGN, foot))
+		_check(view.encloses(board), "%s: the pantry sign %s is whole in %s" % [where, board, view])
+	for key in _first_row(office):
+		var board := _sign_in_world(office, key)
+		_check(view.encloses(board), "%s: %s's sign %s is whole in %s" % [where, key, board, view])
+	_check(view.encloses(kept), "%s: and %s, what it opened on, in %s" % [where, kept, view])
+
+
+## At 960x480 (the default window) and 800x480 the opening view shows the back
+## wall's face with the first zone row's signs: opening on the selection's pod
+## (the selected desk stays whole in view; its pod's near half gives way) and
+## opening on the first zone.
+func test_a_map_opens_with_its_back_wall_in_view() -> void:
+	for screen: Vector2 in [Vector2(960, 480), Vector2(800, 480)]:
+		var office := await _office(screen)
+		_eq(office.navigator.active_key, _pk("api:p1"), "%s: herdr's focus is the selection" % screen)
+		var desk := _floor_in_world(office, office.floor_view.signal_extent(_pk("api:p1")))
+		_opens_on_the_wall(office, desk, "%s on api:p1's pod" % screen)
+		_done(office)
+		office = await _live_office(_focused_on(fixture, ""), screen)
+		office.settle()
+		await _frames(2)
+		_eq(office.navigator.active_key, "", "%s: nothing is selected" % screen)
+		_opens_on_the_wall(office, _sign_in_world(office, _pk("api")), "%s on its first zone" % screen)
+		_done(office)
+
+
+## Where each window opens, against OPENED; the view's bottom in the floor's
+## coordinates is printed for the report. A desk that cannot be kept in view
+## with the wall (api:p3, a near seat, at 960x480: 308 from the wall's top to
+## its signal's bottom, 254 deep) wins over it: its pod is framed as before.
+## A zone picked after the opening (a card's place) opens at its sign as
+## before, and a map that fits the view stays unpanned (the wall already shows).
+func test_a_map_opens_where_the_rule_puts_it() -> void:
+	for screen: Vector2 in OPENED:
+		var pans := []
+		for snapshot: Dictionary in [fixture, _focused_on(fixture, "")]:
+			var office := await _live_office(snapshot, screen)
+			office.settle()
+			await _frames(2)
+			pans.append(office.camera.position)
+			var view := _view(office)
+			print(
+				(
+					"OPENED %s on %s: pan %s, the floor from %d to %d in view"
+					% [
+						screen,
+						office.navigator.active_key if not office.navigator.active_key.is_empty() else "api",
+						office.camera.position,
+						view.position.y - office.floor_view.root.position.y,
+						view.end.y - office.floor_view.root.position.y
+					]
+				)
+			)
+			_done(office)
+		_eq(pans, OPENED[screen], "%s: opened on api:p1's pod, then on the first zone" % screen)
+	var near := await _live_office(_focused_on(fixture, "api:p3"), Vector2(960, 480))
+	near.settle()
+	await _frames(2)
+	_eq(near.navigator.active_key, _pk("api:p3"), "api:p3 is the selection")
+	_eq(near.camera.position, Vector2(0, 98), "a near desk the wall cannot share the view with: its pod as before")
+	_check(
+		_view(near).encloses(_floor_in_world(near, near.floor_view.signal_extent(_pk("api:p3")))),
+		"and the desk is whole in view"
+	)
+	near.navigator.pick_zone(_pk("web"))
+	near.refresh()
+	await _frames(2)
+	_eq(near.camera.position, Vector2(0, 174), "a zone picked afterwards opens at its sign, the wall not lifted in")
+	_done(near)

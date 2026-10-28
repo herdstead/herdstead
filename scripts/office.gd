@@ -890,13 +890,19 @@ func _refresh() -> void:
 	# Where the navigator asked to look: a zone (its aisle row at the top), a
 	# desk (a map seen for the first time: its whole pod; herdr's focus moving:
 	# as far as it takes), and an explicit navigation's desk once it is drawn.
+	# A map seen for the first time then opens with its top wall in view.
+	var opens := navigator.take_pan_opens()
 	var zone := navigator.take_pan_zone()
 	if not zone.is_empty():
 		reveal_zone(zone)
+		if opens:
+			_open_with_wall(floor_view.sign_extent(zone))
 	var whole := navigator.pan_whole_table
 	var pan_to := navigator.take_pan_to()
 	if not pan_to.is_empty() and floor_view.seats.has(pan_to):
 		reveal(pan_to, whole)
+		if opens:
+			_open_with_wall(floor_view.signal_extent(pan_to))
 	var arriving := navigator.reveal_on_arrival
 	if not arriving.is_empty() and floor_view.seats.has(arriving):
 		reveal(arriving)
@@ -1030,6 +1036,15 @@ func reveal_zone(key: String) -> void:
 	var opening := floor_view.zone_opening(key)
 	if opening.has_area():
 		camera.open_on(_in_world(opening))
+
+
+## The framing a map opens on (OfficeNavigator.pan_opens), once reveal() or
+## reveal_zone() placed the view on what it opens for: up to the top wall's
+## face (OfficeFloorView.wall_face()) when the face and `kept` (in the floor's
+## coordinates: the selected desk's signal, or the first zone's sign) fit the
+## view together (OfficeCamera.open_with_wall()).
+func _open_with_wall(kept: Rect2) -> void:
+	camera.open_with_wall(_in_world(floor_view.wall_face()), _in_world(kept))
 
 
 ## `bounds`, which the floor view answers in its floor's coordinates, in the
