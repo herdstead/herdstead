@@ -160,7 +160,7 @@ to the pantry; it sits with a mug now, and the pantry is a corner nook of furnit
   (never sends; under `--read-only` it only selects). While a chip shows, the seat's click area gives up the tag row (far: its top drops from
   −90 to −72; near: its bottom rises from 32 to 14): every point belongs to one click area.
 - Standing still happens only on a frozen, disconnected map; passers-by never stop. The pantry counter is furniture in the entry band's
-  corner: nobody walks to it, and the walking lane runs in front of it.
+  corner, against the top wall: nobody walks to it, and the walking lane starts beside it.
 - Disconnected (invariant 4): chips, paper stacks and mugs freeze and dim; chips show no wait or frame; nothing is re-ordered. The first
   refresh after reconnecting is cold (every start is unknown again).
 
@@ -358,8 +358,9 @@ its tooltip. Full walls around each workspace would cut the office into rooms an
 row on wall. So a zone is bounded by **low partitions**, a U open at the top, drawn no taller than a seated person's legs: they say whose
 workspace a desk belongs to without hiding anyone, and people walk into a zone from its open top.
 
-- Under the top outer wall is a 64-unit entry band (two cells: the wall's drawing clearance, then the walking lane, with the pantry counter
-  in its left corner, nobody at it); the main aisle on the right is
+- Under the top outer wall is a 32-unit entry band (one cell: the walking lane, right under the wall, with the pantry counter against the
+  wall in its left corner, nobody at it; it is also the first zones' aisle row, their signs hanging over it). A walker there stands in front
+  of the wall, their head over its face: the wall draws behind them (S3 BAND, 2026-10-28). The main aisle on the right is
   64 wide; each side wall is one 32-unit cell; the front wall is not drawn.
 - Below the entry band the map is **lanes** of 4 cells (the narrowest pod and its zone's pad) with a one-cell aisle between two; a zone stands in
   whole lanes under an aisle row of its own, first as many as its pods need to stand in one row, its pods in rows as deep as a pod's reservation. Zones are placed as a masonry that only grows, down or right: retained zones hold their
@@ -378,8 +379,8 @@ workspace a desk belongs to without hiding anyone, and people walk into a zone f
 
 A pod's width, seats, stand spots, approach points and draw extents come from `OfficeTable.measure()` ([World model](WORLD_MODEL.md)); the rows
 over a seat (badge, chip, lens line, name plate) are measured there too, on the Labels once the display face is on.
-Layout validation runs on the graph people walk (door threshold, reach to every approach point, the legs to stand spot and seat, wall clearance for
-a full person canvas), so a validated map is a walkable map ([World model](WORLD_MODEL.md), "Collision and walking").
+Layout validation runs on the graph people walk (door threshold, reach to every approach point, the legs to stand spot and seat, side-wall
+clearance for a full person canvas, the top wall keeping off the feet only), so a validated map is a walkable map ([World model](WORLD_MODEL.md), "Collision and walking").
 
 ## Not drawn, and why
 

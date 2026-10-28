@@ -562,21 +562,21 @@ func test_office_actions_answer_their_keys() -> void:
 		MOUSE_BUTTON_WHEEL_LEFT: Vector2(-OfficeCamera.SCROLL_STEP, 0),
 		MOUSE_BUTTON_WHEEL_RIGHT: Vector2(OfficeCamera.SCROLL_STEP, 0),
 	}
-	# A window small enough that the floor reaches past a notch in every
-	# direction, so what the wheel does is not taken back by the pan's clamp.
+	# A window small enough that the floor reaches past a notch in every direction, so the pan's clamp takes nothing
+	# back. S3 BAND (2026-10-28): the band is one row: the map is 64 shallower (furthest pan down 122): from (128, 64).
 	office.test_screen = Vector2(480, 320)
 	office.refresh()
 	var over_world := office.hud.world_rect().get_center()
 	for button: MouseButton in steps:
 		var step: Vector2 = steps[button]
-		office.camera.pan = Vector2(128, 128)
+		office.camera.pan = Vector2(128, 64)
 		await _frames(1)
-		_eq(office.camera.pan, Vector2(128, 128), "the floor reaches a notch past the pan the wheel starts from")
+		_eq(office.camera.pan, Vector2(128, 64), "the floor reaches a notch past the pan the wheel starts from")
 		var notch := _wheel(button)
 		notch.position = over_world
 		notch.global_position = over_world
 		await _parsed(notch)
-		_eq(office.camera.pan, Vector2(128, 128) + step, "the wheel pans one notch: %s" % step)
+		_eq(office.camera.pan, Vector2(128, 64) + step, "the wheel pans one notch: %s" % step)
 		notch.pressed = false
 		await _parsed(notch)
 	_done(office)

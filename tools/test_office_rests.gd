@@ -269,6 +269,9 @@ func test_bubbles_and_papers_match_a_rebuild() -> void:
 ## view is lifted to the wall (pan 40) and the table's near half gives way
 ## under the bottom panel. The desk and its chip stay whole in view, and the
 ## table's top edge; the whole table is no longer.
+## S3 BAND (2026-10-28): the band is one row: the wall's face and the whole
+## first pod row fit the view together, so the opening shows the face from its
+## top and the whole table again.
 func test_the_first_framing_shows_the_desk_its_table_and_its_bubble() -> void:
 	var office := await _live_office(_focused_on(_with(fixture, "api:p2", {"agent_status": "blocked"}), "api:p2"))
 	office.settle()
@@ -283,7 +286,11 @@ func test_the_first_framing_shows_the_desk_its_table_and_its_bubble() -> void:
 		var shown := Rect2(office.world.to_local(box.position), box.size)
 		_check(visible.encloses(shown), "in view: %s in %s" % [shown, visible])
 	var drawn := Rect2(office.world.to_local(table.position), table.size)
-	_check(not visible.encloses(drawn), "the table's near half gives way to the wall: %s in %s" % [drawn, visible])
+	_check(visible.encloses(drawn), "the whole table in view: %s in %s" % [drawn, visible])
+	var face := office.floor_view.wall_face()
+	face.position += office.floor_view.root.position
+	_check(visible.encloses(face), "with the wall's face whole: %s in %s" % [face, visible])
+	_eq(visible.position.y, face.position.y, "from the face's top")
 	_done(office)
 
 
@@ -718,27 +725,28 @@ func test_clicks_pick_idle_workers_at_their_seats_and_the_counter_picks_nothing(
 	_done(office)
 
 
-## Depth is the feet's: the counter sorts as itself, its foot at map y 106, and
-## a worker walking in along the walking lane (y 112) in front of it draws in
-## front of it, sorted by their own feet.
+## Depth is the feet's: the counter sorts as itself, its foot at map y 78, and
+## a worker walking in along the walking lane (y 80) in front of it draws in
+## front of it, sorted by their own feet. S3 BAND (2026-10-28): the band is one
+## row (the foot was at 106, the lane at 112).
 func test_the_nook_counter_sorts_by_its_feet() -> void:
 	var office := await _live_office()
 	office.settle()
 	var sorted := office.floor_view.sorted
 	var pantry: Node2D = sorted.get_node("Fixture_pantry")
 	_eq(_entity_of(sorted, pantry), pantry, "the pantry counter sorts as itself")
-	_eq(sorted.to_local(pantry.global_position).y, 106.0, "its foot at 106")
+	_eq(sorted.to_local(pantry.global_position).y, 78.0, "its foot at 78")
 	_feed(office, _with(fixture, "api:p3", {"agent": "codex"}))
 	var walker := _station(office, _pane("api:p3")).actor()
 	var route := _route(office, walker)
 	var lane := 0
 	for point in route:
-		lane += int(point.y == 112.0)
+		lane += int(point.y == 80.0)
 	_check(lane >= 1, "api:p3 walks in over the walking lane: %s" % route)
 	var passing := false
 	for frame in 400:
 		_step(office, 1.0 / FPS)
-		if _floor_point(office, walker).y == 112.0:
+		if _floor_point(office, walker).y == 80.0:
 			passing = true
 			break
 	_check(passing, "on the lane")

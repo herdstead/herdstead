@@ -16,12 +16,19 @@ extends RefCounted
 ## front of it.
 const WINDOW_FOOT := 56.0
 const DOOR_FOOT := 84.0
+## The top of the wall's face as a map opens on it (wall_face()): the lift
+## door's opaque top, which is the windows' drawn top too. The door's sprite
+## starts 4 higher, but those texel rows are transparent (measured, S3 BAND):
+## nothing on the wall is drawn above this.
+const FACE_TOP := 12.0
 ## How far a window keeps from the lift door (see door()), and how far apart the
 ## evenly spaced windows are.
 const WINDOW_CLEARANCE := 64.0
 const WINDOW_SPACING := 128.0
 ## The top-wall run: plants at the top wall's foot (their foot TOP_RUN_FOOT
-## down, in the entry band's first row, the wall's drawing clearance), on a
+## down: the wall's foot line, the footprint in the wall's cells, the drawing
+## over its face and the walking lane's top, where a person walks in front of
+## it), on a
 ## grid of the wall itself: TOP_RUN_PITCH apart from TOP_RUN_FROM (a cell and
 ## 40 in from the left wall), keyed by the step, never placed by anything the
 ## map holds. A step whose plant would come within WALL_RUN_GAP of the lift
@@ -30,7 +37,7 @@ const WINDOW_SPACING := 128.0
 ## stands a plant, one stands in the first window gap that takes it
 ## (window_gaps()), so every top wall carries one.
 const TOP_RUN_FROM := 72.0
-const TOP_RUN_FOOT := 76.0
+const TOP_RUN_FOOT := 64.0
 const TOP_RUN_PITCH := 160.0
 const WALL_RUN_GAP := 8.0
 ## Lane gaps: a run of at least LANE_GAP_MIN_CELLS free cell rows inside a lane
@@ -49,19 +56,26 @@ const LANE_GAP_FOOT := 8.0
 const FRAME_FOOT := 48.0
 const FRAME_GAP := 8.0
 ## The sign over the pantry counter (pantry_sign()): its foot on the top
-## wall's cream face (y 12..57), so the whole sign hangs on the face, above the
-## counter's drawing. Furniture, bound to nothing (docs/VISUAL_LANGUAGE.md).
-const SIGN_FOOT := 52.0
+## wall's cream face (y 12..57), so the whole sign hangs on the face, its
+## hangers from FACE_TOP: 5 clear of the coffee machine on the counter (the
+## counter's tallest drawing, opaque from 41 above its foot; S3 BAND, pinned by
+## tools/test_office_service.gd). Furniture, bound to nothing
+## (docs/VISUAL_LANGUAGE.md).
+const SIGN_FOOT := 32.0
 
-## The entry band, measured from its top. Its first cell row is inside the top
-## wall's drawing clearance (a person's whole canvas stays off the wall); the
-## second is the walking lane, the centre of that row.
-const WALKING_LANE := 48.0
-## Where the pantry counter meets the floor, under the top wall: its footprint
-## (14 deep) ends 6 units short of the walking lane's node centres, which a
-## person's feet (4 deep) keep clear of, so the lane is walked in front of it.
-## A corner nook: furniture, and nobody stands at it.
-const COUNTER_FOOT := 42.0
+## The entry band, measured from its top: one cell row right under the top
+## wall, and the walking lane is its centre. S3 BAND (2026-10-28): the top wall
+## draws behind a person in front of it, so only the feet keep off it and a
+## walker's canvas reaches over its face (OfficeWalkGraph); the first zones'
+## signs hang over this row (their aisle row).
+const WALKING_LANE := 16.0
+## Where the pantry counter meets the floor, against the top wall: its
+## footprint (14 deep) from the wall's foot line, so its front is 14 into the
+## band and the first zone's sign under it hangs 4 clear of its drawing
+## (pinned by tools/test_office_service.gd). Inflated by the feet, it blocks
+## the walking lane's nodes in front of it; the lane starts beside it. A corner
+## nook: furniture, and nobody stands at it.
+const COUNTER_FOOT := 14.0
 
 ## A zone's low partitions: bands PARTITION_THICKNESS thick inside its left,
 ## right and bottom edges (ZonePlacement.partitions()), drawn no taller than
@@ -187,8 +201,9 @@ static func wall_covers(plan: FloorPlan, pen: OfficeDraw) -> Array[Rect2]:
 ## The top wall's face as a map opens on it (OfficeCamera.with_wall()): every
 ## drawing on or against the top wall (wall_covers(): the lift door, the
 ## windows, the pantry counter and its sign) and every framed picture
-## (frames()), merged; empty when there is none. Placed by the plan's geometry
-## and the pack's sprite sizes alone.
+## (frames()), merged, from FACE_TOP down (the door's transparent top rows
+## left out); empty when there is none. Placed by the plan's geometry and the
+## pack's sprite sizes alone.
 static func wall_face(plan: FloorPlan, pen: OfficeDraw) -> Rect2:
 	var face := Rect2()
 	var pieces := wall_covers(plan, pen)
@@ -196,14 +211,17 @@ static func wall_face(plan: FloorPlan, pen: OfficeDraw) -> Rect2:
 		pieces.append(drawn(pen, ArtContract.PROP_WALL_FRAME, foot))
 	for piece in pieces:
 		face = piece if not face.has_area() else face.merge(piece)
-	return face
+	if not face.has_area() or face.end.y <= FACE_TOP:
+		return face
+	return Rect2(face.position.x, FACE_TOP, face.size.x, face.end.y - FACE_TOP)
 
 
 ## Where the sign over the pantry counter hangs: its foot at SIGN_FOOT on the
 ## top wall's face, centred over the counter's drawing; none on a map without
 ## a pantry. The sign is no wider than the counter, so it stays inside the
 ## stretch the windows leave the pantry (window_xs()) and off every zone's sign
-## (they hang in the zones' aisle rows, under the entry band). Placed by the
+## (they hang in the zones' aisle rows, the walking lane under the counter).
+## Placed by the
 ## counter alone; it reads nothing of herdr. Pure: the floor view hangs exactly
 ## this, and the tests read it.
 static func pantry_sign(plan: FloorPlan) -> Array[Vector2]:

@@ -139,7 +139,8 @@ static func problems(value: FloorPlan, rules: FloorLayoutPolicy) -> PackedString
 
 
 ## Whether the zones are where the map planner puts them: each in whole lanes
-## (its x its first lane's, 10k - 1 wide), from row 6 down, its height whole
+## (its x its first lane's, 5k - 1 wide), from zones_top_cells() down (its aisle
+## row may be the entry band's walking lane), its height whole
 ## pod rows; the slots (aisle row and rectangle) disjoint and on the floor left
 ## of the main corridor; each zone's rows its bands, top to bottom, an oversized
 ## table alone in its row; the aisles exactly what the zones leave
@@ -149,9 +150,9 @@ static func _zone_problems(value: FloorPlan, rules: FloorLayoutPolicy) -> Packed
 	var pod := OfficeZoneLayout.pod_row_cells()
 	var bay := Rect2i(
 		rules.outer_side_cells,
-		rules.wall_cells + rules.entry_cells,
+		rules.zones_top_cells() - rules.zone_aisle_cells,
 		rules.zone_width(value.lanes),
-		value.floor_cells.size.y - rules.wall_cells - rules.entry_cells
+		value.floor_cells.size.y - rules.zones_top_cells() + rules.zone_aisle_cells
 	)
 	var keys: Dictionary[String, bool] = {}
 	var desks := 0
@@ -245,7 +246,7 @@ static func _route_problems(value: FloorPlan, rules: FloorLayoutPolicy) -> Packe
 
 
 ## Whether the pantry is where the fixture planner puts it: only on a map with
-## desks whose band has the walking lane under the wall's clearance; its
+## desks whose band holds the walking lane; its
 ## counter inside the entry band, left of the main corridor, its drawing on
 ## the floor. It has no spots: nobody stands at it.
 static func _fixture_problems(value: FloorPlan) -> PackedStringArray:
@@ -272,16 +273,15 @@ static func _fixture_problems(value: FloorPlan) -> PackedStringArray:
 	return found
 
 
-## Where no standing piece may stand, in map units: the entry band but its
-## first row (the top wall's drawing clearance, where nobody walks and the
-## top-wall run stands at the wall's foot), the main corridor and every aisle.
+## Where no standing piece may stand, in map units: the entry band's last row,
+## the walking lane (the band's one row since S3 BAND; the top-wall run stands
+## at the wall's foot, its footprint in the wall's cells), the main corridor
+## and every aisle.
 ## The decor planner keeps to the same rule.
 static func walkways(value: FloorPlan) -> Array[Rect2]:
 	var grid := float(FloorLayoutPolicy.GRID)
 	var band := value.entry_cells
-	var found: Array[Rect2] = [
-		Rect2(Vector2(band.position.x, band.position.y + 1) * grid, Vector2(band.size.x, band.size.y - 1) * grid)
-	]
+	var found: Array[Rect2] = [Rect2(Vector2(band.position.x, band.end.y - 1) * grid, Vector2(band.size.x, 1) * grid)]
 	var cells: Array[Rect2i] = [value.main_corridor_cells]
 	cells.append_array(value.aisles)
 	for walkway in cells:

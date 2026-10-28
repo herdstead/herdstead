@@ -3,7 +3,8 @@ extends RefCounted
 ## Bounds are in 32-unit cells; all table geometry remains in OfficeTable.
 ##
 ## The map (OfficeFloorLayout): the top wall (wall_cells), the entry band
-## (entry_cells), then the zones in lanes, the main corridor on the right and
+## (entry_cells: one row, the walking lane, which is also the first zones'
+## aisle row), then the zones in lanes, the main corridor on the right and
 ## a side wall at each end. Across: a side wall, `lanes` lanes of
 ## zone_width_cells with an aisle column (lane_aisle_cells) between two of
 ## them, the main corridor and the other side wall; 5L + 3 cells for L lanes
@@ -25,15 +26,17 @@ const GRID := 32
 ## and the floors fixture's 13 seats read clear with every plate shown. What
 ## the map shows, not where anything stands, so it is in no plan's signature.
 const FEW_SEATS := 16
-var version := 4
+var version := 5
 var width_cells := 32
 var wall_cells := 2
-## Two: the top wall's drawing clearance takes the first row, the walking lane
-## the second (OfficeShell.WALKING_LANE); the pantry counter stands at the band's
-## left end, its foot in front of the wall, and nobody stands at it.
-## D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to,
-## so its fixture row went with its people (SEATED-Q2).
-var entry_cells := 2
+## One: the walking lane (OfficeShell.WALKING_LANE), right under the top wall;
+## the pantry counter stands at the band's left end against the wall, and
+## nobody stands at it. D2 (2026-10-27): idle sits with a mug; the pantry is a
+## nook nobody walks to, so its fixture row went with its people (SEATED-Q2).
+## S3 BAND (2026-10-28): the top wall draws behind a person in front of it, so
+## its drawing clearance row went too (a walker's canvas reaches over its face;
+## OfficeWalkGraph), and the map opens with the wall and the first pod row whole.
+var entry_cells := 1
 var main_corridor_cells := 2
 var outer_side_cells := 1
 ## One lane of zones, the partition's pad inside a zone's left edge, and the
@@ -42,14 +45,15 @@ var outer_side_cells := 1
 var zone_width_cells := 4
 var zone_pad_left_cells := 1
 var lane_aisle_cells := 1
-## The aisle row above each zone, where its sign hangs; the first zones' aisle
-## row is the map's top aisle, right under the entry band (zones from row 6).
+## The aisle row above each zone, where its sign hangs. The first zones' aisle
+## row is the entry band's walking lane (S3 BAND: map_top_aisle_cells 0, zones
+## from row 3, their signs over the lane; the row was a top aisle of its own).
 var zone_aisle_cells := 1
-var map_top_aisle_cells := 1
+var map_top_aisle_cells := 0
 ## A new zone takes more lanes, up to the map's, rather than stand taller than
 ## this many pod rows (never fewer lanes than its widest table needs).
 var zone_tall_rows := 1
-var min_height_cells := 11
+var min_height_cells := 9
 var max_width_cells := 512
 var max_height_cells := 1024
 var max_floor_cells := 131072
@@ -96,12 +100,14 @@ func problems() -> PackedStringArray:
 	var found := PackedStringArray()
 	if version < 1 or width_cells < 1 or outer_side_cells < 1:
 		found.append("invalid layout version, width or outer wall band")
-	if wall_cells < 2 or entry_cells < 2 or main_corridor_cells < 2:
-		found.append("wall and corridor bands must be at least two cells")
+	if wall_cells < 2 or entry_cells < 1 or main_corridor_cells < 2:
+		found.append("wall and corridor bands must be at least two cells, the entry band one")
 	if zone_width_cells <= zone_pad_left_cells or zone_pad_left_cells < 1 or lane_aisle_cells < 1:
 		found.append("a lane cannot contain its zone's pad and an aisle")
-	if zone_aisle_cells < 1 or map_top_aisle_cells < zone_aisle_cells or zone_tall_rows < 1:
+	if zone_aisle_cells < 1 or map_top_aisle_cells < 0 or zone_tall_rows < 1:
 		found.append("zone aisles and height preference must be positive")
+	if entry_cells + map_top_aisle_cells < zone_aisle_cells:
+		found.append("the first zones' aisle row must fit under the wall")
 	if min_height_cells < wall_cells + entry_cells:
 		found.append("row or minimum floor height cannot contain its bands")
 	if max_width_cells < 1 or max_width_cells > 32767 or max_height_cells < 1 or max_height_cells > 32767:
@@ -162,6 +168,7 @@ func max_zone_width_cells() -> int:
 	return zone_width(lanes_for(max_width_cells))
 
 
-## The first cell row a zone may start at: under the entry band and the top aisle.
+## The first cell row a zone may start at: under the entry band and the top
+## aisle (none: the first zones' aisle row is the band's walking lane).
 func zones_top_cells() -> int:
 	return wall_cells + entry_cells + map_top_aisle_cells

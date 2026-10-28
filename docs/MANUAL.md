@@ -93,7 +93,7 @@ top-left post. Plants and side tables (each carrying a mug, a notebook, now and 
 else.
 
 **Stable layout.** A 32-unit grid. The map is lanes four cells wide (the narrowest pod) with a one-cell aisle between
-two; the entry band is 64 units, the main aisle 64. A zone takes whole lanes under an aisle row of its own, first as many
+two; the entry band is 32 units (the walking lane under the wall, the first zones' signs over it), the main aisle 64. A zone takes whole lanes under an aisle row of its own, first as many
 as its pods need to stand in one row, and its pods stand in rows 192 units deep (a pod is one 32-unit desk per column, a
 seat on each side). A map's lanes are fixed the first time it is
 planned; a wider window only shows more of it. New tabs fill gaps first, pods grow in place, an over-wide pod gets its

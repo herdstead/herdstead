@@ -1,13 +1,14 @@
 extends "res://tools/test_base.gd"
 ## Pure: the entry band as the plan places it and the validator walks it
-## (OfficeFixturePlanner, OfficeFloorValidation, OfficeWalkGraph): two cells
-## deep, the walking lane in front of the pantry counter, a corner nook nobody
-## walks to or stands at; that every state sits at its seat (OfficeStation on
+## (OfficeFixturePlanner, OfficeFloorValidation, OfficeWalkGraph): one cell
+## deep, the walking lane right under the top wall and beside the pantry
+## counter, a corner nook against the wall nobody walks to or stands at; that every state sits at its seat (OfficeStation on
 ## a bare table, no office); and the one ranking the `N` key uses. There is no
 ## reception. No office.
 ## D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to;
 ## the band is two cells (SEATED-Q2). Who rested where (OfficeRests) is retired
-## with its spots and the fixture row.
+## with its spots and the fixture row. S3 BAND (2026-10-28): the band is one
+## row; the top wall draws behind a person in front of it.
 
 var people: PixelPeople
 ## Made on first use by _pen().
@@ -44,36 +45,48 @@ func _serviced(floor_model: ZoneModel, width := 32, previous: FloorPlan = null) 
 	return result.plan
 
 
-## The entry band is two cells deep: the top wall's drawing clearance and the
-## walking lane. A map of one zone of one pod row is 2 + 2 + 1 + the pod row's
-## cells deep (the wall, the band, the zone's aisle row, the pod row: 6 cells,
-## 11 in all); an empty map is still 11, and so is nothing smaller. The
-## threshold is the lane's node under the door, and the first zone starts under
-## the band and its aisle row.
-func test_the_entry_band_is_two_cells_deep() -> void:
+## The entry band is one cell deep: the walking lane, right under the top wall,
+## which is also the first zones' aisle row. A map of one zone of one pod row is
+## 2 + 1 + the pod row's cells deep (the wall, the band, the pod row: 6 cells, 9
+## in all); an empty map is still 9, and so is nothing smaller. The threshold is
+## the lane's node under the door, 4 above the door's foot, and the first zone
+## starts under the band, its slot (its aisle row) in it. The top wall keeps off
+## the feet only: the lane's row right under it is walked from beside the
+## counter to the far side wall, and the wall's own rows are not.
+## S3 BAND (2026-10-28): the band is one row (it was two, the wall's drawing
+## clearance over the lane, and a top aisle row under them: 2 + 2 + 1 + 6 = 11);
+## the top wall draws behind a person in front of it (the clearance row was not
+## walked).
+func test_the_entry_band_is_one_cell_deep() -> void:
 	var rules := _real_rules(20)
-	_eq([rules.entry_cells, rules.min_height_cells], [2, 11], "the policy's entry band and smallest floor")
-	_eq(OfficeShell.WALKING_LANE, 48.0, "the walking lane is the band's second row's centre")
+	_eq([rules.entry_cells, rules.min_height_cells], [1, 9], "the policy's entry band and smallest floor")
+	_eq(OfficeShell.WALKING_LANE, 16.0, "the walking lane is the band's one row's centre")
 	var plan := _serviced(_floor([_room("a", 2)]), 20)
-	_eq(plan.entry_cells, Rect2i(1, 2, 16, 2), "under the top wall, between the side walls")
+	_eq(plan.entry_cells, Rect2i(1, 2, 16, 1), "under the top wall, between the side walls")
 	var pod := OfficeZoneLayout.pod_row_cells()
-	_eq(plan.floor_cells.size.y, 2 + 2 + 1 + pod, "one pod row: 2 + 2 + 1 + %d cells" % pod)
-	_eq(plan.zones[0].cells.position.y, 5, "the first zone starts under the band and its aisle row")
+	_eq(plan.floor_cells.size.y, 2 + 1 + pod, "one pod row: 2 + 1 + %d cells" % pod)
+	_eq(plan.zones[0].cells.position.y, 3, "the first zone starts under the band")
+	_eq(plan.zones[0].slot().position.y, 2, "its aisle row is the band's walking lane")
 	# An empty workspace is a zone of one empty pod row: as deep as one table.
-	_eq(_plan(_floor([])).floor_cells.size.y, 2 + 2 + 1 + pod, "an empty workspace is one pod row deep")
+	_eq(_plan(_floor([])).floor_cells.size.y, 2 + 1 + pod, "an empty workspace is one pod row deep")
 	var empty := OfficeFloorLayout.plan(MapModel.empty("machine"), null, _real_rules()).plan
-	_eq(empty.floor_cells.size.y, 11, "an empty map (a machine with no workspace) stays 11 deep")
+	_eq(empty.floor_cells.size.y, 9, "an empty map (a machine with no workspace) stays 9 deep")
 	var graph := _graph_of(plan, rules)
-	_eq(graph.threshold, Vector2(OfficeShell.door(plan).x, 112), "the threshold is the lane's node under the door")
+	_eq(graph.threshold, Vector2(OfficeShell.door(plan).x, 80), "the threshold is the lane's node under the door")
+	_eq(graph.door.y - graph.threshold.y, 4.0, "4 above the door's foot, in the same cell row")
 	_eq(graph.threshold_problem(), "", "and the door reaches it")
-	for x in range(plan.entry_cells.position.x, plan.main_corridor_cells.end.x):
-		_check(graph.walkable(Vector2i(x, 3)), "the walking lane is open at column %d" % x)
-		_check(not graph.walkable(Vector2i(x, 2)), "the wall's clearance is not walked at column %d" % x)
+	var beside := OfficeWalkGraph.cell_of(Vector2(plan.pantry.footprint.end.x, 80))
+	for x in range(beside.x, plan.main_corridor_cells.end.x):
+		_check(graph.walkable(Vector2i(x, 2)), "the walking lane under the wall is open at column %d" % x)
+		for row in range(0, plan.entry_cells.position.y):
+			_check(not graph.walkable(Vector2i(x, row)), "the wall's row %d is not walked at column %d" % [row, x])
 
 
 ## Where the counter stands is a pure function of the plan: at the band's left
-## end, its foot COUNTER_FOOT into the band (map y 106), its footprint 14 deep
-## (92..106), its drawing inside the plan's bounds. The same plan twice is the
+## end against the top wall, its foot COUNTER_FOOT into the band (map y 78), its
+## footprint 14 deep from the wall's foot line (64..78), its drawing inside the
+## plan's bounds. S3 BAND (2026-10-28): the band is one row (it stood at 106,
+## on 92..106). The same plan twice is the
 ## same; a zone growing leaves it where it is; widening the map moves the lift
 ## door with the main corridor and leaves the counter where it was. It is the
 ## only fixture, and it has no spots: nobody stands at it.
@@ -86,8 +99,8 @@ func test_the_counter_stands_where_the_plan_puts_it() -> void:
 		return
 	_eq(plan.fixtures().size(), 1, "and no other fixture")
 	var width := OfficeDecor.footprint_of(_pen().art, ArtContract.PROP_PANTRY).x
-	_eq(pantry.position, Vector2(32.0 + width / 2.0, 106.0), "at the band's left end, its foot at 106")
-	_eq(pantry.footprint, Rect2(32, 92, width, 14), "standing on 92..106, the left wall on")
+	_eq(pantry.position, Vector2(32.0 + width / 2.0, 78.0), "at the band's left end, its foot at 78")
+	_eq(pantry.footprint, Rect2(32, 64, width, 14), "standing on 64..78, the left wall on, against the top wall")
 	_check(plan.render_bounds.encloses(pantry.draw_rect), "its drawing is on the map: %s" % pantry.draw_rect)
 	_check(not "spots" in pantry and not "approaches" in pantry, "it has no spots: nobody stands at it")
 	_eq(_serviced(model, 20).geometry_signature(), plan.geometry_signature(), "the same plan twice")
@@ -168,14 +181,16 @@ func test_a_band_too_narrow_for_the_counter_has_none() -> void:
 		plan.main_corridor_cells = Rect2i(corridor, 2, 2, 16)
 		planner.furnish(plan)
 		_eq(plan.pantry != null, cases[corridor], "a corridor at column %d: the counter" % corridor)
-	# A band of one cell has no walking lane under the wall's clearance.
-	var shallow := FloorPlan.new()
-	shallow.desks.append(DeskPlacement.new())
-	shallow.floor_cells = Rect2i(0, 0, 9, 18)
-	shallow.entry_cells = Rect2i(1, 2, 7, 1)
-	shallow.main_corridor_cells = Rect2i(6, 2, 2, 16)
-	planner.furnish(shallow)
-	_eq(shallow.pantry, null, "a one-cell band: none")
+	# S3 BAND (2026-10-28): the band is one row, the walking lane, and it holds
+	# the counter; a band of no row holds no lane and no counter.
+	for rows: int in [1, 0]:
+		var shallow := FloorPlan.new()
+		shallow.desks.append(DeskPlacement.new())
+		shallow.floor_cells = Rect2i(0, 0, 9, 18)
+		shallow.entry_cells = Rect2i(1, 2, 7, rows)
+		shallow.main_corridor_cells = Rect2i(6, 2, 2, 16)
+		planner.furnish(shallow)
+		_eq(shallow.pantry != null, rows == 1, "a band of %d rows: the counter" % rows)
 
 
 ## The validator treats the counter as furniture with a place of its own: it
@@ -212,20 +227,31 @@ func test_the_validator_treats_the_counter_as_furniture() -> void:
 	_eq(OfficeFloorLayout.validate(plan, rules), PackedStringArray(), "and all is well again")
 
 
-## The lane under the counter is walked: every node on it from the left wall to
-## the main corridor is walkable and joined to the next, the counter's inflated
-## footprint ends short of its centres, and the way in from the door to a table
-## in the first lane runs along it.
-func test_the_lane_under_the_counter_is_walked() -> void:
+## The lane beside the counter is walked: every node on it from beside the
+## counter to the main corridor is walkable and joined to the next; the
+## counter, against the wall in the lane's row, takes exactly the nodes in
+## front of it (its footprint grown by the feet covers their centres); and the
+## way in from the door to a table in the first lane runs along the lane.
+## S3 BAND (2026-10-28): the band is one row (the lane was the second, at 112,
+## and ran in front of the counter from the left wall).
+func test_the_lane_beside_the_counter_is_walked() -> void:
 	var rules := _real_rules(20)
 	var plan := _serviced(_floor([_room("a", 2), _room("b", 2, 1)]), 20)
 	var graph := _graph_of(plan, rules)
 	var corridor := plan.main_corridor_cells.position.x
-	for x in range(plan.entry_cells.position.x, corridor):
-		_check(graph.walkable(Vector2i(x, 3)), "the lane's node at column %d is walked" % x)
-		_check(graph.linked(Vector2i(x, 3), OfficeWalkGraph.RIGHT), "and joined to the next at column %d" % x)
 	var feet := PixelPerson.footprint()
-	_check(plan.pantry.footprint.end.y + feet.size.y < 112.0, "the counter with the feet ends short of y 112")
+	var grown := Rect2(plan.pantry.footprint.position - feet.end, plan.pantry.footprint.size + feet.size)
+	for x in range(plan.entry_cells.position.x, corridor):
+		var cell := Vector2i(x, 2)
+		var taken := grown.has_point(OfficeWalkGraph.centre(cell))
+		_eq(
+			not graph.walkable(cell),
+			taken,
+			"the lane's node at column %d is walked unless the counter stands on it" % x
+		)
+		if not taken and x + 1 < corridor:
+			_check(graph.linked(cell, OfficeWalkGraph.RIGHT), "and joined to the next at column %d" % x)
+	_check(not graph.walkable(Vector2i(plan.entry_cells.position.x, 2)), "the counter takes the lane's first node")
 	var first := plan.desks[0]
 	for desk in plan.desks:
 		if desk.origin.x < first.origin.x:
@@ -235,9 +261,78 @@ func test_the_lane_under_the_counter_is_walked() -> void:
 	_check(not route.is_empty(), "the door reaches the first lane's far approach")
 	var on_lane := 0
 	for point in route:
-		on_lane += int(point.y == 112.0)
+		on_lane += int(point.y == 80.0)
 	_check(on_lane >= 2, "the way in runs along the lane: %s" % route)
 	_check(graph.clear_route(route), "and is clear")
+
+
+## S3 BAND (2026-10-28): the band is one row, so the counter stands against the
+## top wall in the walking lane, the COFFEE sign over it on the wall's face and
+## the first zone's sign board under it in the same row. Neither sign touches
+## the counter's drawing: on their opaque texels, the sign keeps at least 4
+## above the coffee machine (the counter's tallest part) in every column they
+## share, and the board at least 4 below the counter's front across the
+## board's width. The gaps are printed.
+func test_the_pantry_corner_keeps_both_signs_off_the_counter() -> void:
+	var plan := _serviced(_floor([_room("a", 4)]), 24)
+	_check(plan != null and plan.pantry != null, "a map with its counter")
+	if plan == null or plan.pantry == null:
+		return
+	world = Node2D.new()
+	root.add_child(world)
+	var floor_root := Node2D.new()
+	world.add_child(floor_root)
+	var view := OfficeFloorView.new()
+	view.setup(_pen(), floor_root)
+	view.reconcile(plan, MapModel.of(_floor([_room("a", 4)])))
+	await process_frame
+	var to_floor := floor_root.get_global_transform().affine_inverse()
+	var counter: Sprite2D = null
+	var hung_sign: Sprite2D = null
+	for piece in view.furnishing():
+		if piece is OfficeDecor and (piece as OfficeDecor).piece == ArtContract.PROP_PANTRY:
+			counter = piece.get_node("Body")
+		elif piece.find_child("PantrySign", true, false) != null:
+			hung_sign = piece.find_child("PantrySign", true, false)
+	_check(counter != null and hung_sign != null, "the counter and its sign are drawn")
+	if counter == null or hung_sign == null:
+		return
+	# In texel cells, two to a unit: per column, the counter's top and bottom, the sign's bottom.
+	var counter_top: Dictionary[int, int] = {}
+	var counter_bottom: Dictionary[int, int] = {}
+	for cell in _ink(counter, to_floor):
+		var top: int = counter_top.get(cell.x, cell.y)
+		var bottom: int = counter_bottom.get(cell.x, cell.y)
+		counter_top[cell.x] = mini(top, cell.y)
+		counter_bottom[cell.x] = maxi(bottom, cell.y)
+	var sign_bottom: Dictionary[int, int] = {}
+	for cell in _ink(hung_sign, to_floor):
+		var low: int = sign_bottom.get(cell.x, cell.y)
+		sign_bottom[cell.x] = maxi(low, cell.y)
+	var above := 1 << 30
+	for column: int in sign_bottom:
+		if counter_top.has(column):
+			above = mini(above, counter_top[column] - sign_bottom[column] - 1)
+	_check(above < 1 << 30, "the sign hangs over the counter")
+	var board := view.zone_sign(plan.zones[0].zone_key)
+	var holder: Node2D = board.get_parent()
+	var hung := to_floor * (holder.get_global_transform() * board.drawn_rect())
+	var art := _pen().art
+	var panel := art.sprite_texture(art.panel()).get_image().get_used_rect()
+	var board_top := floori((hung.position.y + float(panel.position.y) / art.density) * 2.0)
+	var below := 1 << 30
+	for column in range(floori(hung.position.x * 2.0), ceili(hung.end.x * 2.0)):
+		if counter_bottom.has(column):
+			below = mini(below, board_top - counter_bottom[column] - 1)
+	_check(below < 1 << 30, "the first zone's board hangs under the counter")
+	print(
+		(
+			"PANTRY CORNER: the sign %.1f above the coffee machine, the board %.1f below the counter"
+			% [above / 2.0, below / 2.0]
+		)
+	)
+	_check(above >= 8, "the sign keeps 4 above the coffee machine: %.1f" % (above / 2.0))
+	_check(below >= 8, "the board keeps 4 below the counter's front: %.1f" % (below / 2.0))
 
 
 ## The furnished map is validated once; what fails is left out, never a desk:
@@ -443,10 +538,13 @@ func test_everyone_sits_with_or_without_the_counter() -> void:
 		station.free()
 
 
-## Every map with desks has the walking lane in front of the counter, and the
+## Every map with desks has the walking lane under the top wall, and the
 ## threshold stands on it, whether or not the counter stands there: (the
-## door's column, 112), the door's clearance above it never walked. A map
-## without desks (an empty workspace, an empty map) has no counter either.
+## door's column, 80), 4 above the door's foot. A walk along the band runs on
+## the lane from beside the counter (from the left wall without it) to the main
+## corridor. A map without desks (an empty workspace, an empty map) has no
+## counter either. S3 BAND (2026-10-28): the band is one row (the lane was at
+## 112, under the door's clearance).
 func test_the_threshold_stands_on_the_lane_with_or_without_the_counter() -> void:
 	var rules := _real_rules(32)
 	var served := _serviced(_floor([_room("a", 4), _room("b", 2, 1)]), 32)
@@ -455,13 +553,16 @@ func test_the_threshold_stands_on_the_lane_with_or_without_the_counter() -> void
 	for plan: FloorPlan in [served, bare]:
 		var what := "with the counter" if plan.pantry != null else "without it"
 		var graph := OfficeWalkGraph.build(plan, rules.actor_footprint, rules.actor_draw_rect)
-		_eq(graph.threshold, Vector2(OfficeShell.door(plan).x, 112), what + ": the threshold on the lane")
+		_eq(graph.threshold, Vector2(OfficeShell.door(plan).x, 80), what + ": the threshold on the lane")
 		_eq(graph.threshold_problem(), "", what + ": the door reaches it")
-		for x in range(plan.entry_cells.position.x, plan.main_corridor_cells.position.x):
-			_check(graph.walkable(Vector2i(x, 3)), "%s: the walking lane at column %d is open" % [what, x])
+		var first := plan.entry_cells.position.x
+		if plan.pantry != null:
+			first = OfficeWalkGraph.cell_of(Vector2(plan.pantry.footprint.end.x, 80)).x
+		for x in range(first, plan.main_corridor_cells.position.x):
+			_check(graph.walkable(Vector2i(x, 2)), "%s: the walking lane at column %d is open" % [what, x])
 		var along := graph.route_between(
-			Vector2i(1, 3),
-			[Vector2i(plan.main_corridor_cells.position.x - 1, 3)] as Array[Vector2i],
+			Vector2i(first, 2),
+			[Vector2i(plan.main_corridor_cells.position.x - 1, 2)] as Array[Vector2i],
 			PackedFloat32Array([0.0]),
 			PackedInt32Array([-1]),
 			100000,
@@ -469,7 +570,7 @@ func test_the_threshold_stands_on_the_lane_with_or_without_the_counter() -> void
 		)
 		_check(not along.points.is_empty(), what + ": a walk along the band")
 		for point in along.points:
-			_eq(point.y, 112.0, "%s: runs on the lane: %s" % [what, point])
+			_eq(point.y, 80.0, "%s: runs on the lane: %s" % [what, point])
 	var empty := _plan(_floor([]))
 	_eq(empty.fixtures().size(), 0, "a map without desks has no counter")
 
@@ -477,7 +578,7 @@ func test_the_threshold_stands_on_the_lane_with_or_without_the_counter() -> void
 ## At the shipped plan width (the default window's 772 units, 24 cells, and
 ## 25: four lanes, a map 23 cells wide) the counter is the band's one fixture,
 ## in its corner from the left wall at 32, well short of the main corridor at
-## 640, and the band's lane runs from it to the door.
+## 640, and the band's lane runs from beside it to the door.
 func test_the_counter_is_the_only_fixture_at_twenty_three_cells() -> void:
 	var plan := _serviced(_floor([_room("a", 2)]), 25)
 	_eq([plan.lanes, plan.floor_cells.size.x, plan.main_corridor_cells.position.x], [4, 23, 20], "four lanes, 23 cells")
@@ -485,15 +586,20 @@ func test_the_counter_is_the_only_fixture_at_twenty_three_cells() -> void:
 	_eq([plan.pantry.key, plan.pantry.footprint.position.x], ["pantry", 32.0], "the counter from the left wall")
 	_check(plan.pantry.footprint.end.x < 640.0, "short of the main corridor")
 	var graph := _graph_of(plan, _real_rules(25))
-	var along := graph.from_door(Vector2i(1, 3))
-	_check(not along.is_empty() and along[along.size() - 1] == Vector2(48, 112), "the door reaches the lane's end")
+	var beside := OfficeWalkGraph.cell_of(Vector2(plan.pantry.footprint.end.x, 80))
+	var along := graph.from_door(beside)
+	var end := OfficeWalkGraph.centre(beside)
+	_check(not along.is_empty() and along[along.size() - 1] == end, "the door reaches the lane's end beside it")
 
 
-## The counter clears the lane at every furnished width (FloorPlanCache's
-## FURNISHED_WIDTHS as the layout suite asks them): its footprint grown by the
-## feet ends short of the lane's node centres (y 112), the node in front of
-## its middle is walked and joined both ways, and the threshold is on the lane.
-func test_the_counter_clears_the_lane_at_every_shipped_width() -> void:
+## The counter keeps to its corner at every furnished width (FloorPlanCache's
+## FURNISHED_WIDTHS as the layout suite asks them): against the top wall (its
+## footprint from the wall's foot line), in the lane's row; the lane's node
+## beside it is walked and joined both ways, the door reaches it, and the
+## threshold is on the lane. S3 BAND (2026-10-28): the band is one row (the
+## counter's grown footprint ended short of the lane at 112, the node in front
+## of it walked).
+func test_the_counter_keeps_its_corner_at_every_shipped_width() -> void:
 	var feet := PixelPerson.footprint()
 	for width: int in [11, 20, 24, 32, 60]:
 		var rules := _real_rules(width)
@@ -501,16 +607,18 @@ func test_the_counter_clears_the_lane_at_every_shipped_width() -> void:
 		if plan == null or plan.pantry == null:
 			_check(false, "%d cells: a counter" % width)
 			continue
+		_eq(plan.pantry.footprint.position.y, 64.0, "%d cells: against the top wall" % width)
 		var grown_end := plan.pantry.footprint.end.y + feet.end.y + feet.size.y
-		_check(grown_end < 112.0, "%d cells: the counter and the feet end at %s, short of 112" % [width, grown_end])
+		_check(grown_end <= 96.0, "%d cells: the counter and the feet end at %s, in the band" % [width, grown_end])
 		var graph := _graph_of(plan, rules)
-		var front := OfficeWalkGraph.cell_of(Vector2(plan.pantry.position.x, 112))
-		_check(graph.walkable(front), "%d cells: the lane's node in front of it is walked" % width)
+		var beside := OfficeWalkGraph.cell_of(Vector2(plan.pantry.footprint.end.x + 16.0, 80))
+		_check(graph.walkable(beside), "%d cells: the lane's node beside it is walked" % width)
 		_check(
-			graph.linked(front, OfficeWalkGraph.LEFT) and graph.linked(front, OfficeWalkGraph.RIGHT),
-			"%d cells: and joined both ways" % width
+			graph.linked(beside, OfficeWalkGraph.LEFT) or graph.linked(beside, OfficeWalkGraph.RIGHT),
+			"%d cells: and joined along the lane" % width
 		)
-		_eq(graph.threshold.y, 112.0, "%d cells: the threshold on the lane" % width)
+		_check(graph.reaches(beside), "%d cells: the door reaches it" % width)
+		_eq(graph.threshold.y, 80.0, "%d cells: the threshold on the lane" % width)
 
 
 # --- helpers --------------------------------------------------------------------
@@ -583,6 +691,20 @@ func _real_rules(width := 32) -> FloorLayoutPolicy:
 
 func _graph_of(plan: FloorPlan, rules: FloorLayoutPolicy) -> OfficeWalkGraph:
 	return OfficeWalkGraph.of(plan, rules.actor_footprint, rules.actor_draw_rect)
+
+
+## Every opaque texel `sprite` draws, as half-unit cells in `into`'s coordinates.
+func _ink(sprite: Sprite2D, into: Transform2D) -> Array[Vector2i]:
+	var found: Array[Vector2i] = []
+	var image := sprite.texture.get_image()
+	var used := image.get_used_rect()
+	var to_floor := into * sprite.get_global_transform()
+	for y in range(used.position.y, used.end.y):
+		for x in range(used.position.x, used.end.x):
+			if image.get_pixel(x, y).a > 0.0:
+				var middle := to_floor * (sprite.offset + Vector2(x + 0.5, y + 0.5))
+				found.append(Vector2i(floori(middle.x * 2.0), floori(middle.y * 2.0)))
+	return found
 
 
 ## A bare pod of `capacity` columns in a fresh world (freed after the case),

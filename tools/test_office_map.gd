@@ -236,11 +236,12 @@ func test_zones_take_the_top_most_left_most_fit_in_lanes() -> void:
 		"in order"
 	)
 	# D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to; the band is two cells (SEATED-Q2): zones start at row 5.
+	# S3 BAND (2026-10-28): the band is one row: zones start at row 3.
 	var expected := {
-		"machine/1": Rect2i(1, 5, 9, 2 * pod),
-		"machine/2": Rect2i(11, 5, 4, pod),
-		"machine/3": Rect2i(16, 5, 4, pod),
-		"machine/4": Rect2i(11, 6 + pod, 4, pod),
+		"machine/1": Rect2i(1, 3, 9, 2 * pod),
+		"machine/2": Rect2i(11, 3, 4, pod),
+		"machine/3": Rect2i(16, 3, 4, pod),
+		"machine/4": Rect2i(11, 4 + pod, 4, pod),
 	}
 	var lanes := {"machine/1": [0, 2], "machine/2": [2, 1], "machine/3": [3, 1], "machine/4": [2, 1]}
 	for zone in plan.zones:
@@ -251,7 +252,7 @@ func test_zones_take_the_top_most_left_most_fit_in_lanes() -> void:
 			zone.zone_key + ": its slot is its aisle row and it"
 		)
 		_eq([zone.first_lane, zone.lanes], lanes[zone.zone_key], zone.zone_key + ": its lanes")
-	_eq(plan.floor_cells.size.y, 6 + 2 * pod, "as deep as the lowest slot")
+	_eq(plan.floor_cells.size.y, 4 + 2 * pod, "as deep as the lowest slot")
 	for index in plan.zones.size():
 		for later in range(index + 1, plan.zones.size()):
 			_check(not plan.zones[index].slot().intersects(plan.zones[later].slot()), "slots never overlap")
@@ -277,12 +278,13 @@ func test_the_fixture_floors_map_stands_four_zones_abreast() -> void:
 	if plan == null:
 		return
 	# D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to; the band is two cells (SEATED-Q2): zones start at row 5.
-	_eq([plan.lanes, plan.floor_cells.size], [4, Vector2i(23, 18)], "four lanes (23 cells), 18 cells deep")
+	# S3 BAND (2026-10-28): the band is one row: zones start at row 3.
+	_eq([plan.lanes, plan.floor_cells.size], [4, Vector2i(23, 16)], "four lanes (23 cells), 16 cells deep")
 	var pod := OfficeZoneLayout.pod_row_cells()
-	var row_two := 6 + pod
+	var row_two := 4 + pod
 	var expected: Dictionary[String, Array] = {
-		"api": [0, 2, Rect2i(1, 5, 9, pod)],
-		"web": [2, 2, Rect2i(11, 5, 9, pod)],
+		"api": [0, 2, Rect2i(1, 3, 9, pod)],
+		"web": [2, 2, Rect2i(11, 3, 9, pod)],
 		"infra": [0, 2, Rect2i(1, row_two, 9, pod)],
 		"notes": [2, 1, Rect2i(11, row_two, 4, pod)],
 		"data": [3, 1, Rect2i(16, row_two, 4, pod)],
@@ -351,7 +353,8 @@ func test_the_map_keeps_its_extents_when_its_last_zone_goes() -> void:
 	var small := _map_plan(back, empty)
 	_eq(small.floor_cells, first.floor_cells, "a smaller zone comes back: the map stays")
 	# D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to; the band is two cells (SEATED-Q2): zones start at row 5.
-	_eq(small.zone("machine/9").cells.position, Vector2i(1, 5), "at the top-left")
+	# S3 BAND (2026-10-28): the band is one row: zones start at row 3.
+	_eq(small.zone("machine/9").cells.position, Vector2i(1, 3), "at the top-left")
 
 
 ## A zone that grows taller grows down in place while the rows below it are
@@ -432,7 +435,8 @@ func test_a_pod_that_needs_more_lanes_widens_the_map_first() -> void:
 	_eq([width, lanes], [25, 6], "48 panes: 24 columns, 25 cells, six lanes")
 	_eq([first.lanes, grown.lanes], [4, 6], "the map widened from four lanes to six")
 	# D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to; the band is two cells (SEATED-Q2): zones start at row 5.
-	_eq(first.zone("machine/2").cells.position, Vector2i(1, 12), "the other zone stands under it")
+	# S3 BAND (2026-10-28): the band is one row: zones start at row 3.
+	_eq(first.zone("machine/2").cells.position, Vector2i(1, 10), "the other zone stands under it")
 	_eq(grown.zone("machine/1").lanes, lanes, "the zone spans them")
 	_eq(grown.lanes, lanes, "the map widened to them first")
 	_eq(grown.floor_cells.size.x - first.floor_cells.size.x, 5 * (lanes - first.lanes), "by five cells a lane")
@@ -499,9 +503,10 @@ func test_a_mezzanine_lands_below_its_source_once_and_grouping_moves_nothing() -
 		return
 	var source := first.zone("machine/1")
 	# D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to; the band is two cells (SEATED-Q2): zones start at row 5.
+	# S3 BAND (2026-10-28): the band is one row: zones start at row 3.
 	_eq(
 		fitted.zone("machine/9").cells.position,
-		Vector2i(16, 5),
+		Vector2i(16, 3),
 		"a plain zone takes the first fit, beside 2 at the top"
 	)
 	_eq(
@@ -551,14 +556,15 @@ func test_a_mezzanine_hint_steers_only_its_first_placement() -> void:
 		return
 	var pod := OfficeZoneLayout.pod_row_cells()
 	# D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to; the band is two cells (SEATED-Q2): zones start at row 5.
-	_eq(first.zone("machine/9").cells.position, Vector2i(1, 5), "no source open: the first fit, lane 0 at the top")
-	_eq(first.zone("machine/11").cells.position, Vector2i(1, 6 + pod), "B under it")
+	# S3 BAND (2026-10-28): the band is one row: zones start at row 3.
+	_eq(first.zone("machine/9").cells.position, Vector2i(1, 3), "no source open: the first fit, lane 0 at the top")
+	_eq(first.zone("machine/11").cells.position, Vector2i(1, 4 + pod), "B under it")
 	var source := opened.zone("machine/1")
-	_eq(source.cells.position, Vector2i(16, 5), "the source opens as any new zone does: lane 3, at the top")
+	_eq(source.cells.position, Vector2i(16, 3), "the source opens as any new zone does: lane 3, at the top")
 	_eq(opened.zone("machine/9").cells, first.zone("machine/9").cells, "the mezzanine stays where it is")
 	var zone := moved.zone("machine/9")
 	_eq(zone.cells.size.y, 2 * pod, "grown to two pod rows, it had to move")
-	_eq(zone.cells.position, Vector2i(11, 6 + pod), "to the first fit, lane 2 under A")
+	_eq(zone.cells.position, Vector2i(11, 4 + pod), "to the first fit, lane 2 under A")
 	_check(zone.slot().position != Vector2i(source.cells.position.x, source.cells.end.y), "not below its source")
 
 
@@ -805,10 +811,15 @@ func test_the_budget_is_charged_on_the_composed_map() -> void:
 
 ## The furniture keeps clear of what the map draws: every top-wall plant and
 ## lane-gap piece, grown by WALL_RUN_GAP, clear of the lift door, every window,
-## every picture, the pantry counter, every zone's slot (its partitions, posts
-## and sign: the sign as the scene draws it lies in the slot's aisle row) and
-## every workstation, with its footprint off every walkway and aisle. At every
-## shipped width and on maps of several zones.
+## every picture, the pantry counter and every workstation; a lane-gap piece
+## clear of every zone's whole slot, a top-wall plant of every zone's
+## rectangle and of every sign as the scene hangs it (the sign lies in its
+## slot, over the aisle row, its board's foot 2 into the zone); every footprint
+## off every walkway and aisle. At every shipped width and on maps of several
+## zones. S3 BAND (2026-10-28): the band is one row: the first zones' aisle row
+## is the walking lane right under the wall, whose top a top-wall plant's
+## drawing reaches; the sign hangs 4 lower, out of that plant's reach (it lay
+## wholly in its aisle row, and every piece kept off whole slots).
 func test_top_run_and_lane_gap_pieces_clear_the_door_windows_pantry_signs_and_partitions() -> void:
 	var board: OfficeZoneSign = OfficeFloorView.ZONE_SIGN_SCENE.instantiate()
 	board.dress(_pen())
@@ -832,14 +843,19 @@ func test_top_run_and_lane_gap_pieces_clear_the_door_windows_pantry_signs_and_pa
 			var covers: Array[Rect2] = OfficeShell.wall_covers(plan, _pen())
 			for foot in OfficeShell.frames(plan, _pen()):
 				covers.append(OfficeShell.drawn(_pen(), ArtContract.PROP_WALL_FRAME, foot))
+			var slots: Array[Rect2] = []
+			var tops_clear: Array[Rect2] = []
 			for zone in plan.zones:
 				var slot := Rect2(zone.slot().position * grid, zone.slot().size * grid)
-				covers.append(slot)
+				slots.append(slot)
+				tops_clear.append(zone.bounds())
 				board.position = zone.sign_at
 				var hung := board.drawn_rect()
+				tops_clear.append(hung)
 				_check(slot.encloses(hung), "%d cells: %s's sign lies in its slot: %s" % [width, zone.zone_key, hung])
 				var aisle := Rect2(slot.position, Vector2(slot.size.x, grid))
-				_check(aisle.encloses(hung), "%d cells: in its aisle row" % width)
+				_eq(hung.end.y - aisle.end.y, 2.0, "%d cells: its board's foot 2 into the zone" % width)
+				_check(hung.position.y >= aisle.position.y, "%d cells: its board's top in the aisle row" % width)
 			for placed in plan.desks:
 				var drawing := placed.measure.render_rect
 				drawing.position += placed.origin
@@ -847,9 +863,10 @@ func test_top_run_and_lane_gap_pieces_clear_the_door_windows_pantry_signs_and_pa
 			var walkways := OfficeFloorValidation.walkways(plan)
 			for placed in plan.decorations:
 				pieces += 1
-				tops += 1 if placed.key.begins_with("top/") else 0
+				var top_run := placed.key.begins_with("top/")
+				tops += 1 if top_run else 0
 				var near := placed.draw_rect.grow(OfficeShell.WALL_RUN_GAP)
-				for cover in covers:
+				for cover in covers + (tops_clear if top_run else slots):
 					_check(not near.intersects(cover), "%d cells: %s clears %s" % [width, placed.key, cover])
 				for walkway in walkways:
 					_check(
@@ -996,7 +1013,8 @@ func test_lane_gap_pieces_keep_their_keys_when_another_zone_grows() -> void:
 		. plan
 	)
 	# D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to; the band is two cells (SEATED-Q2): zones start at row 5.
-	_check(first != null and first.zone("machine/2").cells == Rect2i(6, 5, 9, 18), "zone 2 grew three rows deep")
+	# S3 BAND (2026-10-28): the band is one row: zones start at row 3.
+	_check(first != null and first.zone("machine/2").cells == Rect2i(6, 3, 9, 18), "zone 2 grew three rows deep")
 	zones[1].rooms.append(_room("e", ROW, 3))
 	var retained := (
 		OfficeFloorLayout
@@ -1124,7 +1142,8 @@ func test_the_zone_sign_writes_a_cjk_label_in_the_pens_display_face() -> void:
 ## label once hung a pixel below the board). The line takes what it lacks from
 ## the padding above it and stays on the board; a line that fits stays where
 ## the scene puts it. F1 (2026-10-27): the 8px cut's line is 12, and the scene
-## puts its top at -22, two units under the board's (its capitals, rows 3..8 of
+## puts its top at -22, two units under the board's (S3 BAND, 2026-10-28: the
+## board hangs 4 lower, so -18; its capitals, rows 3..8 of
 ## the line, then stand in the middle of the board's paper): 14 rows of room
 ## under it, two over it. A face three rows taller than the pixel face (it was
 ## five over Tiny5's 9) stands in for a line taller than the room on any machine.
@@ -1160,7 +1179,7 @@ func test_a_taller_line_stays_on_the_zone_signs_board() -> void:
 		_eq(board.drawn_rect().size.y, 16.0, "+%d: the board is 16 tall" % extra)
 		tops.append(title.position.y)
 		board.free()
-	_eq(tops[0], -22.0, "a line that fits starts where the scene puts it")
+	_eq(tops[0], -18.0, "a line that fits starts where the scene puts it")
 	_check(tops[1] < tops[0], "a taller one starts higher: %s" % [tops])
 
 
@@ -1168,8 +1187,8 @@ func test_a_taller_line_stays_on_the_zone_signs_board() -> void:
 ## moved (codex's review of ba943f9, P1): in one refresh the blocker left of A
 ## (one ROW pod, two lanes) goes, A grows 2 → 20 panes (three lanes) and B under
 ## both grows 20 → 48 (six lanes). Widened zone by zone, A was judged against
-## the four-lane map and moved to (1, 5) although its own place fits the
-## six-lane map B brings; widened first, A grows right in place at (11, 5) and
+## the four-lane map and moved to (1, 3) although its own place fits the
+## six-lane map B brings; widened first, A grows right in place at (11, 3) and
 ## B grows in place under it.
 ## Z1 (2026-10-27): a lane is 4 cells, pitch 5, a new zone takes lanes until it stands one row; the map replans.
 func test_the_map_widens_for_every_zone_before_any_zone_is_moved() -> void:
@@ -1183,7 +1202,7 @@ func test_the_map_widens_for_every_zone_before_any_zone_is_moved() -> void:
 		return
 	_eq(
 		[first.zone("machine/0").cells, first.zone("machine/a").cells, first.zone("machine/b").cells],
-		[Rect2i(1, 5, 9, 6), Rect2i(11, 5, 4, 6), Rect2i(1, 12, 14, 6)],
+		[Rect2i(1, 3, 9, 6), Rect2i(11, 3, 4, 6), Rect2i(1, 10, 14, 6)],
 		"the blocker and A side by side, B of three lanes under both"
 	)
 	var signature := first.geometry_signature()
@@ -1194,16 +1213,18 @@ func test_the_map_widens_for_every_zone_before_any_zone_is_moved() -> void:
 	_eq(first.geometry_signature(), signature, "the previous map is unchanged")
 	_eq(grown.lanes, 6, "the map widened to B's six lanes")
 	# D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to; the band is two cells (SEATED-Q2): zones start at row 5.
-	_eq(grown.zone("machine/a").cells, Rect2i(11, 5, 14, 6), "A grew right in place, from (11, 5), over three lanes")
-	_eq(grown.zone("machine/b").cells, Rect2i(1, 12, 29, 6), "B grew right in place under it, over six")
+	# S3 BAND (2026-10-28): the band is one row: zones start at row 3.
+	_eq(grown.zone("machine/a").cells, Rect2i(11, 3, 14, 6), "A grew right in place, from (11, 3), over three lanes")
+	_eq(grown.zone("machine/b").cells, Rect2i(1, 10, 29, 6), "B grew right in place under it, over six")
 
 
 ## Empty workspaces are bounded work (codex's review of ba943f9, P2): each is a
 ## zone of one empty pod row, so it is charged to the table budget, and a map
 ## whose slots cannot fit max_height_cells even packed lane by lane is refused
 ## before any placement. Straight from herdr's wire (HerdrSnapshot.from_wire(),
-## OfficeProjection.project()): 100 empty workspaces plan; 580, the most four
-## lanes hold (one lane each, 5 + 145 · 7 = 1020 of 1024 rows), plan too; 581
+## OfficeProjection.project()): 100 empty workspaces plan; 584, the most four
+## lanes hold (one lane each, 5 + 145 · 7 = 1020 of 1024 rows; S3 BAND, 2026-10-28,
+## the band one row: 2 + 146 · 7 = 1024, so 584), plan too; 585
 ## do not, nor 600 (4.4 s before, placing every one first), nor 4096
 ## (HerdrSnapshot's cap, over the table budget), each refused promptly and by
 ## name. The bound is generous for CI load: the refusals measure a few to 25 ms
@@ -1211,8 +1232,8 @@ func test_the_map_widens_for_every_zone_before_any_zone_is_moved() -> void:
 func test_many_empty_workspaces_are_refused_before_they_are_placed() -> void:
 	var cases := [
 		[100, ""],
-		[580, ""],
-		[581, "map exceeds width, height or cell budget"],
+		[584, ""],
+		[585, "map exceeds width, height or cell budget"],
 		[600, "map exceeds width, height or cell budget"],
 		[HerdrSnapshot.MAX_WORKSPACES, "input exceeds tab budget"],
 	]
@@ -1268,7 +1289,8 @@ func test_a_lane_gap_stands_both_plants_between_its_side_tables() -> void:
 		. plan
 	)
 	# D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to; the band is two cells (SEATED-Q2): zones start at row 5.
-	_check(plan != null and plan.zone("machine/1").cells == Rect2i(1, 5, 14, 18), "zone 1 grew three rows deep")
+	# S3 BAND (2026-10-28): the band is one row: zones start at row 3.
+	_check(plan != null and plan.zone("machine/1").cells == Rect2i(1, 3, 14, 18), "zone 1 grew three rows deep")
 	if plan == null:
 		return
 	var gaps := OfficeDecorPlanner.lane_gaps(plan, _real_rules(25))

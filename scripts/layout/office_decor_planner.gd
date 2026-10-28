@@ -2,8 +2,9 @@ class_name OfficeDecorPlanner
 extends RefCounted
 ## Standing furniture for a candidate map, on grids of the map itself, never
 ## placed by the tables, the zones or anything herdr says:
-## - the top-wall run: plants at the top wall's foot, in the entry band's
-##   drawing-clearance row, OfficeShell.TOP_RUN_PITCH apart from
+## - the top-wall run: plants at the top wall's foot (their footprint in the
+##   wall's cells, their drawing over its face and the walking lane's top),
+##   OfficeShell.TOP_RUN_PITCH apart from
 ##   TOP_RUN_FROM, keyed by their grid step ("top/%03d"), the plant of the step
 ##   (plant_at()); a step whose plant would come within WALL_RUN_GAP of the
 ##   lift door, a window, a picture or the pantry counter stands empty; where
@@ -21,8 +22,11 @@ extends RefCounted
 ##   its key).
 ## A piece is kept only where its drawing stays on the map and, grown by
 ## WALL_RUN_GAP, clear of every zone's slot (its pods, partitions, posts and
-## sign), the door, the windows, the pictures, the pantry counter and the
-## pieces kept before it, and its footprint stays off every walkway and aisle
+## sign; for the top-wall run every zone's rectangle: the first zones' aisle
+## row is the walking lane right under the wall, whose top the run's drawing
+## reaches, and their signs hang lower than it ever does, pinned by
+## tools/test_office_map.gd), the door, the windows, the pictures, the pantry
+## counter and the pieces kept before it, and its footprint stays off every walkway and aisle
 ## (OfficeFloorValidation.walkways()). Furniture is optional: a piece that does
 ## not fit is left out, never a desk moved for it. Where a piece stands follows
 ## from the map's geometry alone, so a zone growing elsewhere moves none of it.
@@ -119,9 +123,11 @@ func furnish(next: FloorPlan) -> void:
 	var covers := OfficeShell.wall_covers(next, _pen)
 	for frame in OfficeShell.frames(next, _pen):
 		covers.append(OfficeShell.drawn(_pen, ArtContract.PROP_WALL_FRAME, frame))
+	var slots: Array[Rect2] = []
 	for zone in next.zones:
 		var slot := zone.slot()
-		covers.append(Rect2(slot.position * grid, slot.size * grid))
+		slots.append(Rect2(slot.position * grid, slot.size * grid))
+		covers.append(zone.bounds())
 	var walkways := OfficeFloorValidation.walkways(next)
 	var placed: Array[DecorPlacement] = []
 	var bay_end := next.main_corridor_cells.position.x * grid
@@ -140,6 +146,8 @@ func furnish(next: FloorPlan) -> void:
 		if _fits(next, covers, walkways, placed, stand_in):
 			placed.append(stand_in)
 		opening += 1
+	# The lane gaps keep off every zone's whole slot, its aisle row included.
+	covers.append_array(slots)
 	for gap in lane_gaps(next, rules):
 		var middle := (rules.lane_x(gap.lane) + floorf(rules.zone_width_cells / 2.0) + 0.5) * grid
 		var index := 0

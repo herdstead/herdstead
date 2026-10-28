@@ -19,6 +19,9 @@ extends "res://tools/office_test_base.gd"
 ## D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to;
 ## the band is two cells (SEATED-Q2): every y is 32 less, x unchanged, and the
 ## two idle workers (api:p2, infra:p3) answer at their own seats.
+## S3 BAND (2026-10-28): the band is one row: every y is 64 less, a zone's
+## opening starts 4 lower on its sign's board (60 less), and the pans follow
+## (re-pinned from one print).
 
 ## Where the bare world stands, as the HUD's free corner would put it, and the
 ## floor's root in it, as the office puts it under the plate.
@@ -51,137 +54,143 @@ const SEATED: Dictionary[String, String] = {
 }
 ## signal_extent(): the click area and, while it shows, the chip.
 const EXTENT: Dictionary[String, Rect2] = {
-	"api:p1": Rect2(65, 198, 30, 58),
-	"api:p2": Rect2(97, 198, 30, 58),
-	"api:p3": Rect2(97, 264, 30, 56),
-	"api:p4": Rect2(161, 198, 30, 58),
-	"data:p1": Rect2(545, 422, 30, 58),
-	"data:p2": Rect2(545, 488, 30, 56),
-	"infra:p1": Rect2(65, 424, 30, 56),
-	"infra:p2": Rect2(161, 422, 30, 58),
-	"infra:p3": Rect2(161, 488, 30, 56),
-	"notes:p1": Rect2(385, 422, 30, 58),
-	"web:p1": Rect2(385, 200, 30, 56),
-	"web:p2": Rect2(385, 264, 30, 56),
-	"web:p3": Rect2(481, 198, 30, 58),
+	"api:p1": Rect2(65, 134, 30, 58),
+	"api:p2": Rect2(97, 134, 30, 58),
+	"api:p3": Rect2(97, 200, 30, 56),
+	"api:p4": Rect2(161, 134, 30, 58),
+	"data:p1": Rect2(545, 358, 30, 58),
+	"data:p2": Rect2(545, 424, 30, 56),
+	"infra:p1": Rect2(65, 360, 30, 56),
+	"infra:p2": Rect2(161, 358, 30, 58),
+	"infra:p3": Rect2(161, 424, 30, 56),
+	"notes:p1": Rect2(385, 358, 30, 58),
+	"web:p1": Rect2(385, 136, 30, 56),
+	"web:p2": Rect2(385, 200, 30, 56),
+	"web:p3": Rect2(481, 134, 30, 58),
 }
 ## arrow_target(): the chip alone while it shows, else the click area.
 const TARGET: Dictionary[String, Rect2] = {
-	"api:p1": Rect2(65, 198, 30, 58),
-	"api:p2": Rect2(97, 198, 30, 58),
-	"api:p3": Rect2(97, 264, 30, 56),
-	"api:p4": Rect2(161, 198, 30, 58),
-	"data:p1": Rect2(545, 422, 30, 58),
-	"data:p2": Rect2(545, 488, 30, 56),
-	"infra:p1": Rect2(65, 424, 30, 16),
-	"infra:p2": Rect2(161, 422, 30, 58),
-	"infra:p3": Rect2(161, 488, 30, 56),
-	"notes:p1": Rect2(385, 422, 30, 58),
-	"web:p1": Rect2(385, 200, 30, 16),
-	"web:p2": Rect2(385, 304, 30, 16),
-	"web:p3": Rect2(481, 198, 30, 58),
+	"api:p1": Rect2(65, 134, 30, 58),
+	"api:p2": Rect2(97, 134, 30, 58),
+	"api:p3": Rect2(97, 200, 30, 56),
+	"api:p4": Rect2(161, 134, 30, 58),
+	"data:p1": Rect2(545, 358, 30, 58),
+	"data:p2": Rect2(545, 424, 30, 56),
+	"infra:p1": Rect2(65, 360, 30, 16),
+	"infra:p2": Rect2(161, 358, 30, 58),
+	"infra:p3": Rect2(161, 424, 30, 56),
+	"notes:p1": Rect2(385, 358, 30, 58),
+	"web:p1": Rect2(385, 136, 30, 16),
+	"web:p2": Rect2(385, 240, 30, 16),
+	"web:p3": Rect2(481, 134, 30, 58),
 }
 ## pod_extent(): the whole pod the desk stands at.
 const POD: Dictionary[String, Rect2] = {
-	"api:p1": Rect2(64, 198, 64, 122),
-	"api:p2": Rect2(64, 198, 64, 122),
-	"api:p3": Rect2(64, 198, 64, 122),
-	"api:p4": Rect2(160, 198, 64, 122),
-	"data:p1": Rect2(544, 422, 64, 122),
-	"data:p2": Rect2(544, 422, 64, 122),
-	"infra:p1": Rect2(64, 422, 64, 122),
-	"infra:p2": Rect2(160, 422, 64, 122),
-	"infra:p3": Rect2(160, 422, 64, 122),
-	"notes:p1": Rect2(384, 422, 64, 122),
-	"web:p1": Rect2(384, 198, 64, 122),
-	"web:p2": Rect2(384, 198, 64, 122),
-	"web:p3": Rect2(480, 198, 64, 122),
+	"api:p1": Rect2(64, 134, 64, 122),
+	"api:p2": Rect2(64, 134, 64, 122),
+	"api:p3": Rect2(64, 134, 64, 122),
+	"api:p4": Rect2(160, 134, 64, 122),
+	"data:p1": Rect2(544, 358, 64, 122),
+	"data:p2": Rect2(544, 358, 64, 122),
+	"infra:p1": Rect2(64, 358, 64, 122),
+	"infra:p2": Rect2(160, 358, 64, 122),
+	"infra:p3": Rect2(160, 358, 64, 122),
+	"notes:p1": Rect2(384, 358, 64, 122),
+	"web:p1": Rect2(384, 134, 64, 122),
+	"web:p2": Rect2(384, 134, 64, 122),
+	"web:p3": Rect2(480, 134, 64, 122),
 }
 ## zone_opening(): as wide as the zone's cells, from its sign's top to the
 ## bottom of its cells.
 const OPENING: Dictionary[String, Rect2] = {
-	"api": Rect2(32, 142, 288, 210),
-	"web": Rect2(352, 142, 288, 210),
-	"infra": Rect2(32, 366, 288, 210),
-	"notes": Rect2(352, 366, 128, 210),
-	"data": Rect2(512, 366, 128, 210),
+	"api": Rect2(32, 82, 288, 206),
+	"web": Rect2(352, 82, 288, 206),
+	"infra": Rect2(32, 306, 288, 206),
+	"notes": Rect2(352, 306, 128, 206),
+	"data": Rect2(512, 306, 128, 206),
 }
 ## Where 6413cec's reveal(key) and reveal(key, true) left the pan of a VIEW-sized
 ## view of this floor, in the world's coordinates, from each of FROM.
 const FROM: Array[Vector2] = [Vector2(0, 0), Vector2(400, 600), Vector2(137.5, 211.25)]
 const REVEALED: Dictionary[String, Array] = {
-	"api:p1": [Vector2(0, 0), Vector2(0, 44), Vector2(65, 198), Vector2(64, 198), Vector2(65, 198), Vector2(64, 198)],
-	"api:p2": [Vector2(0, 0), Vector2(0, 44), Vector2(97, 198), Vector2(64, 198), Vector2(97, 198), Vector2(64, 198)],
-	"api:p3":
-	[Vector2(0, 44), Vector2(0, 44), Vector2(97, 264), Vector2(64, 198), Vector2(97, 211.25), Vector2(64, 198)],
+	"api:p1": [Vector2(0, 0), Vector2(0, 0), Vector2(65, 134), Vector2(64, 134), Vector2(65, 134), Vector2(64, 134)],
+	"api:p2": [Vector2(0, 0), Vector2(0, 0), Vector2(97, 134), Vector2(64, 134), Vector2(97, 134), Vector2(64, 134)],
+	"api:p3": [Vector2(0, 0), Vector2(0, 0), Vector2(97, 200), Vector2(64, 134), Vector2(97, 200), Vector2(64, 134)],
 	"api:p4":
-	[Vector2(0, 0), Vector2(0, 44), Vector2(161, 198), Vector2(160, 198), Vector2(137.5, 198), Vector2(137.5, 198)],
+	[Vector2(0, 0), Vector2(0, 0), Vector2(161, 134), Vector2(160, 134), Vector2(137.5, 134), Vector2(137.5, 134)],
 	"data:p1":
 	[
-		Vector2(63, 204),
-		Vector2(96, 268),
-		Vector2(400, 422),
-		Vector2(400, 422),
+		Vector2(63, 140),
+		Vector2(96, 204),
+		Vector2(400, 358),
+		Vector2(400, 358),
 		Vector2(137.5, 211.25),
-		Vector2(137.5, 268)
+		Vector2(137.5, 211.25)
 	],
 	"data:p2":
 	[
-		Vector2(63, 268),
-		Vector2(96, 268),
-		Vector2(400, 488),
-		Vector2(400, 422),
-		Vector2(137.5, 268),
-		Vector2(137.5, 268)
+		Vector2(63, 204),
+		Vector2(96, 204),
+		Vector2(400, 424),
+		Vector2(400, 358),
+		Vector2(137.5, 211.25),
+		Vector2(137.5, 211.25)
 	],
 	"infra:p1":
-	[Vector2(0, 204), Vector2(0, 268), Vector2(65, 424), Vector2(64, 422), Vector2(65, 211.25), Vector2(64, 268)],
+	[Vector2(0, 140), Vector2(0, 204), Vector2(65, 360), Vector2(64, 358), Vector2(65, 211.25), Vector2(64, 211.25)],
 	"infra:p2":
 	[
+		Vector2(0, 140),
 		Vector2(0, 204),
-		Vector2(0, 268),
-		Vector2(161, 422),
-		Vector2(160, 422),
+		Vector2(161, 358),
+		Vector2(160, 358),
 		Vector2(137.5, 211.25),
-		Vector2(137.5, 268)
+		Vector2(137.5, 211.25)
 	],
 	"infra:p3":
-	[Vector2(0, 268), Vector2(0, 268), Vector2(161, 488), Vector2(160, 422), Vector2(137.5, 268), Vector2(137.5, 268)],
-	"notes:p1":
 	[
 		Vector2(0, 204),
-		Vector2(0, 268),
-		Vector2(385, 422),
-		Vector2(384, 422),
+		Vector2(0, 204),
+		Vector2(161, 424),
+		Vector2(160, 358),
 		Vector2(137.5, 211.25),
-		Vector2(137.5, 268)
+		Vector2(137.5, 211.25)
+	],
+	"notes:p1":
+	[
+		Vector2(0, 140),
+		Vector2(0, 204),
+		Vector2(385, 358),
+		Vector2(384, 358),
+		Vector2(137.5, 211.25),
+		Vector2(137.5, 211.25)
 	],
 	"web:p1":
-	[Vector2(0, 0), Vector2(0, 44), Vector2(385, 200), Vector2(384, 198), Vector2(137.5, 200), Vector2(137.5, 198)],
+	[Vector2(0, 0), Vector2(0, 0), Vector2(385, 136), Vector2(384, 134), Vector2(137.5, 136), Vector2(137.5, 134)],
 	"web:p2":
-	[Vector2(0, 44), Vector2(0, 44), Vector2(385, 264), Vector2(384, 198), Vector2(137.5, 211.25), Vector2(137.5, 198)],
+	[Vector2(0, 0), Vector2(0, 0), Vector2(385, 200), Vector2(384, 134), Vector2(137.5, 200), Vector2(137.5, 134)],
 	"web:p3":
-	[Vector2(0, 0), Vector2(32, 44), Vector2(400, 198), Vector2(400, 198), Vector2(137.5, 198), Vector2(137.5, 198)],
+	[Vector2(0, 0), Vector2(32, 0), Vector2(400, 134), Vector2(400, 134), Vector2(137.5, 134), Vector2(137.5, 134)],
 }
 ## Where 6413cec's reveal_zone(zone) left that pan, from each of FROM: the
 ## zones are 288 or 128 wide (Z1), narrower than VIEW.
 const OPENED: Dictionary[String, Array] = {
-	"api": [Vector2(0, 174), Vector2(32, 174), Vector2(32, 174)],
-	"web": [Vector2(128, 174), Vector2(352, 174), Vector2(137.5, 174)],
-	"infra": [Vector2(0, 398), Vector2(32, 398), Vector2(32, 398)],
-	"notes": [Vector2(0, 398), Vector2(352, 398), Vector2(137.5, 398)],
-	"data": [Vector2(128, 398), Vector2(400, 398), Vector2(137.5, 398)],
+	"api": [Vector2(0, 114), Vector2(32, 114), Vector2(32, 114)],
+	"web": [Vector2(128, 114), Vector2(352, 114), Vector2(137.5, 114)],
+	"infra": [Vector2(0, 338), Vector2(32, 338), Vector2(32, 338)],
+	"notes": [Vector2(0, 338), Vector2(352, 338), Vector2(137.5, 338)],
+	"data": [Vector2(128, 338), Vector2(400, 338), Vector2(137.5, 338)],
 }
 ## And of a view NARROW wide, narrower than a zone: its left edge, whatever the pan was.
 ## Z1 (2026-10-27): a lane is 4 cells, pitch 5, a new zone takes lanes until it stands one row; the map replans.
 ## The narrowest zone is one lane, 128 units, so the view is 96 wide (160 before).
 const NARROW := Vector2(96, 120)
 const OPENED_NARROW: Dictionary[String, Vector2] = {
-	"api": Vector2(32, 174),
-	"web": Vector2(352, 174),
-	"infra": Vector2(32, 398),
-	"notes": Vector2(352, 398),
-	"data": Vector2(512, 398),
+	"api": Vector2(32, 114),
+	"web": Vector2(352, 114),
+	"infra": Vector2(32, 338),
+	"notes": Vector2(352, 338),
+	"data": Vector2(512, 338),
 }
 
 var art: ArtPack
@@ -396,9 +405,9 @@ func test_pointing_frames_the_signal_extent() -> void:
 		view.point(_pk(pane_id))
 		_eq([pointer.key, pointer.visible], [_pk(pane_id), true], "the pointer is at %s" % pane_id)
 		_eq(pointer.rect, EXTENT[pane_id].grow(OfficePointer.GROW), "around %s's extent, two units off" % pane_id)
-	_eq(pointer.rect, Rect2(479, 196, 34, 62), "the last one, web:p3, as 6413cec framed it")
+	_eq(pointer.rect, Rect2(479, 132, 34, 62), "the last one, web:p3, as 6413cec framed it")
 	view.point(_pk("web:p1"))
-	_eq(pointer.rect, Rect2(383, 198, 34, 60), "a blocked desk's frame takes its chip in")
+	_eq(pointer.rect, Rect2(383, 134, 34, 60), "a blocked desk's frame takes its chip in")
 	view.point("")
 	_eq([pointer.key, pointer.visible, pointer.rect], ["", false, Rect2()], "pointing at nothing clears it")
 	view.point(_pk("web:p1"))
@@ -437,7 +446,7 @@ func test_a_zone_opens_at_its_signs_top_across_its_cells() -> void:
 	_eq(view.zone_opening(""), Rect2(), "and no key")
 	var board := view.zone_sign(_pk("api"))
 	board.get_parent().remove_child(board)
-	_eq(view.zone_opening(_pk("api")), Rect2(32, 128, 288, 224), "api without its sign drawn: from its aisle row's top")
+	_eq(view.zone_opening(_pk("api")), Rect2(32, 64, 288, 224), "api without its sign drawn: from its aisle row's top")
 	_eq(view.zone_opening(_pk("web")), OPENING["web"], "the others keep theirs")
 	board.free()
 
@@ -559,13 +568,21 @@ func test_opening_pans_to_the_top_and_as_little_sideways() -> void:
 ## arrival only: the planned pan lifted to the wall's top when the wall and
 ## what is kept fit the view together, top to bottom; never lowered, never
 ## moved sideways, and left alone when they do not fit or either is empty.
+## S3 BAND (2026-10-28): the pan is the wall's top whenever they fit, also
+## where the planned pan stood higher (lowered to it: no strip above the wall
+## under the bar); still never moved sideways, and left alone when they do not
+## fit or either is empty.
 func test_a_map_opens_with_the_wall_when_it_fits() -> void:
 	var wall := Rect2(0, 40, 800, 80)
 	var desk := Rect2(65, 230, 30, 58)
 	var room := Vector2(936, 254)
 	_eq(OfficeCamera.with_wall(Vector2(0, 98), wall, desk, room), Vector2(0, 40), "lifted to the wall's top")
 	_eq(OfficeCamera.with_wall(Vector2(64, 98), wall, desk, room), Vector2(64, 40), "sideways as planned")
-	_eq(OfficeCamera.with_wall(Vector2(0, 0), wall, desk, room), Vector2(0, 0), "a view that shows it is not lowered")
+	_eq(
+		OfficeCamera.with_wall(Vector2(0, 0), wall, desk, room),
+		Vector2(0, 40),
+		"a view standing higher comes down to it"
+	)
 	_eq(OfficeCamera.with_wall(Vector2(0, 40), wall, desk, room), Vector2(0, 40), "exactly at it")
 	_eq(
 		OfficeCamera.with_wall(Vector2(0, 98), wall, desk, Vector2(936, 248)),
@@ -623,9 +640,7 @@ func test_the_floors_answers_pan_the_view_where_it_was_panned() -> void:
 	board.get_parent().remove_child(board)
 	var bare := _in_world(view, view.zone_opening(_pk("api")))
 	_eq(
-		OfficeCamera.opened(Vector2(400, 600), bare, VIEW),
-		Vector2(32, 160),
-		"api without its sign: its aisle row's top"
+		OfficeCamera.opened(Vector2(400, 600), bare, VIEW), Vector2(32, 96), "api without its sign: its aisle row's top"
 	)
 	board.free()
 
@@ -643,7 +658,7 @@ func test_an_arrow_stands_by_its_target_not_by_the_extent() -> void:
 	var view := _floor_view()
 	var chip := view.arrow_target(_pk("web:p1"))
 	var extent := view.signal_extent(_pk("web:p1"))
-	_eq([chip, extent], [Rect2(385, 200, 30, 16), Rect2(385, 200, 30, 56)], "web:p1's chip, and its chip over its seat")
+	_eq([chip, extent], [Rect2(385, 136, 30, 16), Rect2(385, 136, 30, 56)], "web:p1's chip, and its chip over its seat")
 	var target := EdgeArrowModel.Target.new()
 	target.zone_key = _pk("web")
 	target.pane_key = _pk("web:p1")
@@ -671,7 +686,8 @@ func test_an_arrow_stands_by_its_target_not_by_the_extent() -> void:
 	)
 	# The view's left edge against the chip's right edge. D2 (2026-10-27): the
 	# band is two cells (SEATED-Q2): the chip is 32 higher, and so is the view.
-	var beside := Rect2(Vector2(chip.end.x, 68), VIEW)
+	# S3 BAND (2026-10-28): the band is one row: 64 higher again, both.
+	var beside := Rect2(Vector2(chip.end.x, 4), VIEW)
 	arrows = EdgeArrowModel.of(beside, targets)
 	_eq(arrows.size(), 1, "the chip just left of the view: its arrow")
 	_eq([arrows[0].blocked, arrows[0].edge], [1, EdgeArrowModel.Edge.LEFT], "on the left edge")

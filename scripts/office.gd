@@ -1039,7 +1039,7 @@ func reveal_zone(key: String) -> void:
 
 
 ## The framing a map opens on (OfficeNavigator.pan_opens), once reveal() or
-## reveal_zone() placed the view on what it opens for: up to the top wall's
+## reveal_zone() placed the view on what it opens for: at the top wall's
 ## face (OfficeFloorView.wall_face()) when the face and `kept` (in the floor's
 ## coordinates: the selected desk's signal, or the first zone's sign) fit the
 ## view together (OfficeCamera.open_with_wall()).

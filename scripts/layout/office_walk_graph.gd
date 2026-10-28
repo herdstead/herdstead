@@ -8,8 +8,11 @@ extends RefCounted
 ## 4-neighbours. A node is blocked when its centre lies inside an obstacle and
 ## an edge when its segment enters one, where every obstacle is inflated by the
 ## real person: furniture and walls by the feet (PixelPerson.footprint()), the
-## Ground walls also by the whole drawing (PixelPerson.drawing_rect()), because
-## a wall always draws behind whoever walks in front of it. A segment that only
+## side walls also by the whole drawing (PixelPerson.drawing_rect()): a wall
+## always draws behind whoever walks beside it, so a canvas reaching into a side
+## wall would stand in it. The top wall draws behind whoever stands in front of
+## it, which is where its face is seen, so only the feet keep off it and a
+## walker's canvas reaches over its face (S3 BAND, 2026-10-28). A segment that only
 ## touches an obstacle's edge passes (Rect2.intersects() leaves the edges out).
 ## Checking edges, not only nodes, is what keeps a thin obstacle between two
 ## clear centres from being walked through: the native AStarGrid2D connects
@@ -19,19 +22,20 @@ extends RefCounted
 ## still a shortest way, so nobody zigzags down a corridor.
 ##
 ## Everyone comes in and goes out by the lift door (OfficeShell.door()). Its
-## foot stands inside the wall's drawing clearance, so it is joined to the
-## graph by one fixed threshold leg straight down to the first walkable cell
-## centre below it; the seat and standing legs join a table's approach point to
+## foot stands in the walking lane's cell row, 4 below the row's centre (the
+## door is drawn on Ground, so whoever stands there draws over it), and it is
+## joined to the graph by one fixed threshold leg to the first walkable cell
+## centre in its column from that row down; the seat and standing legs join a table's approach point to
 ## where its worker sits or stands (see leg_to_seat() and leg_to_standing()).
 ## Those legs are the only way into an obstacle: every obstacle carries the
 ## exact segments that may enter it (its entries: a table the far seat legs that
-## run into its footprint, the top wall's drawing clearance the threshold leg),
+## run into its footprint, a side wall's drawing the threshold leg, were it to cross one),
 ## and a check lets a segment into an obstacle only along one of them, at that
 ## obstacle's place in this plan. Nothing is exempt by name.
 ##
 ## The pantry counter in the entry band's corner is furniture like any other
 ## (Kind.FIXTURE, inflated by the feet, with no entries): nobody walks to it,
-## and the walking lane (OfficeShell.WALKING_LANE) runs in front of it.
+## and the walking lane (OfficeShell.WALKING_LANE) starts beside it.
 ##
 ## A zone's low partitions (ZonePlacement.partitions()) are obstacles of their
 ## own kind, inflated by the feet only: they draw no taller than a person, so
@@ -469,12 +473,13 @@ func _build(plan: FloorPlan) -> void:
 	var column := floori(door.x / GRID)
 	for row in range(plan.entry_cells.position.y, plan.entry_cells.end.y):
 		var cell := Vector2i(column, row)
-		if centre(cell).y > door.y and walkable(cell):
+		# From the cell row the door's foot stands in: its centre may be above the foot.
+		if centre(cell).y > door.y - GRID / 2.0 and walkable(cell):
 			threshold = centre(cell)
 			break
 	if not threshold.is_finite():
 		return
-	# The threshold leg is the one way through the top wall's drawing clearance.
+	# Were the threshold leg to cross a wall's drawing, it is the one way through.
 	for obstacle in obstacles:
 		if obstacle.kind == Kind.WALL_DRAWING and not _clear_of(door, threshold, obstacle.rect):
 			obstacle.entries.append_array(PackedVector2Array([door, threshold]))
@@ -482,20 +487,22 @@ func _build(plan: FloorPlan) -> void:
 		_threshold_index = _index(cell_of(threshold))
 
 
-## Every obstacle of the plan, inflated: the outer walls but the cutaway front,
-## every zone's partitions (by the feet only), every table's physical footprint
-## (with the seat legs that run into it as its entries) and every standing
-## piece. The outer walls are where the plan's entry band says they end: it
-## runs between the side walls, right under the top one.
+## Every obstacle of the plan, inflated: the outer walls but the cutaway front
+## (the top one by the feet only, the side ones by the feet and the whole
+## drawing), every zone's partitions (by the feet only), every table's physical
+## footprint (with the seat legs that run into it as its entries) and every
+## standing piece. The outer walls are where the plan's entry band says they
+## end: it runs between the side walls, right under the top one.
 func _collect(plan: FloorPlan) -> void:
 	var outline := Vector2(size) * GRID
 	var entry := Rect2(plan.entry_cells.position * GRID, plan.entry_cells.size * GRID)
-	var walls: Array[Rect2] = [
-		Rect2(0, 0, outline.x, entry.position.y),
+	var top := Rect2(0, 0, outline.x, entry.position.y)
+	_add(_inflate(top, footprint), Kind.WALL)
+	var sides: Array[Rect2] = [
 		Rect2(0, 0, entry.position.x, outline.y),
 		Rect2(entry.end.x, 0, outline.x - entry.end.x, outline.y),
 	]
-	for wall in walls:
+	for wall in sides:
 		_add(_inflate(wall, footprint), Kind.WALL)
 		if drawing.has_area():
 			_add(_inflate(wall, drawing), Kind.WALL_DRAWING)

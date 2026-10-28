@@ -43,8 +43,9 @@ func test_an_arrival_walks_in_from_the_door_to_the_seat() -> void:
 	_check(route.size() >= 3 and route[0] == _door(office), "and walks from there: %s" % [route])
 	# D2 (2026-10-27): the band is two cells (SEATED-Q2): the threshold is the
 	# walking lane's node under the door, where a way in may turn along the lane.
+	# S3 BAND (2026-10-28): the band is one row: the lane is at 80, 4 above the door's foot.
 	var threshold := _threshold(office)
-	_eq([route[1].x, threshold.y], [route[0].x, 112.0], "straight down from the door to the lane's threshold")
+	_eq([route[1].x, threshold.y], [route[0].x, 80.0], "straight up from the door's foot to the lane's threshold")
 	_check(route[1].y >= threshold.y, "and over it: %s" % [route])
 	_eq(_last(route), _seat_of(office, "api:p3"), "to the seat")
 	_eq(body.get_parent(), station, "the seat's own worker while they walk")
@@ -545,40 +546,51 @@ func test_a_table_that_moves_under_a_route_reroutes_its_walker() -> void:
 
 
 ## A map that widens under someone walking can put an obstacle where they
-## stand: a table too wide for its zone widens the map, the main corridor and
-## the lift door move right, and the entry band's fixture-row barrier runs on
-## over the old door's threshold. Whoever is inside it now is put where they
-## belong at once; nobody walks through it.
+## stand: a table too wide for its zone widens the map, its zone grows right
+## over the way they are walking down, and the widened table now stands where
+## they are. Whoever is inside it now is put where they belong at once; nobody
+## walks through it. S3 BAND (2026-10-28): the top wall draws behind a person
+## in front of it, so the entry band holds no obstacle a widening could move
+## onto a walker (they were caught on the old door's threshold leg, inside the
+## wall's drawing clearance, which no longer exists); the widened plan (the same
+## widening, on a second office) says where its new table stands, and the
+## walker is caught there.
 func test_a_walker_the_floor_grows_over_is_put_where_they_belong() -> void:
 	# api:t1 alone on the first row, api:t2 on the second (_stacked()).
-	var office := await _live_office(_stacked(fixture))
 	var grown: Dictionary = fixture.duplicate(true)
 	var source: Dictionary = _list(grown, "panes")[3]
 	var extra := source.duplicate(true)
 	extra.pane_id = "api:p5"
 	extra.terminal_id = "term-api-p5"
 	_list(grown, "panes").append(extra)
+	# Eleven agents: api:t1 a pod of 14 panes, 8 columns, 9 cells, more than a
+	# lane's 8 inner cells: its zone takes two lanes and the map widens.
+	var widened := _grown(grown, STACKED + 2)
+	var ahead := await _live_office(_stacked(fixture))
+	_feed(ahead, _stacked(grown))
+	_feed(ahead, widened)
+	var people := ahead.art.people
+	var later := OfficeWalkGraph.of(ahead.layout_plan(), PixelPerson.footprint(), PixelPerson.drawing_rect(people))
+	_done(ahead)
+	var office := await _live_office(_stacked(fixture))
 	_feed(office, _stacked(grown))
 	var body := _station(office, _pane("api:p5")).actor()
 	var door := OfficeShell.door(office.layout_plan())
 	var reached := false
 	for frame in 400:
 		_step(office, 1.0 / FPS)
-		var at := _floor_point(office, body)
-		if is_equal_approx(at.x, door.x) and at.y > 96.0 and at.y < 128.0:
+		if later.inside(_floor_point(office, body)):
 			reached = true
 			break
-	_check(reached, "they come in through the fixture row at the lift door's column")
+	_check(reached, "they walk in to where the widened map stands a table")
 	var here := _floor_point(office, body)
 	var width := office.layout_plan().floor_cells.size.x
-	# Eleven agents: api:t1 a pod of 14 panes, 8 columns, 9 cells, more than a
-	# lane's 8 inner cells: its zone takes two lanes and the map widens.
-	_feed(office, _grown(grown, STACKED + 2))
+	_feed(office, widened)
 	var plan := office.layout_plan()
 	_check(plan.floor_cells.size.x > width, "api:t1 grew too wide for its zone and widened the map")
 	_check(OfficeShell.door(plan).x > door.x, "the lift door moved right")
 	var graph := OfficeWalkGraph.of(plan, PixelPerson.footprint(), PixelPerson.drawing_rect(office.art.people))
-	_check(graph.inside(here), "the fixture-row barrier now runs where they stand")
+	_check(graph.inside(here), "the widened table now stands where they stand: %s" % here)
 	_check(not _walkers(office).has(body), "so they walk no further")
 	_eq(_floor_point(office, body), _seat_of(office, "api:p5"), "and sit where they belong")
 	_done(office)

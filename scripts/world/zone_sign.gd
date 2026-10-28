@@ -2,7 +2,10 @@ class_name OfficeZoneSign
 extends Node2D
 ## A zone's sign (scenes/world/zone_sign.tscn): hung from the zone's top-left
 ## partition post, whose foot is its origin (ZonePlacement.sign_at), so it
-## sorts with the post; it draws over the aisle row above the zone. It says the
+## sorts with the post; it draws over the aisle row above the zone, its board's
+## foot 2 into the zone's top (S3 BAND: the first zones' aisle row is the
+## walking lane, and the board keeps 4 clear of the pantry counter's front
+## there). It says the
 ## workspace's number (`3`, a mezzanine's `3A`) and its label, beside an accent
 ## stripe that a worktree group shares (accent_of()). Hovering it asks for the
 ## repository and the checkout (`hovered`); the office shows them in the world
