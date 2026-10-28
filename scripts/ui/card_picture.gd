@@ -36,6 +36,12 @@ const DOCKED_ROWS := 6
 const ANSWER_OUTCOME_LINES := 8
 ## What the AGENT page says once the viewer closed the card (its `×`).
 const CLOSED_MESSAGE := "This card is closed: pick a desk or a card, or press N."
+## The frames a portrait wears (Header.frame, frame_of()).
+const FRAME_BLOCKED := &"blocked"
+const FRAME_UNREAD := &"unread"
+const FRAME_WORKING := &"working"
+const FRAME_IDLE := &"idle"
+const FRAME_STALE := &"stale"
 
 
 ## Everything the picture is worked out from. Values only: what the office
@@ -181,8 +187,8 @@ class Header:
 	var note := ""
 	var has_note := false
 	## The portrait: whether there is a person at all (a shell has none), and
-	## whom to draw: provider, state, still starting, greyed and frozen, the
-	## pane's key (the same person as at the seat), and the badge.
+	## whom to draw: provider, state, still starting, greyed, the pane's key
+	## (the same person as at the seat), and the badge.
 	var person := false
 	var person_provider := ""
 	var person_state := &""
@@ -190,6 +196,10 @@ class Header:
 	var dimmed := false
 	var key := ""
 	var badge := &""
+	## The frame over the portrait's edge (frame_of()): blocked, unread,
+	## working or idle, the tile's groups, or stale on a dropped machine; empty
+	## with no person.
+	var frame := &""
 	## The compact line: name, caption and place in the header's words.
 	var summary := ""
 	var summary_tip := ""
@@ -375,10 +385,31 @@ static func header_of(facts: Facts) -> Header:
 	made.badge = (
 		ArtContract.UI_OFFLINE if facts.dimmed else ArtContract.UI_STARTING if starting else facts.state_badge
 	)
+	made.frame = frame_of(state, starting, facts.dimmed) if made.person else &""
 	# The compact line says the same three things in the same words.
 	made.summary = "%s · %s · %s" % [made.name, made.caption, pane.place()]
 	made.summary_tip = made.summary if facts.machine.is_empty() else made.summary + " @ " + facts.machine
 	return made
+
+
+## The frame a portrait wears for `state`: the top bar's group for it
+## (PortraitBarModel.of(): blocked, done as unread, working, and everything
+## else idle), stale on a dropped machine whatever the state (invariant 4),
+## and idle while an agent is still starting and does not ask (a start is
+## quiet, as its pill is; blocked while starting is blocked).
+static func frame_of(state: StringName, starting: bool, dimmed: bool) -> StringName:
+	if dimmed:
+		return FRAME_STALE
+	if starting:
+		return FRAME_IDLE
+	match state:
+		ArtContract.STATE_BLOCKED:
+			return FRAME_BLOCKED
+		ArtContract.STATE_DONE:
+			return FRAME_UNREAD
+		ArtContract.STATE_WORKING:
+			return FRAME_WORKING
+	return FRAME_IDLE
 
 
 # --- the preview ----------------------------------------------------------------

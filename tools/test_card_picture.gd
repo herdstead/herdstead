@@ -1307,6 +1307,46 @@ func test_a_shell_a_start_and_a_dropped_machine_are_quiet() -> void:
 	_check(not CardPicture.header_of(_facts(_agent("working"))).has_note, "no other state has a note")
 
 
+## The portrait's frame (S3 PORTRAIT P2, 2026-10-28: the card shows the seat's
+## person as a portrait): the top bar's group for the state (blocked, done as
+## unread, working, everything else idle), stale on a dropped machine whatever
+## the state, idle while a start does not ask, blocked when it does; a shell has
+## no portrait and no frame.
+func test_the_portrait_wears_its_states_frame_and_stale_on_a_dropped_machine() -> void:
+	var rows: Array[Array] = [
+		# state, starting, dimmed, provider, frame
+		["blocked", false, false, "claude", CardPicture.FRAME_BLOCKED],
+		["done", false, false, "claude", CardPicture.FRAME_UNREAD],
+		["working", false, false, "claude", CardPicture.FRAME_WORKING],
+		["idle", false, false, "claude", CardPicture.FRAME_IDLE],
+		["unknown", false, false, "claude", CardPicture.FRAME_IDLE],
+		["unknown", true, false, "claude", CardPicture.FRAME_IDLE],
+		["idle", true, false, "", CardPicture.FRAME_IDLE],
+		["blocked", true, false, "claude", CardPicture.FRAME_BLOCKED],
+		["working", false, true, "claude", CardPicture.FRAME_STALE],
+		["blocked", false, true, "claude", CardPicture.FRAME_STALE],
+		["done", false, true, "claude", CardPicture.FRAME_STALE],
+		["unknown", true, true, "claude", CardPicture.FRAME_STALE],
+		["idle", false, false, "", &""],
+		["idle", false, true, "", &""],
+	]
+	for row in rows:
+		var pane := _agent(str(row[0]), str(row[3]))
+		pane.starting = row[1]
+		var facts := _facts(pane)
+		facts.dimmed = row[2]
+		var header := CardPicture.header_of(facts)
+		_eq(
+			header.frame,
+			row[4],
+			(
+				"%s%s%s%s: the frame"
+				% [row[0], " starting" if row[1] else "", " dropped" if row[2] else "", "" if row[3] else " shell"]
+			)
+		)
+		_eq(header.person, not header.frame.is_empty(), "%s: a frame exactly when there is a person" % [row])
+
+
 ## The PANE list shows only what the pane has: a label, a foreground directory
 ## that differs, a session; and a seat the snapshot does not name is `?`.
 func test_the_pane_list_shows_only_what_the_pane_has() -> void:

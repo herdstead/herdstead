@@ -1154,6 +1154,9 @@ func test_a_walker_between_two_tables_sorts_by_their_feet() -> void:
 ## The agent card shows the person at the seat: two Claude panes on one floor,
 ## each picked by a real click, and each card's portrait resolves to that pane's
 ## seated worker, slot by slot. The two panes are two people.
+## S3 PORTRAIT P2 (2026-10-28): the card shows the seat's person as a portrait:
+## the portrait (PixelPortrait) carries the seat's look as `look.look`, beside its
+## own extras, where the small person carried it as `look`.
 func test_the_card_portrait_is_the_person_at_the_seat() -> void:
 	var two := _with(fixture, "api:p2", {"agent": "claude", "agent_status": "working"})
 	var office := await _live_office(two)
@@ -1172,7 +1175,11 @@ func test_the_card_portrait_is_the_person_at_the_seat() -> void:
 			continue
 		_eq(portrait.provider, "claude", "%s's card is claude's" % pane_id)
 		for slot in AvatarLook.SLOTS:
-			_eq(portrait.look.slot(slot), seated.look.slot(slot), "%s: the card's %s is the seat's" % [pane_id, slot])
+			_eq(
+				portrait.look.look.slot(slot),
+				seated.look.slot(slot),
+				"%s: the card's %s is the seat's" % [pane_id, slot]
+			)
 		looks.append(seated.look)
 	if looks.size() == 2:
 		var differ: Array[StringName] = []

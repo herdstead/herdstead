@@ -86,7 +86,7 @@ if mode == "script-error":
 if mode == "parse-error":
     print("Parse Error: deliberate engine error")
 marker, count = {
-    "test_card_picture": ("CARD PICTURE TESTS", 35),
+    "test_card_picture": ("CARD PICTURE TESTS", 36),
     "test_pick_follows_write": ("PICK FOLLOWS WRITE TESTS", 20),
     "test_launch_news": ("LAUNCH NEWS TESTS", 5),
     "test_refusal_ladder": ("REFUSAL LADDER TESTS", 23),
@@ -191,7 +191,7 @@ sys.exit(7 if mode == "nonzero" else 0)
                                 text=True, env=environment, timeout=30)
         self.assertEqual(listed.returncode, 0, listed.stdout + listed.stderr)
         suites = listed.stdout.splitlines()
-        for suite, fakes, cases in (("test_card_picture", 0, 35), ("test_launch_news", 2, 5)):
+        for suite, fakes, cases in (("test_card_picture", 0, 36), ("test_launch_news", 2, 5)):
             with self.subTest(suite=suite):
                 shard = f"SHARD={suites.index(suite) + 1}/{len(suites)}"
                 plan = subprocess.run(["make", "-s", "test-list", shard], cwd=self.root,
@@ -276,7 +276,7 @@ sys.exit(7 if mode == "nonzero" else 0)
         self.assertEqual(len(commands), 2, result.stdout)
         environment = dict(os.environ, CASE="test_leaked", SUITES="test_wrong", TIER="quick", SHARD="1/4",
                            ENGINE_CALLS=str(self.calls), FAKE_PIDS=str(self.fakes), ENGINE_RESULT="ok")
-        for command, summary in zip(commands, ("TESTS OK: 35 cases", "TESTS FILTERED OK: 1 cases")):
+        for command, summary in zip(commands, ("TESTS OK: 36 cases", "TESTS FILTERED OK: 1 cases")):
             with self.subTest(command=command):
                 rerun = subprocess.run(["bash", "-c", command], capture_output=True, text=True,
                                        env=environment, timeout=30)

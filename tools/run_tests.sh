@@ -123,13 +123,13 @@ MIN_CASES_EDGE_ARROWS=20
 # 29 -> 30 (Q-A1-4): the docked NEXT says the fixture's words whole at 960.
 # 30 -> 31 (S3 PANEL-a2 round 2, R1): a wide docked card's left column holds
 # the names and the preview takes the rest.
-MIN_CASES_BOTTOM_PANEL=31
+MIN_CASES_BOTTOM_PANEL=33
 MIN_CASES_FRAME_LOOP=9
 MIN_CASES_PIXEL_PEOPLE=53
 # The portraits family (S3 PORTRAIT P1, 2026-10-28): the manifest against the
 # people, every cell as imported, the seat's person and the extras' picks,
 # which cell each layer shows, the contract.
-MIN_CASES_PORTRAITS=11
+MIN_CASES_PORTRAITS=14
 MIN_CASES_AVATAR_STUDIO=13
 MIN_CASES_SAVED_LOOKS=16
 MIN_CASES_COMMANDS=37
@@ -171,7 +171,7 @@ MIN_CASES_REFUSAL_LADDER=23
 # state, only a short screen folds, docked NEXT in a row, and the docked
 # preview's six rows (twelve opened or answering). 34 -> 35 (S3 PANEL-a1
 # round 2): the docked form puts the outcome on one line under NEXT.
-MIN_CASES_CARD_PICTURE=35
+MIN_CASES_CARD_PICTURE=36
 # How a start that is over is said across cards of its pane: four transitions
 # by real input and the closing case, in a suite of its own because
 # tools/test_launch.gd stands at gdlint's file cap.

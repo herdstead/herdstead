@@ -87,6 +87,10 @@ provider** (D3, 2026-10-27): six agents of one kind are six different people. Ea
 
 The pick never reads state, waits, focus, selection or any live field. A pane that changes provider is one person leaving and another arriving
 (see **Identity** below), picked afresh; a new terminal or session is the same person.
+**A portrait is the same person** (`PixelPortrait`, the agent card's; S3 PORTRAIT P2): its look is resolved by the seat's own call
+(`PixelPortraits.look_of()`), so skin, hair, top, hat and glasses are the seat's. Its own extras, the expression (smile, smirk, focus),
+freckles and headphones (about 1 pane in 6 each), are looks too: picked once per pane by the same hash under their own names, never by
+state. A portrait is a still and shows no pose; the frame round it says the state.
 **Read the pane's name on the plate, the provider on the seat's mark (the laptop's lid or the chair's back), the state in the pose and badge**:
 clothing colour is neither a provider code nor a state.
 
@@ -178,7 +182,7 @@ The top bar's middle is who needs you, as faces (`OfficeBar`, `PortraitBarModel`
   The person's foot stands at the face window's middle, 37 under its top, in both forms (head and shoulders on a tile). The
   wordmark, the strip, `1 machine · 13 panes`, the chime switch and the two lines stand in the band's middle, as the short band
   holds them in its own.
-- **A card** (86×28): the seat's person, standing and facing front, still (`OfficeDraw.seat_face()`, the agent card's portrait path);
+- **A card** (86×28): the seat's person, standing and facing front, still (`OfficeDraw.seat_face()`);
   the display name over the space; the space after a flat 3×8 tag in its worktree group's carpet colour (`CarpetTag%d`, the index of
   `OfficeZoneSign.accent_of()`: a mezzanine wears its source's); a blocked card's wait at the end of that row, never cut. Frame: `ink` with a
   1-unit edge in the state's colour, 2 under the pointer; the selection a paper ring just inside that edge; a pane a hovered HUD line
@@ -212,8 +216,12 @@ EVENTS` (`PanelTabs`), the NEWS line to their right, and the page shown under th
   word, never a platform glyph. `Enter` or `Open ⏎` opens it to its full height (149 units) with the whole preview; so do the HISTORY and
   EVENTS tabs; `Esc` outside answer mode, `▾ Esc`, the AGENT tab (unless the card was opened) or selecting another pane folds it. A new
   terminal, agent, session or connection on the same pane does not fold it.
-- **The AGENT page** is the agent card (scene name `inspector`): the portrait in a 48×48 slot (the seat's person at its own size until the
-  portrait art lands), the name, the state in a pill of its colour and its wait, the seat line; the terminal preview; START AGENT or NEW PANE
+- **The AGENT page** is the agent card (scene name `inspector`): the portrait in a 48×48 slot (the seat's person as a head-and-shoulders
+  portrait, `PixelPortrait` from `OfficeDraw.seat_portrait()`, still: a 42×42 window at (3, 3) on the warm `cream` ground
+  (`PortraitWindow`), the 40×40 portrait whole in a clip 1 unit in, its bottom on the window's, and over its edge a 1-unit frame in the
+  state's colour, the top bar's: blocked, unread (done), working, `muted` for idle and for a start that does not ask (`PortraitFrame<State>`,
+  `CardPicture.Header.frame`); on a dropped machine's card an `ink` frame (`PortraitFrameStale`) and the whole window greyed by the pack's
+  stale tint (invariant 4); the state's badge stays beside the name), the name, the state in a pill of its colour and its wait, the seat line; the terminal preview; START AGENT or NEW PANE
   and the manage rows; the PANE details (pane id, label, directory, session, terminal title) where the card has room for them beside START
   AGENT (`details_beside_launch_from`, 1000 units of card); at the right end one column (`%Side`, B2's): NEXT, and under it the verbs
   (Monitor, Answer, Switch herdr here, its note and the outcome, one line of it docked). Docked from 960 units wide, NEXT's pill takes

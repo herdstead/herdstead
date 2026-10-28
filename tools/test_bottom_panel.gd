@@ -1481,6 +1481,92 @@ func test_the_unread_note_shows_only_for_a_done_agent() -> void:
 	_done(office)
 
 
+## The card's portrait (S3 PORTRAIT P2, 2026-10-28: the card shows the seat's
+## person as a portrait): the 48x48 slot holds a 42x42 window at (3, 3) on the
+## warm ground, a 40x40 clip 1 in, the portrait's bottom centre on the clip's,
+## and the frame over the window's edge.
+func test_the_card_portrait_stands_in_a_42_window_in_its_48_slot() -> void:
+	await _bare_hud(Vector2i(800, 480))
+	var frame := _frame_of(fixture)
+	hud.inspector.show_pane(frame.pane(_key_of("api:p1")), "", false)
+	await _frames(3)
+	var area: Control = hud.inspector.get_node("%PortraitArea")
+	var window: Panel = hud.inspector.get_node("%PortraitWindow")
+	var clip: Control = hud.inspector.get_node("%PortraitClip")
+	var edge: Panel = hud.inspector.get_node("%PortraitFrame")
+	_check(area.is_visible_in_tree(), "the slot shows")
+	_eq(area.size, Vector2(48, 48), "48x48 as before")
+	_eq(
+		Rect2(window.get_global_rect().position - area.get_global_rect().position, window.size),
+		Rect2(3, 3, 42, 42),
+		"the window 42x42 at (3, 3)"
+	)
+	_eq(window.theme_type_variation, &"PortraitWindow", "on the warm ground")
+	_eq(
+		Rect2(clip.get_global_rect().position - window.get_global_rect().position, clip.size),
+		Rect2(1, 1, 40, 40),
+		"the clip 40x40, 1 in"
+	)
+	_check(clip.clip_contents, "and it clips")
+	_eq(edge.get_global_rect(), window.get_global_rect(), "the frame over the window")
+	_check(edge.get_index() > window.get_index(), "drawn after it, over the portrait")
+	var portrait := hud.inspector.portrait()
+	_check(portrait != null and portrait.is_visible_in_tree(), "a portrait shows")
+	if portrait == null:
+		return
+	var rect := clip.get_global_rect()
+	_eq(
+		portrait.get_global_transform().origin,
+		Vector2(rect.get_center().x, rect.end.y),
+		"its bottom centre on the clip's"
+	)
+	_check(clip.is_ancestor_of(portrait), "inside the clip")
+	_eq(portrait.look.key(), art.portraits.look_of("claude", _key_of("api:p1")).key(), "the pane's portrait")
+	_eq(recorder.keys, [], "nothing went past the HUD")
+
+
+## The frame says the state in the tile's colours: blocked, done (unread),
+## working and idle picks each wear theirs; a dropped machine's card wears the
+## stale frame and the window is greyed; back online, neither. Every pick
+## re-dresses the same portrait, and the small person is gone from the card.
+func test_the_card_portrait_frame_says_the_state_and_greys_when_dropped() -> void:
+	await _bare_hud(Vector2i(800, 480))
+	var frame := _frame_of(fixture)
+	var window: Panel = hud.inspector.get_node("%PortraitWindow")
+	var edge: Panel = hud.inspector.get_node("%PortraitFrame")
+	var holder: Node2D = hud.inspector.get_node("%PortraitHolder")
+	var portrait: PixelPortrait = null
+	var keys: Array[String] = []
+	for step: Array in [
+		["web:p1", false, &"PortraitFrameBlocked"],
+		["web:p2", false, &"PortraitFrameDone"],
+		["api:p1", false, &"PortraitFrameWorking"],
+		["api:p2", false, &"PortraitFrameIdle"],
+		["api:p1", true, &"PortraitFrameStale"],
+		["api:p1", false, &"PortraitFrameWorking"],
+	]:
+		var pane_id: String = step[0]
+		var dropped: bool = step[1]
+		hud.inspector.show_pane(frame.pane(_key_of(pane_id)), "", dropped)
+		await _frames(2)
+		var what := "%s%s" % [pane_id, " dropped" if dropped else ""]
+		_eq(edge.theme_type_variation, step[2], "%s: the frame" % what)
+		var tint := art.stale_tint if dropped else Color.WHITE
+		_eq([window.modulate, edge.modulate], [tint, tint], "%s: the window and frame tinted" % what)
+		if portrait == null:
+			portrait = hud.inspector.portrait()
+		_eq(hud.inspector.portrait(), portrait, "%s: the same portrait" % what)
+		_eq(holder.get_child_count(), 1, "%s: one portrait in the holder" % what)
+		var provider := frame.pane(_key_of(pane_id)).provider
+		_eq(portrait.look.key(), art.portraits.look_of(provider, _key_of(pane_id)).key(), "%s: dressed for it" % what)
+		keys.append(portrait.look.key())
+	_check(keys[0] != keys[1] and keys[1] != keys[2], "another pane, another portrait on the same node")
+	var people := hud.inspector.find_children("*", "", true, false).filter(
+		func(node: Node) -> bool: return node is PixelPerson
+	)
+	_eq(people.size(), 0, "no small person on the card")
+
+
 func _offers(count: int) -> Array[LaunchBlock.Offer]:
 	var kinds := ["claude", "codex", "pi", "qodercli", "opencode", "copilot", "hermes", "gemini"]
 	var offers: Array[LaunchBlock.Offer] = []
