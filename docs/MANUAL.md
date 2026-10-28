@@ -170,11 +170,13 @@ then the **portrait strip**, who needs you, as faces: every agent of the online 
 blocked first in the order `N` walks them (the leftmost is whom `N` picks, with how long it has waited: `12m`, `+` after
 a time means "at least"), then the done (UNREAD) oldest first, then the working and the idle in place order. A card is
 the seat's person, the pane's name, and its space after a tag in the colour of its worktree group's carpet; its frame
-is its state's colour, and the selected pane's card has a white ring. A dropped machine's agents have no card.
-On a window at least 400 units high (the tall top bar) each card is a **tile**: the person's head and shoulders in a
-window framed in the state's colour, a small mark in its corner (`!` blocked, an envelope for done, a green dot
-working, a white dot idle), and the name and the place under it. On a lower window the cards are horizontal, the
-face beside the words, with no mark.
+is its state's colour, and the selected pane's card has a ring inside it (white on a horizontal card, dark on a tile's
+cream window). A dropped machine's agents have no card.
+On a window at least 400 units high (the tall top bar, 70 units) each card is a **tile**: the seat's person as a
+head-and-shoulders portrait on a cream ground, framed in the state's colour, a small mark in its corner (`!` blocked, an
+envelope for done, a green dot working, a white dot idle), and the name and the place under it; a face-only tile shows the
+middle of the portrait. On a lower window (a 32-unit bar) the cards are horizontal, the small standing person beside the
+words, with no mark.
 
 - When the agents do not fit, the strip folds them by a fixed ladder: the working and the idle into a fold
   (`+12` over `working`), then the done and the blocked into faces alone, then the done into a fold, then tallies
@@ -425,8 +427,8 @@ urgent state (the strategic view's cell colours), furniture dims, and the theme 
 the strategic view is open or a text box has the keyboard; a press that started there has to be released first.
 
 **Pointing.** Hovering a HUD line about a pane (a NEWS entry, an EVENTS row, a HISTORY line, a portrait card) draws a
-still dashed frame in `ink` / `paper` around that seat; for a pane on another machine, its portrait card gets a white
-ring instead. Hovering an edge arrow rings its zone's blocked cards. Pointing never selects, reads, writes, pans or changes map.
+still dashed frame in `ink` / `paper` around that seat; for a pane on another machine, its portrait card gets a ring
+instead (white on a horizontal card, grey on a tile). Hovering an edge arrow rings its zone's blocked cards. Pointing never selects, reads, writes, pans or changes map.
 
 ## Strategic view
 

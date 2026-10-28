@@ -620,7 +620,7 @@ func test_hovering_a_news_item_points_at_its_desk_without_selecting() -> void:
 
 
 ## An EVENTS row for a pane on another machine outlines that pane's card in
-## the top bar (a 1-unit paper ring, PortraitPointed) and draws nothing in the
+## the top bar (a 1-unit ring, PortraitPointed or PortraitPointedTile) and draws nothing in the
 ## world; leaving puts the card back. A row for a pane in another zone of the
 ## shown map points at its desk, as for any desk of the map. (S3 BAR-b,
 ## 2026-10-27: it outlined the zone's SPACES row, whose in-view marks are gone.)

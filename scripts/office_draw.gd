@@ -553,8 +553,8 @@ func station(sorted: Node2D, at_table: OfficeTable, column: int, side: String) -
 ## `actor` when there is one, else a new person, instanced once and kept (its
 ## feet disabled: no floor holds them). The same face and hair as at the seat
 ## (vary_by(key)), dressed in `pack`'s people as `provider`; re-dressing the same
-## node is new textures, never a new person. The top bar's faces come from
-## here.
+## node is new textures, never a new person. The short top bar's cards'
+## faces come from here.
 static func seat_face(holder: Node2D, actor: PixelPerson, pack: ArtPack, provider: String, key: String) -> PixelPerson:
 	var person := actor
 	if person == null:
@@ -572,7 +572,8 @@ static func seat_face(holder: Node2D, actor: PixelPerson, pack: ArtPack, provide
 ## once and kept. The same person as at the seat by construction (the portraits
 ## resolve the look by the seat's own call, PixelPortraits.look_of()), plus the
 ## portrait's own extras for the pane; re-dressing the same node is new
-## textures, never a new portrait. The agent card's portrait comes from here.
+## textures, never a new portrait. The agent card's portrait and the tall top
+## bar's tiles' come from here.
 static func seat_portrait(
 	holder: Node2D, kept: PixelPortrait, pack: ArtPack, provider: String, key: String
 ) -> PixelPortrait:
