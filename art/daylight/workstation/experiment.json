@@ -1,0 +1,317 @@
+{
+  "experiment": true,
+  "image": "state-workstation.png",
+  "density": 2,
+  "frame_size": [
+    80,
+    80
+  ],
+  "pivot": [
+    37.5,
+    70
+  ],
+  "columns": 4,
+  "rows": 6,
+  "palette": {
+    "deep": "1b252b",
+    "slate": "4d5b61",
+    "cream": "f6e8c8",
+    "paper": "fff4dc",
+    "plaster": "e6d5b3",
+    "cream_shadow": "c6b590",
+    "wood_light": "e4b779",
+    "wood": "c58d55",
+    "wood_shadow": "916441",
+    "wood_dark": "664b37",
+    "floor": "cda36e",
+    "floor_light": "d5ad7b",
+    "floor_dark": "bc935f",
+    "hair": "624c3f",
+    "hair_dark": "433b35",
+    "hair_light": "88644a",
+    "jacket": "535e66",
+    "jacket_light": "7c878d",
+    "muted": "a0a9ad",
+    "contact_shadow": "7b583d",
+    "person.ink": "2a2231",
+    "person.eye": "1b1624",
+    "person.catchlight": "f0f4fa",
+    "person.shoe": "4a3a3b",
+    "person.shoe_light": "6d5856",
+    "person.skin.0": "f5d3b4",
+    "person.skin.1": "e2ae8a",
+    "person.skin.2": "bb7f60",
+    "person.hair_colour.0": "85604a",
+    "person.hair_colour.1": "684a39",
+    "person.hair_colour.2": "4f372b",
+    "person.top.0": "8c9bb4",
+    "person.top.1": "66758f",
+    "person.top.2": "485269",
+    "person.legs.0": "62667a",
+    "person.legs.1": "4c4f61",
+    "person.legs.2": "3b3d4c"
+  },
+  "animations": {
+    "working": {
+      "frames": [
+        1,
+        0,
+        2,
+        0,
+        3,
+        0,
+        4,
+        6,
+        4,
+        8,
+        13,
+        12,
+        2,
+        0,
+        3,
+        0,
+        2,
+        0,
+        1,
+        5,
+        4,
+        6,
+        10,
+        8,
+        11,
+        12,
+        14,
+        2,
+        0
+      ],
+      "seconds": [
+        0.12,
+        0.08,
+        0.12,
+        0.08,
+        0.1,
+        0.1,
+        0.06,
+        0.1,
+        0.04,
+        0.2,
+        0.12,
+        0.08,
+        0.12,
+        0.08,
+        0.1,
+        0.16,
+        0.1,
+        0.24,
+        0.1,
+        0.02,
+        0.08,
+        0.1,
+        0.02,
+        0.08,
+        0.1,
+        0.16,
+        0.04,
+        0.06,
+        0.24
+      ],
+      "loop": true
+    },
+    "idle": {
+      "frames": [
+        0,
+        12,
+        16,
+        17,
+        16,
+        12,
+        0
+      ],
+      "seconds": [
+        1.4,
+        1.0,
+        0.04,
+        0.08,
+        0.04,
+        0.44,
+        1.0
+      ],
+      "loop": true
+    },
+    "blocked_enter": {
+      "frames": [
+        18,
+        19
+      ],
+      "seconds": [
+        0.24,
+        0.24
+      ],
+      "loop": false
+    },
+    "blocked": {
+      "frames": [
+        19,
+        20,
+        21,
+        20,
+        19
+      ],
+      "seconds": [
+        2.6,
+        0.04,
+        0.08,
+        0.04,
+        1.24
+      ],
+      "loop": true
+    },
+    "blocked_exit": {
+      "frames": [
+        23,
+        0
+      ],
+      "seconds": [
+        0.12,
+        0.12
+      ],
+      "loop": false
+    },
+    "done": {
+      "frames": [
+        0,
+        4,
+        22,
+        12,
+        0
+      ],
+      "seconds": [
+        0.16,
+        0.12,
+        0.2,
+        0.16,
+        0.36
+      ],
+      "loop": false
+    }
+  },
+  "measurements": [
+    {
+      "frame": 0,
+      "sha256": "0f7bf0f1a4021056325e1e29b6a41766e2bd25e37b6fcc88d4e31ef803bf2bf1"
+    },
+    {
+      "frame": 1,
+      "sha256": "ecdf8a6fdc04a95c7be974e3e95226a3341692ec8ecb61ab842bf2083962732d"
+    },
+    {
+      "frame": 2,
+      "sha256": "1b3c7dc69d8471e62f6ef04bb727cf7235f642942c0637cfbf95524d6c58c4f8"
+    },
+    {
+      "frame": 3,
+      "sha256": "fd78526f7f9ccc5a7c2289dc7757013d70922b2254aa31d5cd8e700056d50a95"
+    },
+    {
+      "frame": 4,
+      "sha256": "82f0a9b88ca76c7f12696e3ab4e29f2a7f671711bdbe03a6ebae69a79f33f8f9"
+    },
+    {
+      "frame": 5,
+      "sha256": "f4c14d4ad8c144fbd0b8f84dd7eec590fde69e4159a6a7ee2341508dffc7e4b8"
+    },
+    {
+      "frame": 6,
+      "sha256": "3da42cdeeba431a4b80b09865291aeaf455d736be5b56c36253b1a24d00fd567"
+    },
+    {
+      "frame": 7,
+      "sha256": "8ea396b9ce70afddd94bfcdf8a7f0e215021395e8c221f9dde835b95cf46bd15"
+    },
+    {
+      "frame": 8,
+      "sha256": "9f6d002e4b64b2815c54ab8ea9b0f7b660a2c3d1cbbca3fff799b5193f21c787"
+    },
+    {
+      "frame": 9,
+      "sha256": "0dc77c49173404e0e7490805eb2ddf0b885cae732c65b9ab72878a88a12ef9cb"
+    },
+    {
+      "frame": 10,
+      "sha256": "4d0278f03486e147546cd06efc2826c632cbdf60c31842421e64e7bd1440b3d2"
+    },
+    {
+      "frame": 11,
+      "sha256": "f778d086af59cc85c94e92b5259cf5cb114e7b4a6599258cee7526ee8d74321b"
+    },
+    {
+      "frame": 12,
+      "sha256": "0c07672e16eab011ab6cee2c52005a5f9a61717bb3ad025c2357f3f0336bdbe5"
+    },
+    {
+      "frame": 13,
+      "sha256": "4b5a9c2c07ab7960341ddf8ca26982a4d0a9921860817c8a482180f26c06de32"
+    },
+    {
+      "frame": 14,
+      "sha256": "5ebf9c3a237c06d049b415fb54d9a0f0c734c4de4102fc335fdd2957a74fab88"
+    },
+    {
+      "frame": 15,
+      "sha256": "6bb465d6bfc08c16613f34974fcb23147b9f2865cd329205ca2ea5a8014d1db9"
+    },
+    {
+      "frame": 16,
+      "sha256": "29e666841928ac0217eda78de4bb85fd53f3cbeb59f5e2bfcca033c6c62bec81"
+    },
+    {
+      "frame": 17,
+      "sha256": "10601888f77aecc812b6ef5baeade0cd8cd0ba211b3df64ed0f5e3c947c3e4a5"
+    },
+    {
+      "frame": 18,
+      "sha256": "242c64e6c9533ee631224ee7a396f6b0355ec9eff822efdbbc692510b1621e03"
+    },
+    {
+      "frame": 19,
+      "sha256": "7ef7babf420746ece1e048dc99f89e976a8ab882990d419403910815fe8d395f"
+    },
+    {
+      "frame": 20,
+      "sha256": "9b937899c9094a21e24f10cce80d3790b26d06894f9d2c38e2757e33fc4fcd63"
+    },
+    {
+      "frame": 21,
+      "sha256": "0f128be069fe083609fa1df21aa66563873dde853772a224b7c3150d9f8b755a"
+    },
+    {
+      "frame": 22,
+      "sha256": "a891a52fd971e49a7c8a37dda1ae10c2dab6e6890ae07d2134080fdb856ed448"
+    },
+    {
+      "frame": 23,
+      "sha256": "e32acf3fc7e4a5a47dd1fa8dc0759a5f21f6bff6732c3f1ca675d78563aba4b9"
+    }
+  ],
+  "poses": {
+    "idle_half": 16,
+    "idle_closed": 17,
+    "settling_back": 18,
+    "reclined": 19,
+    "blocked_half": 20,
+    "blocked_closed": 21,
+    "done_nod": 22,
+    "sitting_forward": 23
+  },
+  "provenance": {
+    "base": "build/desk-chair-a/frames",
+    "painter_attachment": "https://ampcode.com/user-content/attachments/d223de06cd9280407e165ded10af72686c049a460601052dc49125614abe8eb3-file.png",
+    "painting_sha256": "b67223ca8099555ed222f98b99bb6d546a5d234ae2848f880a65d76eb4460344",
+    "painter_calls": 1,
+    "use": "Two head/back poses and crossed trousers/shoes only; generated furniture and spare hands discarded",
+    "signal": "Native-pixel question bubble appears once, holds, disappears at exit",
+    "unchanged": "Working, idle and done frames/timings; desktop, twin monitors, keyboard, metal feet",
+    "runtime": "One whole-image Sprite2D, one AnimationPlayer; no rig or customization",
+    "scope": "Independent workstation experiment, not production"
+  }
+}
