@@ -6,7 +6,7 @@
 # unknown until the class cache has it. Nothing else notices, so everything
 # that starts Godot on the project asks here first: tools/run_tests.sh,
 # tools/capture.sh, tools/perf.sh and the Makefile's check-scripts,
-# check-packs, smoke and walk-strips (through its `imported` target).
+# check-packs, smoke and workstation-strips (through its `imported` target).
 #
 #   tools/import_if_stale.sh           import only when stale, quietly (the log only on failure)
 #   tools/import_if_stale.sh --force   always import, the log on stdout (`make import`, CI)

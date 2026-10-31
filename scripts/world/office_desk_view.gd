@@ -18,26 +18,11 @@ var _sorted: Node2D
 var _name := ""
 
 
-## Node upper bound for a measured pod and everything this view owns, even
-## when every retained slot gains a person. Measured on the dressed prefabs
-## (the geometry suite's count, test_desk_node_budget_bounds_real_prefabs_and_retained_empty_slots,
-## at 2, 4, 18 and 250 columns: 172, 320, 1356 and 18524 nodes with everybody
-## seated): 24 fixed nodes (20 of the pod: its body, 13 holders, the far
-## laptops' marks' among them, the footprint, the overlay, the frame and its 4
-## bars; 4 of the background: itself, the lens's wash, the contact holder and the
-## tab label; the marks' holder took the node the row-wall sign left spare when
-## lane B2a took the sign off) and 74 per column (21 of the pod's: a desk, an
-## apron and a screen module, a bracket, 2 laptops, the far one's mark, 2
-## three-node grommets, 2 lamps, 2 papers, 2 seat and 2 standing markers; 1
-## contact shadow; two stations of at most 16 nodes (15 since the pantry's `Away`
-## rectangle went, D2: the bound keeps the spare), each chair with its mark, and two 10-node
-## people). The bound decides which maps fit
-## FloorLayoutPolicy.max_desk_nodes. Geometry tests count real dressed prefabs
-## so changes to the scenes cannot silently invalidate this allocation
-## contract. This bounds the settled live group, not temporary queue_free
-## replacements.
+## Two permanent 16-node stations and two markers per column; the pod and
+## background use eleven fixed nodes. Empty slots cost the same as full
+## ones. Geometry tests count the dressed scenes to guard this allocation cap.
 static func node_budget(capacity: int) -> int:
-	return 24 + 74 * capacity
+	return 11 + 34 * capacity
 
 
 func setup(drawing: OfficeDraw, ground: Node2D, sorted: Node2D, tab_key: String) -> void:
@@ -119,14 +104,25 @@ func _sync_stations(next: DeskPlacement) -> void:
 	)
 	stations = retained
 	pane_stations = assigned
-	# A vacated old slot may now hold another pane. Restore final occupancy only
-	# after all rebindings, so a later vacate cannot erase the earlier occupant.
-	# Retained shells keep their prompt and retained agents their laptop's mark;
-	# new occupants are furnished afterwards.
-	for station in stations:
-		var worker := station.actor()
-		var provider := worker.provider if worker != null else ""
-		table.equip(station.column, station.side, not station.pane_key.is_empty(), worker == null, provider)
+
+
+## Transfer ownership before either tab reconciles. The station remains a
+## Sorted child, so its animation and signal connections never leave the tree.
+func take_station(key: String) -> OfficeStation:
+	var station: OfficeStation = pane_stations.get(key)
+	if station != null:
+		pane_stations.erase(key)
+		stations.erase(station)
+		# Release the old slot name before any destination reuses that slot.
+		station.name = "MovingSeat%d" % station.get_instance_id()
+		placement = null
+	return station
+
+
+func adopt_station(station: OfficeStation) -> void:
+	stations.append(station)
+	pane_stations[station.pane_key] = station
+	placement = null
 
 
 func _available(used: Dictionary[OfficeStation, bool]) -> OfficeStation:
@@ -141,30 +137,27 @@ static func _slot(column: int, side: String) -> int:
 
 
 func _draw_background(next: DeskPlacement) -> void:
-	# The table owns SeatContacts. Move that holder to the new background before
-	# deleting the old one; reparenting a queued-for-deletion node cannot save it.
 	var previous := background
 	_ground.remove_child(previous)
 	background = Node2D.new()
 	background.name = _name + "Ground"
 	_ground.add_child(background)
+	# Four units below the drawing leave the pod's selection frame clear.
+	var title_at := Vector2(0, next.measure.render_rect.end.y + 4.0)
 	# No rug: the pod stands on the floor itself. The lens's wash covers the
-	# cells under the pod's drawing and its title (which stands right under the
-	# drawing, and with the near seats at the desk starts on a cell's edge),
-	# under the contact shadows, the sign and the title.
-	var visual := next.measure.render_rect.grow_side(SIDE_BOTTOM, OfficeDraw.TAB_LABEL_HEIGHT)
+	# cells under both the complete drawing and the tab title, including its gap.
+	var title_rect := Rect2(title_at, Vector2(next.measure.table_width, OfficeDraw.TAB_LABEL_HEIGHT))
+	var visual := next.measure.render_rect.merge(title_rect)
 	var grid := float(FloorLayoutPolicy.GRID)
 	var start := (visual.position / grid).floor()
 	var end := (visual.end / grid).ceil()
 	wash = _pen.box(background, Rect2(next.origin + start * grid, (end - start) * grid), ArtContract.SLATE)
 	wash.name = "LensWash"
 	wash.visible = false
-	table.contact_shadows(background)
 	previous.queue_free()
 	# The tab's name, small, on the floor right under the table's drawing and
-	# no wider than the table (OfficeDraw.tab_label()).
-	var under := Vector2(next.origin.x, next.origin.y + next.measure.render_rect.end.y)
-	title = _pen.tab_label(background, under, next.measure.table_width)
+	# no wider than the table; four units leave the selection frame clear.
+	title = _pen.tab_label(background, next.origin + title_at, next.measure.table_width)
 
 
 func release() -> void:

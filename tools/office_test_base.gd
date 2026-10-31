@@ -118,7 +118,9 @@ func _done(office: OfficeDouble) -> void:
 	_live_offices.erase(office)
 	_fed.erase(office.get_instance_id())
 	root.remove_child(office)
-	office.queue_free()
+	# Another case may resize the root before a deferred free runs. Disconnect
+	# its window/viewport callbacks now, with the rest of this owned fixture.
+	office.free()
 
 
 ## A script error can skip a case's explicit teardown. Remove its attention
@@ -146,28 +148,27 @@ func _open_tab_of(snapshot: Dictionary, workspace_id: String, tab_id: String) ->
 	return result
 
 
-## The task-lamp level of every seat with a pane on the shown map, by pane id;
+## The focus-underline level of every seat with a pane on the shown map, by pane id;
 ## only workspace `zone`'s (the fixture's pane ids begin with it) when given.
 func _lamps(office: OfficeDouble, zone := "") -> Dictionary:
 	var result := {}
 	for station in _seats(office):
 		if not zone.is_empty() and not HerdrFleet.split_key(station.pane_key)[1].begins_with(zone + ":"):
 			continue
-		result[HerdrFleet.split_key(station.pane_key)[1]] = _lamp_level(station.table, station.column, station.side)
+		result[HerdrFleet.split_key(station.pane_key)[1]] = _lamp_level(station)
 	return result
 
 
-## What a seat's task lamp is drawn at, read off the light itself rather than
-## off what the office meant to ask for.
-func _lamp_level(table: OfficeTable, column: int, side: String) -> OfficeTable.Lamp:
-	var lit := table.task_light(column, side)
-	if not lit.visible:
-		return OfficeTable.Lamp.OFF
-	for level: OfficeTable.Lamp in [OfficeTable.Lamp.DIM, OfficeTable.Lamp.ON, OfficeTable.Lamp.FOCUS]:
-		if is_equal_approx(lit.color.a, table.lamp_color(level).a):
-			return level
-	_fail("a task lamp is drawn at alpha %s, which is none of the four levels" % lit.color.a)
-	return OfficeTable.Lamp.OFF
+## The enum is retained, but its drawing is the station's focus underline,
+## not a separate lamp or a table component.
+func _lamp_level(station: OfficeStation) -> OfficeTable.Lamp:
+	var underline: Polygon2D = station.get_node("Focus")
+	_eq(underline.visible, station.light_level != OfficeTable.Lamp.OFF, "the focus underline agrees with its level")
+	var color := station.art.color(ArtContract.TASK_LIGHT)
+	var strength: Array[float] = [0.0, 0.15, 0.35, 1.0]
+	color.a = strength[station.light_level]
+	_eq(underline.color, color, "its drawn colour and strength agree too")
+	return station.light_level
 
 
 ## Every table of the shown floor, by name, with the node drawing it.
@@ -218,16 +219,23 @@ func _with(snapshot: Dictionary, pane_id: String, changes: Dictionary) -> Dictio
 	return result
 
 
-## An update has set people walking on the shown floor: prove it did, and that
-## the floor mid-walk is not what it settles into (so not what a rebuild draws,
-## which walks nobody), then walk every walk to its end the office's own way
-## (OfficeDouble.settle()). A case compares with a rebuild only after this.
-func _walked(office: OfficeDouble, when: String) -> void:
-	_check(not office.floor_view.presentation.walkers().is_empty(), "somebody really walks " + when)
-	var walking := _fingerprint(office.world)
-	office.settle()
-	_check(office.floor_view.presentation.walkers().is_empty(), "and settles " + when)
-	_check(_fingerprint(office.world) != walking, "the floor mid-walk is not the settled one " + when)
+## Finish only finite image clips before comparing two independently started
+## worlds. Loop clocks and frozen frames are never advanced here. Transition
+## order and refresh clock retention are asserted separately, not normalized
+## away by the rebuild comparison.
+func _finish_workstation_clips(office: OfficeDouble) -> void:
+	for station in _seats(office):
+		var actor := station.actor()
+		if actor == null:
+			continue
+		for step in 3:
+			if (
+				not actor.is_playing()
+				or actor.track not in [&"blocked_enter", &"blocked_exit", &"done", &"starting", &"unknown"]
+			):
+				break
+			var player: AnimationPlayer = actor.get_node("AnimationPlayer")
+			player.advance(player.current_animation_length + 0.001)
 
 
 ## Compare the world after in-place updates with a rebuild from the same data.
@@ -240,6 +248,7 @@ func _same_as_rebuild(office: OfficeDouble, when: String) -> void:
 	# Text normally updates on a 250ms beat. Sample both worlds after that same
 	# text evaluation, not one before its first wait label tick and one after it.
 	office.attention._update_waits()
+	_finish_workstation_clips(office)
 	var updated := _fingerprint(office.world)
 	var rects := _desk_rects(office)
 	var models := {}
@@ -251,6 +260,7 @@ func _same_as_rebuild(office: OfficeDouble, when: String) -> void:
 	await _frames(2)
 	await _physics_frames(2)
 	office.attention._update_waits()
+	_finish_workstation_clips(office)
 	var rebuilt := _fingerprint(office.world)
 	_eq(updated.size(), rebuilt.size(), "node count " + when)
 	for index in mini(updated.size(), rebuilt.size()):
@@ -283,7 +293,10 @@ func _fingerprint(node: Node, depth := 0, out: Array = []) -> Array:
 		parts.append_array([placed.position, placed.rotation, placed.scale])
 	if node is Control:
 		var control: Control = node
-		parts.append_array([control.position, control.size])
+		# Containers leave a hidden label's old allocation untouched. That
+		# invisible geometry is not part of the rendered rebuild contract.
+		if control.is_visible_in_tree():
+			parts.append_array([control.position, control.size])
 	if node is Sprite2D:
 		var sprite: Sprite2D = node
 		# A pulsing badge's offset follows attention's clock, like an actor's frame;
@@ -296,24 +309,28 @@ func _fingerprint(node: Node, depth := 0, out: Array = []) -> Array:
 		# A hidden badge or an undressed layer has no texture.
 		var image := sprite.texture
 		var texture: Variant = [image.resource_path, image.get_size()] if image != null else null
-		# A mirrored layer is a different picture of the same strip.
-		parts.append_array([texture, offset, sprite.centered, sprite.region_enabled, sprite.hframes, sprite.flip_h])
-	if node is PixelPerson:
-		var person: PixelPerson = node
-		var player: AnimationPlayer = person.get_node("AnimationPlayer")
-		# What the worker plays, at what pace and which way they face, never how
-		# far into it they are.
+		# The complete sheet's cell size and any mirroring change its drawing.
 		parts.append_array(
 			[
-				person.animation,
-				person.track,
-				player.assigned_animation,
-				person.is_playing(),
-				person.paced(),
-				person.look.key(),
-				person.facing
+				texture,
+				offset,
+				sprite.centered,
+				sprite.region_enabled,
+				sprite.hframes,
+				sprite.vframes,
+				sprite.flip_h,
+				sprite.flip_v
 			]
 		)
+	if node is WorkstationActor:
+		var actor: WorkstationActor = node
+		var player: AnimationPlayer = actor.get_node("AnimationPlayer")
+		# A complete image, its provider and requested state, never its clock.
+		parts.append_array([actor.provider, actor.animation, actor.is_playing()])
+		# A permanent empty image stops the player but has no requested agent
+		# state. Its previously assigned clip is not displayed by the empty PNG.
+		if not actor.animation.is_empty():
+			parts.append_array([actor.track, player.assigned_animation])
 	if node is CollisionShape2D:
 		var shape: CollisionShape2D = node
 		parts.append(shape.disabled)
@@ -324,6 +341,9 @@ func _fingerprint(node: Node, depth := 0, out: Array = []) -> Array:
 	if node is Polygon2D:
 		var polygon: Polygon2D = node
 		parts.append_array([polygon.polygon, polygon.color])
+	if node is Line2D:
+		var line: Line2D = node
+		parts.append_array([line.points, line.width, line.default_color, line.closed])
 	if node is Label:
 		var label: Label = node
 		parts.append_array(
@@ -399,33 +419,31 @@ func _actor_progress(office: OfficeDouble, skip: String) -> Dictionary:
 	return result
 
 
-## A worker's node, track and place in it, and every layer's frame.
-func _actor_state(actor: PixelPerson) -> Array:
+## A whole-image actor's node, clip clock and Body frame.
+func _actor_state(actor: WorkstationActor) -> Array:
 	var player: AnimationPlayer = actor.get_node("AnimationPlayer")
-	return [actor.get_instance_id(), player.assigned_animation, player.current_animation_position, _layer_frames(actor)]
-
-
-## The frame every layer of a worker shows, in PixelPeople.LAYERS order.
-func _layer_frames(actor: PixelPerson) -> Array:
-	return PixelPeople.LAYERS.map(
-		func(layer: StringName) -> int: return _sprite(actor, PixelPeople.SPRITES[layer]).frame
-	)
+	return [
+		actor.get_instance_id(),
+		player.assigned_animation,
+		player.current_animation_position,
+		_sprite(actor, "Body").frame
+	]
 
 
 func _all_actor_ids(office: OfficeDouble) -> Array:
 	var ids: Array = []
-	for actor: Node in get_nodes_in_group("office_actors"):
-		if office.world.is_ancestor_of(actor):
-			ids.append(actor.get_instance_id())
+	for station in _seats(office):
+		if station.actor() != null:
+			ids.append(station.actor().get_instance_id())
 	ids.sort()
 	return ids
 
 
 func _playing(office: OfficeDouble) -> Array:
 	var seen := {}
-	for actor: PixelPerson in get_nodes_in_group("office_actors"):
-		if office.world.is_ancestor_of(actor):
-			seen[actor.is_playing()] = true
+	for station in _seats(office):
+		if station.actor() != null:
+			seen[station.actor().is_playing()] = true
 	return seen.keys()
 
 
@@ -826,11 +844,10 @@ func _wall_cells(ground: Node2D) -> Dictionary:
 	return found
 
 
-## A table's footprint in the world's own coordinates.
+## A measured pod's physical envelope in global coordinates. There is no
+## furniture collider or separately assembled table surface.
 func _table_rect(table: OfficeTable) -> Rect2:
-	var shape: CollisionShape2D = table.get_node("Footprint")
-	var box: RectangleShape2D = shape.shape
-	return Rect2(shape.global_position - box.size / 2.0, box.size)
+	return table.global_transform * table.geometry.physical_rect
 
 
 ## Every line of text on the shown floor's plate, which is built with the floor
@@ -866,19 +883,10 @@ func _label(parent: Node, path: String) -> Label:
 	return parent.get_node(path)
 
 
-## The worker seated at a station, or null when the seat is a shell.
-func _worker(station: Node) -> PixelPerson:
-	return station.get_node_or_null("Actor") as PixelPerson
-
-
-## A seated worker's collision shape, which is off while they are sitting.
-func _feet(station: Node) -> CollisionShape2D:
-	return station.get_node("Actor/Feet")
-
-
-## A worker's own collision shape, for the tests that hold the worker already.
-func _shape_of(actor: PixelPerson) -> CollisionShape2D:
-	return actor.get_node("Feet")
+## The occupied workstation, or null for a shell/vacancy. Actor is a permanent
+## child even when actor() is null, so node presence is not occupancy.
+func _worker(station: Node) -> WorkstationActor:
+	return (station as OfficeStation).actor()
 
 
 ## The name plate over a seat.
@@ -891,29 +899,6 @@ func _screen_of(hud: OfficeHud) -> Control:
 	return hud.get_node("Screen")
 
 
-## The three sorted y values of a far seat, lowest first.
-func _rising(values: Array) -> bool:
-	var first: float = values[0]
-	var second: float = values[1]
-	var third: float = values[2]
-	return first < second and second < third
-
-
-## The same three for a near seat, which sort the other way round.
-func _falling(values: Array) -> bool:
-	var first: float = values[0]
-	var second: float = values[1]
-	var third: float = values[2]
-	return third < second and second < first
-
-
-## Whether every layer of a worker shows the same frame, which is what one
-## AnimationPlayer per person buys.
-func _all_same(frames: Array) -> bool:
-	var first: int = frames[0]
-	return frames.all(func(f: int) -> bool: return f == first)
-
-
 ## The seat drawn for `key`, found the way the tree holds it.
 func _station(office: OfficeDouble, key: String) -> OfficeStation:
 	for station in _seats(office):
@@ -921,20 +906,6 @@ func _station(office: OfficeDouble, key: String) -> OfficeStation:
 			return station
 	_fail("no seat for " + key)
 	return null
-
-
-## Where the worker of `station` stands up to, in global coordinates.
-func _spot(station: OfficeStation) -> Vector2:
-	return station.table.standing(station.column, station.side).global_position
-
-
-## The size of a worker's feet, as scenes/people/pixel_person.tscn draws them.
-func _feet_size() -> Vector2:
-	var person: PixelPerson = OfficeDraw.PERSON_SCENE.instantiate()
-	var box: RectangleShape2D = _shape_of(person).shape
-	var size := box.size
-	person.free()
-	return size
 
 
 ## The fixture with an agent at api:p3, so floor 1 seats workers on both sides of
@@ -1071,12 +1042,6 @@ func _subtree_ids(node: Node) -> Array:
 		[node.get_instance_id()]
 		+ node.find_children("*", "", true, false).map(func(each: Node) -> int: return each.get_instance_id())
 	)
-
-
-## Whether strip column `frame` is one of `track`'s frames.
-func _within(track: PixelPeople.Track, frame: Variant) -> bool:
-	var column: int = frame
-	return column >= track.start and column < track.start + track.frame_count()
 
 
 ## Each partition sprite of `zone` on the shown map, as "texture@position".

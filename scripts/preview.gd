@@ -1,30 +1,25 @@
 extends Node2D
 ## Asset showroom with explicit mock data. Not a Herdr client.
 ##
-## A fixed 800x480 logical showroom: the project's canvas_items stretch scales it
-## to whatever window it is opened in, and the pack's textures are the same at
-## every window size, so a resize has nothing to rebuild.
+## The default 1920x960 capture gives the expanded canvas 960x480 logical
+## units at 2x. Two zone close-ups use that width, without the machine shell's
+## entry band or extra furniture. Every workstation stays at its native size.
 
-## Each mock workspace's piece of map, nine cells square, as the office lays a
-## map out: the top wall's two cell rows, its zone's aisle row (where the sign
-## hangs), then the zone, one pod row deep, between the two side walls.
-const ROOM_WIDTH := 288.0
-const ROOM_CELLS := 9
-const ZONE_CELLS := Rect2i(1, 3, 7, 6)
-## A zone's pod stands one pad column in from its left partition, as the
-## office's planner stands a zone's first pod (FloorLayoutPolicy.zone_pad_left_cells).
-const POD_PAD_CELLS := 1
-## Each zone's pod: four desks, eight seats.
+## Each zone's pod: four columns, eight complete workstations.
 const TABLE_COLUMNS := 4
+## The pod stands one floor cell from the zone's left edge, with a
+## small clear band above it. The zones' sizes come from OfficeTable.measure(),
+## including the tab label and the lower partition, rounded to floor cells.
+const POD_PAD := Vector2(FloorLayoutPolicy.GRID, 8)
+const ZONE_GAP := 16.0
 ## The showroom's own size.
-const SHOWROOM := Vector2(800, 480)
+const SHOWROOM := Vector2(960, 480)
+const STRIP := Rect2(16, SHOWROOM.y - 80, SHOWROOM.x - 32, 72)
 ## The HUD is laid out on a shorter screen than the showroom, so the staff
 ## panel ends a gap above the state strip instead of touching or covering it.
-## The panel is its one line there, as at every size until it is opened:
-## at full height it would cover the zones. (The screen is also under the HUD's
-## `staff_tall_from`, which only decides where an opened panel leaves the NEWS
-## strip, and the showroom has none.)
-const HUD_SCREEN := Vector2(800, 392)
+## Below staff_tall_from the bar and panel use their compact forms; the
+## showroom keeps both, and leaves the state samples outside the HUD.
+const HUD_SCREEN := Vector2(SHOWROOM.x, STRIP.position.y - 2)
 const HUD_SCENE := preload("res://scenes/ui/hud.tscn")
 ## `--overview=open`: the mock overview's span, and its panes. Each pane is
 ## [machine, pane id, agent, space, tab, minute it appears, [minute, state]…]:
@@ -105,43 +100,27 @@ func _ready() -> void:
 	sorted.name = "Sorted"
 	sorted.y_sort_enabled = true
 	world.add_child(sorted)
-	pen.box(self, Rect2(0, 32, 800, 448), ArtContract.DEEP)
+	pen.box(self, Rect2(Vector2.ZERO, SHOWROOM), ArtContract.DEEP)
 	# Keep the office layer over the background, below the screen-space UI.
 	move_child(world, get_child_count() - 1)
 	var hud := _hud()
-	var api := zone(Vector2(16, 48), 1, "API", "main", true)
-	var web_at := Vector2(320, 48)
-	var web := zone(web_at, 2, "WEB", "feat/ui", false)
-	# Two bystanders prove the sorting is positional, not a per-seat rule: one
-	# stands behind the WEB pod's right end (the pod hides their legs), one
-	# in front of the API pod's left end (they hide the apron and a leg). The
-	# two done workers (WEB far, API near) sit, with their paper on the desk.
-	var curly := AvatarLook.with_slots(
-		{
-			AvatarLook.HAIR_STYLE: &"curl",
-			AvatarLook.HAIR_COLOUR: &"auburn",
-			AvatarLook.TOP: &"cream",
-			AvatarLook.LEGS: &"brown"
-		}
+	var measured := OfficeTable.measure(TABLE_COLUMNS)
+	var frame := measured.render_rect.grow(OfficeTable.FRAME_OUTSIDE)
+	var needed := Vector2(
+		POD_PAD.x + measured.reserved_rect.size.x,
+		POD_PAD.y + frame.size.y + OfficeDraw.TAB_LABEL_HEIGHT + OfficeShell.PARTITION_DRAW
 	)
-	bystander(web.position + Vector2(web.width + 14, -OfficeTable.SURFACE_DEPTH + 14), AvatarLook.FRONT, curly)
-	var capped := AvatarLook.with_slots(
-		{
-			AvatarLook.HEADWEAR: &"cap",
-			AvatarLook.HEADWEAR_COLOUR: &"sea",
-			AvatarLook.TOP: &"terra",
-			AvatarLook.LEGS: &"taupe"
-		}
-	)
-	bystander(api.position + Vector2(-14, 30), AvatarLook.BACK, capped)
-	var hall := pen.layer(ground, Vector2(16, 336))
-	for x in 19:
-		hall.set_cell(Vector2i(x, 0), 0, art.cell(ArtContract.FLOOR_WALKWAY))
-	legend(hud.world_rect(), web_at.x + ROOM_WIDTH + 16)
+	var cells := Vector2i((needed / FloorLayoutPolicy.GRID).ceil())
+	var zone_size := Vector2(cells * FloorLayoutPolicy.GRID)
+	var at := Vector2(roundf((SHOWROOM.x - zone_size.x * 2.0 - ZONE_GAP) / 2.0), hud.world_rect().position.y)
+	zone(at, 1, "API", "main", true, measured, cells)
+	zone(at + Vector2(zone_size.x + ZONE_GAP, 0), 2, "WEB", "feat/ui", false, measured, cells)
 	if stale:
 		world.modulate = art.stale_tint
-		for person: PixelPerson in get_tree().get_nodes_in_group("office_actors"):
-			person.pause()
+		for child in sorted.get_children():
+			if child is OfficeStation:
+				var station: OfficeStation = child
+				station.freeze(true)
 	state_strip()
 	# The top bar and the overview read a mock state log (the live office's
 	# comes from the fleet): two hours, a pane that appeared, a machine that dropped.
@@ -161,8 +140,8 @@ func _ready() -> void:
 		hud.show_overview(_mock_overview(mock), art)
 	print(
 		(
-			"PREVIEW_OK: 2 zones, 2 pods, 16 seats, 11 workers (3 done, 3 blocked), 1 shell, 4 vacant, 2 bystanders,"
-			+ " 5 Herdr states, starting/offline, generic fallback"
+			"PREVIEW_OK: 2 zones, 2 pods, 16 seats, 11 workers (3 done, 3 blocked), 1 shell, 4 vacant,"
+			+ " 5 Herdr states, starting/offline, generic whole-image portraits"
 		)
 	)
 	if args.has("capture"):
@@ -187,51 +166,25 @@ func _record(target: String) -> void:
 	get_tree().quit()
 
 
-## One mock workspace as the office draws one: a zone (its carpet, its partitions, its sign
-## saying `number` and `space`) holding one tab, a pod of four desks named `tab`
-## under it, with a station on both sides of each desk. `split` (API) seats six
-## workers and a shell and is selected; the other (WEB) seats four workers and
-## leaves its near seats vacant.
-func zone(at: Vector2, number: int, space: String, tab: String, split: bool) -> OfficeTable:
-	var grid := float(FloorLayoutPolicy.GRID)
+## One workspace close-up: its carpet, partitions and sign, and one measured
+## pod with its tab's name below. Both logical rows face the viewer. `split`
+## (API) seats seven workers and a shell and is selected; WEB seats four
+## workers and leaves its lower row vacant. No second body or machine shell
+## is fitted around these complete images.
+func zone(
+	at: Vector2, number: int, space: String, tab: String, split: bool, measured: DeskMeasure, cells: Vector2i
+) -> OfficeTable:
 	var floor_layer := pen.layer(ground, at)
-	for y in ROOM_CELLS:
-		for x in ROOM_CELLS:
+	for y in cells.y:
+		for x in cells.x:
 			floor_layer.set_cell(Vector2i(x, y), 0, art.cell(ArtContract.FLOOR_WOOD[(x + y * 2) % 3]))
-	# The same shell the live office lays round a map: the top wall's two
-	# courses of brick, and a side wall down each edge. Furniture, bound to nothing.
-	var shell := pen.layer(ground, at)
-	for y in ROOM_CELLS:
-		shell.set_cell(Vector2i(0, y), 0, art.cell(ArtContract.WALL_SIDE_LEFT))
-		shell.set_cell(Vector2i(ROOM_CELLS - 1, y), 0, art.cell(ArtContract.WALL_SIDE_RIGHT))
-	for x in ROOM_CELLS:
-		var end: StringName = ArtContract.WALL_ENDS[0 if x == 0 else 2 if x == ROOM_CELLS - 1 else 1]
-		for course in ArtContract.WALL_COURSES.size():
-			shell.set_cell(
-				Vector2i(x, course), 0, art.cell(ArtContract.wall_cell(ArtContract.WALL_COURSES[course], end))
-			)
-	# One piece of map has the lift door on its top wall and a plant at the
-	# wall's foot, the other a window and a side table carrying a desk piece (the
-	# pack's first): a 288-unit wall cannot hold every piece without one standing
-	# in front of another, so the two share them out. The door is in the wall's
-	# middle, clear of the zone's sign at its left.
-	var beside := at + Vector2(ROOM_WIDTH - 56, OfficeShell.TOP_RUN_FOOT)
-	if split:
-		pen.prop(ground, ArtContract.PROP_DOOR, at + Vector2(ROOM_WIDTH / 2.0, OfficeShell.DOOR_FOOT))
-		pen.decor(sorted, ArtContract.PROP_PLANT, beside)
-	else:
-		pen.prop(ground, ArtContract.PROP_WINDOW, at + Vector2(80, OfficeShell.WINDOW_FOOT))
-		var side_table := pen.decor(sorted, ArtContract.PROP_SIDE_TABLE, beside)
-		var desk_pieces := art.items_in(&"desk")
-		if side_table != null and not desk_pieces.is_empty():
-			side_table.hold(art, desk_pieces[0].id)
 	# The zone, placed by hand where a plan would place it, and drawn by the
 	# office's own helpers: its partitions in a y-sorted holder (each piece sorts
 	# by its own foot), its sign at the top-left post's foot, cut short of the
 	# top-right post.
 	var placed := ZonePlacement.new()
 	placed.zone_key = space
-	placed.cells = ZONE_CELLS
+	placed.cells = Rect2i(Vector2i.ZERO, cells)
 	# Its carpet inside the partitions, in the family its key wears, flat on
 	# the floor under the pod, as the office lays it (OfficeFloorView).
 	var carpet := NinePatchRect.new()
@@ -264,25 +217,23 @@ func zone(at: Vector2, number: int, space: String, tab: String, split: bool) -> 
 	sorted.add_child(board)
 	var right_post := OfficeShell.drawn(pen, ArtContract.PROP_PARTITION_POST, OfficeShell.right_post(placed))
 	board.show_zone(model, right_post.position.x - post.x)
-	# The pod: its reservation's top at the zone's top (the far tags' rows over
-	# the desks), and its tab's name on the floor right under its drawing.
-	var measured := OfficeTable.measure(TABLE_COLUMNS)
-	var origin := (
-		at
-		+ Vector2(ZONE_CELLS.position + Vector2i(POD_PAD_CELLS, 0)) * grid
-		- Vector2(0, measured.reserved_rect.position.y)
-	)
+	# A close-up needs the whole drawing and its frame, not the live map's
+	# walking reservation above and below. The tab name clears the frame, and
+	# the cell-rounded zone leaves it clear of the bottom partition as well.
+	var frame := measured.render_rect.grow(OfficeTable.FRAME_OUTSIDE)
+	var origin := at + POD_PAD - Vector2(0, frame.position.y)
 	var columns: Array = measured.columns
 	var table := pen.table(sorted, ground, space, origin, measured.table_width, columns)
 	table.set_selected(split)
-	var title := pen.tab_label(ground, origin + Vector2(0, measured.render_rect.end.y), measured.table_width)
+	var title := pen.tab_label(ground, origin + Vector2(0, frame.end.y), measured.table_width)
+	title.name = "Tab" + space
 	title.text = tab.to_upper()
 	var seats: Dictionary[String, OfficeStation] = {}
 	for column in columns.size():
 		for side: String in OfficeTable.SIDES:
 			seats["%d/%s" % [column, side]] = pen.station(sorted, table, column, side)
-	# WEB's first far worker is done: they sit with paper on the desk, as API's
-	# near done workers do (one on the pod's last desk). A far worker on each pod
+	# WEB's first far worker is done, as are API's near done workers
+	# (one on the pod's last desk). A far worker on each pod
 	# and a near one on API are blocked, with a chip; the showroom has no clock,
 	# so API's chips show one sample wait each, and WEB's blocked worker, whose
 	# start this office never saw, shows the badge alone.
@@ -300,8 +251,8 @@ func zone(at: Vector2, number: int, space: String, tab: String, split: bool) -> 
 		seats["2/near"].chip().show_wait(4000.0)
 		seats["3/near"].furnish("claude", ArtContract.STATE_DONE, false, false, "near-4")
 	# API is the tab its workspace has open, with herdr's focus on its first
-	# seat; WEB is a tab nobody has open, so every lamp on it is dimmed. The four
-	# near seats of WEB carry no pane at all: a chair, no screen, no lamp.
+	# seat; WEB is a tab nobody has open, so its focus underlines are dimmed. The
+	# four near seats of WEB carry no pane: the complete empty workstation image.
 	# The mock panes have no titles: each is called by its tab (DisplayName).
 	for spot: String in seats:
 		var level := OfficeTable.Lamp.ON if split else OfficeTable.Lamp.DIM
@@ -311,53 +262,19 @@ func zone(at: Vector2, number: int, space: String, tab: String, split: bool) -> 
 	return table
 
 
-## Someone standing on the floor at `at`, facing `orientation`.
-func bystander(at: Vector2, orientation: StringName, wearing: AvatarLook) -> void:
-	var person: PixelPerson = OfficeDraw.PERSON_SCENE.instantiate()
-	person.name = "Bystander"
-	var look := wearing.copy()
-	look.context = AvatarLook.STAND
-	look.orientation = orientation
-	person.configure(art.people, "generic", look)
-	person.position = at
-	sorted.add_child(person, true)
-	person.play_state(ArtContract.ANIMATION_IDLE)
-	person.add_to_group("office_actors")
-
-
-## The legend: what the showroom's pieces stand for, on a panel of its own in
-## the world's room (`area`, the HUD's world_rect()) right of the zones from
-## `left` on, where no HUD panel covers it. Ink on the pack's panel reads in
-## every pack, as the state strip does.
-func legend(area: Rect2, left: float) -> void:
+## The legend shares the state strip's panel, beside rather than over its
+## native-size portraits. Four short lines leave the full width to the pods.
+func legend(parent: Node, bounds: Rect2) -> void:
 	var lines := PackedStringArray(
 		[
-			"SPACES ARE ZONES",
-			"TABS ARE PODS OF DESKS",
-			"PANES ARE SEATS",
-			"",
-			"LAPTOPS ARE TERMINALS",
-			"$_ = SHELL",
-			"THE LIT LAMP IS HERDR'S FOCUS",
-			"",
-			"PAPER = DONE, NOT YET SEEN",
-			"CHIP = BLOCKED (BADGE + WAIT)",
-			"HOVER OR SELECT A SEAT FOR ITS NAME",
-			"THE TWO BYSTANDERS ARE NOBODY'S AGENT",
+			"SPACES = ZONES / TABS = PODS / PANES = SEATS",
+			"NO PERSON = SHELL OR VACANT / ONE GENERIC LOOK",
+			"CHIP = BLOCKED + WAIT / UNREAD = DONE, NOT SEEN",
+			"BRIGHT UNDERLINE = HERDR'S FOCUS / HOVER = NAME",
 		]
 	)
-	# Its right edge lines up with the state strip's and the staff panel's.
-	var corner := Vector2(minf(area.end.x, SHOWROOM.x - 16), area.end.y)
-	var bounds := Rect2(Vector2(left, area.position.y), corner - Vector2(left, area.position.y))
-	pen.panel(self, bounds)
-	var text := Label.new()
-	# Wrapped before it is sized: a line is only as wide as the panel.
-	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	text.text = "\n".join(lines)
-	pen.style(text, 8, ArtContract.INK)
-	text.position = bounds.position + Vector2(8, 6)
-	text.size = bounds.size - Vector2(16, 12)
-	add_child(text)
+	var text := pen.clipped(parent, "\n".join(lines), bounds.position, bounds.size, 8, ArtContract.INK)
+	text.name = "Legend"
 
 
 ## The showroom shows the office's own bar and bottom panel, fed mock data, so
@@ -388,26 +305,32 @@ func _hud() -> OfficeHud:
 
 
 func state_strip() -> void:
-	pen.panel(self, Rect2(16, 384, 768, 84))
-	pen.label(self, "STATE SAMPLES", Vector2(26, 390), Vector2(90, 12), 10, ArtContract.SLATE)
+	var strip := Control.new()
+	strip.name = "StateStrip"
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	strip.position = STRIP.position
+	strip.size = STRIP.size
+	add_child(strip)
+	pen.panel(strip, Rect2(Vector2.ZERO, strip.size))
+	var stats_width := 112.0
+	var pitch := 64.0
+	pen.clipped(strip, "STATE SAMPLES", Vector2(10, 6), Vector2(stats_width - 10, 14), 10, ArtContract.SLATE)
 	# Herdr's five states, then the two display overlays that are not herdr's.
 	var states: Array[StringName] = ArtContract.STATES.duplicate()
 	states.append_array([ArtContract.UI_STARTING, ArtContract.UI_OFFLINE])
 	for index in states.size():
 		var state := states[index]
-		var at := Vector2(152 + index * 84, 448)
+		var at := Vector2(stats_width + (index + 0.5) * pitch, art.workstation.portrait_pivot.y + 10)
 		var drawn := art.state(state)
-		var starting := state == ArtContract.UI_STARTING
-		var animation := art.animation_for_state(state, starting)
-		var who := "unrecognized-provider" if starting else "codex"
-		var sample := pen.portrait(self, who, animation, at)
+		var holder := Node2D.new()
+		holder.position = at
+		strip.add_child(holder)
+		OfficeDraw.seat_portrait(holder, null, art, "generic", "")
 		if state == ArtContract.UI_OFFLINE:
-			var holder: Node2D = sample.get_parent()
 			holder.modulate = art.stale_tint
-			sample.pause()
-		pen.icon(self, drawn.badge if drawn != null else state, at + Vector2(24, -26))
-		pen.label(
-			self,
+		pen.icon(strip, drawn.badge if drawn != null else state, at + Vector2(24, -26))
+		pen.clipped(
+			strip,
 			"UNREAD" if state == ArtContract.STATE_DONE else str(state).to_upper(),
 			at + Vector2(-32, 4),
 			Vector2(64, 12),
@@ -417,12 +340,14 @@ func state_strip() -> void:
 		)
 	# What this pack actually holds, in its own pixels: geometry stays in
 	# density-1 units, so only these numbers move with the density. The tiles are
-	# the pack's own art; the frames belong to the shared pixel people and carry
-	# that family's density (one pixel per unit), not this pack's.
-	var frame := art.people.frame_size * art.people.density
+	# the pack's own art; the frames belong to the generic workstation family
+	# and carry that family's density, not this pack's.
+	var frame := art.workstation.frame_size * art.workstation.density
 	var sampling := "Nearest" if art.filter == CanvasItem.TEXTURE_FILTER_NEAREST else "Linear + mips"
 	var built := "%dpx tiles\n%dx%d frames\n%s" % [art.tile_size * art.density, frame.x, frame.y, sampling]
-	pen.label(self, built, Vector2(26, 411), Vector2(92, 42), 10, ArtContract.SLATE)
+	pen.clipped(strip, built, Vector2(10, 23), Vector2(stats_width - 10, 42), 10, ArtContract.SLATE)
+	var legend_left := stats_width + states.size() * pitch + 16
+	legend(strip, Rect2(Vector2(legend_left, 8), Vector2(strip.size.x - legend_left - 10, strip.size.y - 16)))
 
 
 ## A state log of MOCK_PANES on a clock of its own, replayed in time order,

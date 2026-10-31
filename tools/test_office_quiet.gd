@@ -2,10 +2,10 @@ extends "res://tools/office_test_base.gd"
 ## What a refresh does not redo: the fleet's changes in one frame are drawn
 ## by one refresh at the frame's end (OfficeScene._queue_refresh()), while the
 ## state log still hears every one of them; and a refresh on a plan the cache
-## kept builds no placement signature, lays no structure out again, redraws no
-## lamp that burns as it did and keeps every node. Counters, not milliseconds:
-## DeskPlacement.signatures, OfficeFloorView.structures, OfficeTable.lamps_drawn
-## and OfficeDouble.refreshes. The live office (office_test_base) is why the
+## kept builds no placement signature, lays no structure out again, keeps the
+## focus underlines and every node. Counters, not milliseconds:
+## DeskPlacement.signatures, OfficeFloorView.structures and OfficeDouble.refreshes.
+## The live office (office_test_base) is why the
 ## suite runs --read-only with its own --socket and --work.
 
 ## Five status events for five panes of the fixture, each a real change.
@@ -150,13 +150,15 @@ func test_a_quiet_refresh_builds_no_signature_and_keeps_every_node() -> void:
 	var nodes := _floor_nodes(office)
 	var signatures := DeskPlacement.signatures
 	var structures := office.floor_view.structures
-	var lamps := _lamps_drawn(office)
+	var lights := _focus_views(office)
+	var progress := _actor_progress(office, "")
 	var plan := office.floor_view.plan
 	office.refresh()
 	office.refresh()
 	_eq(DeskPlacement.signatures - signatures, 0, "no placement signature for an unchanged plan")
 	_eq(office.floor_view.structures - structures, 0, "no structural pass")
-	_eq(_lamps_drawn(office) - lamps, 0, "no lamp redrawn")
+	_eq(_focus_views(office), lights, "focus underlines unchanged")
+	_eq(_actor_progress(office, ""), progress, "quiet refresh never resets an image clock")
 	_eq(office.floor_view.plan, plan, "the same plan")
 	_eq(_floor_nodes(office), nodes, "every node kept, in order")
 	# A status change keeps the plan too: only the seat that changed is furnished.
@@ -164,7 +166,7 @@ func test_a_quiet_refresh_builds_no_signature_and_keeps_every_node() -> void:
 	await _frames(1)
 	_eq(DeskPlacement.signatures - signatures, 0, "a status change builds no signature either")
 	_eq(office.floor_view.structures - structures, 0, "nor a structural pass")
-	_eq(_lamps_drawn(office) - lamps, 0, "nor a lamp")
+	_eq(_focus_views(office), lights, "nor any focus underline changed")
 	_eq(office.frame.pane(_pk("api:p2")).state, "working", "and it is drawn")
 	_done(office)
 
@@ -221,32 +223,34 @@ func test_a_new_plan_is_laid_out_and_the_next_refresh_is_quiet() -> void:
 	_done(office)
 
 
-## The lamps still follow herdr's focus and the tab a workspace has open, and
-## a refresh redraws exactly the lamps whose level moved.
-func test_lamps_follow_focus_and_redraw_only_what_moved() -> void:
+## Focus underlines follow herdr focus and the open tab without touching the
+## image or its clock. The old table-lamp draw counter is retired.
+func test_focus_underlines_change_only_where_the_level_moves() -> void:
 	var office := await _live_office()
 	var before := _lamps(office)
 	_eq(before.get("api:p1", -1), OfficeTable.Lamp.FOCUS, "herdr's focus burns brightest")
-	var lamps := _lamps_drawn(office)
+	var lights := _focus_views(office)
+	var progress := _actor_progress(office, "")
 	_feed(office, _focused_on(fixture, "api:p2"))
 	var after := _lamps(office)
 	_eq(after.get("api:p2", -1), OfficeTable.Lamp.FOCUS, "the focus moved to api:p2")
 	_eq(after.get("api:p1", -1), OfficeTable.Lamp.ON, "and api:p1 burns normally")
-	_eq(_lamps_drawn(office) - lamps, _moved(before, after), "only the lamps that moved were drawn")
-	lamps = _lamps_drawn(office)
+	_eq(_moved(lights, _focus_views(office)), _moved(before, after), "only changed levels alter the drawing")
+	_eq(_actor_progress(office, ""), progress, "focus changes no image clock")
+	lights = _focus_views(office)
 	var open := _open_tab_of(_focused_on(fixture, "api:p2"), "api", "api:t2")
 	_feed(office, open)
 	var dimmed := _lamps(office)
 	_eq(dimmed.get("api:p1", -1), OfficeTable.Lamp.DIM, "a tab its workspace does not have open is dimmed")
 	_eq(dimmed.get("api:p4", -1), OfficeTable.Lamp.ON, "the open one burns")
-	_eq(_lamps_drawn(office) - lamps, _moved(after, dimmed), "again only the lamps that moved")
+	_eq(_moved(lights, _focus_views(office)), _moved(after, dimmed), "again only changed levels alter the drawing")
+	_eq(_actor_progress(office, ""), progress, "open-tab changes no image clock")
 	_done(office)
 
 
-## A table set up again for another pack draws every lamp it keeps anew, at
-## the level it had: a lamp's colour is the pack's, so the guard that skips a
-## lamp already at its level must not skip these.
-func test_a_table_set_up_for_another_pack_redraws_its_lamps() -> void:
+## Redressing a station changes its underline colour, not its retained level
+## or whole-image family. Reapplying the same level changes no visible property.
+func test_station_redressing_keeps_focus_levels_and_updates_their_colour() -> void:
 	var day := ArtPack.from_manifest(MANIFESTS[0])
 	var other := ArtPack.from_manifest(_second_pack())
 	var world := Node2D.new()
@@ -255,18 +259,24 @@ func test_a_table_set_up_for_another_pack_redraws_its_lamps() -> void:
 	world.add_child(ground)
 	world.add_child(sorted)
 	root.add_child(world)
-	var table := OfficeDraw.new(day).table(sorted, ground, "Lamps", Vector2(160, 240), 160, [48.0, 112.0])
-	table.light(0, "far", OfficeTable.Lamp.FOCUS)
-	table.light(1, "near", OfficeTable.Lamp.DIM)
-	var drawn := table.lamps_drawn
-	table.light(0, "far", OfficeTable.Lamp.FOCUS)
-	_eq(table.lamps_drawn, drawn, "a lamp already at its level is not drawn again")
-	var day_focus := table.lamp_color(OfficeTable.Lamp.FOCUS)
-	_check(table.setup(other, 160, [48.0, 112.0]), "set up for the other pack")
-	_check(table.lamp_color(OfficeTable.Lamp.FOCUS) != day_focus, "its focus lamp is another colour")
-	_eq(table.task_light(0, "far").color, table.lamp_color(OfficeTable.Lamp.FOCUS), "the focus lamp in its colour")
-	_eq(table.task_light(1, "near").color, table.lamp_color(OfficeTable.Lamp.DIM), "the dim one too")
-	_check(table.task_light(0, "far").visible and not table.task_light(0, "near").visible, "on and off as before")
+	var pen := OfficeDraw.new(day)
+	var measure := OfficeTable.measure(4)
+	var table := pen.table(sorted, ground, "Focus", Vector2(160, 240), measure.table_width, measure.columns)
+	for level: OfficeTable.Lamp in [OfficeTable.Lamp.FOCUS, OfficeTable.Lamp.DIM, OfficeTable.Lamp.OFF]:
+		var station := pen.station(sorted, table, 0, "far")
+		station.light(level)
+		var underline: Polygon2D = station.get_node("Focus")
+		var before := _fingerprint(station)
+		station.light(level)
+		_eq(_fingerprint(station), before, "same level leaves every drawing property alone")
+		var colour := underline.color
+		var texture := _sprite(station, "Actor/Body").texture
+		station.setup(OfficeDraw.new(other), table, 0, "far")
+		_eq(station.light_level, level, "the level survives redressing")
+		_eq(underline.visible, level != OfficeTable.Lamp.OFF, "visibility survives redressing")
+		_eq(underline.color.a, colour.a, "the same strength")
+		_check(underline.color != colour, "the other pack changes the underline colour")
+		_eq(_sprite(station, "Actor/Body").texture, texture, "the generic image is not recoloured")
 	world.free()
 
 
@@ -290,12 +300,12 @@ func _floor_nodes(office: OfficeDouble) -> Array[int]:
 	return ids
 
 
-## How many lamps every table of the shown floor has drawn, together.
-func _lamps_drawn(office: OfficeDouble) -> int:
-	var total := 0
-	for table in office.floor_view.tables:
-		total += table.lamps_drawn
-	return total
+func _focus_views(office: OfficeDouble) -> Dictionary:
+	var views := {}
+	for station in _seats(office):
+		var underline: Polygon2D = station.get_node("Focus")
+		views[station.pane_key] = [underline.get_instance_id(), underline.visible, underline.color, underline.polygon]
+	return views
 
 
 ## How many seats burn at another level in `after` than in `before`.

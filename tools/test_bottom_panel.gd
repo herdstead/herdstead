@@ -1558,8 +1558,8 @@ func test_the_unread_note_shows_only_for_a_done_agent() -> void:
 	_done(office)
 
 
-## The card's portrait (S3 PORTRAIT P2, 2026-10-28: the card shows the seat's
-## person as a portrait): the 48x48 slot holds a 42x42 window at (3, 3) on the
+## The card's generic whole-image portrait: the 48x48 slot holds a 42x42
+## window at (3, 3) on the
 ## warm ground, a 40x40 clip 1 in, the portrait's bottom centre on the clip's,
 ## and the frame over the window's edge.
 func test_the_card_portrait_stands_in_a_42_window_in_its_48_slot() -> void:
@@ -1598,22 +1598,26 @@ func test_the_card_portrait_stands_in_a_42_window_in_its_48_slot() -> void:
 		"its bottom centre on the clip's"
 	)
 	_check(clip.is_ancestor_of(portrait), "inside the clip")
-	_eq(portrait.look.key(), art.portraits.look_of("claude", _key_of("api:p1")).key(), "the pane's portrait")
+	_eq(portrait.texture, art.workstation.portrait_texture(), "the generic whole image")
+	_eq(portrait.scale, art.workstation.unit_scale(), "only the family's density scale")
+	_eq(portrait.texture_filter, art.workstation.filter, "the family's own sampling")
+	_eq(portrait.get_global_transform() * portrait.get_rect(), rect, "the whole image fits the clip")
+	_eq(portrait.get_child_count(), 0, "no clothing layers or rig")
 	_eq(recorder.keys, [], "nothing went past the HUD")
 
 
 ## The frame says the state in the tile's colours: blocked, done (unread),
 ## working and idle picks each wear theirs; a dropped machine's card wears the
 ## stale frame and the window is greyed; back online, neither. Every pick
-## re-dresses the same portrait, and the small person is gone from the card.
+## keeps the same generic image and sprite, with no rig or customized parts.
 func test_the_card_portrait_frame_says_the_state_and_greys_when_dropped() -> void:
 	await _bare_hud(Vector2i(800, 480))
 	var frame := _frame_of(fixture)
 	var window: Panel = hud.inspector.get_node("%PortraitWindow")
 	var edge: Panel = hud.inspector.get_node("%PortraitFrame")
 	var holder: Node2D = hud.inspector.get_node("%PortraitHolder")
-	var portrait: PixelPortrait = null
-	var keys: Array[String] = []
+	var portrait: Sprite2D = null
+	var image := art.workstation.portrait_texture()
 	for step: Array in [
 		["web:p1", false, &"PortraitFrameBlocked"],
 		["web:p2", false, &"PortraitFrameDone"],
@@ -1634,14 +1638,12 @@ func test_the_card_portrait_frame_says_the_state_and_greys_when_dropped() -> voi
 			portrait = hud.inspector.portrait()
 		_eq(hud.inspector.portrait(), portrait, "%s: the same portrait" % what)
 		_eq(holder.get_child_count(), 1, "%s: one portrait in the holder" % what)
-		var provider := frame.pane(_key_of(pane_id)).provider
-		_eq(portrait.look.key(), art.portraits.look_of(provider, _key_of(pane_id)).key(), "%s: dressed for it" % what)
-		keys.append(portrait.look.key())
-	_check(keys[0] != keys[1] and keys[1] != keys[2], "another pane, another portrait on the same node")
+		_eq(portrait.texture, image, "%s: the same generic image, regardless of pane or provider" % what)
+		_eq(portrait.get_child_count(), 0, "%s: a single sprite, not composed parts" % what)
 	var people := hud.inspector.find_children("*", "", true, false).filter(
-		func(node: Node) -> bool: return node is PixelPerson
+		func(node: Node) -> bool: return node is PixelPerson or node is PixelPortrait
 	)
-	_eq(people.size(), 0, "no small person on the card")
+	_eq(people.size(), 0, "no rig or layered portrait on the card")
 
 
 func _offers(count: int) -> Array[LaunchBlock.Offer]:

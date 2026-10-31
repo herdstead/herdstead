@@ -24,6 +24,8 @@ const FIXTURE_COUNTS: Array[int] = [2, 2, 3, 2]
 const FIXTURE_PANES := "1 machine · 13 panes"
 ## The asset showroom, whose top bar shows a mock of its own.
 const SHOWROOM_SCENE := "res://scenes/preview.tscn"
+## The existing 1920x960 capture's logical canvas at its integer 2x scale.
+const SHOWROOM_SCREEN := Vector2i(960, 480)
 
 
 func _initialize() -> void:
@@ -401,6 +403,7 @@ func test_a_fold_click_moves_no_panel_and_plans_nothing() -> void:
 ## The showroom's top bar is the office's own: its pack name and its status
 ## fit the right-hand lines in both packs (the shipped one and a second), with no ellipsis.
 func test_the_showroom_status_fits_the_lines() -> void:
+	root.size = SHOWROOM_SCREEN
 	for manifest: String in [MANIFESTS[0], _second_pack()]:
 		var showroom: Node = (load("res://scenes/preview.tscn") as PackedScene).instantiate()
 		showroom.set("manifest_path", manifest)
@@ -418,6 +421,7 @@ func test_the_showroom_status_fits_the_lines() -> void:
 			_check(_fits_label(status_line), "`%s` fits (%s)" % [status_line.text, manifest])
 			_check(_fits_label(theme_line), "`%s` fits (%s)" % [theme_line.text, manifest])
 		showroom.free()
+	root.size = SCREEN
 
 
 ## Each blocked card writes its wait and grows on attention's beat, with `+`
@@ -531,14 +535,12 @@ func test_an_unseated_pane_has_a_card_and_a_dropped_machine_none() -> void:
 
 ## The showroom draws its mock as the office draws a map: each of its two
 ## workspaces a zone (partitions in a y-sorted holder, a sign saying its number
-## and label), a pod of four desks with its tab's name under it, and a side
-## table carrying a desk piece where the row room's cabinet stood. Its cast is
-## the regression cast docs/WORLD_MODEL.md names: a bystander behind a pod and
-## one in front of one (sorted by their feet, like the pods), the one in front
-## capped and in a terra top; a done worker on each side with the small paper
-## stack beside the laptop (one on a pod's last desk); blocked far workers
-## under a chip, one with a wait and one with the badge alone.
+## and label), a measured pod with its tab's name under it. Every station owns one complete generic
+## workstation; done workers on both logical rows use its done track, never a
+## separately composed paper stack. No extra rig or bystander is constructed.
+## Blocked far workers keep their chip, one with a wait and one without.
 func test_the_showroom_stands_its_cast_in_zones() -> void:
+	root.size = SHOWROOM_SCREEN
 	var showroom: Node = (load(SHOWROOM_SCENE) as PackedScene).instantiate()
 	root.add_child(showroom)
 	await _frames(2)
@@ -548,12 +550,11 @@ func test_the_showroom_stands_its_cast_in_zones() -> void:
 	_check(sorted != null and sorted.y_sort_enabled, "what stands is under one y-sorted root")
 	if pack == null or sorted == null or ground == null:
 		showroom.free()
+		root.size = SCREEN
 		return
 	var signs: Array[String] = []
 	var pods: Dictionary[String, OfficeTable] = {}
 	var stations: Dictionary[String, OfficeStation] = {}
-	var pieces: Dictionary[StringName, OfficeDecor] = {}
-	var bystanders: Array[PixelPerson] = []
 	var holders := 0
 	for child in sorted.get_children():
 		if child is OfficeZoneSign:
@@ -562,10 +563,6 @@ func test_the_showroom_stands_its_cast_in_zones() -> void:
 			pods[str(child.name)] = child
 		elif child is OfficeStation:
 			stations[str(child.name)] = child
-		elif child is OfficeDecor:
-			pieces[(child as OfficeDecor).piece] = child
-		elif child is PixelPerson:
-			bystanders.append(child)
 		elif str(child.name).begins_with("Partitions"):
 			holders += 1
 			var holder := child as Node2D
@@ -583,36 +580,45 @@ func test_the_showroom_stands_its_cast_in_zones() -> void:
 		named.append((label as Label).text)
 	_check(named.has("MAIN") and named.has("FEAT/UI"), "each pod's tab is named under it: %s" % [named])
 	_check(not named.has("API") and not named.has("WEB"), "no title on a row wall any more: %s" % [named])
-	var side_table: OfficeDecor = pieces.get(ArtContract.PROP_SIDE_TABLE)
-	_check(side_table != null, "a side table where the cabinet stood: %s" % [pieces.keys()])
-	if side_table != null:
-		var desk_pool := pack.items_in(&"desk").map(func(item: ArtSprite) -> StringName: return item.id)
-		_check(desk_pool.has(side_table.held_item), "carrying a desk piece: %s" % side_table.held_item)
-		_check(side_table.held() != null and side_table.held().visible, "drawn on its top")
 	var api: OfficeTable = pods.get("API")
 	var web: OfficeTable = pods.get("WEB")
-	if api == null or web == null or bystanders.size() != 2:
-		_check(false, "two pods and two bystanders: %s, %d" % [pods.keys(), bystanders.size()])
+	if api == null or web == null:
+		_check(false, "two pods: %s" % [pods.keys()])
 		showroom.free()
+		root.size = SCREEN
 		return
-	bystanders.sort_custom(func(a: PixelPerson, b: PixelPerson) -> bool: return a.position.y < b.position.y)
-	var behind := bystanders[0]
-	var front := bystanders[1]
-	_check(
-		behind.position.y < web.position.y and behind.position.x > web.position.x + web.width,
-		"one behind WEB's right end"
+	var measured := OfficeTable.measure(4)
+	for pod: OfficeTable in [api, web]:
+		_eq(pod.width, measured.table_width, "%s: the current measured width" % pod.name)
+		_eq(pod.columns, measured.columns, "%s: the canonical seat columns" % pod.name)
+	_eq(stations.size(), 16, "two rows of four complete stations on each pod")
+	var workers := 0
+	var vacant := 0
+	var shells := 0
+	for station: OfficeStation in stations.values():
+		var actor := station.actor()
+		if station.vacant:
+			vacant += 1
+		elif actor == null:
+			shells += 1
+		else:
+			workers += 1
+			_eq(actor.art, pack.workstation, "%s: the generic image family" % station.name)
+			_eq(actor.find_children("*", "Sprite2D", true, false).size(), 1, "%s: one complete image" % station.name)
+	_eq([workers, shells, vacant], [11, 1, 4], "agents, a shell and the four empty slots")
+	var rigs := showroom.find_children("*", "", true, false).filter(
+		func(node: Node) -> bool: return node is PixelPerson or node is PixelPortrait
 	)
-	_check(front.position.y > api.position.y and front.position.x < api.position.x, "one in front of API's left end")
-	_eq(front.look.slot(AvatarLook.TOP), &"terra", "the one in front in a terra top")
-	_eq(front.look.slot(AvatarLook.HEADWEAR), &"cap", "and capped")
-	var stack := pack.sprite_texture(pack.prop_sprite(ArtContract.PROP_DONE_STACK_SMALL))
-	var papers: Dictionary[String, Sprite2D] = {
-		"WEB 0/far": web.item(0, "far"), "API 1/near": api.item(1, "near"), "API 3/near": api.item(3, "near")
-	}
-	for seat: String in papers:
-		_check(papers[seat].visible, seat + ": done, paper on the desk")
-		_eq(papers[seat].texture, stack, seat + ": the small stack")
-	_check(not api.item(0, "far").visible, "a working seat has none")
+	_eq(rigs.size(), 0, "no separate body, customized portrait or legacy bystander")
+	for seat: String in ["WEBFar0", "APINear1", "APINear3"]:
+		var station: OfficeStation = stations.get(seat)
+		_check(station != null and station.actor() != null, seat + ": a done worker")
+		if station != null and station.actor() != null:
+			_eq(station.actor().animation, &"done", seat + ": the complete-image done track")
+	var working: OfficeStation = stations.get("APIFar0")
+	_check(working != null and working.actor() != null, "a working seat")
+	if working != null and working.actor() != null:
+		_eq(working.actor().animation, &"working", "working uses its own complete-image track")
 	var waited: OfficeStation = stations.get("APIFar1")
 	var unseen: OfficeStation = stations.get("WEBFar1")
 	_check(waited != null and unseen != null, "the blocked far seats: %s" % [stations.keys()])
@@ -623,6 +629,118 @@ func test_the_showroom_stands_its_cast_in_zones() -> void:
 			"WEB's under the badge alone: its start was never seen"
 		)
 	showroom.free()
+	root.size = SCREEN
+
+
+## The old 224-wide zones could not enclose the new 384-wide pods. At the
+## capture's logical size, each whole drawing, focus frame, chip and name row
+## stays inside its own carpet; signs, tab labels, partitions, HUD and samples
+## keep separate bands. Complete images and portraits use only family density.
+func test_the_showroom_fits_its_measured_pods_and_samples() -> void:
+	root.size = SHOWROOM_SCREEN
+	var showroom: Node = (load(SHOWROOM_SCENE) as PackedScene).instantiate()
+	root.add_child(showroom)
+	await _frames(2)
+	var pack: ArtPack = showroom.get("art")
+	var sorted: Node2D = showroom.get("sorted")
+	var ground: Node2D = showroom.get("ground")
+	var hud: OfficeHud = null
+	for child in showroom.get_children():
+		if child is OfficeHud:
+			hud = child as OfficeHud
+	_check(pack != null and sorted != null and ground != null and hud != null, "the showroom is ready")
+	if pack == null or sorted == null or ground == null or hud == null:
+		showroom.free()
+		root.size = SCREEN
+		return
+	var canvas := Rect2(Vector2.ZERO, Vector2(SHOWROOM_SCREEN))
+	var staff := hud.placed(hud.staff)
+	var bar := hud.placed(hud.bar)
+	_check(canvas.encloses(staff) and canvas.encloses(bar), "both HUD bands fit the existing capture")
+	var zones: Array[Rect2] = []
+	for space: String in ["API", "WEB"]:
+		var pod: OfficeTable = sorted.get_node(NodePath(space))
+		var carpet: NinePatchRect = ground.get_node(NodePath("Carpet" + space))
+		var title: Label = ground.get_node(NodePath("Tab" + space))
+		var board: OfficeZoneSign = sorted.get_node(NodePath("Sign" + space))
+		var lies := carpet.get_global_rect()
+		var thick := OfficeShell.PARTITION_THICKNESS
+		var zone := lies.grow_individual(thick, 0, thick, thick)
+		var drawing := pod.geometry.render_rect.grow(OfficeTable.FRAME_OUTSIDE)
+		drawing.position += pod.global_position
+		_check(canvas.encloses(zone), "%s: its whole zone is on screen: %s" % [space, zone])
+		_check(lies.encloses(drawing), "%s: its carpet encloses the measured image and frame" % space)
+		_check(not zone.intersects(staff) and not zone.intersects(bar), "%s: neither HUD band covers it" % space)
+		for other in zones:
+			_check(not zone.intersects(other), "%s: separate zones, no overlapping pods" % space)
+		zones.append(zone)
+		var posted := sorted.global_transform * board.drawn_rect()
+		_check(canvas.encloses(posted) and not bar.intersects(posted), "%s: the sign clears the bar" % space)
+		_check(posted.end.y <= drawing.position.y, "%s: the sign is above the complete workstation" % space)
+		var named := title.get_global_rect()
+		_check(lies.encloses(named), "%s: the tab name stays inside its carpet" % space)
+		_check(named.position.y >= drawing.end.y, "%s: the tab name is below the selection frame" % space)
+		_check(
+			named.end.y <= zone.end.y - OfficeShell.PARTITION_DRAW,
+			"%s: the lower partition covers neither the pod nor its tab name" % space
+		)
+		for child in sorted.get_children():
+			if not child is OfficeStation:
+				continue
+			var station: OfficeStation = child
+			if station.table != pod:
+				continue
+			_check(drawing.encloses(station.target_rect()), "%s: the complete image fits" % station.name)
+			var plate := station.plate_row()
+			plate.position += station.global_position
+			_check(drawing.encloses(plate), "%s: showing its name cannot spill out" % station.name)
+			if station.chip().visible:
+				_check(drawing.encloses(station.chip_rect()), "%s: its chip fits too" % station.name)
+			var images := 0
+			for node in station.find_children("*", "Sprite2D", true, false):
+				var sprite := node as Sprite2D
+				if sprite.texture not in [pack.workstation.sheet_texture(), pack.workstation.empty_texture()]:
+					continue
+				images += 1
+				_eq(sprite.global_scale, pack.workstation.unit_scale(), "%s: native family density" % station.name)
+				var pixels := sprite.get_global_transform() * sprite.get_rect()
+				_check(drawing.encloses(pixels), "%s: the actual sprite fits, not just its feet" % station.name)
+			_eq(images, 1, "%s: one complete workstation, occupied or empty" % station.name)
+	var strip: Control = showroom.get_node("StateStrip")
+	var samples := strip.get_global_rect()
+	_check(canvas.encloses(samples), "the state samples and legend fit the capture")
+	_check(staff.end.y < samples.position.y, "the compact staff panel stops above the samples")
+	for zone in zones:
+		_check(not samples.intersects(zone), "the samples never cover a zone")
+	var portraits: Array[Rect2] = []
+	for node in strip.find_children("*", "Sprite2D", true, false):
+		var sprite := node as Sprite2D
+		if sprite.texture != pack.workstation.portrait_texture():
+			continue
+		var pixels := sprite.get_global_transform() * sprite.get_rect()
+		_check(samples.encloses(pixels), "the sample portrait stays whole inside its panel")
+		_eq(pixels.size, Vector2(pack.workstation.portrait_size), "the native 40x40 portrait, no extra scaling")
+		_eq(sprite.global_scale, pack.workstation.unit_scale(), "the sample uses only family density")
+		for other in portraits:
+			_check(not pixels.intersects(other), "portrait samples do not overlap")
+		portraits.append(pixels)
+	_eq(portraits.size(), ArtContract.STATES.size() + 2, "every state and both overlays have a sample")
+	var words: Array[Rect2] = []
+	for node in strip.find_children("*", "Label", true, false):
+		var label := node as Label
+		var said := label.get_global_rect()
+		_check(samples.encloses(said), "the sample panel holds its words: " + label.text)
+		var face := label.get_theme_font("font")
+		var size := label.get_theme_font_size("font_size")
+		for line in label.text.split("\n"):
+			_check(face.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x <= label.size.x, line + " fits")
+		for other in words + portraits:
+			_check(
+				not said.intersects(other), "sample words stay clear of each other and every portrait: " + label.text
+			)
+		words.append(said)
+	showroom.free()
+	root.size = SCREEN
 
 
 ## The showroom's top bar shows its own mock: Local's agents in the state the
@@ -632,6 +750,7 @@ func test_the_showroom_stands_its_cast_in_zones() -> void:
 ## gives, worked out here from the showroom's own table.
 ## S3 BAR-a (2026-10-27): the portrait strip replaces the counters.
 func test_the_showroom_bar_shows_its_mock_agents() -> void:
+	root.size = SHOWROOM_SCREEN
 	var showroom: Node = (load(SHOWROOM_SCENE) as PackedScene).instantiate()
 	var source: Script = showroom.get_script()
 	var table: Array = source.get_script_constant_map()["MOCK_PANES"]
@@ -657,6 +776,7 @@ func test_the_showroom_bar_shows_its_mock_agents() -> void:
 	_check(hud != null, "the showroom has the office's HUD")
 	if hud == null:
 		showroom.free()
+		root.size = SCREEN
 		return
 	_check(counts.blocked > 0 and counts.idle > 0, "the mock has something to show: %s" % counts)
 	var bar := hud.bar
@@ -672,6 +792,7 @@ func test_the_showroom_bar_shows_its_mock_agents() -> void:
 	_check(_opens_a_line(tip, "Local · LIVE · "), "Local answers: %s" % tip)
 	_check(_opens_a_line(tip, "bee · OFFLINE · "), "bee does not: %s" % tip)
 	showroom.free()
+	root.size = SCREEN
 
 
 ## Read-only: NEXT says no verb, only whom and herdr's state, and a
@@ -721,6 +842,7 @@ func test_read_only_next_says_no_verb_and_only_picks() -> void:
 ## so the longest of all); bee dropped, so none of its. `All clear` only when
 ## the mock has nobody to go to.
 func test_the_showroom_next_names_a_mock_pane_that_waits() -> void:
+	root.size = SHOWROOM_SCREEN
 	var showroom: Node = (load(SHOWROOM_SCENE) as PackedScene).instantiate()
 	var source: Script = showroom.get_script()
 	var table: Array = source.get_script_constant_map()["MOCK_PANES"]
@@ -752,11 +874,12 @@ func test_the_showroom_next_names_a_mock_pane_that_waits() -> void:
 	_check(hud != null, "the showroom has the office's HUD")
 	if hud == null:
 		showroom.free()
+		root.size = SCREEN
 		return
 	var card := hud.inspector
 	var button: Button = card.get_node("%NextButton")
 	_check(card.compact(), "the showroom's staff panel is the compact line")
-	# 800 wide: the line has room for the whole sentence; the showroom
+	# 960 wide: the line has room for the whole sentence; the showroom
 	# writes nothing, so it says no verb, only whom and herdr's state.
 	_check(
 		card.next_text().begins_with("%s · %s @ Local" % [who, state]), "NEXT names the mock's first pane that waits"
@@ -767,6 +890,7 @@ func test_the_showroom_next_names_a_mock_pane_that_waits() -> void:
 		"its tooltip says the whole sentence: %s" % button.tooltip_text
 	)
 	showroom.free()
+	root.size = SCREEN
 
 
 ## Panes no floor seats wait in the same order as seated ones

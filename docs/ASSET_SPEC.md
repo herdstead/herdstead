@@ -6,8 +6,10 @@ that meets the contract is never resampled. Sizes written "per 32 px tile" are d
 them by the density.
 
 The shipped pack, `daylight`, is **schema 2 / density 2 / nearest**: 1 world unit = 2 texture
-pixels, with layout still in 32-unit tiles. Its pod family (`<pack>/table/`, the shared table) and the pixel people are density
-2, nearest too. Display scales are even only (2×–8×), so every texel lands on whole screen pixels. A source not
+pixels, with layout still in 32-unit tiles. The production workstation is a separate density-2 nearest family,
+with its own manifest and palette. `TablePack`, `PixelPeople` and `PixelPortraits` remain **legacy authoring tools**,
+not the production office's drawing path; their specifications below are retained for those tools.
+Display scales are even only (2×–8×), so every texel lands on whole screen pixels. A theme source not
 yet repainted at 2x is a 1x source the build fills in with NEAREST 2×2 blocks.
 
 UI text is never baked into pixel art. Labels use the bundled Fusion Pixel cuts (8, 10 and 12 px, zh_hans, so the user's
@@ -16,10 +18,11 @@ rare symbols).
 
 ## Scope
 
-Assets for a wide, observational office in the "studio light" style: a machine is one open-plan map on a wooden floor, a workspace
-a zone of it inside low partitions, a tab a pod of single desks, a pane a seat at it. This spec covers the art pack only: source PNGs, the runtime
-pack, TileSet / SpriteFrames and the asset showroom (`scenes/preview.tscn`). The live office
-(`scenes/office.tscn`) consumes the pack; see [the manual](MANUAL.md).
+Assets for a wide office in the "studio light" style: a machine is one open-plan map on a wooden floor, a workspace
+a zone of it inside low partitions, a tab a logical pod of complete workstations, a pane a seat at it. This spec covers
+the theme pack, the production workstation family, and retained legacy authoring families: source PNGs, runtime
+manifests and the asset showroom (`scenes/preview.tscn`). The live office (`scenes/office.tscn`) uses the theme for its
+shell, furniture and signals, and `WorkstationArt` for the stationary generic workstation and HUD portrait; see [the manual](MANUAL.md).
 
 The only sound is the chime `OfficeAlerts.tone()` generates in code (`--chime`): no audio file, no `.import`, no
 semantic ID, so no audio asset family.
@@ -47,7 +50,7 @@ semantic ID, so no audio asset family.
 | Scale | Even scales only: 2× / 4× / 6× / 8× (`-` / `=` step two at a time; `OfficeScene.content_scale_for` is the one rule). Below a 960×640 window the scale drops to 1×: degraded, below the supported size, not a scale step. No automatic trim, rotation or packing |
 | Import | Lossless; Fix Alpha Border = true; Premult Alpha = false; `mipmaps/generate` by asset family (see "Import policy by asset family") |
 | Resolution | Logical viewport 800×480. The desktop window defaults to 1920×960 (2× only; 4× needs 1920×1280); the smallest supported window is 960×640. `canvas_items` / `expand` / `integer`. `scenes/preview.tscn` ignores `--zoom` and may use 3× in a large window: it is not the product view |
-| Text | Names, branches and state words are Labels, never baked into furniture. One pixel family at its native sizes only (`OfficeDraw.cut_for()`): the world's labels and the HUD's small rows the 8px cut at 8 (the wordmark at 16), the HUD's body the 10px cut at 10, headings and the counters' numbers the 12px cut at 12. The family has no weight axis: a heading is the 12px cut. The one exception: the compact durations (the chip's wait, the lens line) are Tiny5 at 8, the pack's figures face, whose `99m` is 14 units where the 8px cut's is 16 (the chip at the 32-unit seat pitch has 14) |
+| Text | Names, branches and state words are Labels, never baked into furniture. One pixel family at its native sizes only (`OfficeDraw.cut_for()`): the world's labels and the HUD's small rows the 8px cut at 8 (the wordmark at 16), the HUD's body the 10px cut at 10, headings and the counters' numbers the 12px cut at 12. The family has no weight axis: a heading is the 12px cut. The one exception: the compact durations (the chip's wait, the lens line) are Tiny5 at 8, the pack's figures face, whose `99m` is 14 units where the 8px cut's is 16 (the fixed 30-unit chip has 14 for text) |
 
 When the window does not divide evenly, black bars are kept rather than stretching pixels.
 
@@ -67,9 +70,9 @@ changes.
   `filter`, and its built manifest gains no keys.
 - `density 1` + `"linear"` is refused: 32 px is the pixel look and stays deterministic. For soft edges, raise the
   density.
-- **A pack has one density**, the one it was built with. The pixel people (`assets/pixel_people/`) and the long
-  table (`<pack>/table/`) are separate families with their own manifests; each texture is scaled and sampled by
-  its own family's density and `filter`, never the pack's.
+- **A pack has one density**, the one it was built with. The production workstation and the legacy people,
+  table and portrait families have their own manifests; each texture is scaled and sampled by its own family's
+  density and `filter`, never the pack's. The workstation's schema 1 is its own format, not theme schema 1.
 
 ### Geometry is always in density-1 units
 
@@ -115,9 +118,8 @@ atlas is `atlas_size × d` with `32·d` cells. From schema 2 on, `manifest.json`
 3. **Minification belongs to GPU mipmaps; `density` only means pixels per unit** (like PPU). Textures load as
    built, never resampled on the CPU, and nodes always scale by 1/density. A density > 1 pack shown below its
    density picks a mip level through `LINEAR_WITH_MIPMAPS`, so its import must generate mipmaps. Filtering is
-   per family: the pack's `filter` governs its own images; the pod family samples by its own manifest (density 1
-   is NEAREST; denser without a `filter` is `LINEAR_WITH_MIPMAPS`); the pixel people stay density 2 `nearest`,
-   crisp even beside a density 4 `linear` pack.
+   per family: the pack's `filter` governs its own images. The workstation stays density 2 `nearest`, even beside
+   a density-4 linear theme; legacy table, people and portrait tools likewise sample by their own manifests.
    A `nearest` family is **never minified** at a supported scale: the floor is 2, where a density-2 texel is one
    screen pixel, and higher even scales magnify by whole numbers, so NEAREST never reads a mip level. Below
    960×640 the scale is 1 and outlines break into dots: degradation below the supported size, with no mipmaps
@@ -135,9 +137,10 @@ atlas is `atlas_size × d` with `32·d` cells. From schema 2 on, `manifest.json`
 | Family | Directory | Sampling | `mipmaps/generate` |
 |---|---|---|---|
 | A theme pack's own images (tile atlas, props, UI) | `assets/<id>/` | density 2, NEAREST | `false` |
-| A theme pack's pod family (the shared table) | `assets/<id>/table/` | density 2, NEAREST | `false` |
-| Pixel people | `assets/pixel_people/` | density 2, NEAREST | `false` |
-| Portraits | `assets/portraits/` | density 2, NEAREST | `false` |
+| Production complete workstation, empty image and generic portrait | `assets/daylight/workstation/` | density 2, NEAREST | `false` |
+| Legacy table authoring family | `assets/<id>/table/` | density 2, NEAREST | `false` |
+| Legacy pixel people | `assets/pixel_people/` | density 2, NEAREST | `false` |
+| Legacy layered portraits | `assets/portraits/` | density 2, NEAREST | `false` |
 | Agent logos (Avatar Studio shows them minified by `size/64`) | `assets/agent_badges/` | LINEAR_WITH_MIPMAPS | `true` |
 
 - **The project default (`[importer_defaults]` in `project.godot`) is `false`**, right for every nearest family.
@@ -150,8 +153,8 @@ atlas is `atlas_size × d` with `32·d` cells. From schema 2 on, `manifest.json`
   the other fields stay).
 - `test_imports_follow_their_family` (`tools/test_art.gd`) checks **every** PNG under `res://assets`: the nearest
   `*manifest.json` above it decides by its `filter`; logos (no manifest) count as minified; a PNG in no family
-  fails. It also asserts the project default. `test_art_textures_as_built` checks the textures the office draws
-  (pack, table, people and portraits without mipmaps, every logo with).
+  fails. It also asserts the project default. Production and retained authoring assets both keep their family's
+  import policy; a legacy asset being checked does not mean the office draws it.
 
 ### Style rules by `filter`
 
@@ -205,14 +208,69 @@ density). The normal build never calls it or overwrites painted sources. The wal
 
 Each structural cell belongs to one module: a corner replaces the side-wall cell of its cap / face
 pair, with no side wall drawn underneath. The template tool can still draw the retired row walls' T joint and free
-end (`t_left`, `end_right`); the pack ships neither. Walls stay on Ground, cut open at the front; walkable space is
+end (`t_left`, `end_right`); the pack ships neither. Walls stay on Ground, cut open at the front; floor reservations are
 validated by the FloorPlan, never inferred from transparent pixels. The build checks port pixels and coverage;
 still look at seams and corners at 2× and 4×.
 
 ## Open floor and pods
 
-A tab is one `OfficeTable` prefab (`scenes/world/table.tscn`), a **pod of single desks**, assembled from the
-`table/` companion pack: `desk_left/mid_a/mid_b/right` (the desktop and its grain, one module per column),
+### Production complete workstation (`WorkstationArt`)
+
+A tab's `OfficeTable` is now a logical pod: seat markers and a selection outline, not drawn furniture. Each
+`OfficeStation` owns one `WorkstationActor` with a retained `Body` Sprite2D and one `AnimationPlayer`. Every frame
+already contains the generic person, chair, desk and twin monitors. Both logical rows face front; no mirroring,
+rig, outfit variation, recolouring, component assembly or walking is used in the production office.
+
+Source: `art/daylight/workstation/manifest.json` and its three PNGs → `tools/build_workstation_assets.py`
+(`make art`) → `assets/daylight/workstation/` → `WorkstationArt.from_manifest()`, the only raw reader, held as
+`ArtPack.workstation`. The family is shared by themes, not recoloured from their palettes.
+
+| Contract | Value |
+|---|---|
+| Format | Workstation schema 1, `id: generic-workstation`; density 2, `filter: nearest` |
+| Frame | 80×80 world units / 160×160 texels; pivot (37.5, 70) units / (75, 140) texels |
+| Sheet | `state-workstation.png`: 640×960 RGBA, 4 columns × 6 rows, 24 complete-image cells in row-major order |
+| Empty | `empty-workstation.png`: 160×160, same canvas and pivot; shared by shell panes and vacant slots |
+| Portrait | `generic-portrait.png`: 80×80 texels / 40×40 units, pivot (20, 40); one still generic look for every HUD portrait |
+| Palette and alpha | Its own 37 distinct colours, independent of the theme's palette; hard alpha 0 / 255 |
+| World placement | Column pitch 96, x = 48 + 96i; logical far/near feet y = −128 / 0. Physical/render/reserved pod envelopes are `OfficeTable.measure()`'s, specified in [World model](WORLD_MODEL.md), not inferred from opaque pixels |
+
+The manifest's `animations` give `frames`, matching positive per-frame `seconds`, and a `loop` flag. The four
+approved states are working, idle, blocked and done: working and idle loop, blocked uses nonlooping
+`blocked_enter`, looping `blocked`, and nonlooping `blocked_exit`; done nods once and ends on frame 0. Static
+`starting` and `unknown` aliases hold frame 0 and add no activity. `WorkstationArt` builds discrete `Body:frame`
+keys once; `WorkstationActor` owns transitions. A repeated state does not restart a loop or a finished nod;
+pausing/resuming preserves progress. No state adds a separate mug, paper stack, raised-hand rig or provider mark.
+
+`OfficeDraw.seat_face()` and `seat_portrait()` dress a retained Sprite2D from `portrait_texture()`: the short bar
+crops it, the tall bar and card show it whole. Provider and pane identity change words and bindings, not the image.
+The world's focus underline and selection outline are separate nodes, not alterations to these source pixels.
+
+**Build and provenance.** The builder validates the complete family before writing and copies the PNGs and
+manifest byte for byte: no redraw, resize, re-encoding or runtime extraction. Geometry, field sets, image sizes,
+palette, hard alpha and animation entries are checked; malformed runtime manifests return null with a diagnostic,
+including in release builds. [PROVENANCE.md](../art/daylight/workstation/PROVENANCE.md) records the source paths,
+hashes and offline derivation. The approved state sheet and flattened generic portrait are unchanged copies.
+`experiment.json` is historical provenance, not a second runtime manifest; its former experimental scope does not
+override the production integration. All non-working clips and loop flags remain unchanged. Working now selects
+only poses 0..7: stationary shoulders and at most one texel of head movement, once per 4.8-second loop. Twelve
+hand presses per loop (2.5 per second) form unequal 3-, 5- and 4-press phrases, separated by 0.66-, 0.90- and
+0.64-second hands-on-keys pauses. Hand order and key holds vary, not the approved amplitude or head timing;
+the rhythm is authored rather than randomized at runtime.
+This working-only revision changes frame selection and timing, not the approved image bytes or runtime playback.
+
+The **empty image is an offline derivation**, not a separately approved painting: it removes the person/hands and
+uses the same approved A chair reference. Its newly exposed seat, gas lift and caster pixels still warrant visual
+review as an unoccupied picture, as provenance states. Do not describe that review as already complete.
+
+`make workstation-strips` captures the production animations at 2x and 4x for visual review; it does not author
+new frames. `make perf CHANGES=1` measures snapshot transitions on the stationary stress floor, not walking.
+
+### Legacy table family (`TablePack`)
+
+The retained `table/` companion pack is an **authoring asset family**, no longer used by `OfficeTable` or
+`OfficeStation`. Its module dimensions and source/template rules below describe the retired component pod, not
+production workstation spacing. It contains `desk_left/mid_a/mid_b/right` (the desktop and its grain, one module per column),
 `screen_left/mid/right` (the low screen between the two rows), `apron_*` (near edge) and `bracket`. The pod has no legs
 (its two short end legs were retired: the near chairs, pushed in under the desk, hid them at every column).
 Occlusion is Y-sort by position; there is no occlusion module. Modules repeat at their native 32 units, never
@@ -224,9 +282,8 @@ The top is warm pixel-art oak: planks along the pod, one dark seam row, sparse l
 far edge of one outline row and one lit row, a near lip of one highlight over two shadow rows; lit from the
 top-left. The family is **density 2**, sampled NEAREST; canvases, rows, columns and probe points below are units,
 × `DENSITY` in the PNG (`tools/build_table_assets.py`). The pod set is **17 images** (`POD_ONLY` in the builder):
-the 11 modules the runtime lays (`ArtContract.TABLE_MODULES`: four desks, three screens, three aprons and the
-bracket) and the 6 furniture views (two chairs, two laptops, two shell marks); a test holds the two
-lists together (`test_the_pod_only_set_is_exactly_what_the_office_draws`).
+11 modules (`ArtContract.TABLE_MODULES`: four desks, three screens, three aprons and the bracket) and the
+6 furniture views (two chairs, two laptops, two shell marks), retained for authoring compatibility.
 
 - `desk_*` 32×48: opaque rows 0..42, transparent 43..47. Rows 0..39 are the working top (pod y −48..−8), 40..42
   the lip the three-row apron continues (near thickness **3 + 3 = 6**: the apron is 32×3, attached at y −5); rows
@@ -263,20 +320,16 @@ lists together (`test_the_pod_only_set_is_exactly_what_the_office_draws`).
 
 The table contract is fixed (schema 2, density 2, `filter: nearest`, the modules of the accepted set, one set of
 size / pivot / views / assembly) and `manifest.json` must match the builder's; the build never repairs it. The
-builder accepts one module set, `pod` (the 17 above, what the office draws): a source manifest declares exactly
+builder accepts one module set, `pod` (the 17 legacy images above): a source manifest declares exactly
 those names, and one that declares fewer, more or others (the long table's `surface_*`, `divider_*` and `leg`,
 which the builder took until the office drew the pod alone, or the pod's retired `leg_short`) is refused with what is missing and what is unknown,
-before anything is written. Changing table geometry
-means updating the contract and the world model together; changing pixels needs no code or manifest change. `make
+before anything is written. Changing legacy table geometry
+means updating this family's contract; it does not change production pod measurements. Changing pixels needs no code or manifest change. `make
 art` copies the table, then compares against the committed products.
 
-The pod sorts as one piece by its near edge. Each pane is an `OfficeStation` (chair, occupant, badge, click
-area, incremental-update boundary). Near and far panes in the same layout x column face each other; a pane with
-no layout x takes a stable fallback column. The far worker's seat lies inside the pod's footprint, so the pod
-hides their lower body; the near worker's seat is just below the pod's near edge, so they are drawn over the pod,
-head and shoulders over its near working plane, and the near chair back, pushed in under the desk, over them. The task
-light is a child of the table and falls only on its top; the contact shadow is on the ground layer; neither
-darkens the floor. Full depth, collision and geometry rules: [the world model](WORLD_MODEL.md).
+The retired assembly sorted the pod as one piece by its near edge, far worker behind it and near worker/chair
+in front, with separate task-light wedges and chair shadows. Those node placements, facing rules and collisions
+are not production requirements. Current whole-image depth and geometry are in [the world model](WORLD_MODEL.md).
 
 **The laptop** is `furniture.monitor` in the table family: a 32×32-unit canvas, pivot `[16,30]`. Views
 `rear_shell / front_privacy` map to `monitor_rear / monitor_front`; `shell_rear / shell_front` add a static `$_`
@@ -285,8 +338,8 @@ shoulders, centred on x 16; the rear is 8 tall, the front with keyboard 11, draw
 `deep` outline. Silver lid with a small dark mark and lit top edge, hinge line, dark screen with two output lines,
 keyboard and centred trackpad, in `muted / jacket_light / sky_light`; no stand, no runtime shrinking.
 The far mark is a dark `$_` on the lid, the near one a light `$_` on the screen. `TablePack.from_manifest()` /
-`TableFurniture.views` parse the views with no extra schema field. The shell mark binds only to "no provider and
-not launching", never to state, focus or connection; `ArtContract` and the asset tests check all four views.
+`TableFurniture.views` parse the views with no extra schema field. The shell mark formerly bound to "no provider and
+not launching"; the four views remain legacy assets, not a mark drawn on the complete workstation.
 
 ## Furniture and desk-item canvases and pivots
 
@@ -324,25 +377,24 @@ fixed by where the side table stands (see [the visual language](VISUAL_LANGUAGE.
 - `wall_frame` hangs on the top wall: no footprint, drawn in the shell, foot at `OfficeShell.FRAME_FOOT` (48);
   its position depends only on the windows (`OfficeShell.frames()`).
 - `pantry_sign` (the `COFFEE` sign) hangs on the top wall over the pantry counter: no footprint, no `item` block,
-  drawn in the shell, foot at `OfficeShell.SIGN_FOOT` (52), centred over the counter (`OfficeShell.pantry_sign()`);
+  drawn in the shell, foot at `OfficeShell.SIGN_FOOT` (32), centred over the counter (`OfficeShell.pantry_sign()`);
   no wider than the counter, so it stays off the windows. Furniture: wood, brass and cream, no state colour.
 - **The partition kit** bounds a zone, a U open at the top (`OfficeShell.partition_pieces()`): `partition_v` down
   each side (one per cell row, foot at the row's bottom), `partition_corner_bl / _br` at the bottom corners,
   `partition_h` along the bottom between them, and a `partition_post` at each top corner (the zone's sign hangs
   from the left one). The horizontal pieces draw no taller than 10 units over their foot, the vertical ones are 6
-  wide with no overhang; they are sorted sprites with no collider and no `item` block (the walk graph's partitions
-  are the obstacle).
+  wide with no overhang; they are sorted sprites with no collider and no `item` block. Their footprint and drawing
+  bands belong to layout validation, not a walking graph.
 - `side_table` stands on the floor (`item`: `place: floor`, footprint 28×10) and carries one desk or cat piece on
   its top, whose foot sits at `OfficeDecor.TOP_Y` (−20 over the table's foot; [ITEMS](ITEMS.md)).
-- `done_stack_small` is a signal, not a fixture: while a done agent sits at their seat, the pod shows a small
-  stack of paper right of that seat's laptop (`OfficeTable.ITEM_ASIDE` 13), on the seat's one desk item; only its
-  texture and `visible` change. Its opaque pixels are 6 wide and 9 tall over its foot (x −3..3, rows 13..21 of the
-  24 canvas), so it fits between the laptop and the column's edge on a 32-unit desk, the last column's included.
-- `idle_mug` (24×24, pivot 12,22, no `item` block) is idle's signal on the same desk item (D2, 2026-10-27): the
+- `done_stack_small` is a **legacy state-prop asset**, not drawn by production stations. Its opaque pixels are
+  6 wide and 9 tall over its foot (x −3..3, rows 13..21 of the 24 canvas). In the retired component pod it stood
+  13 units right of the laptop, inside the 32-unit desk's edge.
+- `idle_mug` (24×24, pivot 12,22, no `item` block) is the other **legacy state-prop asset**:
   painted desk pool's mug texel for texel (`draw_pixel_sources.py` draws it at density 2), a prop of its own so it is
   never drawn from a pool (`ArtContract.DESK_SIGNALS`). Opaque 7 wide and 6.5 tall over its foot (x −3.5..3.5, the
-  handle the right half unit), it stands at `OfficeTable.MUG_ASIDE` 12.5, opaque x+9..x+16: 2 clear of the laptop
-  and inside the last column's desk.
+  handle the right half unit), its former x offset was 12.5, opaque x+9..x+16. The complete workstation never swaps
+  this mug or the paper stack in for a state. The side-table `desk_mug` remains ordinary furniture.
 
 **Desk library**: five items (mug, notebook with pencil, clipped printout, potted plant, headphones) and three
 white-cat poses (loaf, sitting, asleep), each a 24×24-unit RGBA image under the pixel people's rules: a 1-unit
@@ -360,39 +412,37 @@ reception. `draw_pixel_sources.py` draws a first draft; the committed counter is
 check the footprint contract on the committed file at its own density. The counter's opaque width is its whole
 canvas, which is its footprint width (its `item` footprint, 64); its bottom outline sits one row above the foot
 point, and the foot point and below are transparent. The planner fits the counter into the band's bay by that width,
-and the walk graph holds it as an obstacle by it: the counter is a corner nook nobody walks to (D2, 2026-10-27), so
-its footprint still matters.
+and validates its footprint and drawing against reservations and shell clearances. It is furniture, never a place
+an idle or done agent goes.
 
-A station is not one composite image: chair and worker sort by their own foot points, the laptop belongs to the
-pod, badge, chip and seat mark float above the world, and signs, tab labels and dynamic text are separate nodes.
-Seat, laptop, screen and chair offsets live only in `scripts/world/table.gd` (0 = the pod's near edge); plate
-and badge offsets in `scripts/world/station.gd`. Those were measured on every frame of the pixel people: seated
-head top −31; standing head −37..−25; width −8..8; a raised hand reaches −38 with the straight arm (side out to
-9) and −36 with the bent arm (side out to 12; see `raised_hand` in "Pixel people"). If figures change height or
-raised hand, measure again; `tools/test_office_geometry.gd` catches a plate that covers a face or drifts away.
+A production station **is one complete image**, sorted at its authored pivot. Badge, chip, focus underline,
+selection and dynamic text remain separate nodes. Seat pitch and pod envelopes live in `scripts/world/table.gd`;
+annotations and the stable camera/pointer signal rectangle in `scripts/world/station.gd`. The old rig's head,
+raised hand and chair envelopes no longer determine production offsets; see [World model](WORLD_MODEL.md).
 
 ## People and herdr agents
 
-A theme pack carries no figures. People are one family shared by all themes, the pixel people; each pack reads one
-copy (`ArtPack.people`, sharing the pack's `AgentCatalog`). A pack's `states[].animation` may only name a semantic
+A theme pack carries no figure images of its own. Production uses the complete workstation and generic portrait
+described above; **this section describes the legacy `PixelPeople` authoring family and Avatar Studio**. Each pack
+still reads that family (`ArtPack.people`, sharing the pack's `AgentCatalog`). A pack's `states[].animation` may only name a semantic
 name that `state_tracks` in `art/pixel_people/people.json` maps in both `stand` and `desk` (checked by
-`tools/build_assets.py`); the office accepts only `ArtContract.ANIMATIONS` (checked by `make check-packs`).
-Stations, the agent card portrait, the showroom and Avatar Studio all draw `PixelPerson`.
+`tools/build_assets.py`); `ArtContract.ANIMATIONS` retains that compatibility check. Production actors use their
+semantic state directly, not this legacy mapping. No production station or HUD portrait constructs `PixelPerson`.
 
-**The provider is shown by a mark at the seat** (`mark_<provider>` on the far laptop's lid or the near chair's back, see "Provider marks" below), never by the
-person: a unit is 2×2 texels, too small for a recognisable chest logo. Clothes and looks are not a provider code:
-since D3 (2026-10-27) every slot, the clothes as well as the face and head, comes from the user's saved choice for
+Legacy clothes and looks are not a provider code: since D3 (2026-10-27) every slot, the clothes as well as the face
+and head, comes from the user's saved choice for
 the provider or else a fixed variation from the pane's stable key, and the provider's default outfit is what a
-person wears only where no pane is given (see `docs/VISUAL_LANGUAGE.md`, "Looks", and "Pixel people").
+person wears only where no pane is given (see "Pixel people"). These choices remain authoring data; they do not
+change the generic production image. Provider names remain UI words and tooltips, never a world logo.
 
-### Tracks and nodes
+### Legacy tracks and nodes
 
 One animation clock: each `PixelPerson` has one `AnimationPlayer` whose value tracks drive the `frame` of the six
 `Sprite2D` under `Layers/` (`Legs`, `Top`, `Body`, `Glasses`, `Hair`, `Headwear`, bottom to top), all on the same
 frame with no sync code. `PixelPeople.animation_library()` builds the library once per family. Clothes, facing,
 sitting and standing only change textures, `flip_h` and the playing track of existing nodes; a state change only
-changes the track; no node is rebuilt. Seated on the far side shows the front, on the near side the back; a
-standing `done` faces the viewer.
+changes the track; no node is rebuilt. Its seated front/back and standing views remain available to authoring tools,
+not to choose a production station's facing.
 
 | herdr / display state | track (`desk` / `stand`) | Intent |
 |---|---|---|
@@ -413,8 +463,8 @@ sparse default outfit (top, legs, headwear and colours). The user's fixed slots 
 `user://herdstead_avatars.json` (see "The avatar save file"). An undrawn option or unknown provider falls back slot
 by slot (`PixelPeople.look_for()`). The logos in `assets/agent_badges/` (downloaded or generated monograms; sources
 and licences in `assets/agent_badges/ATTRIBUTIONS.md`) appear only in Avatar Studio's agent list: they are smooth
-64×64 images in the minified family, and drawing one on a laptop would scale a texture at run time. In the office
-the provider is the pack's own few-texel mark at the seat.
+64×64 images in the minified family. Neither these logos nor the retained few-texel marks below are drawn on
+production workstations.
 
 ## UI assets (17, and a mark per provider) and state semantics
 
@@ -432,8 +482,8 @@ the provider is the pack's own few-texel mark at the seat.
   the plank, a shade, an outline; light from the top-left on every rail) and a brass plate with a rivet in each
   corner cell, round the dark fill `ink`. The rails and the middle are stretched, so each is one colour along its
   length.
-- `selection_seat`: 32×48 transparent corner marks round a seated figure, pivot 16,46.
-- `mark_<provider>`: the provider's mark at a seat, one per agent in `data/agent_catalog.json` (see "Provider marks").
+- `selection_seat`: legacy 32×48 transparent corner marks, pivot 16,46. Production stations use a `Line2D` outline.
+- `mark_<provider>`: retained legacy provider mark, one per agent in `data/agent_catalog.json` (see "Provider marks"); not drawn in the world.
 - `carpet_<family>`: a zone's carpet, five families (see "Zone carpets").
 - `badge_<badge>_small`: a portrait tile's state mark in the top bar (B2's small marks), one per badge a drawn state
   wears: `badge_blocked_small` (`!`), `badge_unread_small` (done's envelope), `badge_working_small` (a `working` dot),
@@ -460,8 +510,9 @@ length.
 
 ### Provider marks
 
-A seat shows which agent sits there with the provider's mark, `ArtContract.lid_mark(provider)` =
-`mark_<provider>` in the pack's `ui`. Each is **4×3 units (8×6 texels at density 2) on the pivot `[0, 0]`**, its
+These are **legacy authoring assets**, still declared and validated but not drawn by production stations.
+`ArtContract.lid_mark(provider)` names `mark_<provider>` in the pack's `ui`.
+Each is **4×3 units (8×6 texels at density 2) on the pivot `[0, 0]`**, its
 top-left corner, drawn texel by texel in `tools/draw_pixel_sources.py` (`MARK_LOGOS`, `MARK_TILES`; `make
 pixel-sources`), with hard alpha, the pack's palette only, and **no opaque texel within RGB distance 48 of a state
 colour** (`working`, `blocked`, `unread`, `muted`, `task_light`), so a mark never reads as a signal. It fills its
@@ -469,15 +520,10 @@ canvas but for its four corner texels. A provider with a logo is that logo simpl
 terracotta starburst, codex's eye, gemini's sparkle, cursor's cube, copilot's goggles, pi, opencode's square in a
 square, amp's chevron); every other provider is a tile of its colour with its 3×5 initial in the top five rows.
 
-It shows for an agent whose provider the pack has a mark for (`OfficeTable.mark_of()`), never for a shell, a
-launch whose kind herdr has not detected yet, an empty seat or an unknown provider. **Far, on the laptop's lid**:
-`OfficeTable` builds one per far seat with the pod (holder `Marks`, after the far laptops) and `equip()` only dresses
-it; `MARK_AT["far"]` centres it on the rear lid face over the lid's dot (x −2..2, y −6.5..−3.5 from the laptop's
-foot). **Near, on the chair's back**: a seated near worker covers the whole near laptop, so the mark hangs on the
-station's chair (`Chair/Mark` in `scenes/world/station.tscn`, sorted with the chair in front of the sitter, scaled
-back to the pack's density); `MARK_AT["near"]` puts it on the backrest's face (x −2..2, y −17.5..−14.5 from the
-chair's foot, `chair_back` texels 28..35 by 57..62, chair pixels only). It stays while its agent is away. The
-colours above are chosen against both: the light grey lid and the dark slate backrest.
+The retired component assembly placed the far mark on the laptop's rear lid (x −2..2, y −6.5..−3.5 from its
+foot), and the near mark on the chair back (x −2..2, y −17.5..−14.5 from its foot, `chair_back` texels 28..35 by
+57..62). The colours above were chosen against both the light grey lid and the dark slate backrest. Those
+placements explain the retained pixels, not current `OfficeTable`/`OfficeStation` nodes.
 
 **Adding a provider** is one PNG and one `pack.json` entry: draw it in `draw_pixel_sources.py` (add the id to
 `MARK_PROVIDERS` in the catalog's order, and to `MARK_LOGOS` or `MARK_TILES`), run `make pixel-sources OUT=<empty
@@ -486,16 +532,21 @@ dir>`, look at it magnified, copy `ui/mark_<id>.png` into `art/daylight/ui/`, de
 check-packs` names any catalog agent without a mark (`ArtContract.mark_ids()` reads only the shipped catalog's ids,
 never the user's saved looks), and `tools/test_assets.py` holds the drawn and shipped marks to the catalog.
 
-| herdr state | Animation | Icon / meaning |
-|---|---|---|
-| working | working | activity mark; not "a shell command is known to run" |
-| blocked | blocked | amber `!`; needs attention, no invented reason |
-| done | idle (standing `stand_idle`, beside the seat, facing the viewer) | blue envelope / UNREAD; no trophy or tick |
-| idle | idle | neutral ellipsis |
-| unknown | idle | grey `?`; infers neither success nor failure |
+### Production state semantics
 
-starting and offline are display overlays, not new herdr states. On a disconnect the office keeps the last
-positions, pauses motion, dims the picture and says STALE; idle never stands in for a lost connection.
+The production animation column is `WorkstationArt`'s, not the legacy rig's `states[].animation` mapping.
+
+| herdr state | Complete-image animation | Icon / meaning |
+|---|---|---|
+| working | `working`, looping | activity mark; not "a shell command is known to run" |
+| blocked | `blocked_enter` → looping `blocked`; `blocked_exit` before the next state | amber `!`; needs attention, no invented reason |
+| done | `done`, one nod, then frame 0 | blue envelope / UNREAD; no trophy or tick |
+| idle | `idle`, looping | neutral ellipsis |
+| unknown | frame 0, static | grey `?`; infers neither success nor failure |
+
+Starting (static frame 0 and hourglass; blocked wins) and offline are display forms, not new herdr states. On a
+disconnect the office keeps the last positions and frame, pauses motion and dims the picture; idle never stands
+in for a lost connection. Only a valid live observation releases the freeze.
 
 ## Replace and iterate protocol
 
@@ -530,8 +581,10 @@ positions, pauses motion, dims the picture and says STALE; idle never stands in 
    at the new canvas size; the build passes at every step, and 1× / 2× / 4× images may be mixed. Without
    `--manifest-only` every PNG is written scaled up (handy for painting over). The tool suffixes `id` / `name`
    (override with `--id` / `--name`) and refuses the source directory, a non-empty directory, or a lower density.
-4. **Animation timing**: edit fps / durations in the source `pack.json` and rebuild. There is no pre-generated
-   `.tres`: `ArtPack` builds the TileSet and `PixelPeople` the animation library from their manifests.
+4. **Animation timing** belongs to its family: production workstation `animations` are in its own manifest;
+   legacy people `tracks` are in `people.json`. Production keeps the approved timings; a change is an art decision,
+   not a replacement rig mapping. There is no pre-generated `.tres`: `ArtPack` builds the TileSet and each animated
+   family builds its animation library from its manifest.
 5. **Atlas cells**: keep coordinates stable. Procedural scenes use `ArtPack.cell(id)` and survive a re-layout;
    **a hand-painted, saved TileMapLayer stores coordinates and needs migrating**.
 6. `art/daylight/` is hand-made; `assets/<id>/` and derived `art/<id>/` are products, and the build never touches
@@ -542,10 +595,9 @@ positions, pauses motion, dims the picture and says STALE; idle never stands in 
 7. **Optional stale tint**: top-level `"stale_modulate": "rrggbb"` (6-digit lowercase hex) tints the office while
    herdr is disconnected; default `Color(0.65, 0.65, 0.65)`. Additive to schema v1, no version bump; read through
    `ArtPack.stale_tint`. A dark theme should set it, or 0.65 grey crushes the picture.
-8. **Optional task-light strength**: top-level `"task_lights": "soft" | "strong"` sets how strongly the table's
-   task-light wedges and chair contact shadows draw; default `"soft"`. Additive to schema v1; read through
-   `ArtPack.task_lights`.
-   `scripts/world/table.gd` looks only at this key, **never at the pack's name**.
+8. **Legacy task-light strength**: top-level `"task_lights": "soft" | "strong"`, default `"soft"`, remains
+   readable through `ArtPack.task_lights` for compatibility with the retired lamp/shadow assembly. It does not
+   change the production workstation or focus underline (`OfficeStation.LIGHT_ALPHA`: 0 / .15 / .35 / 1).
    **Optional display and heading cuts**: top-level `"display_font": {"path", "license"}` and
    `"heading_font": {"path", "license"}`, like `font`, name the pack's small cut (native 8: the world's labels, the HUD's
    8-unit rows, the wordmark at 16) and its heading cut (native 12: headings, NEWS,
@@ -557,10 +609,10 @@ positions, pauses motion, dims the picture and says STALE; idle never stands in 
    **Optional figures face**: top-level `"figures_font": {"path", "license"}`, read through `ArtPack.figures_font`,
    names the face the compact durations alone are written in (`OfficeDraw.figures`, `style_figures()`, native 8: the
    chip's wait and the lens line); a pack without one writes them in the display cut.
-9. **Scene dependency list**: the palette keys, props, UI, tiles, states and animations scenes use, plus the table
-   modules and the pixel people (every semantic animation has a track in both poses, seated tracks draw the
-   back), live in `scripts/art/art_contract.gd`, beside the code that uses them; scene code takes IDs only through
-   its constants. `make check-packs` checks every pack under `assets/` and refuses one missing a key (an exported
+9. **Scene dependency list**: the theme palette keys, props, UI, tiles, states and animations, plus the retained
+   legacy table, people and portrait contracts, live in `scripts/art/art_contract.gd`. Legacy validation is not a
+   claim those assets are drawn in production. The workstation has its own typed manifest boundary and contract.
+   Scene code takes semantic IDs through these families. `make check-packs` checks every pack under `assets/` and refuses one missing a key (an exported
    PCK runs the same check through `tools/check_pack.gd`). `ArtContract.unused()` reports IDs a pack has but the
    contract does not need, printed as `PACK_UNUSED:` lines (**exit code unaffected**: a pack may draw more).
    `tools/build_assets.py` checks only the pack's own shape, with **`pack.json` as the only source of IDs, sizes
@@ -573,12 +625,13 @@ positions, pauses motion, dims the picture and says STALE; idle never stands in 
 
 On disk a pack is only `pack.json` / `manifest.json` and PNGs, no generated `.tres`. People and the Python builders
 write packs; the Godot editor never does. Loose packs (`--pack=/abs/path`, test fixtures) load from JSON too. The
-three `from_manifest()` functions in `scripts/art/` are the only readers of these files and return typed classes.
+families' `from_manifest()` functions in `scripts/art/` are the only readers of these files and return typed classes.
 A standalone export must add `*.json` to Godot's non-resource Include Filter so the manifests reach the PCK.
 
 ## Pixel people
 
-The family (`pixel_people`) that draws every person in the office. **True pixel art**: density 1 or 2 (the shipped
+**Legacy authoring family**, not the production office's people. `pixel_people` remains available to Avatar Studio,
+standalone previews and its authoring tools. **True pixel art**: density 1 or 2 (the shipped
 `people.json` is density 2: 64×96-texel frames, three 1728×4512 sheets), nearest, never minified at a scale floor
 of 2, small frame animations, recoloured at build time. Geometry, pivot, frames and choreography are in **units**;
 textures are used as built and nodes scale by 1/density (`ArtFamily.dress()`). The standalone showroom
@@ -586,7 +639,7 @@ textures are used as built and nodes scale by 1/density (`ArtFamily.dress()`). T
 
 Pipeline: `art/pixel_people/people.json` → `tools/build_pixel_people.py` (`make art`) →
 `assets/pixel_people/people_manifest.json` → `PixelPeople.from_manifest()`, read once per `ArtPack` (`art.people`).
-The office's requirements are in `ArtContract` (every semantic animation has a track in both poses, seated tracks
+The retained compatibility requirements are in `ArtContract` (every semantic animation has a track in both poses, seated tracks
 draw the back). The product manifest is not named `manifest.json`, so it is never taken for a theme.
 
 ### Contract (`people.json`, the only hand-written source)
@@ -617,18 +670,17 @@ Key and fixed colours are all distinct, since recolouring is a table lookup; the
 | `desk_idle` | front, back | 2 | seated idle / done / unknown |
 | `desk_work` | front, back | 4 | typing: hands rise 1 unit in turn |
 | `desk_blocked` | front, back | 2 | seated, a hand raised above the head |
-| `stand_blocked` | front, side | 2 | standing with a hand raised (drawn for the retired reception queue; nobody stands blocked in the office now); from the side the far hand reaches up behind the head, never covering the face |
+| `stand_blocked` | front, side | 2 | standing with a hand raised (originally drawn for the retired reception queue); from the side the far hand reaches up behind the head, never covering the face |
 | `desk_start` / `stand_start` | front, back | 2 | launch pending: hands on the lap / together in front, a nod on frame 2 |
 | `carry_walk` | front, back, side | 4 | walking with papers |
-| `drink` | front, side | 3 | coffee: cup at chest, chin, mouth (kept in the family, played by nothing in the office since idle sits with a mug, D2, 2026-10-27; its front is no longer required) |
+| `drink` | front, side | 3 | coffee: cup at chest, chin, mouth; retained authoring motion, its front no longer required |
 
 **1 unit = density texels**: "1 unit" is 2 texel rows at density 2. The feet are on texel row
 `pivot.y × density − 1` (45 at density 1, 91 at density 2). Strip and skin sizes and source-strip coordinates are
 texels; contract and motions are units.
 
-`stand` maps `working` to `stand_idle`: nobody stands for a state in the office now (every state sits; the stand
-pose is the walk's, and the showroom's); working is "at your seat, typing". A standing-at-work picture would need a
-new motion and a change to this row.
+The legacy `stand` pose maps `working` to `stand_idle`; it has no standing-at-work motion. These tracks describe
+the authoring rig only, not production actors, which use the approved complete-image clips.
 
 ### Slots
 
@@ -658,8 +710,8 @@ lilac→plum); `short` → short hair, `brown`; `curl` → curly hair, `auburn`;
 overriding the last and skipping undrawable options: the pack's `default_look` → the provider's catalog `look` → the
 user's fixed options for the provider → for an unfixed slot in `variation`, `pool[u32 % pool size]`, where `u32` is
 the first four bytes (big-endian) of the SHA-256 of UTF-8 `"herdstead.look/1␟provider␟pane_key␟slot"` (␟ = U+001F;
-stations and portraits pass `HerdrFleet.pane_key` as `vary_by`) → what the caller explicitly wants (Studio preview,
-showroom). SHA-256 makes a pane pick the same person on every run, machine and Godot version, and the tests pin
+legacy callers can pass `HerdrFleet.pane_key` as `vary_by`) → what the caller explicitly wants (Studio preview,
+showroom). SHA-256 makes that pane pick the same legacy look on every run, machine and Godot version, and the tests pin
 values computed outside Godot. Each slot hashes separately, so a new slot or pool reshuffles only that slot. The
 choice happens only in `configure()`; state never takes part.
 
@@ -730,8 +782,8 @@ per-facing index sheets keeps one draw call per person.
   too, so the fill never touches air or an earlier part — except on an eye the white model paints, which always
   shows (`test_a_thin_ring_s_corner_never_covers_an_eye`: in `drink` the cup sits diagonally against an eye). So the
   whole person and every hair, headwear and glasses frame keep the whole-cell envelope and foot row and add only
-  corner ink (`test_a_thin_ring_keeps_every_frame_s_envelope`), and the offsets in `scripts/world/station.gd`
-  stand. The cost: a thinner outline and wider fill, moving the chin, waist and arm seams out by half a unit. A
+  corner ink (`test_a_thin_ring_keeps_every_frame_s_envelope`). This is the legacy rig's envelope, not the current
+  station's geometry. The cost: a thinner outline and wider fill, moving the chin, waist and arm seams out by half a unit. A
   single layer may gain a corner ink texel, so only the per-person envelope is guaranteed, not the per-layer one.
   The shipped `"ring_texels": 1` gives people the same 1-texel outline as the environment's 2x art.
 - **The raised hand** (the `raised` / `waved` frames of `desk_blocked` and `stand_blocked`), chosen by
@@ -769,7 +821,7 @@ the skin.
   `catchlight` are forbidden**: only the white model paints eyes, and either colour in a skin would count as an
   extra eye in the colour-counting tests; the builder and `cut` refuse it. Pixelize with `--only` omitting those
   two; `cut` leaves the head's eye cells empty. So the real pixel envelope (seated head −31, raised hand −38, width
-  ±8) and the offsets in `scripts/world/station.gd` stand.
+  ±8) of the legacy rig is unchanged; production station offsets do not depend on it.
 - A transparent skin texel keeps the white model's tone; the ink ring is always the white model's; **the eyes are
   painted after the skin**, covering whatever it holds there. Hat-over-hair still holds by the brim check: a skin
   changes fill, never which cells a hat covers.
@@ -830,6 +882,8 @@ The three sheets' `.import` have `mipmaps/generate=false` and are lossless (`com
 asset family".
 
 ### The avatar save file (`user://herdstead_avatars.json`)
+
+This is the legacy authoring customization format. Saving a look does not alter production workstation or HUD art.
 
 `{"schema_version": 2, "looks": {"<provider>": {"<slot>": "<option>" | {"rgb": "rrggbb"}}}}`, only the slots the
 user fixed. `{"rgb"}` is reserved for per-colour picking: read and written back as is, not drawn. `AgentCatalog` is
@@ -897,11 +951,11 @@ rule the builder checks). The output directory must be empty; painted work is ne
 
 ## Portraits
 
-The family (`portraits`) that draws the seat's person head and shoulders for the HUD (the top bar's tiles and the
-agent card, from S3 PORTRAIT P2 / P3 on). A sibling of the pixel people, not a part of them: **true pixel art**,
-density 2 (the people's), nearest, never minified, recoloured at build time with **the people's own key colours and
-swatches**, so a pane's portrait is its seat's person by construction. A portrait is a still: it shows no pose and
-no state (the HUD's frame, the tile's corner mark and the card's badge say the state).
+**Legacy layered portrait authoring family**, not the current HUD image. `PixelPortraits` / `PixelPortrait` retain
+the per-look head-and-shoulders pipeline formerly used by the top bar and agent card. Production uses the single
+flattened `WorkstationArt` portrait instead. The legacy family is a sibling of the pixel people: **true pixel art**,
+density 2, nearest, recoloured at build time with **the people's own key colours and swatches**, so an authored
+portrait matches its legacy rig's look. A portrait is a still and does not encode agent state.
 
 Pipeline: `art/portraits/portraits.json` (+ painted parts in `art/portraits/parts/`) → `tools/build_portraits.py`
 (`make art`, after the people) → `assets/portraits/portraits.png` + `portraits_manifest.json` →
@@ -922,9 +976,10 @@ Pipeline: `art/portraits/portraits.json` (+ painted parts in `art/portraits/part
 | `face_box` | `[11, 14, 29, 25]` units, x0 and y0 inclusive, x1 and y1 exclusive: every `face` and `brows` texel lies inside |
 | `head_rows` | `[7, 33]`: the bald head's crown and chin rows; checked loosely (a note, `PORTRAIT_HEAD_ROWS`, never a refusal) |
 
-**The face box is HUD geometry, not art direction**: it keeps the eyes, brows and mouth ≥ 3 units from every edge of
+**The face box retains the legacy HUD geometry, not new art direction**: it keeps the eyes, brows and mouth ≥ 3 units from every edge of
 the 40×40 clip (the frame and the selection rings are drawn over the portrait), inside the face-only tile's crop
-(columns 9..31) and clear of the tile's corner mark (0..8 × 0..8). Move it only with the HUD's measurements.
+(columns 9..31) and clear of the tile's corner mark (0..8 × 0..8). It remains an authoring contract, not a runtime
+cut or validation of the flattened generic production portrait.
 
 | Layer | Shape | Colour | Fixed | Sources |
 |---|---|---|---|---|
@@ -953,7 +1008,7 @@ reader and answers `push_error` and null for: an unknown field, schema, density 
 or a pivot off the centre; a layer the runtime does not have, or one missing; a shape that is no look shape slot and
 no extra; a colour that is no people colour slot; extras other than the three, or one whose default or pool names an
 undrawn option; a sheet other than `portraits.png`, one that is not whole cells wide `columns` times, or a cell index
-outside it. `look_of(provider, pane_key)` resolves the person with the seat's own call
+outside it. `look_of(provider, pane_key)` resolves the person with the legacy rig's own call
 (`people.look_for(provider, …, pane_key)`) and picks each extra with `PixelPeople.pick(provider, pane_key,
 "portrait.<extra>")` (the default with no pane): `VARIATION_SCHEME` is unchanged, so nobody's look moves.
 `part_texture(layer, look)` is the cell's `AtlasTexture` (made once), null for `none`, an undrawn option, and the
@@ -963,8 +1018,8 @@ hair under a hood.
 
 A part that is not in `art/portraits/parts/` is **drawn by the builder** from the contract in key colours (a bald
 oval head, a shoulder band, a hair cap per style, a cap and a hood, a line mouth per expression…) and listed in
-`mock_files`, as the people's placeholders are; the placeholders pass every check below, so the HUD can be built on
-them. The orchestrator merges a portrait HUD only once `mock_files` is empty (or with the user's go).
+`mock_files`, as the people's placeholders are. They follow the same authoring checks below; they are not approved
+replacement art. This placeholder/part pipeline is not involved in the production generic portrait.
 
 Every source, painted or drawn: exactly 80×80, alpha 0 or 255, every opaque texel a colour its layer allows
 (`PORTRAITS_BUILD_FAILED:` naming the file, the texel and the colour); a PNG the contract does not name is refused.
@@ -1017,7 +1072,7 @@ family".
   the system fallbacks only, each cut no taller than its own row (`OfficeDraw.no_taller()`).
 - Tiny5 from [Google Fonts](https://github.com/google/fonts/tree/main/ofl/tiny5), `Tiny5-Regular.ttf`, kept with its
   `OFL.txt` (SIL OFL 1.1): the pack's `figures_font`, for the compact durations only (`99m`, `99m+`, `4s+`). Its digits
-  are 4 wide (Fusion's 8px cut's are 5), which is what fits a wait in the chip at the 32-unit seat pitch. Drawn at 8,
+  are 4 wide (Fusion's 8px cut's are 5), which fits a wait in the fixed 30-unit chip's 14-unit text area. Drawn at 8,
   hard, over the system fallbacks, no taller than its own row.
 - Each cut ships with one licence text beside it, `FusionPixel-<N>px-LICENSES.txt`: the release's `OFL.txt` (SIL OFL
   1.1) followed, each under a one-line header naming it, by every file in that build's `LICENSES/` directory,

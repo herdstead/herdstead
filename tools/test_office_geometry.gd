@@ -1,11 +1,16 @@
 extends "res://tools/seat_test_base.gd"
-## Public workstation geometry and identity across repeated placement.
-
-## How much of a near task lamp's wedge stays in sight on each side of whoever
-## sits at it, in half-unit texels (four to a square unit). Measured: 248 on
-## each side of a sitter (of the wedge's 650 a side; the laptop alone, with
-## nobody over the desk, leaves 342), 146 on the right of one with a hand up.
-const NEAR_LAMP_IN_SIGHT := 140
+## Complete-image stations: public geometry, retained identity and real picking.
+##
+## Retirement ledger (34 old cases -> 24 migrated + 5 new = 29): the ten
+## separate-component cases for thin_front, contact_shadows, paper_stack,
+## near_chair, far_laptop, agents_mark, near_sitter, no_legs, near_paper and
+## mug are retired. There is no runtime apron/support/shadow, provider mark,
+## paper/mug, chair/monitor occlusion or walk-to-seat composition to test.
+## Complete-frame bounds and annotation clearance replace their surviving
+## visibility concern. laptops_align becomes native whole-image playback;
+## shell_laptop becomes permanent empty/person reuse; near_lamp becomes the
+## independent focus underline. Five new cases cover enter/exit interruption,
+## completion, frozen state changes and quiet starting/unknown states.
 
 var art: ArtPack
 var pen: OfficeDraw
@@ -23,11 +28,20 @@ func _run() -> void:
 	root.size = Vector2i(1600, 960)
 	root.physics_object_picking = true
 	art = ArtPack.from_manifest("res://assets/daylight/manifest.json")
-	if art == null:
-		print("TEST_HARNESS_ERROR: office geometry has no art pack")
+	if art == null or art.workstation == null:
+		print("TEST_HARNESS_ERROR: office geometry has no workstation art")
 		quit(2)
 		return
 	pen = OfficeDraw.new(art)
+	var family := art.workstation
+	var image := family.sheet_texture().get_image()
+	for index in family.columns * family.rows:
+		var used := image.get_region(_sheet_cell(index, family)).get_used_rect()
+		frame_ink.append(
+			Rect2(Vector2(used.position) / family.density - family.pivot, Vector2(used.size) / family.density)
+		)
+	var empty := family.empty_texture().get_image().get_used_rect()
+	empty_ink = Rect2(Vector2(empty.position) / family.density - family.pivot, Vector2(empty.size) / family.density)
 	await run_cases()
 
 
@@ -40,14 +54,17 @@ func _after_case() -> void:
 		world.free()
 
 
-## The smallest pod, measured the way the office measures it (two desks).
-func _table() -> OfficeTable:
+func _world() -> void:
 	world = Node2D.new()
 	ground = Node2D.new()
 	sorted = Node2D.new()
 	world.add_child(ground)
 	world.add_child(sorted)
 	root.add_child(world)
+
+
+func _table() -> OfficeTable:
+	_world()
 	var measured := OfficeTable.measure(2)
 	return pen.table(sorted, ground, "Measured", Vector2(160, 240), measured.table_width, measured.columns)
 
@@ -56,13 +73,13 @@ func test_repeated_table_setup_is_idempotent() -> void:
 	var table := _table()
 	var count := table.find_children("*", "", true, false).size()
 	var first := table.seat(0, "far")
-	table.equip(0, "far", true)
-	table.light(0, "far", OfficeTable.Lamp.FOCUS)
-	_check(table.setup(art, 64, [16.0, 48.0]), "same setup succeeds")
+	table.set_selected(true)
+	_check(table.setup(art, 192, [48.0, 144.0]), "same setup succeeds")
 	_eq(table.find_children("*", "", true, false).size(), count, "same setup adds no nodes")
 	_eq(table.seat(0, "far"), first, "existing seat marker remains valid")
-	_check(table.monitor(0, "far").visible, "same setup keeps the occupied monitor")
-	_eq(table.task_light(0, "far").color, table.lamp_color(OfficeTable.Lamp.FOCUS), "same setup keeps lamp")
+	_check((table.get_node("Overlay/Frame") as Node2D).visible, "same setup keeps the selection")
+	_eq(table.find_children("*", "Sprite2D", true, false).size(), 0, "the pod never duplicates workstation art")
+	_eq(ground.get_child_count(), 0, "no separate contact shadows are drawn")
 
 
 func test_repeated_station_setup_does_not_drift_the_click_targets() -> void:
@@ -71,115 +88,83 @@ func test_repeated_station_setup_does_not_drift_the_click_targets() -> void:
 	station.furnish("claude", ArtContract.STATE_BLOCKED)
 	var target := station.target_rect()
 	var bubble := station.chip_rect()
-	var bubble_shape: CollisionShape2D = station.get_node(OfficeStation.CHIP_TARGET)
+	var bubble_shape: CollisionShape2D = station.get_node("Target/Chip")
 	var shape_at := bubble_shape.global_position
 	var worker := station.actor()
-	_check(bubble.has_area(), "a blocked seat has a bubble")
-	station.setup(pen, table, 0, "far")
-	station.furnish("claude", ArtContract.STATE_BLOCKED)
-	_eq(station.target_rect(), target, "same setup keeps the seat's click target")
-	_eq(station.chip_rect(), bubble, "and the bubble")
-	_eq(bubble_shape.global_position, shape_at, "and the bubble's click target")
-	_eq(station.actor(), worker, "same setup keeps worker node")
+	var player := _manual_player(station)
+	player.advance(0.3)
+	var elapsed := player.current_animation_position
+	var frame := _body(station).frame
+	_check(bubble.has_area(), "a blocked seat has a chip")
+	for _repeat in 12:
+		station.setup(pen, table, 0, "far")
+		station.furnish("claude", ArtContract.STATE_BLOCKED)
+		_eq(station.target_rect(), target, "same setup keeps the seat's click target")
+		_eq(station.chip_rect(), bubble, "and the chip")
+		_eq(bubble_shape.global_position, shape_at, "and the chip's click target")
+		_eq(station.actor(), worker, "same setup keeps the whole-image actor")
+		_eq(player.current_animation_position, elapsed, "setup/refresh cannot restart blocked enter")
+		_eq(_body(station).frame, frame, "nor change the shown frame")
 
 
 func test_measure_is_the_capacity_and_clearance_contract() -> void:
-	# A pod of single desks (docs/WORLD_MODEL.md): one 32-unit desk per column,
-	# a 48-deep desktop, six reserved cells from the far approach row to the
-	# near one with a passage cell on the right, and the stationary drawing from
-	# the far tag row's pulse envelope (-90) to the near one's foot (32: the near
-	# seat is 8 below the near edge, at the near working plane).
 	var minimum := OfficeTable.measure(0)
 	_eq(minimum.capacity, 2, "even an empty tab reserves two columns")
-	_eq(minimum.table_width, 64.0, "minimum pod width: two desks")
+	_eq(minimum.table_width, 192.0, "minimum pod width: two 96-unit columns")
 	for capacity in range(2, 17):
 		var measured := OfficeTable.measure(capacity)
 		_eq(measured.columns.size(), capacity, "one x coordinate per column")
-		_eq(measured.table_width, capacity * 32.0, "one 32-unit desk per column")
-		_eq(measured.physical_rect, Rect2(0, -48, measured.table_width, 48), "physical desktop only")
-		_eq(measured.reserved_rect, Rect2(0, -128, measured.table_width + 32, 192), "walk and drawing reserve")
-		_eq(measured.render_rect, Rect2(0, -90, measured.table_width, 122), "the stationary drawing")
-		_check(measured.reserved_rect.encloses(measured.render_rect), "all stationary drawing fits reservation")
+		_eq(measured.table_width, capacity * 96.0, "one whole workstation column per 96 units")
+		_eq(measured.physical_rect, Rect2(0, -198, measured.table_width, 208), "both complete-image rows")
+		_eq(measured.render_rect, Rect2(0, -200, measured.table_width, 256), "images and annotation rows")
+		_eq(measured.reserved_rect, Rect2(0, -224, measured.table_width + 32, 320), "drawing and passage reserve")
+		_check(measured.reserved_rect.encloses(measured.render_rect), "drawing fits the reservation")
 		for index in capacity:
-			_eq(measured.columns[index], 16.0 + 32.0 * index, "growth never recenters an existing column")
-			_eq(measured.seat_position(index, "far"), Vector2(16.0 + 32.0 * index, -36), "far seat")
-			_eq(measured.seat_position(index, "near"), Vector2(16.0 + 32.0 * index, 8), "near seat")
-			_eq(measured.approach_position(index, "far"), Vector2(16.0 + 32.0 * index, -80), "far approach")
-			_eq(measured.approach_position(index, "near"), Vector2(16.0 + 32.0 * index, 48), "near approach")
+			_eq(measured.columns[index], 48.0 + 96.0 * index, "growth never recenters an existing column")
+			_eq(measured.seat_position(index, "far"), Vector2(48.0 + 96.0 * index, -128), "upper row's feet")
+			_eq(measured.seat_position(index, "near"), Vector2(48.0 + 96.0 * index, 0), "lower row's feet")
 			for side: String in OfficeTable.SIDES:
-				_check(measured.has_seat(index, side), "both sides of a measured column exist")
-				_check(measured.reserved_rect.has_point(measured.standing_position(index, side)), "standing fits")
-				var approach := measured.approach_position(index, side)
-				_check(measured.reserved_rect.has_point(approach), "approach is inside the reserved island")
-				_check(not measured.physical_rect.has_point(approach), "approach is outside the physical table")
+				_check(measured.has_seat(index, side), "both rows of a measured column exist")
+				var canvas := Rect2(
+					measured.seat_position(index, side) + OfficeStation.CANVAS.position, Vector2(80, 80)
+				)
+				_check(measured.physical_rect.encloses(canvas), "the whole image fits, not merely the person's feet")
 	_check(not minimum.has_seat(2, "far") and not minimum.has_seat(0, "other"), "invalid seats are absent")
 	_eq(minimum.seat_position(-1, "far"), Vector2.INF, "invalid position has an explicit sentinel")
 
 
-func test_thin_front_joins_supports_without_moving_the_floor() -> void:
-	var table := _table()
-	_eq(art.table.apron_height, 3, "three-unit apron complements the three-unit lip")
-	for child in table.get_node("Apron").get_children():
-		var apron := child as Sprite2D
-		_eq(apron.position.y, -5.0, "apron directly follows the painted surface")
-		_eq(apron.position.y + apron.get_rect().size.y * apron.scale.y, -2.0, "thin front ends at -2")
-	# No legs: the supports are one bracket under each desk and nothing else.
-	_check(table.resize(4), "a pod with middle columns")
-	var brackets: Array[float] = []
-	for child in table.get_node("Supports").get_children():
-		var support := child as Sprite2D
-		_eq(support.texture, art.table.module_texture(&"bracket"), "every support is a bracket")
-		brackets.append(support.position.x + 6.0)
-		_eq(support.position.y, -11.0, "hung under the apron")
-	brackets.sort()
-	_eq(brackets, table.columns, "one bracket under each column")
-	for index in table.columns.size():
-		for point in table.task_light(index, "near").polygon:
-			_check(point.y <= -8.0, "near light stops on the working top, not below the thin edge")
-
-
-## The desk decor's pools stand on side tables now (the pod carries none): a
-## lane gap's side table carries one piece picked by its placement key, and
-## that piece survives growth elsewhere (the pod in the lane above it growing
-## wider, the zone in the next lane growing down and deepening the map: the
-## same node, the same piece, where it stood), state updates at every seat, and
-## a rebuild in another theme (the same semantic piece, drawn from that pack).
-## It replaces test_desktop_decor_survives_growth_state_updates_and_theme_rebuilds;
-## lane B1 stood it in a row's spare bay, lane B2a moves it into the lane gaps.
 func test_side_table_items_survive_growth_state_updates_and_theme_rebuilds() -> void:
-	world = Node2D.new()
-	root.add_child(world)
+	_world()
 	var policy := FloorLayoutPolicy.new()
-	policy.width_cells = 32
-	policy.actor_footprint = PixelPerson.footprint()
-	policy.actor_draw_rect = PixelPerson.drawing_rect(art.people)
-	# Zone 1 (lanes 0 and 1, two 2-pane pods in one row) is one pod row; zone 2
-	# (lanes 2 and 3) three rows of twelve-pane pods, so the map is deeper than
-	# zone 1 and lane 0 has a gap under it. Z1 (2026-10-27): a lane is 4 cells,
-	# pitch 5, a new zone takes lanes until it stands one row; the map replans:
-	# zone 2 grows into its three pods (a new zone of them would take every
-	# lane and stand under zone 1), and zone 1's other pod stands left of the
-	# room, which grows right, in place.
+	# Start with three small pods, then close the last: the retained zone has
+	# room for tab-a to grow in place. The adjacent zone grows down, leaving a
+	# lane-zero gap whose furniture must keep both its position and identity.
+	policy.width_cells = 64
 	var room := _side_room("tab-a", 1, 0, 2)
-	var first_zone := _side_zone("side/1", 1, [_side_room("tab-f", 0, 500, 2), room])
+	var first_zone := _side_zone(
+		"side/1", 1, [_side_room("tab-f", 0, 500, 2), room, _side_room("tab-closed", 2, 600, 2)]
+	)
 	var second_zone := _side_zone("side/2", 2, [_side_room("tab-b", 0, 100, 12)])
 	var zones: Array[ZoneModel] = [first_zone, second_zone]
 	var decor := OfficeDecorPlanner.new(pen)
 	var start := OfficeFloorLayout.plan(MapModel.of_zones("side", zones), null, policy, decor).plan
+	_check(start != null, "the initial side-by-side zones are planned")
+	if start == null:
+		return
+	first_zone.rooms.remove_at(2)
 	second_zone.rooms.append_array([_side_room("tab-c", 1, 200, 12), _side_room("tab-d", 2, 300, 12)])
 	var first := OfficeFloorLayout.plan(MapModel.of_zones("side", zones), start, policy, decor).plan
 	_check(first != null, "the map is planned")
 	if first == null:
 		return
-	_eq(first.lanes, 5, "five lanes")
-	_eq([first.zones[0].lanes, first.zones[1].lanes, first.zones[1].rows.size()], [2, 2, 3], "zone 1 beside zone 2")
+	_eq(first.zones[0].rows.size(), 1, "the left zone is one pod row")
+	_eq(first.zones[1].rows.size(), 3, "the adjacent zone grew down three rows")
 	var bay := _gap_table_of(first)
-	_check(bay != null, "lane 0's gap stands a side table")
+	_check(bay != null, "lane zero's gap stands a side table")
 	if bay == null:
 		return
-	_eq(bay.piece, ArtContract.PROP_SIDE_TABLE, "the lane gap stands a side table")
 	_eq(bay.item, OfficeDecorPlanner.side_table_item(art, bay.key), "carrying its key's piece")
-	_check(art.prop_sprite(bay.item) != null, "a piece of the pack: " + bay.item)
+	_check(art.prop_sprite(bay.item) != null, "a piece of the pack")
 	var floor_root := Node2D.new()
 	world.add_child(floor_root)
 	var view := OfficeFloorView.new()
@@ -206,7 +191,7 @@ func test_side_table_items_survive_growth_state_updates_and_theme_rebuilds() -> 
 	if moved == null:
 		return
 	_check(grown.desk(room.key).capacity > first.desk(room.key).capacity, "the pod above it really grew")
-	_check(grown.floor_cells.size.y > first.floor_cells.size.y, "and the next lane's zone deepened the map")
+	_check(grown.floor_cells.size.y > first.floor_cells.size.y, "and the adjacent zone deepened the map")
 	_eq([moved.item, moved.position], [bay.item, bay.position], "the same piece where it stood")
 	view.reconcile(grown, MapModel.of_zones("side", zones))
 	view.update_desks(MapModel.of_zones("side", zones), "", false)
@@ -225,11 +210,10 @@ func test_side_table_items_survive_growth_state_updates_and_theme_rebuilds() -> 
 			state + ": unchanged"
 		)
 	var other := ArtPack.from_manifest(_second_pack_at(_work_dir().path_join("geometry-pack-second")))
-	var themed := OfficeDraw.new(other)
 	var rebuilt_root := Node2D.new()
 	world.add_child(rebuilt_root)
 	var rebuilt := OfficeFloorView.new()
-	rebuilt.setup(themed, rebuilt_root)
+	rebuilt.setup(OfficeDraw.new(other), rebuilt_root)
 	rebuilt.reconcile(grown, MapModel.of_zones("side", zones))
 	var again := _decor_node(rebuilt_root, bay.key)
 	_check(again != null, "the rebuild in another theme draws it")
@@ -238,15 +222,8 @@ func test_side_table_items_survive_growth_state_updates_and_theme_rebuilds() -> 
 		_eq(again.held().texture, other.sprite_texture(other.prop_sprite(bay.item)), "from the other pack")
 
 
-## Over 64 lane-gap placement keys, in both packs, the side tables' pieces
-## vary: every piece of the `desk` pool and a cat occur, cats on some tables
-## and not most, each key always the same piece. Stood on a real side table, a
-## piece's foot is on the top's solid wood (rows -23.5..-19 over the foot,
-## OfficeDecor.TOP_Y -20) and its pixels keep to the top's middle 16 units. It
-## replaces test_desktop_library_varies_without_covering_equipment_or_leaving_the_top.
 func test_side_table_items_vary_and_stay_on_the_top() -> void:
-	world = Node2D.new()
-	root.add_child(world)
+	_world()
 	for manifest: String in [
 		"res://assets/daylight/manifest.json", _second_pack_at(_work_dir().path_join("geometry-pack-second"))
 	]:
@@ -258,7 +235,6 @@ func test_side_table_items_vary_and_stay_on_the_top() -> void:
 		for sprite in pack.items_in(OfficeDecorPlanner.CAT_GROUP):
 			cat_ids.append(sprite.id)
 		for sample in 64:
-			# The planner's own key shape: lane, then row.
 			var key := "%02d/gap/%04d" % [sample % 4, 7 + 2 * (sample >> 2)]
 			var id := OfficeDecorPlanner.side_table_item(pack, key)
 			_eq(OfficeDecorPlanner.side_table_item(pack, key), id, "%s: the same piece every time" % key)
@@ -270,146 +246,130 @@ func test_side_table_items_vary_and_stay_on_the_top() -> void:
 			var drawn := (
 				table.get_global_transform().affine_inverse() * item.get_global_transform() * _opaque_local(item)
 			)
-			_eq(item.scale, pack.unit_scale(), "%s: the piece uses its family's density" % id)
-			_check(drawn.end.y >= -23.5 and drawn.end.y <= -19.0, "%s %s: its foot on the top's wood" % [pack.id, id])
-			_check(
-				drawn.position.x >= -8.0 and drawn.end.x <= 8.0,
-				"%s %s: inside the top's middle, %s" % [pack.id, id, drawn]
-			)
+			_eq(item.scale, pack.unit_scale(), "%s: its family's density" % id)
+			_check(drawn.end.y >= -23.5 and drawn.end.y <= -19.0, "%s: its foot on the top's wood" % id)
+			_check(drawn.position.x >= -8.0 and drawn.end.x <= 8.0, "%s: inside the top's middle" % id)
 			table.free()
 		for sprite in pack.items_in(OfficeDecorPlanner.DESK_GROUP):
 			_check(seen.has(sprite.id), "%s: the keys exercise %s" % [pack.id, sprite.id])
 		_check(cats > 0 and cats < 32, "%s: cats occur, on most tables not: %d of 64" % [pack.id, cats])
 
 
-## A pane of the side-table map, working.
-func _side_pane(index: int) -> PaneModel:
-	var pane := PaneModel.new()
-	pane.pane_id = "p%d" % index
-	pane.key = "side:p%d" % index
-	pane.terminal_id = "term-p%d" % index
-	pane.provider = "claude"
-	pane.state = "working"
-	return pane
-
-
-## A tab `key` numbered `number` of `count` working panes, their indices from `first`.
-func _side_room(key: String, number: int, first: int, count: int) -> RoomModel:
-	var room := RoomModel.new()
-	room.key = key
-	room.number = number
-	room.label = key.to_upper()
-	for index in count:
-		room.panes.append(_side_pane(first + index))
-	return room
-
-
-## A workspace `key` numbered `number` holding `rooms`: one zone of the map.
-func _side_zone(key: String, number: int, rooms: Array[RoomModel]) -> ZoneModel:
-	var zone := ZoneModel.new()
-	zone.key = key
-	zone.number = number
-	zone.label = key
-	zone.rooms = rooms
-	return zone
-
-
-## Lane 0's first gap side table of `plan` (or the one keyed `key`), or null.
-func _gap_table_of(plan: FloorPlan, key := "") -> DecorPlacement:
-	for placed in plan.decorations:
-		if key.is_empty() and placed.key.begins_with("00/gap/") and placed.piece == ArtContract.PROP_SIDE_TABLE:
-			return placed
-		if not key.is_empty() and placed.key == key:
-			return placed
-	return null
-
-
-## The drawn standing piece keyed `key` under `floor_root` (OfficeFloorView names
-## it after its plan key), or null.
-func _decor_node(floor_root: Node, key: String) -> OfficeDecor:
-	return floor_root.find_child("Decor_" + key.replace("/", "_"), true, false) as OfficeDecor
-
-
-func test_laptops_align_with_workers_on_both_sides_after_growth() -> void:
+func test_native_whole_image_playback_uses_one_sprite_on_both_rows() -> void:
 	var table := _table()
 	_check(table.resize(4), "include appended columns")
+	var family := art.workstation
+	_eq(family.frame_size, Vector2i(80, 80), "native world canvas")
+	_eq(family.pivot, Vector2(37.5, 70), "approved foot point")
+	_eq(family.density, 2, "two source pixels per unit")
+	_eq(family.sheet_texture().get_size(), Vector2(640, 960), "the approved 4 by 6 sheet")
 	for column in table.columns.size():
 		for side: String in OfficeTable.SIDES:
 			var station := pen.station(sorted, table, column, side)
 			station.furnish("codex", ArtContract.STATE_WORKING)
-			var laptop := table.monitor(column, side)
-			_eq(laptop.global_position.x, station.actor().global_position.x, "laptop is centered on its worker")
-			_eq(laptop.position.y, -40.0 if side == "far" else -10.0, "laptop is at its sitter's edge, not the screen")
-			_eq(laptop.scale, art.table.unit_scale(), "alignment never rescales the native art")
-			var at := laptop.global_position
-			station.furnish("", ArtContract.STATE_IDLE)
-			_eq(laptop.global_position, at, "empty shell chair keeps the same edge-aligned laptop")
+			var actor := station.actor()
+			var body := _body(station)
+			var player := _manual_player(station)
+			_eq(actor.find_children("*", "Sprite2D", true, false), [body], "one indivisible image, not a layered rig")
+			_eq(body.texture, family.sheet_texture(), "the native sheet, not a composited texture")
+			_eq(body.scale, Vector2(0.5, 0.5), "density only scales texels back to units")
+			_eq(body.texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST, "hard pixel edges")
+			_check(not body.centered and not body.flip_h and not body.flip_v, "both rows face front without mirroring")
+			_eq([body.hframes, body.vframes], [4, 6], "native atlas cells")
+			_eq(body.offset, Vector2(-75, -140), "pivot in source pixels")
+			_eq(body.transform * body.get_rect(), OfficeStation.CANVAS, "whole native canvas about the foot")
+			_eq(actor.global_position, table.seat(column, side).global_position, "the image follows its measured foot")
+			_eq(player.get_animation_library(&""), family.library, "the family library is shared, not rebuilt per seat")
+			for clip in family.tracks:
+				var entry := family.tracks[clip]
+				var animation := player.get_animation(clip)
+				_eq(animation.get_track_count(), 1, "%s: only the complete frame changes" % clip)
+				_eq(animation.track_get_path(0), ^"Body:frame", "%s: public scene property" % clip)
+				_eq(
+					animation.value_track_get_update_mode(0),
+					Animation.UPDATE_DISCRETE,
+					"%s: no interpolated images" % clip
+				)
+				player.play(clip)
+				var at := 0.0
+				for index in entry.frames.size():
+					player.seek(at + entry.seconds[index] / 2.0, true)
+					_eq(body.frame, entry.frames[index], "%s: approved frame %d at its authored hold" % [clip, index])
+					at += entry.seconds[index]
 			station.free()
 
 
-func test_shell_laptop_changes_in_place_and_survives_growth() -> void:
+func test_shell_person_vacancy_and_reuse_keep_the_permanent_workstation() -> void:
 	var table := _table()
-	for manifest: String in [
-		"res://assets/daylight/manifest.json", _second_pack_at(_work_dir().path_join("geometry-pack-second"))
-	]:
-		var pack := ArtPack.from_manifest(manifest)
-		_check(table.setup(pack, table.width, table.columns), "dress table in each theme")
-		var drawing := OfficeDraw.new(pack)
-		var piece := pack.table.piece(ArtContract.FURNITURE_MONITOR)
-		for side: String in OfficeTable.SIDES:
-			var station := drawing.station(sorted, table, 1, side)
-			var laptop := table.monitor(1, side)
-			var normal := pack.table.module_texture(piece.view(&"rear_shell" if side == "far" else &"front_privacy"))
-			var prompt := pack.table.module_texture(piece.view(&"shell_rear" if side == "far" else &"shell_front"))
-			_check(prompt != null and prompt != normal, "shell has its own prompt on both views")
-			station.furnish("codex", ArtContract.STATE_WORKING)
-			_eq(laptop.texture, normal, "agent uses the plain laptop")
-			station.furnish("", ArtContract.STATE_IDLE)
-			_eq(laptop.texture, prompt, "shell shows the terminal prompt")
-			_check(laptop.visible and station.actor() == null, "shell is an equipped seat without a person")
-			_check(table.resize(table.columns.size() + 2), "grow while shell is present")
-			_eq(table.monitor(1, side), laptop, "growth retains the same laptop node")
-			_eq(laptop.texture, prompt, "growth retains the shell prompt")
-			station.furnish("", ArtContract.STATE_IDLE, false, true)
-			_eq(laptop.texture, normal, "launch pending is not a shell, even without a provider yet")
-			_check(station.actor() != null, "launch pending has a starting worker")
-			station.furnish("", ArtContract.STATE_IDLE)
-			station.vacate()
-			_check(not laptop.visible, "vacant seat hides all equipment")
-			station.furnish("pi", ArtContract.STATE_DONE)
-			_eq(table.monitor(1, side), laptop, "occupant changes do not replace equipment")
-			_eq(laptop.texture, normal, "standing agent with an empty chair is not a shell")
-			station.free()
+	for side: String in OfficeTable.SIDES:
+		var station := pen.station(sorted, table, 0, side)
+		var permanent: WorkstationActor = station.get_node("Actor")
+		var body := _body(station)
+		var player := _manual_player(station)
+		var nodes := station.find_children("*", "", true, false)
+		var heard := PackedStringArray()
+		station.picked.connect(func(key: String, _at: Vector2) -> void: heard.append(key))
+		station.furnish("", ArtContract.STATE_IDLE, true)
+		station.pane_key = "machine:shell"
+		station.show_name("shell")
+		_eq(station.actor(), null, "shell has no person")
+		_eq(body.texture, art.workstation.empty_texture(), "shell draws the authored empty workstation")
+		_eq([body.hframes, body.vframes], [1, 1], "the empty picture is a complete single cell")
+		_check(not player.is_playing(), "no hidden person's animation at a shell")
+		_check(station.plate_shown() and _selection(station).visible, "a shell still has its normal name and pick")
+		_check(not station.chip().visible and not _badge(station).visible, "no agent badge or chip at a shell")
+		await _click(station.target_rect().get_center(), true)
+		_check(heard.is_empty(), "shell press does not select")
+		await _click(station.target_rect().get_center(), false)
+		_eq(heard, PackedStringArray(["machine:shell"]), "shell release picks the shell")
+		station.furnish("claude", ArtContract.STATE_WORKING)
+		_eq(station.actor(), permanent, "shell to person reuses the permanent actor")
+		_eq(body.texture, art.workstation.sheet_texture(), "the person appears in the complete image")
+		_check(table.resize(4), "grow around the occupied station")
+		_check(station.rebind(table, 2, side), "move into an appended column")
+		station.vacate()
+		_eq(station.actor(), null, "vacant has no person")
+		_eq(body.texture, art.workstation.empty_texture(), "vacancy keeps the desk, chair and monitors")
+		_eq([station.pane_key, station.name_shown()], ["", ""], "vacancy keeps no pane or name")
+		_check(not station.plate_shown() and not _selection(station).visible, "vacancy has no name or selection")
+		_check(not _badge(station).visible and not station.chip().visible, "vacancy has no badge or chip")
+		heard.clear()
+		await _click(station.target_rect().get_center(), true)
+		await _click(station.target_rect().get_center(), false)
+		_check(heard.is_empty(), "a vacant workstation cannot be picked")
+		station.furnish("pi", ArtContract.STATE_DONE)
+		station.pane_key = "machine:replacement"
+		station.show_name("replacement")
+		_eq(station.actor(), permanent, "a new occupant reuses the same actor")
+		_eq(permanent.provider, "pi", "public provider metadata follows the new occupant")
+		_eq(permanent.track, &"done", "the new occupant gets its own one-shot")
+		_eq(station.find_children("*", "", true, false), nodes, "no node was replaced through the cycle")
+		await _click(station.target_rect().get_center(), true)
+		await _click(station.target_rect().get_center(), false)
+		_eq(heard, PackedStringArray(["machine:replacement"]), "reused input wiring names only the new pane")
+		station.free()
 
 
-func test_resize_preserves_seats_equipment_and_selection() -> void:
+func test_resize_preserves_seats_stations_and_selection() -> void:
 	var table := _table()
 	var marker := table.seat(1, "near")
-	var monitor := table.monitor(1, "near")
-	var lamp := table.task_light(1, "near")
-	table.equip(1, "near", true)
-	table.light(1, "near", OfficeTable.Lamp.FOCUS)
+	var station := pen.station(sorted, table, 1, "near")
+	station.furnish("claude", ArtContract.STATE_WORKING, true)
+	var actor := station.actor()
+	var body := _body(station)
 	table.set_selected(true)
 	_check(table.resize(6), "grow capacity")
 	var measured := OfficeTable.measure(6)
 	_eq(table.width, measured.table_width, "runtime width comes from measure")
 	_eq(table.columns, measured.columns, "runtime columns come from measure")
 	_eq(table.seat(1, "near"), marker, "marker identity survives growth")
-	_eq(table.monitor(1, "near"), monitor, "monitor identity survives growth")
-	_eq(table.task_light(1, "near"), lamp, "lamp identity survives growth")
-	_check(monitor.visible and lamp.visible, "occupied seat remains equipped")
-	_eq(lamp.color, table.lamp_color(OfficeTable.Lamp.FOCUS), "lamp level survives growth")
-	var frame: Node2D = table.get_node("Overlay/Frame")
-	_check(frame.visible, "selection survives growth")
+	_eq(station.actor(), actor, "the station owns its actor across pod growth")
+	_eq(_body(station), body, "and its complete-image sprite")
+	_check(_selection(station).visible, "station selection survives growth")
+	_check((table.get_node("Overlay/Frame") as Node2D).visible, "pod selection survives growth")
 	for index in 6:
 		for side: String in OfficeTable.SIDES:
 			_eq(table.seat(index, side).position, measured.seat_position(index, side), "rendered seat agrees")
-			_eq(table.standing(index, side).position, measured.standing_position(index, side), "standing agrees")
-			if index >= 2:
-				_check(not table.monitor(index, side).visible, "new column starts empty")
-	var shape: CollisionShape2D = table.get_node("Footprint")
-	var footprint: RectangleShape2D = shape.shape
-	_eq(Rect2(shape.position - footprint.size / 2, footprint.size), measured.physical_rect, "collision agrees")
 	var count := table.find_children("*", "", true, false).size()
 	_check(table.resize(6), "same capacity is accepted")
 	_eq(table.find_children("*", "", true, false).size(), count, "repeated growth adds no nodes")
@@ -420,307 +380,360 @@ func test_relocation_rebind_keeps_actor_clock_and_pose() -> void:
 	var station := pen.station(sorted, table, 0, "near")
 	station.furnish("claude", ArtContract.STATE_WORKING, true)
 	station.pane_key = "machine:pane"
-	var worker := station.actor()
-	var player: AnimationPlayer = worker.get_node("AnimationPlayer")
-	worker.pause()
-	player.seek(0.37, true)
-	var elapsed := player.current_animation_position
-	var relative_target := station.target_rect().position - station.global_position
+	var actor := station.actor()
+	var player := _manual_player(station)
+	var body := _body(station)
 	_check(table.resize(4), "grow around the current worker")
-	for step in 12:
-		_check(table.relocate(Vector2(192 + step * 32, 320)), "absolute table placement")
-		_check(station.rebind(table, 0, "near"), "absolute station binding")
-		_eq(station.actor(), worker, "same worker object")
-		_eq(worker.get_node("AnimationPlayer"), player, "same native animation player")
-		_eq(player.current_animation_position, elapsed, "pause and clock survive binding")
-		_check(not worker.is_playing(), "paused worker stays paused")
-		_eq(worker.global_position, table.seat(0, "near").global_position, "worker follows its actual marker")
-		_eq(station.target_rect().position - station.global_position, relative_target, "target never drifts")
-		_eq(station.pane_key, "machine:pane", "pane identity stays attached")
-	_check(station.rebind(table, 2, "far"), "move to another column and side")
-	_eq(station.actor(), worker, "turning does not replace the worker")
-	_eq(worker.look.orientation, AvatarLook.FRONT, "far-side sitting refreshes orientation")
-	_eq(station.chair_view, ArtContract.CHAIR_FRONT, "chair follows new side")
-	station.furnish("claude", ArtContract.STATE_BLOCKED)
-	var blocked_target := station.target_rect().position - station.global_position
-	var bubble := station.chip_rect().position - station.global_position
-	for step in 12:
-		_check(station.rebind(table, 2, "far"), "repeat blocked binding")
-		_eq(station.target_rect().position - station.global_position, blocked_target, "the seat's target stays put")
-		_eq(station.chip_rect().position - station.global_position, bubble, "and so does the bubble")
-		_eq(worker.global_position, table.seat(2, "far").global_position, "the blocked worker stays on the seat")
-		_eq(worker.track, &"desk_blocked", "hand up at the desk")
-
-
-func test_contact_shadows_follow_relocation_and_replacement_ground() -> void:
-	var table := _table()
-	var original := ground.find_children("*", "Polygon2D", true, false)
-	_eq(original.size(), 2, "one contact per near chair")
-	table.contact_shadows(ground)
-	_eq(ground.find_children("*", "Polygon2D", true, false), original, "repeat reuses shadows")
-	var replacement := Node2D.new()
-	replacement.position = Vector2(64, 32)
-	world.add_child(replacement)
-	table.contact_shadows(replacement)
-	_eq(ground.find_children("*", "Polygon2D", true, false).size(), 0, "former ground keeps no stale shadow")
-	_eq(replacement.find_children("*", "Polygon2D", true, false), original, "replacement adopts existing shadows")
-	_check(table.relocate(Vector2(352, 384)), "move after replacing ground")
-	var shadow: Polygon2D = original[0]
-	var center := Vector2.ZERO
-	for point in shadow.polygon:
-		center += shadow.to_global(point)
-	center /= shadow.polygon.size()
-	_check(center.is_equal_approx(table.seat(0, "near").global_position + Vector2(0, 6)), "shadow stays under chair")
-	_check(table.resize(4), "expanded table adds contact coverage")
-	_eq(replacement.find_children("*", "Polygon2D", true, false).size(), 4, "one shadow per new column")
-	replacement.free()
-	_check(table.relocate(Vector2(384, 384)), "freed old ground is harmless")
-	table.contact_shadows(ground)
-	_eq(ground.find_children("*", "Polygon2D", true, false).size(), 4, "replacement after free recreates coverage")
-	table.free()
-	_eq(ground.get_child_count(), 0, "deleting table cleans up its Ground holder")
+	for state: StringName in [&"working", &"idle", &"blocked"]:
+		station.furnish("claude", state, true)
+		if state == &"blocked":
+			player.advance(0.5)
+		player.advance(0.37)
+		for frozen: bool in [false, true]:
+			station.freeze(frozen)
+			var elapsed := player.current_animation_position
+			var frame := body.frame
+			for step in 12:
+				var side: String = OfficeTable.SIDES[step % 2]
+				_check(table.relocate(Vector2(192 + step * 32, 320)), "absolute table placement")
+				_check(station.rebind(table, step % 4, side), "rebind across both front-facing rows")
+				station.furnish("claude", state, true)
+				_eq(station.actor(), actor, "same actor object")
+				_eq(station.get_node("Actor/AnimationPlayer"), player, "same native player")
+				_eq(player.current_animation_position, elapsed, "refresh/rebind cannot restart the clock")
+				_eq(body.frame, frame, "refresh/rebind keeps the frame")
+				_eq(actor.is_playing(), not frozen, "freeze survives a rebind and refresh")
+				_eq(actor.global_position, table.seat(step % 4, side).global_position, "whole image follows its marker")
+				_eq(
+					station.target_rect().position - station.global_position, Vector2(-37.5, -70), "target never drifts"
+				)
+				_eq(station.pane_key, "machine:pane", "pane identity stays attached")
+				_check(not body.flip_h and not body.flip_v, "row changes do not turn the artwork")
+		station.freeze(false)
 
 
 func test_invalid_updates_leave_existing_geometry_unchanged() -> void:
 	var table := _table()
 	var station := pen.station(sorted, table, 0, "near")
 	station.furnish("claude", ArtContract.STATE_WORKING)
-	var worker := station.actor()
+	var actor := station.actor()
 	var where := station.position
 	var table_at := table.position
 	var marker := table.seat(0, "near")
-	for invalid: float in [NAN, INF, 32.0, 80.0]:
-		_check(not table.setup(art, invalid, [16.0, 48.0]), "bad width is rejected")
-	_check(not table.setup(art, 64, [NAN]), "non-finite seat is rejected")
-	_check(not table.setup(art, 64, [16.0, 16.0]), "duplicate seat is rejected")
+	for invalid: float in [NAN, INF, 32.0, 80.0, 193.0]:
+		_check(not table.setup(art, invalid, [48.0, 144.0]), "bad width is rejected")
+	_check(not table.setup(art, 192, [NAN, 144.0]), "non-finite seat is rejected")
+	_check(not table.setup(art, 192, [48.0, 48.0]), "duplicate seat is rejected")
+	_check(not table.setup(art, 192, [49.0, 144.0]), "noncanonical column is rejected")
 	_check(not table.relocate(Vector2.INF), "non-finite position is rejected")
 	_check(not station.rebind(table, 50, "near"), "missing column is rejected")
 	_check(not station.rebind(table, 0, "other"), "unknown side is rejected")
-	_eq(table.width, 64.0, "bad update keeps old width")
-	_eq(table.columns, [16.0, 48.0], "bad update keeps old columns")
+	_eq(table.width, 192.0, "bad update keeps old width")
+	_eq(table.columns, [48.0, 144.0], "bad update keeps old columns")
 	_eq(table.position, table_at, "bad position keeps old placement")
 	_eq(table.seat(0, "near"), marker, "bad update keeps old marker")
 	_eq(station.position, where, "bad rebind keeps old placement")
-	_eq(station.actor(), worker, "bad rebind keeps worker")
+	_eq(station.actor(), actor, "bad rebind keeps actor")
 
 
-## Everything a station draws that is not transient stays inside the pod's
-## render_rect: the badge at the top of its pulse, the chip, the selection mark,
-## the chair and the worker's own canvas. The name plate and the lens line are
-## transient rows (shown while hovered, selected or while `L` is held, and
-## pinned by test_rows_at_the_pod_pitch_never_meet()): a 30-wide plate row
-## above the tag row cannot stay inside the stationary envelope, so they are
-## left out here (they were inside the old 222-tall envelope; docs/WORLD_MODEL.md).
+func test_latest_state_during_blocked_enter_wins_without_a_stale_loop() -> void:
+	var table := _table()
+	for wanted: StringName in [&"working", &"idle", &"done", &"starting", &"unknown"]:
+		var station := pen.station(sorted, table, 0, "near")
+		station.furnish("claude", ArtContract.STATE_BLOCKED)
+		var actor := station.actor()
+		var player := _manual_player(station)
+		player.advance(0.3)
+		_eq(actor.track, &"blocked_enter", "the request changes during enter, not after it")
+		_check(_has_question(station), "blocked enter really draws the approved question bubble")
+		station.furnish("claude", wanted, false, wanted == &"starting")
+		_eq(actor.animation, wanted, "the latest semantic state is public immediately")
+		_eq(actor.track, &"blocked_exit", "leaving blocked finishes through the authored exit")
+		_check(not _has_question(station), "the baked question bubble is gone on the first exit frame")
+		_check(
+			not station.chip().visible and station.chip_rect() == Rect2(), "the duration chip is gone immediately too"
+		)
+		_check(
+			not (station.get_node("Target/Chip") as CollisionShape2D).disabled,
+			"the visible state badge keeps the tag row pickable; it is no longer a question"
+		)
+		player.advance(0.25)
+		_eq(actor.track, wanted, "the obsolete enter cannot resurrect blocked")
+		station.free()
+
+
+func test_latest_state_during_blocked_exit_wins_without_restarting_exit() -> void:
+	var table := _table()
+	var station := pen.station(sorted, table, 0, "near")
+	station.furnish("claude", ArtContract.STATE_BLOCKED)
+	var actor := station.actor()
+	var player := _manual_player(station)
+	player.advance(0.5)
+	_eq(actor.track, &"blocked", "enter reaches the blocked loop")
+	station.furnish("claude", ArtContract.STATE_WORKING)
+	player.advance(0.06)
+	var elapsed := player.current_animation_position
+	var frame := _body(station).frame
+	for wanted: StringName in [&"idle", &"done", &"working", &"done"]:
+		station.furnish("claude", wanted)
+		_eq(actor.animation, wanted, "remember the latest request while exiting")
+		_eq(actor.track, &"blocked_exit", "an ordinary update does not skip the exit")
+		_eq(player.current_animation_position, elapsed, "nor restart its clock")
+		_eq(_body(station).frame, frame, "nor change its frame")
+		_check(not _has_question(station) and not station.chip().visible, "neither question signal returns")
+	player.advance(0.2)
+	_eq(actor.track, &"done", "the last requested state wins, not the first exit request")
+	station.furnish("claude", ArtContract.STATE_BLOCKED)
+	player.advance(0.1)
+	station.furnish("claude", ArtContract.STATE_IDLE)
+	player.advance(0.06)
+	station.furnish("claude", ArtContract.STATE_BLOCKED)
+	_eq(actor.animation, &"blocked", "blocked can be requested again during exit")
+	player.advance(0.6)
+	_eq(actor.track, &"blocked", "the renewed request reaches blocked, never the obsolete idle")
+	_check(station.chip().visible and _has_question(station), "both question signals return for the new block")
+
+
+func test_done_one_shot_survives_refresh_and_freeze_thaw_without_replaying() -> void:
+	var table := _table()
+	var station := pen.station(sorted, table, 0, "near")
+	station.furnish("claude", ArtContract.STATE_DONE)
+	var actor := station.actor()
+	var player := _manual_player(station)
+	var body := _body(station)
+	var finished: Array[StringName] = []
+	player.animation_finished.connect(func(clip: StringName) -> void: finished.append(clip))
+	_eq(player.get_animation(&"done").loop_mode, Animation.LOOP_NONE, "the approved done is a one-shot")
+	player.advance(0.35)
+	_eq(body.frame, 22, "the approved nod is shown, not idle activity")
+	station.freeze(true)
+	var elapsed := player.current_animation_position
+	station.furnish("claude", ArtContract.STATE_DONE, true)
+	_eq(player.current_animation_position, elapsed, "refresh cannot rewind a frozen nod")
+	_check(not actor.is_playing(), "refresh cannot thaw it")
+	station.freeze(false)
+	_check(actor.is_playing(), "an unfinished nod resumes")
+	player.advance(0.7)
+	_eq(finished, [&"done"], "one completion")
+	_eq(body.frame, 0, "the one-shot ends on the approved neutral frame")
+	_check(not actor.is_playing(), "the completed nod is stopped")
+	for _repeat in 6:
+		station.furnish("claude", ArtContract.STATE_DONE, true)
+		station.setup(pen, table, 0, "near")
+		_check(station.rebind(table, 1, "far"), "rebind after completing")
+		station.freeze(true)
+		station.freeze(false)
+		_check(not actor.is_playing(), "neither refresh, rebind nor reconnect replays completed done")
+		player.advance(2.0)
+		_eq(body.frame, 0, "completed done stays neutral")
+	_eq(finished, [&"done"], "the same state never completed twice")
+	station.furnish("claude", ArtContract.STATE_WORKING)
+	station.furnish("claude", ArtContract.STATE_DONE)
+	_check(actor.is_playing(), "a genuinely new done transition plays again")
+	player.advance(1.1)
+	_eq(finished, [&"done", &"done"], "only a new completion state earns another nod")
+
+
+func test_frozen_new_states_stay_still_then_resume_the_latest_request() -> void:
+	var table := _table()
+	var station := pen.station(sorted, table, 0, "near")
+	station.furnish("claude", ArtContract.STATE_WORKING)
+	var actor := station.actor()
+	var player := _manual_player(station)
+	station.freeze(true)
+	station.furnish("claude", ArtContract.STATE_IDLE)
+	_eq(actor.track, &"idle", "a frozen new state is installed")
+	_eq(_body(station).frame, 0, "its first frame is shown immediately")
+	_check(not actor.is_playing(), "installing a new state does not thaw it")
+	station.furnish("claude", ArtContract.STATE_BLOCKED)
+	_eq(actor.track, &"blocked_enter", "a block while frozen installs the enter")
+	_eq(_body(station).frame, 18, "the new enter's first frame")
+	_check(not actor.is_playing(), "the enter also remains frozen")
+	station.furnish("claude", ArtContract.STATE_WORKING)
+	_eq(actor.track, &"blocked_exit", "a newer request replaces the frozen enter")
+	_eq(_body(station).frame, 23, "its exit frame is installed without time advancing")
+	station.furnish("claude", ArtContract.STATE_DONE)
+	_check(not actor.is_playing(), "latest requested done still cannot unfreeze the exit")
+	station.freeze(false)
+	_check(actor.is_playing(), "thaw resumes the pending exit")
+	player.advance(0.25)
+	_eq(actor.track, &"done", "thaw ends at the latest request, not working or blocked")
+	player.advance(1.1)
+	_check(not actor.is_playing(), "the new done finishes once")
+	station.freeze(true)
+	station.vacate()
+	station.furnish("", ArtContract.STATE_IDLE)
+	_check(station.actor() == null and not player.is_playing(), "a frozen reused shell has no hidden animation")
+	station.furnish("pi", ArtContract.STATE_WORKING)
+	_eq(station.actor(), actor, "reuse keeps the actor even while frozen")
+	_check(not actor.is_playing(), "reuse cannot bypass an existing freeze")
+	station.freeze(false)
+	_check(actor.is_playing(), "the newly occupied workstation resumes only on thaw")
+	_eq(actor.track, &"working", "the new occupant's requested state resumes")
+
+
+func test_starting_and_unknown_hold_frame_zero_without_activity() -> void:
+	var table := _table()
+	var station := pen.station(sorted, table, 0, "far")
+	for state: StringName in [&"starting", &"unknown"]:
+		station.furnish("claude", ArtContract.STATE_WORKING)
+		station.furnish("claude", state, false, state == &"starting")
+		var actor := station.actor()
+		var player := _manual_player(station)
+		var expected := &"starting" if state == &"starting" else &"unknown"
+		_eq(actor.animation, expected, "unresolved states use a still alias")
+		_eq(actor.track, expected, "not the working or idle animation")
+		for delta: float in [0.0, 0.1, 0.6, 0.4, 2.0]:
+			player.advance(delta)
+			_eq(_body(station).frame, 0, "%s stays on frame zero throughout" % state)
+		_check(not actor.is_playing(), "the still alias does not loop")
+		_check(not station.chip().visible, "a still alias has no blocked duration chip")
+	station.actor().play_state(&"working")
+	station.actor().play_state(&"future-state")
+	_eq(station.actor().track, &"unknown", "an unsupported actor state also chooses the still alias")
+	_eq(_body(station).frame, 0, "not invented activity")
+	station.furnish("", ArtContract.STATE_IDLE, false, true)
+	_check(station.actor() != null, "a launch with no provider yet still has a person")
+	_eq(station.actor().track, &"starting", "but no invented working activity")
+
+
+## Every authored cell, including cells unused by today's animation sequence,
+## fits every column of both rows. Annotations are included, not a smaller
+## person-only approximation of the complete workstation's canvas.
 func test_supported_station_drawing_stays_inside_measure() -> void:
 	var table := _table()
 	_check(table.resize(4), "measure four columns")
+	_eq(frame_ink.size(), 24, "all approved cells are checked")
 	for column in table.columns.size():
 		for side: String in OfficeTable.SIDES:
 			var station := pen.station(sorted, table, column, side)
-			# Once as the world is, once with the lens held: the chip draws
-			# nothing then, and the badge is back in the middle of its row.
-			for held: bool in [false, true]:
-				for lift: int in [0, -1, -2]:
-					_check_inside_measure(table, station, held, lift)
+			station.furnish("claude", ArtContract.STATE_BLOCKED, true)
+			station.freeze(true)
+			station.show_name(LONG_NAME)
+			station.chip().show_wait(5999.0)
+			for frame in 24:
+				_body(station).frame = frame
+				for held: bool in [false, true]:
+					station.show_lens(held, "99m+")
+					for lift: int in [0, -1, -2]:
+						_badge(station).lift(lift)
+						_check_inside_measure(
+							table, station, "%d/%s frame %d lens %s lift %d" % [column, side, frame, held, lift]
+						)
+			for state: StringName in [&"working", &"idle", &"done", &"unknown", &"starting"]:
+				station.furnish("claude", state, true, state == &"starting")
+				for held: bool in [false, true]:
+					station.show_lens(held, "99m+")
+					_check_inside_measure(table, station, "%d/%s %s lens %s" % [column, side, state, held])
+			station.vacate()
+			_check_inside_measure(table, station, "%d/%s empty" % [column, side])
 			station.free()
 
 
-## One pass of test_supported_station_drawing_stays_inside_measure(): every
-## state, the lens `held` or not, the badge lifted by `lift`.
-func _check_inside_measure(table: OfficeTable, station: OfficeStation, held: bool, lift: int) -> void:
-	var side := station.side
-	for state: StringName in [ArtContract.STATE_WORKING, ArtContract.STATE_BLOCKED, ArtContract.STATE_DONE]:
-		station.furnish("claude", state, true)
-		if state == ArtContract.STATE_BLOCKED:
-			# A wait to tell draws the whole chip: frame and number.
-			station.chip().show_wait(5999.0)
-		station.show_lens(held, "99m+")
-		var line: Label = station.get_node("Overlay/Lens")
-		_eq(line.is_visible_in_tree(), held, "%s %s: the lens line shows only while held" % [side, state])
-		var badge: StatusBadge = station.get_node("Overlay/Badge")
-		badge.lift(lift)
-		for child in station.find_children("*", "CanvasItem", true, false):
-			var canvas := child as CanvasItem
-			if not canvas.is_visible_in_tree() or child.name in [&"Plate", &"Lens"]:
-				continue
-			var bounds := Rect2()
-			if child is Sprite2D:
-				var sprite: Sprite2D = child
-				if sprite.texture == null:
-					continue
-				bounds = sprite.get_rect()
-				# The badge's 16-unit canvas has half a unit of clear margin each
-				# side; in the chip its ink starts on the pod's edge at column 0.
-				if child == badge:
-					bounds = _opaque_local(sprite)
-			elif child is Control:
-				var control: Control = child
-				bounds = Rect2(Vector2.ZERO, control.size)
-			else:
-				continue
-			var relative := table.global_transform.affine_inverse() * canvas.get_global_transform()
-			_check(
-				table.geometry.render_rect.encloses(relative * bounds),
-				(
-					"render envelope contains %s %s %s %s in %s (lift %d)"
-					% [side, state, child.name, relative * bounds, table.geometry.render_rect, lift]
-				)
-			)
-		badge.lift(0)
+func _check_inside_measure(table: OfficeTable, station: OfficeStation, where: String) -> void:
+	var to_pod := table.global_transform.affine_inverse()
+	var rows := _seat_rows(station)
+	rows["whole canvas"] = station.get_global_transform() * OfficeStation.CANVAS
+	var extent := station.signal_rect()
+	_eq(
+		extent,
+		Rect2(station.global_position + Vector2(-47, -70), Vector2(94, 124)),
+		where + ": stable camera/pointer extent includes the reserved name and lens rows"
+	)
+	_eq(station.target_rect(), rows["whole canvas"], where + ": the click target stays on the 80 by 80 image")
+	for part in rows:
+		_check(extent.encloses(rows[part]), "%s: camera/pointer extent contains %s %s" % [where, part, rows[part]])
+	rows["signal"] = extent
+	for part in rows:
+		_check(
+			table.geometry.render_rect.encloses(to_pod * rows[part]),
+			"%s: render envelope contains %s %s" % [where, part, to_pod * rows[part]]
+		)
 
 
-## The labels hang on the pixel people as they are really drawn: every opaque
-## pixel of every frame the worker plays, on both layers. No plate text and no
-## badge ever covers the figure, and the selection mark frames the whole
-## figure. The rows stack away from the pod: on the far side the plate is the
-## top row, over the lens row and the tag row (the badge), which sits over the
-## head or the raised hand; on the near side the tag row hangs below the
-## chair, then the lens row, then the plate. (The plate used to sit just over
-## the head, the badge beside it; a 30-wide plate row cannot share a row with
-## the badge at the 32-unit pitch, so it is the outermost row now, shown only
-## on hover, selection or under the lens.) A blocked worker's chip covers
-## none of the figure, raised hand included, nor the plate's text, and the
-## badge is drawn over it, in its left half, clear of the wait.
 func test_labels_clear_the_heads_they_hang_on() -> void:
 	var table := _table()
 	for side: String in OfficeTable.SIDES:
 		var station := pen.station(sorted, table, 0, side)
-		for state: StringName in [
-			ArtContract.STATE_WORKING, ArtContract.STATE_BLOCKED, ArtContract.STATE_IDLE, ArtContract.STATE_DONE
-		]:
-			station.furnish("claude", state, true)
-			# The plate's words are show_name()'s now (S1 names); a long name fills
-			# the plate's whole width, so its text is measured at its widest.
-			station.show_name("refactor the fleet")
-			if state == ArtContract.STATE_BLOCKED:
-				station.chip().show_wait(5999.0)
-			var where := "%s %s" % [side, state]
-			var figure := _drawn_figure(station)
-			var text := _plate_text(station)
-			var badge_node: Sprite2D = station.get_node("Overlay/Badge")
-			var badge := _in_station(station, badge_node, _opaque_local(badge_node))
-			var mark_node: Sprite2D = station.get_node("Overlay/Selection")
-			var mark := _in_station(station, mark_node, mark_node.get_rect())
-			_check(figure.size.y > 30, "%s: the worker is really drawn: %s" % [where, figure])
-			_check(_plate_of(station).is_visible_in_tree(), "%s: selected, the plate shows" % where)
-			_check(not text.intersects(figure), "%s: the plate's text %s clears the figure %s" % [where, text, figure])
-			_check(not badge.intersects(figure), "%s: the badge %s clears the figure %s" % [where, badge, figure])
-			_check(mark.encloses(figure), "%s: the selection mark %s frames the figure %s" % [where, mark, figure])
-			# Without the lens the plate stands in its own slot where the lens row
-			# would be (S3 SEATTAGS round 2: PLATE_REST, 2 units further out, 10
-			# tall, clear of the frame bar and the tab label it now meets at rest);
-			# with it, the lens line takes the row and the plate moves out.
-			var slot: Vector2 = OfficeStation.PLATE_REST[side]
-			_eq(_plate_of(station).position, slot, "%s: unheld, the plate in its own slot" % where)
-			# The lens line clears the figure and the badge as the plate does.
-			station.show_lens(true, "99m+")
-			_eq(_plate_of(station).position, OfficeStation.PLATE_AT[side], "%s: held, the plate moves out" % where)
-			text = _plate_text(station)
-			_check(not text.intersects(figure), "%s: held, the plate's text %s clears the figure" % [where, text])
-			var lens := _lens_text(station)
-			_check(not lens.intersects(figure), "%s: the lens line %s clears the figure %s" % [where, lens, figure])
-			_check(not lens.intersects(badge), "%s: the lens line %s clears the badge %s" % [where, lens, badge])
-			_check(not lens.intersects(text), "%s: and the plate's text %s" % [where, text])
-			station.show_lens(false, "")
-			if side == "far":
-				_check(
-					text.end.y <= lens.position.y and lens.end.y <= badge.position.y,
-					"%s: plate over lens over badge" % where
+		station.furnish("claude", ArtContract.STATE_BLOCKED, true)
+		station.freeze(true)
+		station.show_name(LONG_NAME)
+		station.chip().show_wait(5999.0)
+		for frame in 24:
+			_body(station).frame = frame
+			var image := _drawing(station)
+			_check(image.size.y >= 59.0, "%s frame %d: the complete image is measured" % [side, frame])
+			var mark := _line_bounds(_selection(station))
+			_check(mark.encloses(image), "%s frame %d: selection frames all opaque pixels" % [side, frame])
+			for held: bool in [false, true]:
+				station.show_lens(held, "99m+")
+				_eq(
+					_plate_of(station).position,
+					OfficeStation.PLATE_AT if held else OfficeStation.PLATE_REST,
+					"both rows put the plate below the image"
 				)
-				_check(
-					badge.end.y <= figure.position.y, "%s: the badge %s sits over the head %s" % [where, badge, figure]
-				)
-			else:
-				_check(badge.position.y >= figure.end.y, "%s: the badge hangs below the feet" % where)
-				_check(
-					badge.end.y <= lens.position.y and lens.end.y <= text.position.y,
-					"%s: badge over lens over plate" % where
-				)
-			if state == ArtContract.STATE_BLOCKED:
-				var bubble := Rect2(station.chip().position, OfficeStation.CHIP_SIZE)
-				_check(not bubble.intersects(figure), "%s: the chip %s clears the figure %s" % [where, bubble, figure])
-				_check(not bubble.intersects(text), "%s: and the plate's text %s" % [where, text])
-				# One unit over the chip's left edge, so the wait has daylight on both sides.
-				_eq(badge.position.x, bubble.position.x - 1.0, "%s: the badge over the chip's left edge" % where)
-				_check(
-					bubble.grow_side(SIDE_LEFT, 1.0).encloses(badge),
-					"%s: the badge %s on the chip %s" % [where, badge, bubble]
-				)
-				_check(badge.end.x <= bubble.position.x + OfficeChip.BADGE_SLOT, "%s: in its left half" % where)
-				var overlay := station.get_node("Overlay")
-				_check(
-					badge_node.get_index() > station.chip().get_index() and badge_node.get_parent() == overlay,
-					"%s: the badge is drawn over the chip" % where
-				)
-				var wait: Label = station.chip().get_node("%Wait")
-				_eq(wait.text, "99m", "%s: the chip says the wait, compactly" % where)
-				var inside := Rect2(Vector2.ZERO, OfficeChip.SIZE).encloses(Rect2(wait.position, wait.size))
-				_check(inside, "%s: the chip's wait stays inside its frame" % where)
-				var drawn := _in_station(station, wait, Rect2(Vector2.ZERO, wait.size))
-				_check(not drawn.intersects(badge), "%s: the wait %s clears the badge %s" % [where, drawn, badge])
+				for lift: int in [0, -1, -2]:
+					_badge(station).lift(lift)
+					var rows := _seat_rows(station)
+					for part: String in ["plate", "badge", "chip", "lens"]:
+						if rows.has(part):
+							_check(
+								not image.intersects(rows[part]),
+								"%s frame %d: %s clears all workstation pixels" % [side, frame, part]
+							)
+					_check(not rows["plate"].intersects(rows["badge"]), "plate clears the badge at every pulse lift")
+					if held:
+						_check(not rows["lens"].intersects(rows["plate"]), "lens clears the plate")
+						_check(not rows["lens"].intersects(rows["badge"]), "lens clears the badge")
+					else:
+						var wait: Label = station.chip().get_node("%Wait")
+						_eq(wait.text, "99m", "the chip says the compact wait")
+						_check(not wait.get_global_rect().intersects(rows["badge"]), "wait clears the badge")
+						_check(rows["chip"].encloses(wait.get_global_rect()), "wait stays inside its frame")
+						_check(
+							rows["badge"].end.x <= rows["chip"].position.x + OfficeChip.BADGE_SLOT,
+							"badge stays in the chip's left slot"
+						)
 		station.free()
 
 
-## The lens line on each side, an idle worker's included (at their seat: D2,
-## 2026-10-27): its row is the one between the tag row and the plate row (far
-## pod [-102, -90), near [40, 52), past the tab label), its text clears the
-## badge at the top of its pulse and the plate's text.
-## While it shows the chip draws nothing and the badge is back in the middle of
-## its row; let go, the line is gone and the chip is drawn again (a transient
-## row of its own, see test_rows_at_the_pod_pitch_never_meet()).
 func test_the_lens_line_stays_inside_the_desk_and_off_the_badge() -> void:
 	var table := _table()
 	for side: String in OfficeTable.SIDES:
 		var station := pen.station(sorted, table, 0, side)
-		station.furnish("claude", ArtContract.STATE_BLOCKED, false)
+		station.furnish("claude", ArtContract.STATE_BLOCKED)
 		station.chip().show_wait(240.0)
-		var badge_node: StatusBadge = station.get_node("Overlay/Badge")
-		var chipped := badge_node.position
+		var badge := _badge(station)
+		var chipped := badge.position
 		station.show_lens(true, "99m+")
 		var line: Label = station.get_node("Overlay/Lens")
-		_check(line.is_visible_in_tree(), "%s: the line shows" % side)
-		var in_table := table.global_transform.affine_inverse() * line.get_global_transform()
-		var drawn := in_table * Rect2(Vector2.ZERO, line.size)
-		var row := Rect2(6, -102, 20, 12) if side == "far" else Rect2(6, 40, 20, 12)
-		_eq(drawn, row, "%s: the lens row (S3 item 7, CARPET-B1: `99m+`'s paper tag, 18 + 2, centred)" % side)
-		_eq(badge_node.position, OfficeStation.BADGE_AT[side], "%s: the badge is back in the middle" % side)
-		_check(badge_node.position != chipped, "%s: it was in the chip before" % side)
-		badge_node.lift(-2)
-		var lens := _lens_text(station)
-		var badge := _in_station(station, badge_node, _opaque_local(badge_node))
-		_check(not lens.intersects(badge), "%s: the text %s clears the badge %s" % [side, lens, badge])
+		var feet := -128.0 if side == "far" else 0.0
+		var to_pod := table.global_transform.affine_inverse()
+		_eq(to_pod * line.get_global_rect(), Rect2(38, feet + 30, 20, 12), "the lens tag is centered below its image")
+		_eq(badge.position, OfficeStation.BADGE_AT, "under the lens the badge returns to the middle")
+		_check(badge.position != chipped, "it was in the chip before")
+		badge.lift(-2)
+		station.show_name(LONG_NAME)
 		station.select(true)
-		_check(not lens.intersects(_plate_text(station)), "%s: and the plate's text" % side)
+		var rows := _seat_rows(station)
+		_check(not rows["lens"].intersects(rows["badge"]), "lens clears the highest badge")
+		_check(not rows["lens"].intersects(rows["plate"]), "and the plate")
 		for part: String in ["%Frame", "%Wait"]:
-			var drawn_part: CanvasItem = station.chip().get_node(part)
-			_check(not drawn_part.is_visible_in_tree(), "%s: the chip draws no %s meanwhile" % [side, part])
+			_check(not (station.chip().get_node(part) as CanvasItem).is_visible_in_tree(), "the chip draws no " + part)
 		station.show_lens(false, "")
-		_check(not line.visible, "%s: let go, no line" % side)
-		_eq(badge_node.position, chipped, "%s: and the badge is in the chip again" % side)
+		_check(not line.visible, "let go: no lens line")
+		_eq(badge.position, chipped, "and the badge returns to the chip")
 		station.free()
-	# D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to.
-	# An idle worker's line is on their own seat's lens row, as anyone's (it hung
-	# over the worker standing in the pantry before), and the plate shows with it.
 	var idle := pen.station(sorted, table, 1, "far")
-	idle.furnish("codex", ArtContract.STATE_IDLE, false)
+	idle.furnish("codex", ArtContract.STATE_IDLE)
 	idle.show_lens(true, "12m")
 	var idle_line: Label = idle.get_node("Overlay/Lens")
-	var idle_drawn := table.global_transform.affine_inverse() * idle_line.get_global_transform()
-	_eq(idle_drawn * Rect2(Vector2.ZERO, idle_line.size), Rect2(40, -102, 16, 12), "idle: its tag (S3 item 7, B1)")
-	_check(_plate_of(idle).visible, "idle: and its plate under the lens, at the desk")
-	idle.free()
-
-
-## Where the lens line's text is drawn, in the station's coordinates: centred,
-## from the label's top to its font's baseline (digits, `s m h`, `+`, `?`).
-func _lens_text(station: OfficeStation) -> Rect2:
-	var overlay: Node2D = station.get_node("Overlay")
-	var line: Label = overlay.get_node("Lens")
-	var font := line.get_theme_font("font")
-	var pixels := line.get_theme_font_size("font_size")
-	var width := font.get_string_size(line.text, HORIZONTAL_ALIGNMENT_LEFT, -1, pixels).x
-	var top_left := line.position + Vector2((line.size.x - width) / 2.0, 0)
-	return _in_station(station, overlay, Rect2(top_left, Vector2(width, font.get_ascent(pixels))))
+	_eq(
+		table.global_transform.affine_inverse() * idle_line.get_global_rect(),
+		Rect2(136, -98, 16, 12),
+		"idle uses its own seat's same lens row"
+	)
+	_check(_plate_of(idle).visible, "idle's plate also shows under the lens")
 
 
 func test_shrink_removes_only_discarded_columns() -> void:
@@ -728,17 +741,17 @@ func test_shrink_removes_only_discarded_columns() -> void:
 	_check(table.resize(6), "grow before compact")
 	var kept := table.seat(1, "far")
 	var removed := table.seat(5, "near")
+	var station := pen.station(sorted, table, 1, "far")
+	station.furnish("claude", ArtContract.STATE_IDLE)
+	var actor := station.actor()
 	_check(table.resize(2), "explicit caller can compact vacant columns")
 	_eq(table.columns.size(), 2, "compacted capacity")
 	_eq(table.seat(1, "far"), kept, "retained marker stays valid")
 	_check(not is_instance_valid(removed), "discarded marker is released")
-	_eq(ground.find_children("*", "Polygon2D", true, false).size(), 2, "discarded shadows are released")
+	_eq(table.get_node("Seats").get_child_count(), 4, "only the two retained rows of markers remain")
+	_eq(station.actor(), actor, "a retained occupied station keeps its actor")
 
 
-## A station bound again and again, then moved to another table place and
-## seat, still answers real clicks where it is now: its seat's rectangle picks
-## (`picked`) and its chip's asks (`asked`), each through the viewport's own
-## physics picking, and only on the release.
 func test_a_rebound_station_picks_by_seat_and_bubble_through_real_input() -> void:
 	var table := _table()
 	var station := pen.station(sorted, table, 0, "far")
@@ -747,201 +760,89 @@ func test_a_rebound_station_picks_by_seat_and_bubble_through_real_input() -> voi
 	var heard := PackedStringArray()
 	station.picked.connect(func(key: String, _at: Vector2) -> void: heard.append("picked " + key))
 	station.asked.connect(func(key: String, _at: Vector2) -> void: heard.append("asked " + key))
-	for step in 12:
+	for _repeat in 12:
 		_check(station.rebind(table, 0, "far"), "repeat bind before clicking")
 	_check(table.relocate(Vector2(320, 320)), "relocate before real click")
-	_check(station.rebind(table, 1, "near"), "rebind onto a new near seat")
-	await physics_frame
-	await physics_frame
-	for target: String in ["seat", "bubble"]:
+	_check(station.rebind(table, 1, "near"), "rebind onto a new lower seat")
+	for target: String in ["seat", "chip"]:
 		heard.clear()
 		var at := station.target_rect().get_center() if target == "seat" else station.chip_rect().get_center()
-		var motion := InputEventMouseMotion.new()
-		motion.position = at
-		motion.global_position = at
-		Input.parse_input_event(motion)
-		Input.flush_buffered_events()
-		await physics_frame
-		for pressed: bool in [true, false]:
-			var click := InputEventMouseButton.new()
-			click.position = at
-			click.global_position = at
-			click.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
-			click.button_index = MOUSE_BUTTON_LEFT
-			click.pressed = pressed
-			Input.parse_input_event(click)
-			Input.flush_buffered_events()
-			await physics_frame
-			await physics_frame
-			if pressed:
-				_check(heard.is_empty(), "%s: a press remains a potential drag" % target)
+		await _click(at, true)
+		_check(heard.is_empty(), "%s: a press remains a potential drag" % target)
+		await _click(at, false)
 		var said := "picked" if target == "seat" else "asked"
 		_eq(heard, PackedStringArray([said + " machine:pane"]), "one release on the %s: %s" % [target, said])
+	var former_chip := station.chip_rect().get_center()
+	station.furnish("claude", ArtContract.STATE_WORKING)
+	heard.clear()
+	await _click(former_chip, true)
+	await _click(former_chip, false)
+	_eq(heard, PackedStringArray(["picked machine:pane"]), "the visible working badge only picks, never asks")
+	station.furnish("", ArtContract.STATE_UNKNOWN)
+	heard.clear()
+	await _click(former_chip, true)
+	await _click(former_chip, false)
+	_check(heard.is_empty(), "a shell has no badge and leaves no invisible tag target")
 
 
-## The chip never lands on a click target it does not own: on pods from the
-## narrowest to a wide one, every column and both sides blocked at once, no
-## chip meets any seat's rectangle, its own included, nor another chip, and no
-## chip's click rectangle meets any seat's. The far tag row's middle is the
-## chip's while it shows and the seat's again once it goes.
 func test_the_bubble_clears_every_click_target_and_its_neighbours() -> void:
 	for capacity: int in [2, 4, 6, 12]:
 		var table := _table()
-		var measured := OfficeTable.measure(capacity)
-		_check(table.setup(art, measured.table_width, measured.columns), "a %s-wide pod" % measured.table_width)
-		var bubbles: Array[Rect2] = []
-		var chips: Array[Rect2] = []
-		var seats: Array[Rect2] = []
-		var names: Array[String] = []
+		_check(table.resize(capacity), "grow the test pod")
 		var stations: Array[OfficeStation] = []
-		for column in measured.columns.size():
+		for column in capacity:
 			for side: String in OfficeTable.SIDES:
 				var station := pen.station(sorted, table, column, side)
 				station.furnish("claude", ArtContract.STATE_BLOCKED)
 				station.chip().show_wait(60.0 * column)
 				stations.append(station)
-				bubbles.append(station.chip_rect())
-				chips.append(_shape_rect(station.get_node(OfficeStation.CHIP_TARGET)))
-				seats.append(station.target_rect())
-				names.append("%d columns, column %d %s" % [capacity, column, side])
-		for index in bubbles.size():
-			_check(bubbles[index].has_area(), names[index] + ": a chip")
-			_check(chips[index].encloses(bubbles[index]), names[index] + ": its click rectangle covers it")
-			# The far tag row, the chip's while it shows, is the chip's to answer.
-			if names[index].ends_with("far"):
-				var badge_at := stations[index].global_position + OfficeStation.BADGE_AT["far"] + Vector2(0, -8)
-				_check(bubbles[index].has_point(badge_at), names[index] + ": the tag row's middle is in the chip")
-				_check(not seats[index].has_point(badge_at), names[index] + ": and not in the seat's rectangle")
-				stations[index].furnish("claude", ArtContract.STATE_WORKING)
-				_check(
-					stations[index].target_rect().has_point(badge_at),
-					names[index] + ": working, the seat covers the badge"
-				)
-				_eq(stations[index].chip_rect(), Rect2(), names[index] + ": with no chip")
-				stations[index].furnish("claude", ArtContract.STATE_BLOCKED)
-				stations[index].chip().show_wait(60.0)
-			for other in seats.size():
-				_check(
-					not bubbles[index].intersects(seats[other]),
-					"%s: the chip %s clears %s's seat %s" % [names[index], bubbles[index], names[other], seats[other]]
-				)
-				_check(
-					not chips[index].intersects(seats[other]),
-					"%s: its click rectangle %s clears %s's seat" % [names[index], chips[index], names[other]]
-				)
-			for other in bubbles.size():
-				if other != index:
+		for station in stations:
+			var bubble := station.chip_rect()
+			var target := _shape_rect(station.get_node("Target/Chip"))
+			_check(bubble.has_area() and target.encloses(bubble), "the chip's click rectangle covers it")
+			for other in stations:
+				_check(not bubble.intersects(other.target_rect()), "the chip never overlaps a workstation click target")
+				_check(not target.intersects(other.target_rect()), "nor does its click rectangle")
+				if other != station:
+					_check(not bubble.intersects(other.chip_rect()), "neighbouring chips stay separate")
 					_check(
-						not bubbles[index].intersects(bubbles[other]),
-						"%s: the chip clears %s's chip" % [names[index], names[other]]
+						not target.intersects(_shape_rect(other.get_node("Target/Chip"))), "and their click rectangles"
 					)
-					_check(
-						not chips[index].intersects(chips[other]),
-						"%s: its click rectangle clears %s's" % [names[index], names[other]]
-					)
+			station.furnish("claude", ArtContract.STATE_WORKING)
+			_eq(station.chip_rect(), Rect2(), "working has no chip rectangle")
+			var badge: Sprite2D = station.get_node("Overlay/Badge")
+			_check(badge.visible, "the question is replaced by a visible working badge")
+			_check(
+				target.encloses(badge.get_global_transform() * badge.get_rect()),
+				"the same tag-row target still contains the working badge"
+			)
+			station.furnish("", ArtContract.STATE_UNKNOWN)
+			_check(
+				(station.get_node("Target/Chip") as CollisionShape2D).disabled, "a shell leaves no invisible tag target"
+			)
+			station.furnish("claude", ArtContract.STATE_BLOCKED)
+			station.chip().show_wait(60.0)
 		world.free()
 
 
-## A done seat's paper (the small stack) stands on its own side's working plane
-## (far -48..-32, near -26..-8, from the pod's constants), inside the desktop on
-## every column including the last one, right of the laptop and clear of it,
-## clear of every opaque pixel its own worker draws as a done agent sits (the
-## only state the paper shows in), and clear of what the workers of the
-## columns on either side draw while blocked (the raised hand is on the
-## right). A seat's own raised hand is not held against its paper: a seat
-## shows one or the other, never both, and on the near side, where the worker
-## sits over the near plane, the hand's column (x+7..x+12, pod -28..-11) does
-## pass over the paper's left 2 units
-## (test_the_near_paper_shows_beside_whoever_sits_there holds that the two
-## never show together, and the paper's texels against the sitters'). On the
-## far side only what shows above the far edge counts: the desk hides the rest
-## of the far worker. Pods of two, four and six desks.
-func test_the_paper_stack_sits_beside_the_laptop_and_off_the_neighbours() -> void:
-	var table := _table()
-	for capacity: int in [2, 4, 6]:
-		_check(table.resize(capacity), "%d columns" % capacity)
-		var w := table.width
-		var screen := -OfficeTable.SURFACE_DEPTH + OfficeTable.SCREEN_TOP
-		var planes := {
-			"far": Rect2(0, -OfficeTable.SURFACE_DEPTH, w, OfficeTable.SCREEN_TOP),
-			"near":
-			Rect2(
-				0,
-				screen + OfficeTable.SCREEN_HEIGHT,
-				w,
-				OfficeTable.NEAR_SURFACE_EDGE - screen - OfficeTable.SCREEN_HEIGHT
-			),
-		}
-		_eq(planes["far"], Rect2(0, -48, w, 16), "the far plane")
-		_eq(planes["near"], Rect2(0, -26, w, 18), "the near plane")
-		var blocked: Dictionary[String, Rect2] = {}
-		var done: Dictionary[String, Rect2] = {}
-		for column in table.columns.size():
-			for side: String in OfficeTable.SIDES:
-				var station := pen.station(sorted, table, column, side)
-				for state: StringName in [ArtContract.STATE_BLOCKED, ArtContract.STATE_DONE]:
-					station.furnish("claude", state)
-					var figure := _drawn_figure(station)
-					figure.position += station.position - table.position
-					if side == "far":
-						figure = figure.intersection(Rect2(-1000, -1000, 3000, 1000 - OfficeTable.SURFACE_DEPTH))
-					var into := blocked if state == ArtContract.STATE_BLOCKED else done
-					into["%d/%s" % [column, side]] = figure
-				station.free()
-		for column in table.columns.size():
-			for side: String in OfficeTable.SIDES:
-				var where := "%d columns, column %d %s" % [capacity, column, side]
-				table.show_item(column, side, ArtContract.PROP_DONE_STACK_SMALL)
-				var paper := _opaque(table.item(column, side))
-				var laptop := _opaque(table.monitor(column, side))
-				var plane: Rect2 = planes[side]
-				_check(plane.encloses(paper), "%s: the paper %s is on its plane %s" % [where, paper, plane])
-				_check(paper.position.x >= laptop.end.x, "%s: right of the laptop %s, clear of it" % [where, laptop])
-				# The pod's selection frame stands outside its desks: no bar on the paper.
-				table.set_selected(true)
-				for bar in _frame_bars(table):
-					var local := table.global_transform.affine_inverse() * bar
-					_check(not local.intersects(paper), "%s: the frame's bar %s clears the paper" % [where, local])
-				table.set_selected(false)
-				var own := "%d/%s" % [column, side]
-				_check(
-					not paper.intersects(done[own]), "%s: clear of its done worker %s: %s" % [where, done[own], paper]
-				)
-				for other: String in ["%d/%s" % [column - 1, side], "%d/%s" % [column + 1, side]]:
-					if blocked.has(other):
-						_check(
-							not paper.intersects(blocked[other]),
-							"%s: clear of blocked worker %s %s: %s" % [where, other, blocked[other], paper]
-						)
-				table.show_item(column, side, &"")
-
-
-## The opaque pixels of `sprite`, a child of the table, in the table's coordinates.
-func _opaque(sprite: Sprite2D) -> Rect2:
-	var pixels := Rect2(sprite.texture.get_image().get_used_rect())
-	pixels.position += sprite.offset
-	return sprite.transform * pixels
-
-
 func test_desk_node_budget_bounds_real_prefabs_and_retained_empty_slots() -> void:
-	world = Node2D.new()
-	ground = Node2D.new()
-	sorted = Node2D.new()
-	world.add_child(ground)
-	world.add_child(sorted)
-	root.add_child(world)
+	_world()
 	var room := RoomModel.new()
 	room.key = "budget-table"
 	var view := OfficeDeskView.new()
 	view.setup(pen, ground, sorted, room.key)
 	for capacity: int in [2, 4, 18, 250]:
-		var placed := DeskPlacement.new()
-		placed.tab_key = room.key
-		placed.capacity = capacity
-		placed.measure = OfficeTable.measure(capacity)
+		_eq(
+			OfficeDeskView.node_budget(capacity),
+			11 + 34 * capacity,
+			"eleven fixed nodes, two 16-node stations and two markers per column"
+		)
+		var placed := _placement(room.key, capacity)
 		view.reconcile(room, placed)
-		_eq(view.stations.size(), capacity * 2, "every retained column allocates two real stations")
-		_check(view.table.find_children("*", "", true, false).size() > 0, "a pod carries no decoration to count")
+		_eq(view.stations.size(), capacity * 2, "every retained column allocates two stations")
+		var actors: Array[Node] = []
+		for station in view.stations:
+			actors.append(station.get_node("Actor"))
 		for provider: String in ["", "claude"]:
 			for station in view.stations:
 				station.furnish(provider, ArtContract.STATE_WORKING)
@@ -950,54 +851,38 @@ func test_desk_node_budget_bounds_real_prefabs_and_retained_empty_slots() -> voi
 			_check(
 				nodes <= OfficeDeskView.node_budget(capacity),
 				(
-					"%d columns, %s: the actual group including all actors, %d nodes, fits the bound %d"
-					% [
-						capacity,
-						"people" if not provider.is_empty() else "shells",
-						nodes,
-						OfficeDeskView.node_budget(capacity)
-					]
+					"%d columns, %s: actual %d nodes fit budget %d"
+					% [capacity, provider, nodes, OfficeDeskView.node_budget(capacity)]
 				)
 			)
-			if not provider.is_empty():
+			for index in view.stations.size():
 				_eq(
-					world.find_children("*", "PixelPerson", true, false).size(),
-					capacity * 2,
-					"both sides are furnished"
+					view.stations[index].get_node("Actor"),
+					actors[index],
+					"a shell/person change allocates no replacement actor"
 				)
 		for station in view.stations:
 			station.vacate()
 		await process_frame
-		_eq(view.stations.size(), capacity * 2, "vacating retains the budgeted empty capacity")
+		_eq(view.stations.size(), capacity * 2, "vacating retains empty capacity")
 		var empty_nodes := world.find_children("*", "", true, false).size() - 2
 		_check(empty_nodes <= OfficeDeskView.node_budget(capacity), "empty retained table remains bounded")
+		for station in view.stations:
+			_eq(
+				_body(station).texture,
+				art.workstation.empty_texture(),
+				"all empty slots still draw their whole workstation"
+			)
 
 
-## Two pods one row pitch apart (192, the planner's row: the wall's two cells,
-## the pod's six, the corridor's two), the lower one shifted by whole columns
-## either way, and a third pod beside the first across its passage cell: with
-## every seat blocked and selected, once with the lens held (the plate and lens
-## rows, the badge in the middle) and once without (the plate and the chip),
-## so every row a seat can show is drawn, nothing one seat draws or answers a click with
-## meets anything another seat does — its badge (at rest and at each pulse
-## lift, 0, -1 and -2, centred or in the chip), its chip, its lens row, its
-## plate row, its seat mark, its seat's rectangle and its chip's rectangle —
-## whether the chips have a wait to tell or not. Within one seat, the plate,
-## the lens and the tag rows never meet, nor do the seat's and the chip's
-## rectangles. The rows are where docs/WORLD_MODEL.md says, in pod coordinates.
-## S3 SEATTAGS (2026-10-27): once with every seat taken, then with seats left
-## vacant on either side (alternate, the ends, a lone one, pairs), every pod's
-## plates widened by the floor's own rule (OfficeFloorView.widen_plates()) over
-## the vacant slots, a long name filling each: still nothing meets.
+## Every seat occupied or several vacancy patterns, at the planner's pod-row
+## pitch and shifted by complete columns. Includes empty workstation ink:
+## widening a neighbour's name plate must not cover the retained furniture.
 func test_rows_at_the_pod_pitch_never_meet() -> void:
-	world = Node2D.new()
-	ground = Node2D.new()
-	sorted = Node2D.new()
-	world.add_child(ground)
-	world.add_child(sorted)
-	root.add_child(world)
+	_world()
 	var measured := OfficeTable.measure(4)
-	var pitch := 192.0
+	var pitch := OfficeZoneLayout.pod_row_cells() * float(FloorLayoutPolicy.GRID)
+	_eq(pitch, 320.0, "the planner reserves ten cells per pod row")
 	var upper := pen.table(sorted, ground, "Upper", Vector2(256, 240), measured.table_width, measured.columns)
 	var beside_at := Vector2(256 + measured.reserved_rect.size.x, 240)
 	var beside := pen.table(sorted, ground, "Beside", beside_at, measured.table_width, measured.columns)
@@ -1006,37 +891,25 @@ func test_rows_at_the_pod_pitch_never_meet() -> void:
 	for table: OfficeTable in [upper, beside, lower]:
 		for column in measured.columns.size():
 			for side: String in OfficeTable.SIDES:
-				var station := pen.station(sorted, table, column, side)
-				station.pane_key = "%s/%d/%s" % [table.name, column, side]
-				stations.append(station)
-	# Which columns hold a pane, by side, on every pod: the first is every seat.
+				stations.append(pen.station(sorted, table, column, side))
 	var fars: Array[PackedInt32Array] = [[0, 1, 2, 3], [0, 2], [0, 3], [1, 2]]
 	var nears: Array[PackedInt32Array] = [[0, 1, 2, 3], [1, 3], [1], [0, 2, 3]]
 	var widened := 0
 	for pattern in fars.size():
-		for shift: float in [-64.0, -32.0, 0.0, 32.0, 64.0]:
-			lower.relocate(Vector2(256 + shift, 240 + pitch))
+		for shift: float in [-192.0, -96.0, 0.0, 96.0, 192.0]:
+			_check(lower.relocate(Vector2(256 + shift, 240 + pitch)), "shift the lower pod by whole columns")
 			for station in stations:
 				if station.table == lower:
-					station.rebind(lower, station.column, station.side)
-			widened += _never_meet([upper, beside, lower], stations, fars[pattern], nears[pattern], shift)
-	_check(widened > 0, "plates were widened over vacant seats: %d" % widened)
-	for station in stations:
-		station.free()
+					_check(station.rebind(lower, station.column, station.side), "station follows the shifted pod")
+			widened += _never_meet([upper, beside, lower], stations, fars[pattern], nears[pattern])
+	_check(widened > 0, "the test exercised plates widened over vacant slots")
 
 
-## One shift of test_rows_at_the_pod_pitch_never_meet(): its seats taken as
-## `pattern` says, in every mode; how many plates were drawn widened.
 func _never_meet(
-	tables: Array[OfficeTable],
-	stations: Array[OfficeStation],
-	far: PackedInt32Array,
-	near: PackedInt32Array,
-	shift: float
+	tables: Array[OfficeTable], stations: Array[OfficeStation], far: PackedInt32Array, near: PackedInt32Array
 ) -> int:
 	var widened := 0
-	var every := far.size() == 4 and near.size() == 4
-	for mode: int in 4:
+	for mode in 4:
 		var known := mode % 2 == 0
 		var held := mode >= 2
 		for lift: int in [0, -1, -2]:
@@ -1047,13 +920,14 @@ func _never_meet(
 				if station.column in (far if station.side == "far" else near):
 					station.pane_key = "%s/%d/%s" % [station.table.name, station.column, station.side]
 					station.furnish("claude", ArtContract.STATE_BLOCKED, true)
-					station.show_name("S3 item 7, CARPET-B1: a plate's tag hugs its name; a long one fills its row")
+					station.freeze(true)
+					_body(station).frame = 19
+					station.show_name(LONG_NAME)
 					station.chip().show_wait(5999.0 if known else -1.0)
 				else:
 					station.vacate()
 				station.show_lens(held, "99m+")
-				var badge: StatusBadge = station.get_node("Overlay/Badge")
-				badge.lift(lift)
+				_badge(station).lift(lift)
 			for table in tables:
 				var pod: Array[OfficeStation] = []
 				for station in stations:
@@ -1065,10 +939,10 @@ func _never_meet(
 					widened += 1
 				_check(not station.vacant or not _plate_of(station).visible, "a vacant seat shows no plate")
 				var rows := _seat_rows(station)
-				for name: String in rows:
-					parts.append(rows[name])
+				for part in rows:
+					parts.append(rows[part])
 					owners.append(station)
-					names.append(name)
+					names.append(part)
 			var clashes := PackedStringArray()
 			for index in parts.size():
 				for other in range(index + 1, parts.size()):
@@ -1076,56 +950,45 @@ func _never_meet(
 						continue
 					if owners[index] == owners[other] and not _same_seat_clash(names[index], names[other]):
 						continue
-					if _facing_marks(owners[index], names[index], owners[other], names[other]):
-						continue
 					clashes.append(
 						(
 							"%s %s %s / %s %s %s"
 							% [
-								owners[index].pane_key,
+								owners[index].name,
 								names[index],
 								parts[index],
-								owners[other].pane_key,
+								owners[other].name,
 								names[other],
 								parts[other]
 							]
 						)
 					)
-			# Every pod selected: its frame's bars meet nothing of another pod, nor
-			# its own seats' badges, chips, marks or click rectangles (its plate
-			# and lens Labels may reach under a bar with no ink there).
 			for table in tables:
 				table.set_selected(true)
 				for bar in _frame_bars(table):
 					for index in parts.size():
-						var own := owners[index].table == table
-						# S3 SEATTAGS round 2: the plate (shown at rest on a small map) stands
-						# clear of its own pod's frame too; only the held lens line may still
-						# reach under a bar with no ink there.
-						if own and names[index] == "lens":
-							continue
 						if bar.intersects(parts[index]):
 							clashes.append(
 								(
 									"%s frame %s / %s %s %s"
-									% [table.name, bar, owners[index].pane_key, names[index], parts[index]]
+									% [table.name, bar, owners[index].name, names[index], parts[index]]
 								)
 							)
 					for other in tables:
-						if other == table:
-							continue
-						for far_bar in _frame_bars(other):
-							if bar.intersects(far_bar):
-								clashes.append("%s frame %s / %s frame %s" % [table.name, bar, other.name, far_bar])
-			var where := "far %s near %s, shift %d, wait %s, lens %s, lift %d" % [far, near, shift, known, held, lift]
-			_eq(clashes, PackedStringArray(), where + ": nothing meets")
-			if every and shift == 0.0:
+						if other != table:
+							for other_bar in _frame_bars(other):
+								if bar.intersects(other_bar):
+									clashes.append("%s frame / %s frame" % [table.name, other.name])
+			_eq(
+				clashes,
+				PackedStringArray(),
+				"far %s near %s wait %s lens %s lift %d: nothing meets" % [far, near, known, held, lift]
+			)
+			if far.size() == 4 and near.size() == 4:
 				_check_row_literals(tables[0], stations, known, held, lift)
 	return widened
 
 
-## The rows of `table`'s first column, in pod coordinates, where the world
-## model puts them (docs/WORLD_MODEL.md, "Rows over a seat").
 func _check_row_literals(
 	table: OfficeTable, stations: Array[OfficeStation], known: bool, held: bool, lift: int
 ) -> void:
@@ -1133,622 +996,99 @@ func _check_row_literals(
 	for station in stations:
 		if station.table != table or station.column != 0:
 			continue
-		var far := station.side == "far"
+		var feet := -128.0 if station.side == "far" else 0.0
 		var rows := _seat_rows(station)
-		var where := "%s, wait %s, lens %s, lift %d" % [station.side, known, held, lift]
-		var tag_top := -88.0 if far else 16.0
-		var badge := to_pod * rows["badge"]
 		var chipped := known and not held
-		var badge_x := 0.0 if chipped else 8.5
-		_eq(badge, Rect2(badge_x, tag_top + lift, 15, 16), "%s: the badge's pixels" % where)
-		_eq(rows.has("chip"), chipped, "%s: a chip frame only with a wait, off the lens" % where)
+		_eq(to_pod * rows["badge"], Rect2(32.0 if chipped else 40.5, feet + 12 + lift, 15, 16), "badge's opaque pixels")
+		_eq(rows.has("chip"), chipped, "the frame draws only with a wait and no lens")
 		if chipped:
-			_eq(to_pod * rows["chip"], Rect2(1, tag_top, 30, 16), "%s: the chip" % where)
-		_eq(rows.has("lens"), held, "%s: the lens row only under the lens" % where)
+			_eq(to_pod * rows["chip"], Rect2(33, feet + 12, 30, 16), "the chip below the complete image")
+		_eq(rows.has("lens"), held, "lens row only while held")
 		if held:
-			_eq(to_pod * rows["lens"], Rect2(6, -102.0 if far else 40.0, 20, 12), "%s: lens tag (S3 item 7)" % where)
-		# Held, the plate is the outermost row; unheld, its own slot (S3 SEATTAGS
-		# round 2: 10 tall, far [-104, -94) under the frame bar, near [42, 52)
-		# 2 under the tab label and 2 over a zone's lower partition).
-		var plate_top := (-114.0 if far else 52.0) if held else (-104.0 if far else 42.0)
-		_eq(to_pod * rows["plate"], Rect2(1, plate_top, 30, 10), "%s: the plate row" % where)
-		_eq(
-			to_pod * rows["chip rect"],
-			Rect2(1, -90.0 if far else 14.0, 30, 18),
-			"%s: the chip's click rectangle" % where
-		)
-		_eq(
-			to_pod * rows["seat"],
-			Rect2(1, -72.0 if far else -24.0, 30, 40 if far else 38),
-			"%s: the seat's, under the chip" % where
-		)
-		var mark := to_pod * (station.get_node("Overlay/Selection") as Sprite2D).get_global_transform()
-		var mark_canvas := mark * (station.get_node("Overlay/Selection") as Sprite2D).get_rect()
-		_eq(mark_canvas, Rect2(0, -72.0 if far else -32.0, 32, 48), "%s: the seat mark's canvas" % where)
+			_eq(to_pod * rows["lens"], Rect2(38, feet + 30, 20, 12), "the compact lens tag")
+		_eq(to_pod * rows["plate"], Rect2(1, feet + (44 if held else 32), 94, 10), "the name plate's own row")
+		_eq(to_pod * rows["chip rect"], Rect2(33, feet + 10, 30, 18), "the chip's click target")
+		_eq(to_pod * rows["seat"], Rect2(10.5, feet - 70, 80, 80), "the complete workstation's click target")
+		_eq(to_pod * rows["mark"], Rect2(11.5, feet - 69.5, 78, 79), "selection line including its half-unit stroke")
 
 
-## The near badge hangs right under the near chair, on its column (the chair
-## is opaque down to pod y 14, the badge's row is [16, 32)), and at every lift
-## of its pulse, centred or in the chip, it never shares a texel with the
-## chair: its pulse envelope [14, 32) only touches it. The badge over the head
-## of a far worker likewise stands right over the raised hand (top at -72) and
-## never shares a texel with it.
-func test_the_near_chair_clears_the_badge_at_its_highest_lift() -> void:
-	var table := _table()
-	for side: String in OfficeTable.SIDES:
-		var station := pen.station(sorted, table, 0, side)
-		station.furnish("claude", ArtContract.STATE_BLOCKED)
-		var badge: StatusBadge = station.get_node("Overlay/Badge")
-		var chair: Sprite2D = station.get_node("Chair")
-		var to_pod := table.global_transform.affine_inverse()
-		var rest := to_pod * badge.get_global_transform() * _opaque_local(badge)
-		var column := table.columns[0]
-		_eq(rest, Rect2(column - 7.5, -88.0 if side == "far" else 16.0, 15, 16), side + ": the badge on its column")
-		var under := to_pod * (chair.get_global_transform() * _opaque_local(chair))
-		if side == "near":
-			_check(
-				rest.position.x < under.end.x and rest.end.x > under.position.x and rest.position.y >= under.end.y,
-				"near: right under the chair %s" % under
-			)
-		for known: bool in [true, false]:
-			station.chip().show_wait(60.0 if known else -1.0)
-			for lift: int in [0, -1, -2]:
-				badge.lift(lift)
-				var badge_texels := _texels(badge)
-				var where := "%s, wait %s, lift %d" % [side, known, lift]
-				_check(not badge_texels.is_empty(), "%s: the badge is drawn" % where)
-				var shared := 0
-				var against := _texels(chair) if side == "near" else _figure_texels(station)
-				for texel: Vector2i in badge_texels:
-					shared += int(against.has(texel))
-				_eq(
-					shared,
-					0,
-					"%s: the badge shares no texel with the %s" % [where, "chair" if side == "near" else "worker"]
-				)
-		station.free()
-
-
-## A far laptop sits on the far plane (-48..-40 for the rear view, -48 up for
-## a shell's): it never reaches above the far edge, where the far worker shows
-## over the desk, so it covers none of the worker's visible pixels.
-func test_the_far_laptop_never_covers_the_far_worker() -> void:
-	var table := _table()
-	_check(table.resize(4), "four columns")
-	for column in table.columns.size():
-		var station := pen.station(sorted, table, column, "far")
-		for provider: String in ["claude", ""]:
-			station.furnish(provider, ArtContract.STATE_WORKING)
-			var laptop := _opaque(table.monitor(column, "far"))
-			_check(
-				laptop.position.y >= -48.0, "column %d %s: the laptop %s stays on the desk" % [column, provider, laptop]
-			)
-			_check(laptop.end.y <= -32.0, "column %d %s: and on the far plane" % [column, provider])
-		station.furnish("claude", ArtContract.STATE_BLOCKED)
-		var visible := 0
-		var covered := 0
-		var to_pod := table.global_transform.affine_inverse()
-		var laptop_texels := _texels(table.monitor(column, "far"), to_pod)
-		for texel: Vector2i in _figure_texels(station, to_pod):
-			if texel.y < -48 * 2:
-				visible += 1
-				covered += int(laptop_texels.has(texel))
-		_check(visible > 0, "column %d: the far worker shows over the desk" % column)
-		_eq(covered, 0, "column %d: and the laptop covers none of it" % column)
-		station.free()
-
-
-## An agent's seat wears its provider mark (D3, 2026-10-27): on the far
-## laptop's rear lid face (the table's, built with the pod), clear of the far
-## worker; on the near chair's back (the station's, on its chair), every texel
-## on an opaque chair texel and none under the near sitter, who sorts behind the
-## chair, in every seated state. A shell, a launch whose kind is not known yet,
-## an empty seat and a provider the pack has no mark for wear none, and a seat
-## that wears none holds no texture. (The near mark stayed while its agent was
-## away in the pantry; nobody is away since D2, 2026-10-27.) A provider change swaps the texture on the same node; a
-## resize, a relocation and a move to another seat (OfficeDeskView's reconcile,
-## with no furnish after it) keep the mark with its agent.
-func test_a_seat_wears_its_agents_mark() -> void:
-	var table := _table()
-	_check(table.resize(4), "four columns")
-	var claude := art.sprite_texture(art.ui_sprite(&"mark_claude"))
-	var codex := art.sprite_texture(art.ui_sprite(&"mark_codex"))
-	_check(claude != null and codex != null and claude != codex, "the pack draws both marks")
-	# Measured: the far lid face on monitor_rear, texels 19..43 by 46..53 about its
-	# pivot texel (32, 60), in texel cells from the laptop's foot; the mark's
-	# top-left from the laptop's foot (far) and from the near chair's foot (near).
-	var lid_face := Rect2i(-13, -14, 25, 8)
-	var corner: Dictionary[String, Vector2] = {"far": Vector2(-2, -6.5), "near": Vector2(-2, -17.5)}
-	for column in table.columns.size():
-		for side: String in OfficeTable.SIDES:
-			var station := pen.station(sorted, table, column, side)
-			var where := "column %d %s" % [column, side]
-			var path := "Marks/Far%d" % column
-			var mark := (
-				table.get_node_or_null(path) as Sprite2D if side == "far" else station.get_node_or_null("Chair/Mark")
-				as Sprite2D
-			)
-			_check(mark != null, "%s: the seat's mark is built with it" % where)
-			if mark == null:
-				station.free()
-				continue
-			var chair: Sprite2D = station.get_node("Chair")
-			for state: StringName in [
-				ArtContract.STATE_WORKING, ArtContract.STATE_BLOCKED, ArtContract.STATE_IDLE, ArtContract.STATE_DONE
-			]:
-				station.furnish("claude", state)
-				var at := "%s %s" % [where, state]
-				_check(mark.visible and mark.texture == claude, "%s: claude's mark shows" % at)
-				var to_pod := table.global_transform.affine_inverse()
-				var texels := _texels(mark, to_pod)
-				_eq(texels.size(), 44, "%s: the whole mark (8x6 but its four corners)" % at)
-				_check(
-					mark.get_global_transform().get_scale().is_equal_approx(art.unit_scale()), "%s: a pack sprite" % at
-				)
-				var figure := _figure_texels(station, to_pod)
-				if side == "far":
-					var foot := Vector2i(table.monitor(column, side).position * 2.0)
-					var face := Rect2i(foot + lid_face.position, lid_face.size)
-					var outside := 0
-					var over := 0
-					for texel: Vector2i in texels:
-						outside += int(not face.has_point(texel))
-					for texel: Vector2i in figure:
-						over += int(texel.y < -OfficeTable.SURFACE_DEPTH * 2 and texels.has(texel))
-					_eq(outside, 0, "%s: inside the lid face" % at)
-					_eq(over, 0, "%s: never over the far worker, who shows above the far edge" % at)
-					_eq(mark.position, table.monitor(column, side).position + corner[side], "%s: on the lid" % at)
-					continue
-				var chair_texels := _chair_texels(station, to_pod)
-				var off_chair := 0
-				for texel: Vector2i in texels:
-					off_chair += int(not chair_texels.has(texel))
-				_eq(off_chair, 0, "%s: every texel on an opaque chair texel" % at)
-				# The station y-sorts its children by their feet, ties in tree order:
-				# the mark is drawn with its chair, so the sitter covers it only if the
-				# sitter is drawn after the chair.
-				var worker := station.actor()
-				var chair_y := chair.global_position.y
-				var worker_y := worker.global_position.y
-				var after := worker_y > chair_y or (worker_y == chair_y and worker.get_index() > chair.get_index())
-				var covered := 0
-				for texel: Vector2i in texels:
-					covered += int(after and figure.has(texel))
-				_check(not after, "%s: the sitter sorts behind the chair" % at)
-				_eq(covered, 0, "%s: the near sitter covers none of it" % at)
-				var top_left := Vector2i(1 << 20, 1 << 20)
-				for texel: Vector2i in texels:
-					top_left = Vector2i(mini(top_left.x, texel.x), mini(top_left.y, texel.y))
-				var chair_foot := to_pod * chair.global_position
-				# Only the corner texel itself is cut, so the opaque texels' smallest x and
-				# y are the canvas's own top-left.
-				_eq(Vector2(top_left) / 2.0, chair_foot + corner[side], "%s: on the backrest" % at)
-			var nodes := world.find_children("*", "", true, false).size()
-			station.furnish("codex", ArtContract.STATE_WORKING)
-			_eq(mark.texture, codex, "%s: a provider change swaps the mark" % where)
-			_eq(world.find_children("*", "", true, false).size(), nodes, "%s: and adds no node" % where)
-			station.furnish("", ArtContract.STATE_IDLE)
-			_check(not mark.visible, "%s: a shell wears no mark" % where)
-			_eq(mark.texture, null, "%s: and holds none, as a rebuilt seat does" % where)
-			station.furnish("", ArtContract.STATE_IDLE, false, true)
-			_check(not mark.visible, "%s: nor a launch whose kind is not known yet" % where)
-			station.furnish("future-agent", ArtContract.STATE_WORKING)
-			_check(not mark.visible, "%s: nor a provider the pack has no mark for" % where)
-			station.furnish("claude", ArtContract.STATE_WORKING)
-			station.vacate()
-			_check(not mark.visible and mark.texture == null, "%s: nor an empty seat" % where)
-			station.furnish("claude", ArtContract.STATE_WORKING)
-			_check(table.resize(6), "%s: grow" % where)
-			_check(table.relocate(Vector2(400, 320)), "%s: move" % where)
-			_check(station.rebind(table, column, side), "%s: and the station follows" % where)
-			_check(mark.visible and mark.texture == claude, "%s: a resize and a relocation keep the mark" % where)
-			if side == "far":
-				_eq(mark.position, table.monitor(column, side).position + corner[side], "%s: on its laptop" % where)
-			_check(table.resize(4), "%s: shrink back" % where)
-			station.free()
-	# Two agents swap seats and sides while the desks grow: the stations keep
-	# their people and nobody furnishes them again, so each mark must move with
-	# its agent: OfficeDeskView's re-equip after the rebind dresses the far lid,
-	# and the near chair's mark goes with its station.
-	world.free()
-	world = Node2D.new()
-	ground = Node2D.new()
-	sorted = Node2D.new()
-	world.add_child(ground)
-	world.add_child(sorted)
-	root.add_child(world)
-	var room := RoomModel.new()
-	room.key = "marks"
-	var view := OfficeDeskView.new()
-	view.setup(pen, ground, sorted, room.key)
-	view.reconcile(room, _mark_placement(room.key, 2, {"a": [0, "far"], "b": [1, "near"]}))
-	view.pane_stations["a"].furnish("claude", ArtContract.STATE_WORKING)
-	view.pane_stations["b"].furnish("codex", ArtContract.STATE_WORKING)
-	view.reconcile(room, _mark_placement(room.key, 4, {"a": [1, "near"], "b": [0, "far"]}))
-	await process_frame
-	var far_lid := view.table.get_node_or_null("Marks/Far0") as Sprite2D
-	var near_back := view.pane_stations["a"].get_node_or_null("Chair/Mark") as Sprite2D
-	var far_back := view.pane_stations["b"].get_node_or_null("Chair/Mark") as Sprite2D
-	_check(far_lid != null and near_back != null and far_back != null, "the moved seats have their marks")
-	if far_lid != null and near_back != null and far_back != null:
-		_check(far_lid.visible and far_lid.texture == codex, "codex moved to far 0, and its lid wears its mark")
-		_check(
-			near_back.visible and near_back.texture == claude, "claude moved to near 1, and its chair wears its mark"
-		)
-		_check(not far_back.visible, "codex's chair, now on the far side, wears none")
-
-
-## A placement of `seats` (pane key: [column, side]) on a pod of `capacity` columns.
-func _mark_placement(tab_key: String, capacity: int, seats: Dictionary) -> DeskPlacement:
-	var placed := DeskPlacement.new()
-	placed.tab_key = tab_key
-	placed.capacity = capacity
-	placed.measure = OfficeTable.measure(capacity)
-	for key: String in seats:
-		var where: Array = seats[key]
-		var seat := SeatPlacement.new()
-		seat.pane_key = key
-		seat.tab_key = tab_key
-		seat.column = where[0]
-		seat.side = where[1]
-		placed.seats.append(seat)
-	return placed
-
-
-## A near worker sits at the desk, not below it: the shoulders (the topmost
-## row the seated figure is at its full width on) are above the near working
-## edge, and the figure draws over part of its own laptop, in every state. The
-## back-view chair is pushed in under the desk: its top is under the working
-## top's near edge and above the apron's foot, so it covers none of the working
-## top, and a shell's laptop with nobody in the chair shares no texel with it.
-## Sorting is still by feet alone: the pod, then the sitter, then the chair.
-## The leg of a walk into the seat (OfficeWalkGraph.leg_to_seat()) still goes
-## round the chair: at every knee of it the walker's feet are off the desktop's
-## footprint, and at the knee beside the seat they are clear of the chair.
-func test_a_near_sitter_sits_at_the_near_working_plane() -> void:
-	var table := _table()
-	_check(table.resize(4), "four columns")
-	var to_pod := table.global_transform.affine_inverse()
-	var edge := OfficeTable.NEAR_SURFACE_EDGE * 2
-	var apron_foot := (OfficeTable.APRON_DROP + OfficeTable.APRON_HEIGHT) * 2
-	for column in table.columns.size():
-		var station := pen.station(sorted, table, column, "near")
-		for state: StringName in [
-			ArtContract.STATE_WORKING, ArtContract.STATE_BLOCKED, ArtContract.STATE_IDLE, ArtContract.STATE_DONE
-		]:
-			station.furnish("claude", state)
-			var where := "column %d %s" % [column, state]
-			var figure := _figure_texels(station, to_pod)
-			var laptop := _texels(table.monitor(column, "near"), to_pod)
-			var shared := 0
-			for texel: Vector2i in laptop:
-				shared += int(figure.has(texel))
-			_check(shared > 0, "%s: the sitter is at the laptop, over part of it" % where)
-			if state == ArtContract.STATE_BLOCKED:
-				continue
-			# Half units: the widest row is the shoulders (the raised arm aside).
-			var spans: Dictionary[int, Vector2i] = {}
-			for texel: Vector2i in figure:
-				var span: Vector2i = spans.get(texel.y, Vector2i(texel.x, texel.x))
-				spans[texel.y] = Vector2i(mini(span.x, texel.x), maxi(span.y, texel.x))
-			var widest := 0
-			var shoulders := 0
-			var rows := spans.keys()
-			rows.sort()
-			for row: int in rows:
-				var wide := spans[row].y - spans[row].x + 1
-				if wide > widest:
-					widest = wide
-					shoulders = row
-			_check(shoulders < edge, "%s: the shoulders (pod y %s) are above the near edge" % [where, shoulders / 2.0])
-		var chair: Sprite2D = station.get_node("Chair")
-		var chair_texels := _texels(chair, to_pod)
-		var top := 1 << 20
-		for texel: Vector2i in chair_texels:
-			top = mini(top, texel.y)
-		_check(top >= edge, "column %d: the chair (top %s) covers none of the working top" % [column, top / 2.0])
-		_check(top < apron_foot, "column %d: and is pushed in under the desk's edge" % column)
-		_check(
-			table.position.y < station.position.y and station.position.y < station.position.y + chair.position.y,
-			"column %d: the pod sorts before the sitter, the sitter before the chair" % column
-		)
-		var feet := PixelPerson.footprint()
-		var seat := table.geometry.seat_position(column, "near")
-		var spot := table.geometry.standing_position(column, "near")
-		var leg := OfficeWalkGraph.leg_to_seat(table.geometry.approach_position(column, "near"), seat, spot, true)
-		_eq(leg[leg.size() - 1], seat, "column %d: the leg ends on the seat" % column)
-		_eq(leg[leg.size() - 2], spot, "column %d: after the knee beside it" % column)
-		for knee in leg:
-			var stood := Rect2(knee + feet.position, feet.size)
-			_check(
-				not stood.intersects(table.geometry.physical_rect),
-				"column %d: at %s the feet %s are off the desktop" % [column, knee, stood]
-			)
-		var beside := Rect2(spot + feet.position, feet.size)
-		var chair_box := to_pod * (chair.get_global_transform() * _opaque_local(chair))
-		_check(
-			beside.position.x >= chair_box.end.x,
-			"column %d: the knee %s is clear of the chair %s" % [column, beside, chair_box]
-		)
-		# A shell: a laptop with a prompt and nobody in the chair. The chair hides none of it.
-		station.furnish("", ArtContract.STATE_WORKING)
-		_check(station.actor() == null, "column %d: nobody sits at a shell" % column)
-		var shell := _texels(table.monitor(column, "near"), to_pod)
-		var hidden := 0
-		for texel: Vector2i in shell:
-			hidden += int(chair_texels.has(texel))
-		_check(not shell.is_empty(), "column %d: the shell's laptop is drawn" % column)
-		_eq(hidden, 0, "column %d: the empty chair covers none of the shell's laptop" % column)
-		station.free()
-
-
-## The tab's label stands right under the pod's drawing ([32, 40)), and the near
-## seats' transient rows hang below the chairs of the same pod: while a near
-## seat is hovered or selected its plate, and under the held lens its lens
-## line and its plate, meet the label's box at no column, in either slot.
-## Seen on a real fleet before this: a selected near seat's plate over the tab
-## name (MAI|LAUDE) and a lens line glued to it (4s+TESTS).
 func test_the_near_rows_stand_clear_of_the_tab_label() -> void:
-	world = Node2D.new()
-	ground = Node2D.new()
-	sorted = Node2D.new()
-	world.add_child(ground)
-	world.add_child(sorted)
-	root.add_child(world)
+	_world()
 	var room := RoomModel.new()
 	room.key = "label-table"
 	room.label = "critics"
 	var view := OfficeDeskView.new()
 	view.setup(pen, ground, sorted, room.key)
-	var placed := DeskPlacement.new()
-	placed.tab_key = room.key
-	placed.capacity = 4
-	placed.measure = OfficeTable.measure(4)
+	var placed := _placement(room.key, 4)
 	view.reconcile(room, placed)
 	await process_frame
 	var label := view.title.get_global_rect()
-	var to_pod := view.table.global_transform.affine_inverse()
-	_eq(to_pod * label, Rect2(0, 32, placed.measure.table_width, 8), "the label right under the drawing")
+	_eq(
+		view.table.global_transform.affine_inverse() * label,
+		Rect2(0, 60, placed.measure.table_width, 8),
+		"tab title below the image and annotation envelope"
+	)
 	for station in view.stations:
 		station.furnish("claude", ArtContract.STATE_WORKING)
+		station.show_name(LONG_NAME)
 	for held: bool in [false, true]:
 		for station in view.stations:
 			station.show_lens(held, "4s+")
 			station.select(true)
 		await process_frame
 		for station in view.stations:
-			if station.side != "near":
-				continue
 			var rows := _seat_rows(station)
-			var where := "column %d, lens %s" % [station.column, held]
-			_check(rows.has("plate"), "%s: the plate shows" % where)
-			_eq(rows.has("lens"), held, "%s: the lens line only under the lens" % where)
-			for name: String in ["plate", "lens"]:
-				if rows.has(name):
+			_check(rows.has("plate"), "selected plate shows")
+			_eq(rows.has("lens"), held, "lens shows only while held")
+			for part: String in ["plate", "lens"]:
+				if rows.has(part):
 					_check(
-						not rows[name].intersects(label),
-						"%s: the %s %s clears the label %s" % [where, name, rows[name], label]
+						not rows[part].grow(2.0).intersects(label),
+						"%s: the %s stays at least two units off the title" % [station.name, part]
 					)
-			# S3 SEATTAGS round 2: the plate shows at rest on a small map, so it keeps
-			# the seat rows' 2 units from the label (it met the label's box before).
-			_check(label.end.y + 2.0 <= rows["plate"].position.y, "%s: the plate hangs 2 below the label" % where)
 
 
-## The pod stands on no legs: its two short end legs were retired once the
-## near chairs, pushed in under the desk, hid them at every column, somebody
-## in the chair or not. Nothing under the apron but the brackets, no module of
-## the table family named for a leg, and the fixed node cost two lower.
-func test_the_pod_stands_on_no_legs() -> void:
+func test_herdr_focus_underline_is_independent_of_selection_and_animation() -> void:
 	var table := _table()
-	_check(table.resize(4), "a pod with middle columns")
-	_eq(table.get_node("Supports").get_child_count(), 4, "one bracket a column, nothing else")
-	for child in table.get_node("Supports").get_children():
-		var support := child as Sprite2D
-		_eq(support.texture, art.table.module_texture(&"bracket"), "a bracket")
-	for module: StringName in art.table.modules:
-		_check(not String(module).begins_with("leg"), "no leg module in the pack: %s" % module)
-	_check(not ArtContract.TABLE_MODULES.has(&"leg_short"), "none in the contract")
-	_eq(OfficeDeskView.node_budget(0), 24, "24 fixed nodes, two fewer than with the legs")
-
-
-## A near done seat's paper stays in sight now that the sitter leans over the
-## near plane: no texel of it is behind its own sitter (who plays what a done
-## agent plays), behind either neighbour, blocked with a hand up, or behind
-## any of their chairs. A seat shows the paper or the raised hand, never both:
-## the paper is a done agent's, the hand a blocked one's.
-func test_the_near_paper_shows_beside_whoever_sits_there() -> void:
-	var table := _table()
-	for capacity: int in [2, 4, 6]:
-		_check(table.resize(capacity), "%d columns" % capacity)
-		var to_pod := table.global_transform.affine_inverse()
-		var stations: Array[OfficeStation] = []
-		for column in table.columns.size():
-			stations.append(pen.station(sorted, table, column, "near"))
-		for column in table.columns.size():
-			for other in stations.size():
-				stations[other].furnish(
-					"claude", ArtContract.STATE_DONE if other == column else ArtContract.STATE_BLOCKED
-				)
-				_eq(
-					table.item(other, "near").visible,
-					other == column,
-					"%d columns, column %d: paper only at the done seat (%d)" % [capacity, column, other]
-				)
-				_eq(
-					stations[other].chip().visible,
-					other != column,
-					"%d columns, column %d: the chip only at the blocked seats (%d)" % [capacity, column, other]
-				)
-			var paper := _texels(table.item(column, "near"), to_pod)
-			_check(not paper.is_empty(), "%d columns, column %d: the paper is drawn" % [capacity, column])
-			for other: int in [column - 1, column, column + 1]:
-				if other < 0 or other >= stations.size():
-					continue
-				var covers := _figure_texels(stations[other], to_pod)
-				covers.merge(_chair_texels(stations[other], to_pod))
-				var hidden := 0
-				for texel: Vector2i in paper:
-					hidden += int(covers.has(texel))
-				_eq(
-					hidden,
-					0,
-					(
-						"%d columns, column %d: the sitter and chair of column %d cover none of it"
-						% [capacity, column, other]
-					)
-				)
-		for station in stations:
-			station.free()
-
-
-## The idle mug (ArtContract.PROP_IDLE_MUG) beside the laptop, on both sides
-## and at every column of pods of 2, 4 and 6: inside its side's working plane
-## (the last column's too), right of the laptop and clear of it, clear of the
-## pod's selection frame, and no texel of it under the idle sitter's desk_idle
-## frames (the near sitter sits over the near plane; the far one shows above
-## the far edge) or the near chair, nor under either neighbour at work. It
-## shows only for idle: hidden for done (the paper instead, on the same
-## sprite), blocked, working, a shell and a vacant seat; the swap adds no
-## node, and the mug is still there after a resize and a relocation.
-## D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to.
-func test_the_mug_sits_beside_the_laptop_and_off_the_neighbours() -> void:
-	var table := _table()
-	var mug_texture := art.sprite_texture(art.prop_sprite(ArtContract.PROP_IDLE_MUG))
-	_check(mug_texture != null, "the pack draws the idle mug")
-	for capacity: int in [2, 4, 6]:
-		_check(table.resize(capacity), "%d columns" % capacity)
-		var to_pod := table.global_transform.affine_inverse()
-		var w := table.width
-		var screen := -OfficeTable.SURFACE_DEPTH + OfficeTable.SCREEN_TOP
-		var planes := {
-			"far": Rect2(0, -OfficeTable.SURFACE_DEPTH, w, OfficeTable.SCREEN_TOP),
-			"near":
-			Rect2(
-				0,
-				screen + OfficeTable.SCREEN_HEIGHT,
-				w,
-				OfficeTable.NEAR_SURFACE_EDGE - screen - OfficeTable.SCREEN_HEIGHT
-			),
-		}
-		for side: String in OfficeTable.SIDES:
-			var stations: Array[OfficeStation] = []
-			for column in table.columns.size():
-				stations.append(pen.station(sorted, table, column, side))
-			for column in table.columns.size():
-				var where := "%d columns, column %d %s" % [capacity, column, side]
-				for other in stations.size():
-					stations[other].furnish(
-						"claude", ArtContract.STATE_IDLE if other == column else ArtContract.STATE_WORKING
-					)
-				var item := table.item(column, side)
-				_check(item.visible and item.texture == mug_texture, "%s: idle, the mug shows" % where)
-				for other in stations.size():
-					if other != column:
-						_check(
-							not table.item(other, side).visible, "%s: and no other seat's item (%d)" % [where, other]
-						)
-				var mug := _opaque(item)
-				var laptop := _opaque(table.monitor(column, side))
-				var plane: Rect2 = planes[side]
-				_check(plane.encloses(mug), "%s: the mug %s is on its plane %s" % [where, mug, plane])
-				_check(mug.position.x >= laptop.end.x + 2.0, "%s: 2 right of the laptop %s at least" % [where, laptop])
-				table.set_selected(true)
-				for bar in _frame_bars(table):
-					var local := to_pod * bar
-					_check(not local.intersects(mug), "%s: the frame's bar %s clears the mug" % [where, local])
-				table.set_selected(false)
-				var texels := _texels(item, to_pod)
-				_eq(texels.size(), 155, "%s: every texel of the mug is drawn" % where)
-				for other: int in [column - 1, column, column + 1]:
-					if other < 0 or other >= stations.size():
-						continue
-					var covers := _figure_texels(stations[other], to_pod)
-					if side == "near":
-						covers.merge(_chair_texels(stations[other], to_pod))
-					var hidden := 0
-					for texel: Vector2i in texels:
-						hidden += int(covers.has(texel))
-					_eq(hidden, 0, "%s: column %d's sitter and chair cover none of it" % [where, other])
-			# The one sprite swaps between the paper, the mug and nothing in place.
-			var station := stations[0]
-			var nodes := world.find_children("*", "", true, false).size()
-			var held := table.item(0, side)
-			for state: StringName in [
-				ArtContract.STATE_DONE, ArtContract.STATE_BLOCKED, ArtContract.STATE_WORKING, ArtContract.STATE_IDLE
-			]:
-				station.furnish("claude", state)
-				var want: StringName = OfficeStation.desk_item(true, state)
-				_eq(table.item(0, side), held, "%s %s: the same sprite" % [side, state])
-				_eq(table.item_piece(0, side), want, "%s %s: shows %s" % [side, state, want])
-				_eq(held.visible, want != &"", "%s %s: shown or not" % [side, state])
-				_eq(world.find_children("*", "", true, false).size(), nodes, "%s %s: no node added" % [side, state])
-			_eq(held.texture, mug_texture, "%s: idle again, the mug's picture" % side)
-			var at := held.position
-			_check(table.resize(capacity + 2), "%s: grown" % side)
-			_check(table.relocate(table.position + Vector2(32, 0)), "%s: moved" % side)
+	for side: String in OfficeTable.SIDES:
+		var station := pen.station(sorted, table, 0, side)
+		station.furnish("claude", ArtContract.STATE_WORKING)
+		var player := _manual_player(station)
+		player.advance(0.37)
+		var frame := _body(station).frame
+		var elapsed := player.current_animation_position
+		var focus: Polygon2D = station.get_node("Focus")
+		var underline := Rect2(focus.polygon[0], Vector2.ZERO)
+		for point in focus.polygon:
+			underline = underline.expand(point)
+		_eq(underline, Rect2(-28, 4, 62, 1), "herdr focus is a narrow floor underline, not a desk lamp")
+		_check(OfficeStation.CANVAS.encloses(focus.transform * underline), "the focus signal stays within its station")
+		for ink in frame_ink:
 			_check(
-				table.item(0, side) == held and held.visible and held.texture == mug_texture,
-				"%s: the mug kept across a resize and a relocation" % side
+				not (focus.transform * underline).intersects(ink), "the underline covers none of the 24 approved images"
 			)
-			_eq(held.position, at, "%s: where it was on the pod" % side)
-			_check(table.resize(capacity), "%s: back to %d columns" % [side, capacity])
-			_check(table.relocate(table.position - Vector2(32, 0)), "%s: and back where it stood" % side)
-			station.furnish("", ArtContract.STATE_IDLE)
-			_check(not held.visible and held.texture == null, "%s: a shell has none and holds no texture" % side)
-			station.furnish("claude", ArtContract.STATE_IDLE)
-			station.vacate()
-			_check(not held.visible and held.texture == null, "%s: a vacant seat has none" % side)
-			for each in stations:
-				each.free()
-
-
-## The near task lamp's wedge still reads with somebody at the desk: the sitter
-## covers its middle (as the laptop always did), and on each side of them at
-## least NEAR_LAMP_IN_SIGHT half-unit texels of it stay in sight, whatever the
-## agent plays, a raised hand and a done seat's paper included.
-func test_the_near_lamp_shows_on_both_sides_of_its_sitter() -> void:
-	var table := _table()
-	_check(table.resize(4), "four columns")
-	var to_pod := table.global_transform.affine_inverse()
-	for column in table.columns.size():
-		var station := pen.station(sorted, table, column, "near")
-		table.light(column, "near", OfficeTable.Lamp.FOCUS)
-		var lamp := table.task_light(column, "near")
-		var wedge := to_pod * lamp.get_global_transform() * lamp.polygon
-		var bounds := Rect2(wedge[0], Vector2.ZERO)
-		for point in wedge:
-			bounds = bounds.expand(point)
-		for state: StringName in [
-			ArtContract.STATE_WORKING, ArtContract.STATE_BLOCKED, ArtContract.STATE_IDLE, ArtContract.STATE_DONE
+		var nodes := station.find_children("*", "", true, false)
+		for level: OfficeTable.Lamp in [
+			OfficeTable.Lamp.OFF, OfficeTable.Lamp.DIM, OfficeTable.Lamp.ON, OfficeTable.Lamp.FOCUS
 		]:
-			station.furnish("claude", state)
-			var covers := _figure_texels(station, to_pod)
-			covers.merge(_chair_texels(station, to_pod))
-			covers.merge(_texels(table.monitor(column, "near"), to_pod))
-			if table.item(column, "near").visible:
-				covers.merge(_texels(table.item(column, "near"), to_pod))
-			var sides: Dictionary[String, int] = {"left": 0, "right": 0}
-			for y in range(floori(bounds.position.y * 2.0), ceili(bounds.end.y * 2.0)):
-				for x in range(floori(bounds.position.x * 2.0), ceili(bounds.end.x * 2.0)):
-					var middle := Vector2(x + 0.5, y + 0.5) / 2.0
-					if not Geometry2D.is_point_in_polygon(middle, wedge) or covers.has(Vector2i(x, y)):
-						continue
-					sides["left" if middle.x < table.columns[column] else "right"] += 1
-			for side: String in sides:
-				_check(
-					sides[side] >= NEAR_LAMP_IN_SIGHT,
-					(
-						"column %d %s: %d texels of the lamp in sight on the %s, at least %d"
-						% [column, state, sides[side], side, NEAR_LAMP_IN_SIGHT]
-					)
-				)
+			station.light(level)
+			_eq(station.light_level, level, "public focus level follows herdr")
+			_eq(focus.visible, level != OfficeTable.Lamp.OFF, "only a nonzero focus level draws its underline")
+			_check(is_equal_approx(focus.color.a, OfficeStation.LIGHT_ALPHA[level]), "focus uses the prescribed alpha")
+			for picked: bool in [true, false]:
+				station.select(picked)
+				_eq(_selection(station).visible, picked, "selection controls its own frame")
+				_eq(station.light_level, level, "selection cannot replace herdr focus")
+				_eq(focus.visible, level != OfficeTable.Lamp.OFF, "selection cannot hide/show the focus underline")
+				_eq(_body(station).frame, frame, "focus/selection never change the image frame")
+				_eq(player.current_animation_position, elapsed, "or restart its clock")
+				_eq(_body(station).modulate, Color.WHITE, "focus does not make the person look disconnected")
+		_eq(station.find_children("*", "", true, false), nodes, "focus and selection add no nodes")
+		station.vacate()
+		_check(not focus.visible and not _selection(station).visible, "vacancy clears both channels")
 		station.free()
 
 
-## The in-world duration (OfficeAttention.compact_duration()) at its unit
-## boundaries, capped at 99 days, with `+` only when asked; and every form it
-## can take fits its slot as the label draws it, once the display face is on:
-## 14 units in the chip (never `+`) and 30 in the lens row (with `+`).
 func test_the_compact_duration_is_bounded_and_fits_its_rows() -> void:
 	var forms := {
 		0.0: "0s",
@@ -1761,7 +1101,7 @@ func test_the_compact_duration_is_bounded_and_fits_its_rows() -> void:
 		360000.0: "4d",
 		8553599.0: "98d",
 		8553600.0: "99d",
-		1.0e9: "99d",
+		1.0e9: "99d"
 	}
 	for seconds: float in forms:
 		_eq(OfficeAttention.compact_duration(seconds, false), forms[seconds], "%s s" % seconds)
@@ -1775,8 +1115,6 @@ func test_the_compact_duration_is_bounded_and_fits_its_rows() -> void:
 	var wait: Label = station.chip().get_node("%Wait")
 	var lens: Label = station.get_node("Overlay/Lens")
 	var probe := Label.new()
-	# F1 (2026-10-27): the compact durations wear the pack's figures face (Tiny5),
-	# the rest of the world's labels Fusion Pixel's 8px cut: measured in the former.
 	pen.style_figures(probe, OfficeChip.WAIT_PIXELS)
 	root.add_child(probe)
 	await process_frame
@@ -1794,24 +1132,22 @@ func test_the_compact_duration_is_bounded_and_fits_its_rows() -> void:
 	probe.free()
 	_eq(chip_widest, 14.0, "the widest chip form (`99m`) is 14 wide")
 	_eq(lens_widest, 18.0, "the widest lens form (`99m+`) is 18 wide")
-	_check(chip_widest <= wait.size.x, "it fits the chip's slot, %s" % wait.size.x)
-	# S3 SEATTAGS round 2: the plate is 10 tall (OfficeDraw.plate_cut()), the lens row still 12.
-	_eq([OfficeStation.LENS_SIZE, OfficeStation.PLATE_SIZE], [Vector2(30, 12), Vector2(30, 10)], "rows (S3 item 7)")
-	_eq(wait.size, Vector2(14, 12), "the chip's slot, measured after the face is on")
+	_check(chip_widest <= wait.size.x, "the chip's slot fits every form")
+	_eq(
+		[OfficeStation.LENS_SIZE, OfficeStation.PLATE_SIZE],
+		[Vector2(30, 12), Vector2(94, 10)],
+		"compact lens and workstation-width name row"
+	)
+	_eq(wait.size, Vector2(14, 12), "the chip's slot after its face is on")
 	station.show_lens(true, "99m+")
-	_eq(lens.size, Vector2(lens_widest + 2.0 * OfficeDraw.TAG_PAD, 12), "the widest lens form's tag, in its row")
-	var plate: Label = station.get_node("Overlay/Plate")
-	station.show_name("a pane name longer than its row")
-	_eq(plate.size, Vector2(30, 10), "a long name's tag fills the plate row (S3 SEATTAGS round 2: 10 tall)")
-	_eq(plate.text_overrun_behavior, TextServer.OVERRUN_TRIM_ELLIPSIS_FORCE, "a long name ends in an ellipsis")
-	_eq(plate.get_theme_font_size("font_size"), 8, "the display face at its native 8")
-	station.free()
+	_eq(lens.size, Vector2(lens_widest + 2.0 * OfficeDraw.TAG_PAD, 12), "the widest lens tag fits its row")
+	station.show_name(LONG_NAME)
+	var plate := _plate_of(station)
+	_eq(plate.size, Vector2(94, 10), "a long name fills its new name row")
+	_eq(plate.text_overrun_behavior, TextServer.OVERRUN_TRIM_ELLIPSIS_FORCE, "long names still end with an ellipsis")
+	_eq(plate.get_theme_font_size("font_size"), 8, "native display face")
 
 
-## A real pointer over a seat shows that seat's plate and no other; moving off
-## hides it; over the chip it shows too. Selected, or under the held lens, the
-## plate shows without the pointer. No plate covers a worker's pixels. A vacant
-## seat has no plate to show.
 func test_hovering_a_seat_shows_only_its_plate() -> void:
 	var table := _table()
 	_check(table.resize(4), "four columns")
@@ -1821,63 +1157,47 @@ func test_hovering_a_seat_shows_only_its_plate() -> void:
 			var station := pen.station(sorted, table, column, side)
 			if column < 3:
 				station.furnish("claude", ArtContract.STATE_WORKING)
+				station.show_name("pane %d %s" % [column, side])
 			stations.append(station)
 	var blocked := stations[2]
 	blocked.furnish("codex", ArtContract.STATE_BLOCKED)
 	blocked.chip().show_wait(60.0)
-	await physics_frame
+	await _point(Vector2(20, 20))
 	for station in stations:
-		_check(not _plate_of(station).visible, "%d %s: no plate at rest" % [station.column, station.side])
+		_check(not _plate_of(station).visible, "no plate at rest")
 	for index: int in [0, 1, 3, 2]:
 		var target := stations[index]
 		await _point(target.target_rect().get_center())
 		for station in stations:
-			_eq(
-				_plate_of(station).visible,
-				station == target,
-				"over %d %s: %d %s's plate" % [target.column, target.side, station.column, station.side]
-			)
+			_eq(_plate_of(station).visible, station == target, "only the genuinely hovered seat's plate shows")
 	await _point(blocked.chip_rect().get_center())
-	_check(_plate_of(blocked).visible, "over the chip, its seat's plate shows")
+	_check(_plate_of(blocked).visible, "hovering the chip shows its plate too")
 	await _point(Vector2(20, 20))
 	for station in stations:
-		_check(not _plate_of(station).visible, "pointer off: no plate")
+		_check(not _plate_of(station).visible, "moving off hides the plate")
 	await _point(stations[7].target_rect().get_center())
-	_check(not _plate_of(stations[7]).visible, "a vacant seat shows no plate")
+	_check(not _plate_of(stations[7]).visible, "vacant furniture has no plate")
 	await _point(Vector2(20, 20))
 	stations[1].select(true)
-	_check(_plate_of(stations[1]).visible, "selected, the plate shows")
+	_check(_plate_of(stations[1]).visible, "selected, the plate shows without hovering")
 	stations[1].select(false)
 	_check(not _plate_of(stations[1]).visible, "unselected, it goes")
-	var figures: Array[Rect2] = []
-	for station in stations:
-		if station.actor() != null:
-			figures.append(station.get_global_transform() * _drawn_figure(station))
 	for station in stations:
 		station.show_lens(true, "12m")
 	for station in stations:
 		var plate := _plate_of(station)
-		_eq(plate.visible, not station.vacant, "%d %s: under the lens the plate shows" % [station.column, station.side])
+		_eq(plate.visible, not station.vacant, "under the lens only occupied plates show")
 		if plate.visible:
-			var box := plate.get_global_transform() * Rect2(Vector2.ZERO, plate.size)
-			for figure in figures:
+			for other in stations:
 				_check(
-					not box.intersects(figure),
-					"%d %s: the plate %s covers no worker %s" % [station.column, station.side, box, figure]
+					not plate.get_global_rect().intersects(_drawing(other)),
+					"no plate covers even an empty workstation's pixels"
 				)
 	for station in stations:
 		station.show_lens(false, "")
-		_check(not _plate_of(station).visible, "let go: no plate")
+		_check(not _plate_of(station).visible, "letting go hides the plate")
 
 
-## S3 SEATTAGS (2026-10-27): on a map with few occupied seats every plate
-## shows with nothing hovered or selected, and a vacant seat still shows none.
-## A plate next to a vacant seat on its side of the pod takes that seat's slot
-## too (OfficeFloorView.widen_plates()): a long name's tag fills two slots, 62
-## wide, its start over its own column; a short one stays centred on its
-## column; a slot goes to the seat on its left first, else to the one on its
-## right, never to both; a seat taken again gives its slot back. In pod
-## coordinates, as docs/WORLD_MODEL.md says; no widened plate covers a worker.
 func test_a_long_name_takes_a_vacant_neighbours_slot() -> void:
 	var table := _table()
 	_check(table.resize(4), "four columns")
@@ -1888,57 +1208,42 @@ func test_a_long_name_takes_a_vacant_neighbours_slot() -> void:
 	_seat_far(stations, [0, 2])
 	await process_frame
 	for station in stations:
-		_eq(
-			_plate_of(station).visible,
-			not station.vacant,
-			"few seats, nothing hovered: %d %s's plate shows only if taken" % [station.column, station.side]
-		)
-	_eq(_pod_plate(stations[0]), Rect2(1, -104, 62, 10), "far 0, beside vacant 1: two slots, from its own")
-	_eq(_pod_plate(stations[4]), Rect2(65, -104, 62, 10), "far 2: vacant 3's slot; vacant 1's is 0's")
-	_eq(_pod_plate(stations[1]), Rect2(1, 42, 30, 10), "near 0, its neighbour taken: its own slot")
+		_eq(_plate_of(station).visible, not station.vacant, "few seats: every occupied plate, no vacant plate")
+	_eq(_pod_plate(stations[0]), Rect2(1, -96, 190, 10), "far 0 takes vacant 1's slot")
+	_eq(_pod_plate(stations[4]), Rect2(193, -96, 190, 10), "far 2 takes vacant 3's slot, not 1's")
+	_eq(_pod_plate(stations[1]), Rect2(1, 32, 94, 10), "near 0 has an occupied neighbour")
 	for far: OfficeStation in [stations[0], stations[4]]:
-		var plate := _plate_of(far)
-		var box := plate.get_global_transform() * Rect2(Vector2.ZERO, plate.size)
 		for station in stations:
-			if station.actor() != null:
-				var figure := station.get_global_transform() * _drawn_figure(station)
-				_check(not box.intersects(figure), "a widened plate %s covers no worker %s" % [box, figure])
+			_check(
+				not _plate_of(far).get_global_rect().intersects(_drawing(station)),
+				"widened plate covers no complete workstation"
+			)
 	stations[0].show_name("ab")
-	var short := _pod_plate(stations[0])
-	_eq(short.get_center().x, 16.0, "a short name stays centred on its own column")
-	_check(short.size.x < OfficeStation.PLATE_SIZE.x, "hugging its text")
+	_eq(_pod_plate(stations[0]).get_center().x, 48.0, "short name stays centered on its own column")
+	_check(_pod_plate(stations[0]).size.x < 94.0, "short name hugs its text")
 	stations[0].show_name(LONG_NAME)
 	stations[0].show_lens(true, "")
-	_eq(_pod_plate(stations[0]), Rect2(1, -114, 62, 10), "held, the widened plate moves out to the outermost row")
+	_eq(_pod_plate(stations[0]), Rect2(1, -84, 190, 10), "held lens moves the widened name to the outer row")
 	stations[0].show_lens(false, "")
 	_seat_far(stations, [0, 1, 2])
-	_eq(_pod_plate(stations[0]), Rect2(1, -104, 30, 10), "1 taken again: 0's plate gives its slot back")
+	_eq(_pod_plate(stations[0]), Rect2(1, -96, 94, 10), "taking seat 1 returns its slot")
 	_seat_far(stations, [1])
-	_eq(_pod_plate(stations[2]), Rect2(17, -104, 62, 10), "a lone seat: both neighbours' slots, centred on it")
+	_eq(_pod_plate(stations[2]), Rect2(49, -96, 190, 10), "a lone middle seat borrows half from both neighbours")
 	_seat_far(stations, [3])
-	_eq(_pod_plate(stations[6]), Rect2(65, -104, 62, 10), "the last column: its left neighbour's slot")
+	_eq(_pod_plate(stations[6]), Rect2(193, -96, 190, 10), "the last column borrows left")
 	_seat_far(stations, [1, 3])
-	_eq(_pod_plate(stations[2]), Rect2(17, -104, 62, 10), "vacant 2 goes to its left neighbour, 1")
-	_eq(_pod_plate(stations[6]), Rect2(97, -104, 30, 10), "and not to 3 as well")
+	_eq(_pod_plate(stations[2]), Rect2(49, -96, 190, 10), "vacant 2 goes to its left neighbour first")
+	_eq(_pod_plate(stations[6]), Rect2(289, -96, 94, 10), "not to seat 3 as well")
 	for station in stations:
 		station.show_plates_always(false)
-		_check(not _plate_of(station).visible, "more seats: no plate at rest, %d %s" % [station.column, station.side])
+		_check(not _plate_of(station).visible, "larger maps hide unselected unhovered plates")
 
 
-## S3 SEATTAGS round 2 (R1): on a planned zone, every seat's plate at rest
-## (a map with few seats shows it with nothing hovered) keeps 2 units of floor
-## from its pod's tab label and from the zone's lower partition's opaque
-## pixels (OfficeFloorView.partition_sprites()), in every seating the never-meet case
-## walks, the plates widened over vacant seats as the floor widens them.
 func test_a_plate_at_rest_stands_clear_of_its_label_and_partition() -> void:
-	world = Node2D.new()
-	root.add_child(world)
-	var policy := FloorLayoutPolicy.new()
-	policy.actor_footprint = PixelPerson.footprint()
-	policy.actor_draw_rect = PixelPerson.drawing_rect(art.people)
+	_world()
 	var zone := _side_zone("tags/1", 1, [_side_room("tab-t", 1, 0, 8)])
 	var map := MapModel.of_zones("tags", [zone] as Array[ZoneModel])
-	var plan := OfficeFloorLayout.plan(map, null, policy, OfficeDecorPlanner.new(pen)).plan
+	var plan := OfficeFloorLayout.plan(map, null, FloorLayoutPolicy.new(), OfficeDecorPlanner.new(pen)).plan
 	_check(plan != null and plan.zones.size() == 1, "one zone planned")
 	if plan == null or plan.zones.size() != 1:
 		return
@@ -1956,7 +1261,7 @@ func test_a_plate_at_rest_stands_clear_of_its_label_and_partition() -> void:
 	for piece in view.partition_sprites(plan.zones[0].zone_key):
 		for cell: Vector2i in _texels(piece, to_floor):
 			ink.append((Vector2(cell) + Vector2(0.5, 0.5)) / 2.0)
-	_check(ink.size() > 100, "the zone's partition is drawn: %d texels" % ink.size())
+	_check(ink.size() > 100, "the zone's partition is really drawn")
 	var fars: Array[PackedInt32Array] = [[0, 1, 2, 3], [0, 2], [0, 3], [1, 2]]
 	var nears: Array[PackedInt32Array] = [[0, 1, 2, 3], [1, 3], [1], [0, 2, 3]]
 	for pattern in fars.size():
@@ -1972,8 +1277,7 @@ func test_a_plate_at_rest_stands_clear_of_its_label_and_partition() -> void:
 			var plate := _plate_of(station)
 			if not plate.visible:
 				continue
-			var row := to_floor * (plate.get_global_transform() * Rect2(Vector2.ZERO, plate.size))
-			var where := "far %s near %s: %d %s %s" % [fars[pattern], nears[pattern], station.column, station.side, row]
-			_check(not row.grow(2.0).intersects(label), "%s: 2 clear of the tab label %s" % [where, label])
+			var row := to_floor * plate.get_global_rect()
+			_check(not row.grow(2.0).intersects(label), "%s: two units clear of the title" % station.name)
 			var near := ink.filter(func(at: Vector2) -> bool: return row.grow(2.0).has_point(at))
-			_eq(near, [], "%s: 2 clear of the partition's ink" % where)
+			_eq(near, [], "%s: two units clear of the partition's ink" % station.name)

@@ -63,18 +63,15 @@ const FRAME_GAP := 8.0
 ## (docs/VISUAL_LANGUAGE.md).
 const SIGN_FOOT := 32.0
 
-## The entry band, measured from its top: one cell row right under the top
-## wall, and the walking lane is its centre. S3 BAND (2026-10-28): the top wall
-## draws behind a person in front of it, so only the feet keep off it and a
-## walker's canvas reaches over its face (OfficeWalkGraph); the first zones'
-## signs hang over this row (their aisle row).
+## The entry band's aisle centre, measured from its top. The historical name
+## remains a fixture-clearance measurement; there are no office walkers.
+## The first zones' signs hang over this row (their aisle row).
 const WALKING_LANE := 16.0
 ## Where the pantry counter meets the floor, against the top wall: its
 ## footprint (14 deep) from the wall's foot line, so its front is 14 into the
 ## band and the first zone's sign under it hangs 4 clear of its drawing
-## (pinned by tools/test_office_service.gd). Inflated by the feet, it blocks
-## the walking lane's nodes in front of it; the lane starts beside it. A corner
-## nook: furniture, and nobody stands at it.
+## (pinned by tools/test_office_service.gd). A corner nook: furniture, never a
+## destination or a state signal.
 const COUNTER_FOOT := 14.0
 
 ## A zone's low partitions: bands PARTITION_THICKNESS thick inside its left,
@@ -99,12 +96,9 @@ class Piece:
 		foot = at
 
 
-## Where the lift door meets the floor: on the top wall, over the left lane of
-## the main corridor, so whoever comes in walks straight down the corridor and
-## along the walking lane to their lane, and whoever leaves walks straight up
-## it. Its x is a cell centre: the threshold leg runs straight down from its
-## foot (OfficeWalkGraph). Windows keep WINDOW_CLEARANCE from it. The door
-## moves with the main corridor when the map widens.
+## Where the decorative lift door meets the floor: on the top wall, over the
+## left lane of the main corridor. Windows keep WINDOW_CLEARANCE from it.
+## The door moves with the main corridor when the map widens.
 static func door(plan: FloorPlan) -> Vector2:
 	return Vector2((plan.main_corridor_cells.position.x + 0.5) * FloorLayoutPolicy.GRID, DOOR_FOOT)
 

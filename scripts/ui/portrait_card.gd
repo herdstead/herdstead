@@ -1,7 +1,7 @@
 class_name PortraitCard
 extends Button
 ## One agent in the top bar's portrait strip (scenes/ui/portrait_card.tscn):
-## the seat's person, still, with the pane's name over its place (a
+## the generic portrait, still, with the pane's name over its place (a
 ## tag in its worktree group's carpet family and its space) and, for a blocked
 ## agent, how long it has waited. Its frame wears the state's colour; the
 ## selected one a ring just inside it, and one a hovered HUD line points at a
@@ -10,7 +10,7 @@ extends Button
 ## card is as wide as the face.
 ##
 ## Two forms of the same node, by the bar's height (set_tall()). On a tall bar
-## it is B2's tile (`tile_size`): the seat's person as a portrait (PixelPortrait,
+## it is B2's tile (`tile_size`): the approved whole-image portrait (Sprite2D,
 ## OfficeDraw.seat_portrait(), whole in a 42×42 window on the cream ground;
 ## cropped to its middle on a face-only tile), the state's frame over the
 ## portrait's edge (`%FaceFrame`), the rings over that, the state's small mark
@@ -18,8 +18,8 @@ extends Button
 ## a plain Sprite2D, not a StatusBadge, so the attention clock never bobs it;
 ## and the scene names no StatusBadge script, which would load in a cycle under
 ## the bar's preload), and the name and the place under it on the bar's
-## ground. On a short bar it is the horizontal card (`card_size`): the small
-## person at the left, the words beside it, the frame round the whole card,
+## ground. On a short bar it is the horizontal card (`card_size`): the same
+## image cropped at the left, the words beside it, the frame round the whole card,
 ## and no mark. The rings (`%Selected`, `%Pointed`) move to whichever node
 ## wears the frame; every node is kept, and only the form's own face is shown
 ## and dressed.
@@ -92,13 +92,12 @@ var key := ""
 
 var _card: PortraitBarModel.Card
 var _art: ArtPack
-var _actor: PixelPerson
-var _portrait: PixelPortrait
-## What the person and the portrait are dressed as now: provider, pack and
-## pane; each holder's own, so the hidden one is not dressed again until it
-## shows.
-var _look := ""
-var _portrait_look := ""
+var _actor: Sprite2D
+var _portrait: Sprite2D
+## Each holder's image family. Provider, pane, clothes and state never change
+## the generic portrait; a family swap re-dresses only the shown form.
+var _face_art: WorkstationArt
+var _portrait_art: WorkstationArt
 var _face_only := false
 ## The tile form (set_tall()), or the card.
 var _tall := false
@@ -146,31 +145,21 @@ func show_card(card: PortraitBarModel.Card, art: ArtPack, selected: bool) -> voi
 	_show_wait_label()
 
 
-## The seat's person, still: a strip of bobbing heads would compete with the
-## seats. On a tile the portrait (a still by itself; the frame and the mark say
-## the state), on a card the small person paused in the state's pose. Both are
-## made, and dressed, with the card's first pane, so a flip of the form makes
-## no node; after that only the shown face follows the pane, its provider and
-## the pack, and the hidden one catches up when it shows again.
+## Both forms keep one still sprite each, made with the card's first pane so
+## a flip makes no node. State lives in the frame and mark, identity in the
+## words: neither changes the image. The hidden form catches a family swap
+## only when it shows again.
 func _show_face() -> void:
 	if _card == null:
 		return
-	var look := JSON.stringify([_card.provider, _art.base_path, _card.key])
-	if _portrait == null or (_tall and look != _portrait_look):
-		_portrait_look = look
+	if _portrait == null or (_tall and _art.workstation != _portrait_art):
+		_portrait_art = _art.workstation
 		var frame: Node2D = %PortraitHolder
 		_portrait = OfficeDraw.seat_portrait(frame, _portrait, _art, _card.provider, _card.key)
-	if _actor == null or (not _tall and look != _look):
-		_look = look
+	if _actor == null or (not _tall and _art.workstation != _face_art):
+		_face_art = _art.workstation
 		var holder: Node2D = %FaceHolder
 		_actor = OfficeDraw.seat_face(holder, _actor, _art, _card.provider, _card.key)
-		_actor.animation = &""
-	if _tall:
-		return
-	var animation := _art.animation_for_state(StringName(_card.state), _card.starting)
-	if _actor.animation != animation:
-		_actor.play_state(animation)
-	_actor.pause()
 
 
 ## How long a blocked agent has waited (OfficeAttention.wait_text()); empty
@@ -204,7 +193,7 @@ func face_only() -> bool:
 ## The tile (`on`, a tall bar) or the horizontal card (a short one). Only the
 ## nodes' properties change: the box turns, the sizes are the scene's, the
 ## rings move to the node that wears the frame, the portrait shows on a tile
-## and the small person on a card, and the mark shows on a tile alone.
+## and its cropped face on a card, and the mark shows on a tile alone.
 ## Nothing is made or freed.
 func set_tall(on: bool) -> void:
 	if on == _tall:
@@ -355,15 +344,15 @@ func pointed() -> bool:
 	return _pointed
 
 
-## The small person a card shows (hidden on a tile); null before the first
+## The cropped portrait a card shows (hidden on a tile); null before the first
 ## show_card().
-func person() -> PixelPerson:
+func person() -> Sprite2D:
 	return _actor
 
 
 ## The portrait a tile shows (hidden on a card); null before the first
 ## show_card().
-func portrait() -> PixelPortrait:
+func portrait() -> Sprite2D:
 	return _portrait
 
 

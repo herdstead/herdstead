@@ -1,12 +1,14 @@
-# Herdstead world model: people, space, objects, collision, walking
+# Herdstead world model: workstations, space, objects and picking
 
 The office world is built only from Godot's own systems. There is no custom depth contract, render-pass table or
 occlusion texture: who covers whom follows from position, never from numbers tuned against a screenshot.
 
-The people are pixel people (`PixelPerson`): density 2, nearest filtering, six layer strips. Floor tiles, pods and
-people are all density 2; geometry is in world units and does not depend on density. The pixel people's contract and
-build are in [the asset spec](ASSET_SPEC.md), "Pixel people". Changing the people never changes Y-sort, the order of
-furniture, or where anyone's feet land.
+The production office uses one generic **complete workstation image** per station (`WorkstationActor`): person,
+chair, desk and twin monitors are already painted together. Every station faces front; `far` and `near` mean only
+the upper and lower logical rows. The family is density 2, nearest, with an 80×80-unit canvas and pivot (37.5, 70).
+There is no runtime rig, customization, separate equipment, walking or ghost lifecycle in this phase. The HUD uses
+the same family's generic portrait. `PixelPeople`, `PixelPortraits` and `TablePack` remain legacy authoring tools,
+not the production office's drawing path; their contracts remain in [the asset spec](ASSET_SPEC.md).
 
 ## Abandoned approaches
 
@@ -15,52 +17,43 @@ These were tried and dropped as a whole. Do not bring them back under any name.
 | Approach | Why it is gone |
 |---|---|
 | A depth contract: a spatial_contract.json file + `TableSpace` + 12 `z_index` passes + occlusion layers | Depth came from tuned numbers, not position. It put a person sitting on the near side of a table behind the table's occlusion layer, although someone closer to the viewer than a table cannot be hidden by it. |
-| `AvatarRig` syncing six `AnimatedSprite2D` every frame | Per-frame sync code lets layers drift a frame apart. One `AnimationPlayer` per person keys every layer instead (rule 6). |
-| A hand-kept table of hit rectangles in `office.gd` (screen + pan − origin arithmetic) | The engine's physics picking does it (see "Collision and walking"). |
-| The native `AStarGrid2D` for walking | It walks through a thin obstacle between two clear cell centres, even with its points moved to the centres. `OfficeWalkGraph` checks edges, not only nodes. |
+| `AvatarRig` syncing six `AnimatedSprite2D` every frame | Per-frame sync code lets layers drift a frame apart. Production now keys one complete-image Sprite with one `AnimationPlayer` (rule 6). |
+| A hand-kept table of hit rectangles in `office.gd` (screen + pan − origin arithmetic) | The engine's physics picking does it (see "Picking and camera framing"). |
+| The native `AStarGrid2D` for walking | It walked through a thin obstacle between two clear cell centres. The later edge-checked walk graph and walking presentation are also retired from production: stationary workstations need neither routes nor actor-clearance policy. |
 
 ## Six rules
 
-1. **Origin = foot point.** Every world object's node origin is where it touches the floor: a person's feet, a
-   chair's legs, a table's near edge.
+1. **Origin = foot point.** A workstation's origin is its authored pivot, shared by all its frames and its empty
+   image. Standing furniture keeps its own foot point. The logical pod's origin is the left end of the lower row's feet.
 2. **Depth comes only from Y-sort.** Every `Node2D` on the path from the sort root to a sorted entity has
    `y_sort_enabled = true` (nested y-sort merges into one sort group). Larger y is closer to the viewer and draws later.
 3. **`z_index` has one use.** The floor is not a z value but a sibling drawn before the sort root. UI floating over
    the world (name plates, status badges, selection frames, table frames) uses the one named constant
    `OfficeWorld.OVERLAY_Z` (10). No other `z_index` is allowed: `z_index` beats Y-sort, so every extra z value is one
    more place where the position rule stops holding.
-4. **What sits on a tabletop is a child of the tabletop.** A pod of desks sorts as one whole at its near edge.
-   Desktops → grommets → lamp light → far laptops → their marks → the low screen → near laptops → papers draw
-   in node order, with no depth rule; nothing else stands on a desk (trinkets and the cat are not a pod's). Every
-   seat's laptop, grommet, lamp and paper stack, and every far laptop's mark, are built in `setup()`, new
-   columns start switched off, and `resize()` only adds new columns, keeping existing seat markers and equipment.
-   State changes go through `equip()` (has a pane, is a shell, whose mark a far laptop wears) and `light()` (four lamp levels
-   `Lamp.OFF / DIM / ON / FOCUS`), which switch texture, `visible` and `color` on existing nodes and never add or
-   remove nodes. The four alphas (`LAMP_ALPHA` = `[0.0, 0.10, 0.22, 0.52]`, `LAMP_STRONG` = 1.4 for lamp-lit packs)
-   are table geometry and live only in `table.gd`; which seat gets which level is `OfficeFloorView.lamp_of()`'s call.
-5. **Sitting = snapping to the seat `Marker2D` with collision off; standing up is only for walking (in at the door,
-   out, or to another seat), with collision on.** A far seat lies inside the table's footprint, so the table hides the
-   legs. A near seat is just outside the table's near edge (`NEAR_SEAT = 8`), the chair pushed in under the desk: the
-   person sorts after the table and is drawn over it, head and shoulders over the near working plane and their
-   laptop, and the near chair back sorts after the person (closer to the viewer). **Every state sits** (D2,
-   2026-10-27): done beside its paper stack, idle beside its mug (both the one desk item a child of the table,
-   `OfficeTable.show_item()`, chosen by `OfficeStation.desk_item()`), blocked under its chip (in the station's
-   `Overlay`); nobody leaves the seat for a state, and the pantry counter is furniture nobody walks to. A walking
-   actor is the same node, never rebuilt, keeps origin = feet and sorts by the y of its feet. The table's standing spot `table.standing(column, side)` still exists (constants
-   only in `table.gd`: `STAND_ASIDE = 16` beside the column, in the gap between two chairs, the far one `FAR_STAND = 6` above the far edge, the near
-   one `NEAR_STAND = NEAR_SEAT`), but nobody stands there: it is the corner where the near seat leg turns round the
-   chair (see "Collision and walking"). Its numbers stay so no map is planned differently.
-6. **One `AnimationPlayer` per person.** Its value tracks drive each layer's `frame`; layers cannot drift apart and
-   there is no per-frame sync code. Sitting, standing and turning swap only textures, `flip_h` and the playing track,
-   never nodes.
+4. **A workstation is indivisible art.** Its internal person/furniture occlusion is painted, not assembled by
+   nodes. The station sorts as one whole at its foot point. `OfficeTable` owns only the pod's seat markers and
+   selection outline; it draws no second desk, chair, monitor, lamp or state item. Separate side-table decor remains
+   a child of that side table, never of a workstation.
+5. **Every workstation stays at its measured seat.** Arrival, removal and relocation reconcile directly, without
+   walking, standing spots, approach points or body collisions. A permanent actor draws the empty workstation for
+   both a shell pane and a vacant slot; only the shell is pickable and has pane annotations. Herdr focus is a thin
+   underline, distinct from the selection outline: `OfficeStation.LIGHT_ALPHA` is `[0.0, 0.15, 0.35, 1.0]` for
+   `OfficeTable.Lamp.OFF / DIM / ON / FOCUS`. `OfficeFloorView.lamp_of()` chooses the level from herdr's focus and
+   active tab; a weaker underline never dims the person like a lost connection.
+6. **One `AnimationPlayer` per workstation.** `WorkstationArt` builds discrete keys on `Body:frame`; each frame is
+   a complete image. Working and idle loop, blocked enters then holds its looping wait and exits before the next
+   state, and done nods once. Starting and unknown hold frame 0. Repeating the same state does not restart its
+   animation, including a completed done nod. Pausing is separate from state selection, so reconnecting cannot
+   replay the nod. Frame order and timing come from the approved manifest, not the old rig's state mapping.
 
 ## Prefabs
 
 | Scene | Root | Role |
 |---|---|---|
-| `scenes/people/pixel_person.tscn` | `CharacterBody2D` | A pixel person: six layer sprites under `Layers` (`Legs`, `Top`, `Body`, `Glasses`, `Hair`, `Headwear`, bottom to top), one `AnimationPlayer`, a `Feet` collider, no chest badge. `configure` dresses, `play_state` picks the motion, `face` turns, `sit` / `stand_up`, `pace` sets the step rate; `drawing_rect()` / `footprint()` measure the person for layout. |
-| `scenes/world/table.tscn` | `StaticBody2D` | A pod of single desks built from 32-unit modules, one desk per column: desktops, apron, the low screen between the two rows, two short legs, a bracket per desk, footprint collider; per column and side a seat `Marker2D`, a standing `Marker2D` (`Standing`, `standing()`: the near seat leg's corner, nobody stands there), laptop, on a far laptop the provider's mark (`Marks`, `mark(column)`: shown only for an agent whose provider the pack has a mark for, `mark_of()`, never for a shell or a launch with no kind yet; only its texture and `visible` change; a near seat's mark is on its chair, the station's), grommet, lamp and the desk item, done's paper stack or idle's mug (`Items`, `show_item()` / `item()` / `item_piece()`, one sprite per seat built with the table, only its texture and `visible` change). `measure()` gives the planner its size; `resize()` / `relocate()` update in place; `equip()`, `light()` and `show_item()` switch existing nodes. **All table geometry constants live only in `scripts/world/table.gd`.** |
-| `scenes/world/station.tscn` | `Node2D` (y-sort) | One seat: chair (on the near side its back wears the agent's provider mark, `Chair/Mark`, drawn with the chair; see "Provider mark"), person (seated in every state, rule 5), `Overlay` and `Target`. `Overlay` holds the name plate, lens line, seat mark (`selection_seat`), status badge and the blocked chip (`chip.tscn`, `OfficeChip`: a 30×16 `panel` with the same badge node moved into its left half and the wait in `OfficeAttention.compact_duration()` in its right half; with no writable wait (start not seen, disconnected) it draws nothing, not even the frame, the badge is back in the middle and its click area stays; it never shows the question, which is in the HUD tooltip `%WorldTip`). The rows over a seat are listed in "Rows over a seat" below. The plate shows at all times on a map with few occupied seats (`OfficeStation.show_plates_always()`, told by the floor; see "Rows over a seat"), otherwise only while the seat's or the chip's rectangle is hovered, the seat is selected or `L` is held. Seated offsets (`PLATE_AT`, `CHIP_AT`, ...) are relative to the seat, the `AWAY_*` ones relative to where the person rests in the pantry, where there is no plate; a move only changes their `position`. `Target` is the click `Area2D`: this side's seat rectangle (while the chip shows it is swapped for a shorter one that leaves the tag row to the chip), `Chip` (the chip's, enabled only while it shows; a click there emits `asked`, anywhere else `picked`; pointer enter/exit emits `chip_hovered`; the badge draws over the chip) and `Away` (enabled with the seat rectangle while the person rests in the pantry). The other side's seat rectangle is never enabled. `rest_at()`, called by the presentation, hangs overlay and click area where the person rests. Every column has a station on both sides; one without a pane is an empty chair that cannot be clicked (no laptop, lamp off). `rebind()` rebinds the seat and sets position and click area absolutely, keeping the actor. A station hands its laptop, lamp and paper stack to the table and never touches the table's nodes. While the presentation walks the person (`walking`), `furnish()` / `rebind()` leave the person's position and motion alone, only recording the seated look, and `land()` applies it on arrival. |
+| `scenes/world/workstation_actor.tscn` | `Node2D` | One retained `Body` Sprite and one `AnimationPlayer`. `configure()` dresses the shared `WorkstationArt`; `play_state()` handles the approved state transitions; `show_empty()` uses the separate empty image with the same pivot; `pause()` / `play()` preserve the clock. No rig, recolouring or runtime compositing. |
+| `scenes/world/table.tscn` | `Node2D` | A tab's logical pod: `Seats` markers and an `Overlay/Frame` with four bars. `measure()` is the sole producer of `DeskMeasure`; `setup()` accepts only its canonical width and columns; `resize()` / `relocate()` retain surviving markers and selection. **All pod geometry constants live in `scripts/world/table.gd`.** No furniture sprites or footprint collider. |
+| `scenes/world/station.tscn` | `Node2D` | One complete `Actor`, the focus underline, `Overlay` and `Target`. The overlay holds the name plate, lens line, a `Line2D` selection outline, status badge and blocked chip. The 30×16 chip shows the same badge in its left half and a compact wait in its right; without a known wait it draws no frame or text, leaves the badge centred, and retains its click area. The question excerpt is the HUD's `%WorldTip`. `Target` is an `Area2D` with one 80×80 seat rectangle and a separate 30×18 chip rectangle; a chip release emits `asked`, a seat release `picked`. Both rows use identical offsets. Every slot has a permanent actor, even when vacant; a vacant slot draws the empty workstation and cannot be clicked. `rebind()` moves the whole station to its new marker without replacing the actor or its animation. No world provider mark is drawn. |
 | `scenes/world/decor.tscn` | `StaticBody2D` | One standing piece of furniture (plant, side table, and the entry band's pantry counter): a `Sprite2D` placed on its foot point plus a footprint on the `FURNITURE` layer, and a `%Top` holder for what a side table carries (`hold()`, `held()`, `TOP_Y`). Footprint sizes come from each piece's `item` block in the pack (`OfficeDecor.footprint_of()`, including the two counters; [ITEMS](ITEMS.md)). **Furniture binds no herdr field**; its position comes only from the floor layout. |
 | `scenes/world/chip.tscn` | `Node2D` | The blocked chip inside a station's `Overlay` (`OfficeChip`): the `panel` frame and the wait's Label, both the scene's; `show_wait()`, `clear()`, `set_lensed()` and `framed()` only change their properties. It holds no button: a click on it is the station's. |
 | `scenes/world/machine_plate.tscn` | `Control` | The machine plate over the map (`OfficeMachinePlate`): the machine's name, its live state or an empty map's note, its space and pane counts, and the layout problem line; Labels in containers styled by `HudTheme`, never clickable. |
@@ -72,10 +65,9 @@ Floor assembly:
 FloorRooms              the node dimmed as a whole when its machine disconnects
 ├── Ground              in this order: the shell (floor TileMapLayer, corridors, walls, framed pictures on the top
 │                       wall), the zones' carpets (`Carpets`, one NinePatchRect per zone), then each pod's
-│                       background: the lens's wash, contact shadows, tab label (drawn first)
+│                       background: the lens's wash and tab label (drawn first)
 └── Sorted (y-sort)     tables, stations, standing furniture, the entry band's pantry, each zone's partitions (a
-                        y-sorted holder) and sign, and anything else that stands on the floor and can cover or be
-                        covered by a person
+                        y-sorted holder) and sign; each complete workstation sorts at its station's foot point
 ```
 
 ### Grid, measurement and stable ordering
@@ -97,22 +89,23 @@ zone of one empty pod row.
 The grid is fixed at **32 world units**. **The map is lanes** (`FloorLayoutPolicy`): across it a side wall (1 cell),
 `lanes` lanes of `zone_width_cells` (4) with an aisle column (`lane_aisle_cells`, 1) between two of them, the main
 corridor (2) and the other side wall: **5L + 3 cells** for L lanes; lane i covers columns 1 + 5i to 4 + 5i, the
-aisle after it is column 5 + 5i, and the main corridor is columns 5L and 5L + 1. A lane holds the narrowest pod (2
-columns, 3 cells) right of its zone's pad. Down it: the top wall (2 cells),
-the entry band (1, the walking lane, which is also the first zones' aisle row), then the zones from row 3. A map's first plan picks L = max(2, ⌊(width − 3) / 5⌋) from the
+aisle after it is column 5 + 5i, and the main corridor is columns 5L and 5L + 1. The narrowest pod (2 columns,
+7 reserved cells) spans two lanes, right of its zone's pad. Down it: the top wall (2 cells),
+the entry band (1, also the first zones' aisle row), then the zones from row 3. A map's first plan picks L = max(2, ⌊(width − 3) / 5⌋) from the
 viewport width available at that moment (the default 1920×960 window at 2x: 936 units, 29 cells: five lanes, 28 cells);
 after that, window or zoom changes only change how much is visible, and nothing reflows. L is raised only when a zone
 needs more lanes than the map has. Never fewer than two lanes (13 cells): the smallest window (480×320 units) keeps the
 top wall's window and its picture.
 
 **A zone** (a workspace, `ZonePlacement`) stands in k adjacent lanes under an **aisle row** of its own
-(`zone_aisle_cells`, 1; the first zones' aisle row is row 2, the entry band's walking lane: `map_top_aisle_cells` 0,
+(`zone_aisle_cells`, 1; the first zones' aisle row is row 2, the entry band: `map_top_aisle_cells` 0,
 S3 BAND): it is 5k − 1 cells wide
 (the aisle columns between its lanes are its own) and whole **pod rows** deep; its **slot** is its aisle row and its
 rectangle. Inside it a pad column (`zone_pad_left_cells`, 1) keeps its tables off its left partition; the rows are as
-deep as a table's measured reservation (`OfficeZoneLayout.pod_row_cells()`, 6 cells on the pods), with no
+deep as a table's measured reservation (`OfficeZoneLayout.pod_row_cells()`, 10 cells), with no
 walls and no cross corridors between them. **Lane span**: the fewest lanes whose 5k − 2 inner cells hold its widest
-table (for a table w cells wide, ⌈(w + 2) / 5⌉; a pod of c columns needs ⌈(c + 3) / 5⌉); on its first placement a
+table reservation (for a reservation w cells wide, ⌈(w + 2) / 5⌉; a pod of c columns reserves 3c + 1 cells and needs
+⌈(3c + 3) / 5⌉ lanes); on its first placement a
 zone takes more lanes, up to the map's, while it would stand taller than `zone_tall_rows` (1) pod row: a new zone is as
 wide as its pods need to stand in one row, and wraps rows only at the map's lanes. A placed zone keeps its width as it
 grows (down, or right when a table is too wide for it).
@@ -149,54 +142,59 @@ removing the last or lowest zone, or emptying a lane, never shrinks the map. The
 as plain floor) are every zone's aisle row and every inter-lane aisle column where no zone spans both lanes; no
 reservation, zone or furniture stands on them or on a walkway.
 
-`OfficeTable.measure(capacity) -> DeskMeasure` is the only source of table geometry. A tab is a **pod of single
-desks**: one 32-unit desk per column, a seat on each side of it, the two rows facing across a low screen.
-Coordinates are relative to the pod's origin at the left end of its near edge:
+`OfficeTable.measure(capacity) -> DeskMeasure` is the only source of pod geometry. A tab has two logical rows of
+complete workstations, **both facing front**, on a 96-unit column pitch. Coordinates are relative to the pod's
+origin at the left end of the lower row's feet. `FloorLayoutPolicy.version` is 6 for this geometry.
 
 | Measure | Value / rule |
 |---|---|
-| Capacity and width | `capacity` is at least 2 and counts columns per side; the planner grows it 2 columns at a time and keeps old capacity. Width is `max(64, capacity × 32)` (`MIN_WIDTH` 64) |
-| Column x | `16 + 32 × i`; growth never re-centres existing columns |
-| `physical_rect` | `(0, -48, width, 48)` (`SURFACE_DEPTH` 48), the desktop's collision footprint only |
-| `render_rect` | `(0, -90, width, 122)`: y [−90, 32), the stationary drawing: the tag rows' badge pulse envelopes, the chips, laptops, paper and the seat marks. The plate and lens rows are transient (hover, selection, held `L`; the plate also at all times on a map with few occupied seats) and lie outside it; so does the pod's selection frame, an overlay 2 units outside it (`FRAME_OUTSIDE`) so its bars cover neither the end desks' paper nor the near chips |
-| `reserved_rect` | `(0, -128, width + 32, 192)`: six cells, from the far approach row to the near one, with a one-cell passage on the right; bottom edge 64 |
-| Seats | far `(x, -36)` (`FAR_SEAT` 12 inside the far edge), near `(x, 8)` (`NEAR_SEAT` 8 below the near edge: the sitter's head reaches −23 and the shoulders −10, over the near working plane; the near row used to sit at 22, wholly below the apron, typing on air) |
-| Laptops | same x as the seat; far foot `(x, -40)` (8 inside the far edge: the rear view −48..−40, clear of the far worker, who shows only above −48), near `(x, -10)` (−21..−10). 14 units wide; rear view 8 units tall, front view with keyboard 11. A shell's empty chair gets the same laptop as an agent |
-| Near edge and supports | The working surface ends at `NEAR_SURFACE_EDGE = -8`; a 3-unit lip meets the apron at `APRON_DROP = -5`, `APRON_HEIGHT = 3`. A `bracket` per desk at `BRACKET_DROP = -11`, and no legs: the pod's two short end legs were retired once the near chairs, pushed in under the desk (opaque over −7.5..14), hid them at every column, somebody in the chair or not. Lamp light stops at the working surface, never past the edge |
-| Low screen | `SCREEN_TOP = 16` below the far edge, `SCREEN_HEIGHT = 6` (−32..−26). The far working plane is −48..−32, the near one −26..−8 |
-| Lamps | `LAMP_HALF_WIDTH = 4` at the screen, `LIGHT_HALF_WIDTH = 14` at the sitter's edge |
-| Provider mark | `OfficeTable.mark_of()` → `ArtContract.lid_mark(provider)`, 4×3 units (8×6 texels at density 2), pivot its top-left corner; `MARK_AT`. **Far, on the laptop's lid**, from the laptop's foot `(-2, -6.5)`: x −2..2, y −6.5..−3.5, centred on the rear lid face (x −6.5..6, y −7..−3.5) over the lid's dot, inside the laptop, so it covers no more of the far worker than the laptop does (none); the table's (`Marks`). **Near, on the chair's back**, from the near chair's foot `(-2, -17.5)`: x −2..2, y −17.5..−14.5 (`chair_back` texels 28..35 by 57..62), on the backrest's face (x −5..4.5, y −20..−12.5), chair pixels only. A seated near worker covers the whole near laptop, and the chair is the one part of a near seat drawn in front of them (`CHAIR_OFFSET`): the mark is the station's `Chair/Mark`, a child of the chair (sorted with it; scaled back to the pack's density), |
-| Chair | `CHAIR_OFFSET` far −4 (sorts just behind the worker), near 6 (just in front; opaque over y −7.5..14: its top right under the working top's near edge at −8, so it covers none of the working top and none of a shell's laptop) |
-| Desk item | One sprite per seat: the paper (done) or the mug (idle), never both (`OfficeStation.desk_item()`). The paper, `done_stack_small` (6×9 opaque), `ITEM_ASIDE = 13` right of the column: opaque x+10..x+16; the mug, `idle_mug` (7×6.5 opaque, x −3.5..3.5 about its foot), `MUG_ASIDE = 12.5`: opaque x+9..x+16. Either is clear of the laptop (x−7..x+7) and of the next column's worker (from x+24), inside the desktop on the last column. Far foot `ITEM_FAR = -33` (paper −42..−33, mug −39.5..−33: far plane, under the far edge the far worker shows above), near `ITEM_NEAR = -15` (paper −24..−15, mug −21.5..−15: near plane): beside the near worker, who sits over that plane (a done or idle agent's head is x−6..x+6 there, the shoulders x−8..x+8 from −11 down; the idle sitter's `desk_idle` frames cover none of the mug, measured texel by texel). A near blocked agent's raised hand (x+7..x+12, −28..−11) would pass over the item's left part and never does: a blocked seat shows none |
-| Standing spots | far `(x + 16, -54)`, near `(x + 16, 8)`: the near seat leg's corner, in the gap between two chairs, the feet (y 4..8) 4 clear of the desktop's footprint; nobody stands there |
-| Approach points | far `(x, -80)`, near `(x, 48)`, both cell centres; read via `approach_position()`. They start the walk-graph legs to seat and standing spot (see "Collision and walking") |
+| Capacity and width | `capacity` is at least 2 and counts columns, each with two workstations; the planner grows it 2 columns at a time and keeps old capacity. Width is `max(2, capacity) × 96` (`MODULE` 96, `MIN_WIDTH` 192) |
+| Column x | `48 + 96 × i`; growth never re-centres existing columns |
+| Seats | far `(x, -128)`, near `(x, 0)`; row names never select a different facing |
+| Complete-image canvas | `(-37.5, -70, 80, 80)` relative to either seat; 160×160 texture pixels at density 2. Far pod y [−198, −118), near [−70, 10) |
+| `physical_rect` | `(0, -198, width, 208)`: y [−198, 10), the two image rows' bounding envelope, not a desktop collider |
+| `render_rect` | `(0, -200, width, 256)`: y [−200, 56), enclosing the supported stationary images and annotations, including plate and lens rows |
+| `reserved_rect` | `(0, -224, width + 32, 320)`: ten cells deep, with a one-cell passage on the right; bottom edge 96 |
+| Pod selection frame | Two-unit bars outside `render_rect` (`FRAME_OUTSIDE` 2): top [−202, −200), bottom [56, 58), sides x [−2, 0) and [width, width + 2) |
+| Tab label | The pod's width × 8 at y [60, 68), four units below `render_rect.end.y`, clear of the selection frame |
 
-No trinket, cat or rug belongs to a pod: nothing stands on a desk but a seat's own equipment and its paper.
+There are no separately placed laptops, desk items, provider marks, chairs, standing spots or approach points in
+this measure. No trinket, cat or rug belongs to a pod; the furniture painted into a workstation is not an attachment
+point for another prop.
 
 #### Rows over a seat
 
-Every row is 30 units wide and centred on its column, so neighbours (32 apart) keep 2 units between them; the one
-exception is a plate beside a vacant seat, which takes that seat's slot too (below). Pod y,
-half-open; the badge's pulse (`OfficeAttention.PULSES`) lifts it by 0, −1 or −2. The lens line and the plate stand on
-a **paper tag** (S3 item 7, CARPET-B1: they hang over a zone's carpet, where `ink` alone reads at about 2:1, under the
-lens about 1:1): the Label's own `normal` stylebox (`OfficeDraw.back_label()`: `paper`, square, not anti-aliased, no
-margins; no node is added), the Label laid by `OfficeDraw.hug()` as wide as its text and `TAG_PAD` (1) either side,
-centred in its row (the plate: on its own column, kept inside its row), the row's height, at most the row's width (a
-longer name fills it and ends in its ellipsis); a label
-with no text wears no tag. `99m+`'s tag is 20 wide ([−9, 11) about the column), `12m`'s 16. `ink` on `paper` is
-11.5:1. It is resized only when its text or its row changes (a name, a lens text, the lens held or let go):
+Both logical rows put their annotations **below the complete image**, using the same station-local offsets.
+The chip and lens row are 30 units wide; the name plate is 94, leaving 2 between occupied neighbours at the 96-unit
+pitch. The badge's pulse (`OfficeAttention.PULSES`) lifts it by 0, −1 or −2. Coordinates below are half-open pod y
+ranges except the selection line, whose centreline is stated explicitly.
 
-| Row | Far (above the head; raised hand top −72) | Near (below the chair; chair bottom 14) |
+The lens line and plate stand on a **paper tag**: the Label's own `normal` stylebox (`OfficeDraw.back_label()`:
+`paper`, square, no antialiasing or margins), laid by `OfficeDraw.hug()` as wide as the text plus `TAG_PAD` (1)
+on either side, at most its row's width. The plate stays centred on its column as far as its widened row allows;
+a longer name is ellipsized. An empty label draws no tag. The display face at 8 uses a 10-unit plate row
+(`OfficeDraw.PLATE_HEIGHT`, `plate_cut()`); compact waits use the figures face at 8.
+
+| Row | Far (feet −128) | Near (feet 0) |
 |---|---|---|
-| Tag (the badge, 15 opaque, centred) | [−88, −72); pulse envelope [−90, −72) | [16, 32); pulse envelope [14, 32) |
-| Chip (blocked with a known wait) | `panel` [−15, 15) × [−88, −72); the badge in x [−16, −1) (one unit over the chip's left edge), the wait's 14-wide label in [0, 14): the widest form inks 13 units, so daylight stays between it and the badge and before the frame's right border | the same, over [16, 32) |
-| Lens (held `L`), a row of 30×12, its paper tag hugging the text | [−102, −90) | [40, 52), past the tab label |
-| Plate (always on a map with at most `FloorLayoutPolicy.FEW_SEATS` (16) occupied seats; otherwise hover, selection, held `L`), a row of 30×10 (`OfficeDraw.PLATE_HEIGHT`: the display face at 8 cut to 10 rows by `plate_cut()`, two of its empty rows over the capitals given up), or 62×10 beside a vacant seat (below), its paper tag hugging the name, display face at 8, upper case, forced ellipsis | at rest its own slot `PLATE_REST` [−104, −94): 2 clear of a selected pod's frame top bar [−92, −90), 4 of the tag row's pulse envelope; while `L` is held, [−114, −104), 2 over the lens row | at rest `PLATE_REST` [42, 52): 2 under the tab label's box [32, 40) and 2 over a zone's lower partition (drawn from 54 when the pod stands in the zone's last row); while `L` is held, [52, 62) |
-| Seat click rectangle | [−90, −32); [−72, −32) while the chip shows | [−24, 32) (from the far seat mark's foot, a unit over the near head, to the tag row; only a raised hand's tip, −28..−24, is above it); [−24, 14) while the chip shows |
-| Chip click rectangle | [−90, −72) | [14, 32) |
-| Pod selection frame (2-unit bars, `FRAME_OUTSIDE` 2 outside `render_rect`) | top bar [−92, −90), sides x [−2, 0) and [w, w + 2) | bottom bar [32, 34) |
-| Tab label (`OfficeDraw.tab_label()`, the pod's width × 8, right under `render_rect`) | — | [32, 40); the near lens and plate rows hang below it and meet it at no column (`test_the_near_rows_stand_clear_of_the_tab_label`) |
-| Seat mark (`selection_seat`, 32×48, pivot (16, 46)) | `SELECTION_AT` (0, 10): [−72, −24) | `SELECTION_AT` (0, 6): [−32, 16), from the far seat's click rectangle's end to the tag row, the raised hand (−28) and the chair (to 14) inside |
+| Badge (`BADGE_AT` (0, 28), 16×16 canvas, pivot (8, 16)) | [−116, −100); pulse envelope [−118, −100) | [12, 28); pulse envelope [10, 28) |
+| Chip (`CHIP_AT` (−15, 12), 30×16) | [−116, −100) | [12, 28) |
+| Lens (`LENS_AT` (−15, 30), 30×12) | [−98, −86) | [30, 42) |
+| Plate at rest (`PLATE_REST` (−47, 32), 94×10) | [−96, −86) | [32, 42) |
+| Plate with `L` held (`PLATE_AT` (−47, 44)) | [−84, −74) | [44, 54) |
+| Seat click rectangle (the full image canvas) | [−198, −118) | [−70, 10) |
+| Tag-row click rectangle (badge or chip; 30×18, centre (0, 19) from the seat) | [−118, −100) | [10, 28) |
+| Seat selection outline (1-unit `Line2D`, centreline x −36..41) | centreline y −197..−119 | centreline y −69..9 |
+| Focus underline (`Focus`, x [−28, 34), 1 unit tall) | [−124, −123) | [4, 5) |
+| Stable signal rectangle (camera and pointer; x [−47, 47)) | [−198, −74) | [−70, 54) |
+
+The chip's wait label is x [0, 14) relative to the seat, y 2..14 within the chip. While framed, the same badge
+moves −8.5 in x (`CHIP_BADGE_SHIFT`); without a known wait, or under the lens, it is centred again. The chip's
+click rectangle touches but never overlaps the image's click rectangle; the seat rectangle does not change shape
+when blocked. The tag row stays pickable wherever a badge is visible: a non-blocked badge only selects, while a
+blocked chip requests answer mode. A shell or vacancy has neither and disables this target. If the state changes
+under a still pointer, the tooltip switches between the pane's name/state and the question. The selection line is
+separate from the focus underline and from the pod frame.
 
 **Plates on a map with few seats** (S3 SEATTAGS, the user's Q-U2): a map whose occupied seats (every pane on it, agents
 and shells: both carry a plate; `MapModel.pane_count()`) number at most `FloorLayoutPolicy.FEW_SEATS` (16) shows every
@@ -204,49 +202,26 @@ seat's plate at all times; above it, today's rule. `OfficeFloorView.few_seats()`
 floor tells every station on each refresh (`show_plates_always()`, which does something only on a change).
 **A plate beside a vacant seat** takes that seat's slot too (`OfficeFloorView.widen_plates()`, per pod, on each
 refresh): on the same side of the same pod, a vacant slot goes to the seat on its left when that one holds a pane,
-else to the one on its right, so no slot is given twice. The row then reaches `PLATE_REACH` (32, the column pitch)
-into it: [−15, 47) about its column with the right neighbour's slot, [−47, 15) with the left's, [−31, 31) with both
-(two slots, 62, at most), 10 tall. The tag still hugs its name and sits centred on its own column as far as the row lets it,
+else to the one on its right, so no slot is given twice. The row then reaches `PLATE_REACH` (96, the column pitch)
+into it: [−47, 143) about its column with the right neighbour's slot, [−143, 47) with the left's, [−95, 95) with both
+(190 wide at most), 10 tall. The tag still hugs its name and sits centred on its own column as far as the row lets it,
 so a short name does not move and a long one keeps its start over its own worker; the next seat's row starts 2 units
-past the slot. A vacant slot draws no row (no plate, lens line, badge or chip), and its click rectangle only touches
-the far plate row at −90. The rows stay at the same y; a widened plate never leaves its pod's columns.
+past the slot. A vacant slot draws no annotation and has no enabled click target. The rows stay at the same y;
+a widened plate never leaves its pod's columns.
 
-**Why the plate is 10 tall and has its own slot** (S3 SEATTAGS round 2): shown at rest on a small map, a near plate in
-the lens row's slot [40, 52) met the tab label's box (its last ink row on the plate's first) and a far one ran 2 units
-under a selected pod's frame top bar. Below a pod there are 14 units from the label's box (40) to a last-row pod's lower
-partition (54): a 12-tall plate cannot keep 2 from both, a 10-tall one can. The lens row and its slot do not move.
+The far plate under the lens ends at −74, four units before the near image begins at −70. At the 320-unit pod-row
+pitch, the next row's render envelope begins at 120, after this row's tab label ends at 68. These are envelopes
+from the layout constants, not measurements of opaque artwork.
 
-At the 192-unit row pitch the next row's far plate starts at 192 − 114 = 78, past this row's near plate (62): 16 units
-to spare. The geometry suite pins every row, both pulse extremes, known and unknown waits and held `L` across two rows
-(`test_rows_at_the_pod_pitch_never_meet`, also with seats left vacant on either side and every plate widened as the
-floor widens it, every plate clear of its own pod's frame; `test_a_long_name_takes_a_vacant_neighbours_slot` pins the widened
-rows; `test_a_plate_at_rest_stands_clear_of_its_label_and_partition` measures a planned zone's tab label and the partition's
-opaque texels). One pair may meet: the seat marks of the two seats facing each other across
-a desk share [−32, −24), because the near worker's raised hand (−28) is above the far mark's foot (−24); only one seat
-is ever selected, so the two are never drawn together. The near mark's foot touches the near tag row (16): on a
-selected, blocked near seat the chip's badge, lifted 1 or 2 by its pulse, is drawn over the mark's bottom-left corner
-for that beat (7 and 18 texels measured; a seat's own mark may meet its own rows).
+The planner rounds `reserved_rect` outward to a grid reservation and derives the pod origin from that;
+`office.gd` never copies width, column pitch or seat offsets. Seat nodes come from `table.seat(column, side)`.
+`setup()` rejects non-finite numbers, widths below 192 or not divisible by 96, and columns that differ from
+`measure()` for that capacity. The plate, lens and chip Labels are sized again after applying their face.
 
-The near rows follow the near seat, so the pod's stationary drawing ends at y 32, the top of the near approach row
-(the cell row [32, 64), walked at y 48). The plan's geometry did not follow: `reserved_rect`, the approach rows and
-the 192-unit pitch are as they were, and the 14 units the near tag row left, [32, 46), are plain floor: the tab label
-stands at their top and the near lens and plate rows show over them.
-
-`reserved_rect` includes walkable space and must not be used whole as a navigation obstacle. The planner rounds it
-outward to a grid reservation and derives the table origin from that; `office.gd` never copies table width, column
-pitch or seat offsets. Seat nodes still come from `table.seat(column, side)` / `standing()`. `setup()` rejects
-non-finite numbers, illegal widths and illegal columns at creation and on update; a width must be a multiple of 32 and
-at least 64. The plate, lens and chip Labels are sized again once the display face is on: a Label is 23 units tall
-before its font applies.
-
-Below the top outer wall is a **32-unit entry band** of one cell row (`entry_cells` 1): the walking lane (y = 80,
-`OfficeShell.WALKING_LANE` 16 into the band), the lift door's threshold on it, and the first zones' aisle row, where
-their signs hang. (Three rows with a fixture row for the pantry's spots before D2, 2026-10-27; two, a drawing-clearance
-row over the walking lane, and a top aisle row of its own under them, before S3 BAND, 2026-10-28: the top wall now
-draws behind a person standing in front of it, see "Collision and walking", so a map opens with the wall's face and
-the first pod row whole at 960×480.) The main corridor on the right is 64 wide, and each side outer wall takes 32. A
-map of one zone of one pod row is therefore 2 + 1 + 6 = 9 cells deep (a pod row is 6); an empty map is 9 too, the
-least a map is.
+Below the top outer wall is a **32-unit entry band** of one cell row (`entry_cells` 1), also the first zones'
+aisle row, where their signs hang. The main corridor on the right is 64 wide, and each side outer wall takes 32.
+A map of one zone of one pod row is therefore 2 + 1 + 10 = 13 cells deep; an empty map stays at the policy minimum
+of 9. The corridor and passage reservations remain spatial structure, not promises of walking routes.
 
 `FloorPlan.floor_cells` is the one half-open integer rectangle. The base floor covers every cell of it, including
 under walls, in lane gaps and in gaps left by deletions; walkways draw over that full floor. Each zone's carpet
@@ -266,10 +241,9 @@ joints (`wall.cap_t_left / face_t_left`, `wall.cap_end_right / face_end_right`) 
 floor's own), from the screen's left edge to its right one and as deep as the floor, so the HUD's side panels float
 over floor rather than over the backdrop (`OfficeFloorView.apron_cells()` from the camera's room and the screen;
 `set_apron()` only refills its cells). It is drawn only: no wall, walkway or furniture, never in the plan's cells, the
-walk graph, a seat's click or the camera's reach. Below and beyond the floor's depth the backdrop stays.
+seats' clicks or the camera's reach. Below and beyond the floor's depth the backdrop stays.
 
-Cap plus face make a 64-unit drawing band. A person in front of the top wall may overlap it (the wall is Ground,
-drawn behind them); the side walls' drawing is the band the people's clearance check uses. Bricks are placed with
+Cap plus face make a 64-unit drawing band on Ground, behind the sorted workstations and furniture. Bricks are placed with
 `set_cell()` by semantic ID; no Terrain autotiling, and no `TileMapPattern` deciding where walls and openings go.
 Walkway tiles are laid on the corridors only (the entry band and the main corridor); lane aisles and aisle rows are
 plain wood.
@@ -279,7 +253,7 @@ main corridor's left lane (`OfficeShell.door()`, its x a cell centre), so it mov
 keep `WINDOW_CLEARANCE` (64) from it. A picture hangs centred in every second gap between two neighbouring windows
 (`OfficeShell.frames()`: the second, the fourth, ...), foot at `FRAME_FOOT` (48), where it, grown by `FRAME_GAP` (8),
 clears every window, the door, the pantry counter and the wall's end cells: one at 23 cells, five at 53. Pictures are
-drawn in the shell, have no footprint and are not on the walk graph; the shell's key includes them, so a widening that
+drawn in the shell and have no footprint; the shell's key includes them, so a widening that
 moves the door and the windows redraws the shell. The pantry's `COFFEE` sign hangs the same way, centred over the
 counter's drawing with its foot at `SIGN_FOOT` (32) (`OfficeShell.pantry_sign()`): on the cream face, its hangers from
 the face's top (`FACE_TOP`, 12), 5 above the coffee machine on the counter (opaque to opaque; at least 4 is pinned by
@@ -292,21 +266,22 @@ top-run plant comes near it.
 each cell centre between them along the bottom edge; and `partition_post` (6 × 12, foot (3, 12)) at each top corner,
 its foot `POST_FOOT` (6) below the zone's top, where it covers the side run's top end (the art lane's mock). They are
 Sorted sprites placed by id (`OfficeDraw.prop()`), in a y-sorted holder per zone (so each sorts by its own foot), made
-again only when the zone's rectangle changes; they have no collider and no item block: the walk graph's partitions are
-the obstacle (see "Collision and walking"). Inside them lies the zone's **carpet** (`OfficeShell.carpet_rect()`: the
+again only when the zone's rectangle changes; they have no collider and no item block. Inside them lies the zone's
+**carpet** (`OfficeShell.carpet_rect()`: the
 zone's `bounds()` inset by `PARTITION_THICKNESS` on the left, right and bottom, the top at the zone's top, so it runs
 under the posts and stops at the aisle row): one `NinePatchRect` per zone in `Ground/Carpets` (after `Shell`, before
 the pods' backgrounds), dressed like the panel (`OfficeDraw.dress_nine_patch()`: the art's own pixels at its margins,
 only the flat middle stretched), in its worktree group's family (`OfficeZoneSign.carpet_of()`, the sign's
-`accent_of()` index), made again with the partitions when the zone's rectangle changes, its texture set again only
-when the family changes. No collider, no footprint: the walk graph never sees it. The lens dims it with the
-furnishing; the pod's wash lies over it. A narrowest zone (4 cells) carries a 116-unit carpet, a two-lane zone 276. The bottom run draws at [y1 − 10, y1), 14 units under the last pod row's tab
-labels, which stand where the pod's drawing ends and end at y1 − 24: a tab label is `OfficeDraw.TAB_LABEL_HEIGHT` (8)
+`accent_of()` index), resized in place when the zone's rectangle changes, its texture set again only
+when the family changes. No collider or footprint. The lens dims it with the
+furnishing; the pod's wash lies over it. A one-lane empty zone (4 cells) carries a 116-unit carpet; the narrowest
+zone holding a pod spans two lanes and carries 276. The bottom run draws at [y1 − 10, y1), 18 units under the last pod row's tab
+labels, which end at y1 − 28: a tab label is `OfficeDraw.TAB_LABEL_HEIGHT` (8)
 deep (`tab_face` gives up the display
 face's lowest descent row; the labels are upper case).
 The zone's **sign** (`scenes/world/zone_sign.tscn`) hangs from the top-left post, at its foot, and draws over the aisle
 row at zone y − 14 .. + 2 (S3 BAND: 4 lower than before, its foot 2 over the zone's top, so the first zone's board keeps
-4 clear of the pantry counter's front in the walking lane over it; pinned by `tools/test_office_service.gd`): a `panel`, the workspace's number (a mezzanine's `3A`), its label and a 3-unit accent stripe
+4 clear of the pantry counter's front in the entry band over it; pinned by `tools/test_office_service.gd`): a `panel`, the workspace's number (a mezzanine's `3A`), its label and a 3-unit accent stripe
 (the worktree group's, `OfficeZoneSign.accent_of()`). The panel is as wide as what it says
 (`PAD` 4, the stripe, `GAP` 3, the number, `GAP`, the label, `PAD`), at most `MAX_WIDTH` (160) and never past the drawn
 left edge of the zone's top-right post (`OfficeShell.right_post()`), the label cut with a forced ellipsis to fit; its
@@ -315,22 +290,22 @@ text is written in the pen's display face (`OfficeDraw.display`: the pixel font 
 is drawn); text and width follow the zone's model on every reconcile; the plan only positions it.
 
 **There is no front wall**: `wall.front_*` and `wall.threshold` stay unused, because a wall at the near edge would
-cover the seats of the nearest row. The door is outer-wall furniture (it does not open, there is no opening); people
-enter and leave a map at the door's foot (see "Collision and walking").
+cover the nearest workstations. The door is outer-wall furniture: it does not open and no workstation enters or
+leaves through it.
 
 The shell, the partitions, the signs, the plants and the side tables are **furniture**: they do not change with agent
 state, focus, selection or connection. Structural changes (a tab opened or closed, a table grown, a zone moved) may
 move them; furniture has no herdr data behind it and does not stand for repos or agent counts. Standing furniture is
 optional: its drawing, grown by `WALL_RUN_GAP` (8), must not cover a pod, a zone's slot (its partitions, posts and
-sign; for the top-wall run every zone's rectangle and sign: its drawing reaches over the walking lane's top, the first
+sign; for the top-wall run every zone's rectangle and sign: its drawing reaches over the entry band's top, the first
 zones' aisle row, but never down to a sign), the door, a window, a picture or the pantry counter; its footprint must not
-intrude on a walkway or aisle (`OfficeFloorValidation.walkways()`: the entry band's last row, the walking lane, the main
-corridor and every aisle); and the map must still pass the entrance-to-station path check with
-it placed. If it does not fit, it is left out. Its candidates (`OfficeDecorPlanner`), keyed by grid step, never by tab,
+intrude on a walkway or aisle (`OfficeFloorValidation.walkways()`: the entry band's last row, the main
+corridor and every aisle). Validation checks furniture footprints and drawing envelopes against the measured
+workstations, not entrance-to-seat reachability. If it does not fit, it is left out. Its candidates (`OfficeDecorPlanner`), keyed by grid step, never by tab,
 zone or state:
 
 - **the top-wall run**: plants `top/%03d` at the top wall's foot (foot y `TOP_RUN_FOOT` 64, the wall's foot line: the
-  footprint in the wall's cells, the drawing over its face; a walker in the lane is drawn in front of it),
+  footprint in the wall's cells, the drawing over its face),
   `TOP_RUN_PITCH` (160) apart from `TOP_RUN_FROM` (72), the plant of its step (`plant_at(step)`); a step whose plant
   would meet the door, a window, a picture or the pantry counter stands empty (at 23 cells one stands, at 232). The
   grid meets a window gap only at some widths (it does at 23, 33, 43, 53 and 63 cells, never at 5L + 3 with L odd, nor
@@ -353,9 +328,8 @@ with two, even places `plant`, odd `plant_b`). `OfficeFloorLayout.plan()` places
 the one validation a candidate plan gets (see "Entry-band fixtures" for what it drops when that fails). Furniture never
 moves a table group. The wall-front and floor position constants (door, windows, pictures, partitions, furniture feet)
 all live in `OfficeShell`, so planning and drawing read the same numbers. Standing furniture stays a direct child of
-`Sorted`; each table's lens wash (the cells under the pod's drawing and its tab label), tab label and contact shadow may
-be grouped under Ground, but people must never be wrapped
-in a table group with y-sort off.
+`Sorted`; each pod's lens wash and tab label belong under Ground. Stations must remain separate Sorted children:
+the logical pod must not flatten the two rows into one sort position.
 
 ### Entry-band fixtures
 
@@ -363,17 +337,15 @@ One counter stands against the top wall in the entry band: the **pantry** at the
 typed `FixturePlacement`, planned by `OfficeFixturePlanner` in `scripts/layout/`, drawn by `decor.tscn` as an ordinary
 `OfficeDecor`). **There is no reception.** The pantry is not a furniture candidate: for the furniture rules the entry
 band is a walkway, and the counter stands in it on purpose. **It is a corner nook, furniture only** (D2, 2026-10-27):
-nobody walks to it or stands at it, it has no spots, and an idle agent sits at their seat with a mug.
+nobody goes to it, and it has no occupancy spots or agent-state meaning.
 
 Only maps with at least one desk have it. Every position is a pure function of the plan's geometry. The counter's left
 edge touches the left outer wall; it meets the floor at y = 78 (`COUNTER_FOOT` = 14 from the band's top), its
 footprint 64..78, from the wall's foot line: against the wall, its coffee machine over the face (5 under the `COFFEE`
 sign) and its front 4 above the first zone's sign board (both gaps opaque to opaque, pinned by
-`tools/test_office_service.gd`). Inflated by the feet (to 82) it blocks the walking lane's two nodes in front of it;
-the lane starts beside it, and nothing needs those two.
+`tools/test_office_service.gd`). Its footprint and drawing remain layout inputs; no actor's feet inflate them.
 
-- **The counter is an obstacle like any furniture**: its footprint, inflated by the feet, is the walk graph's one
-  `FIXTURE` obstacle, with no entries (see "Collision and walking"). A band too shallow to hold the walking lane, or
+- **The counter must fit its bay**: a band shallower than one corridor row, or
   one whose bay left of the main corridor is narrower than the counter (64), has none;
   no real map is so narrow. When the map widens, the lift door moves with the main corridor; the counter stays.
 - **Windows** (`OfficeShell.window_xs()`, a pure function; the floor view only draws what it returns): on a map with a
@@ -383,12 +355,12 @@ the lane starts beside it, and nothing needs those two.
   `WINDOW_CLEARANCE` from the door. The shell's signature includes the fixtures; a fixture change redraws the shell.
 - **Left out when validation fails**, never moving a table group: `OfficeFloorLayout.plan()` validates once with the
   furniture and the pantry. If that fails, the second try drops the furniture (the pantry kept); if that fails too
-  (or there was no furniture), the third and last drops the pantry. Default widths pass on the first try (one flood
-  fill). The validator holds the counter to its place (`_fixture_problems()`: in the band's bay, its drawing on the
+  (or there was no furniture), the third and last drops the pantry. The validator holds the counter to its place
+  (`_fixture_problems()`: in the band's bay, its drawing on the
   floor), so one moved out of its corner is refused as standing outside the bay, as decor in a walkway is.
 
-Desk trinkets and the white cat are not a pod's: nothing stands on a desk but a seat's own equipment and its paper.
-They stand on side tables (see "Standing furniture" above; [ITEMS](ITEMS.md) for the top plane).
+Desk trinkets and the white cat stand on side tables, never added to complete workstation images
+(see the furniture placements above; [ITEMS](ITEMS.md) for the top plane).
 
 ### Incremental updates and caching
 
@@ -404,7 +376,7 @@ last attempt's input signature with its failure diagnostics and failing zones; `
 (`pan_of()`). None of this is saved to
 disk. Renames, state, focus and disconnects do not invalidate the geometry cache. The same failing input reuses the old
 picture and diagnostics without running the planner and never adopts an invalid display model; only a change of
-structure, theme, clearance policy or budget tries again. Window size does not change fixed rows; only when a new
+structure, theme, layout policy or budget tries again. Window size does not change fixed rows; only when a new
 policy is incompatible with the old plan and has not yet laid out successfully does a width change retry a cold plan
 under that policy. A machine going away clears its valid plan and attempt record (`prune()` by machine key); a
 workspace closing is a zone leaving its machine's map, planned like any change. Rebuilding the same plan keeps the
@@ -422,42 +394,39 @@ together. The price, said plainly: while one workspace's input is invalid, none 
 The allocation budget has three parts. Input pane / tab counts bound parsing work. Floor cell count, width and height
 bound the TileMap, the shell, the partitions and the standing furniture (the top-wall run at most one plant per 160
 units, the lane gaps at most one piece every two rows of a lane). `FloorLayoutPolicy.max_desk_nodes` (default 32768) separately bounds **the
-sum of the node upper bounds of all live table groups on a map**, every zone's together. `OfficeDeskView.node_budget(capacity)` charges
-`24 + 74 × capacity` per pod, where capacity is the retained columns per side, not the current pane count: 24 fixed
-nodes (20 of the pod: its body, 13 holders, the far laptops' marks' among them, the footprint, the overlay, the frame
-and its 4 bars; 4 of the background: itself, the lens's wash, the contact holder and the tab label; the marks' holder
-took the node the row wall sign left spare) and 74 per column (21 of the
-pod's: a desk, an apron and a screen module, a bracket, 2 laptops, the far one's mark, 2 three-node grommets, 2 lamps,
-2 papers, 2 seat and 2 standing markers; 1 contact shadow; two 16-node stations, each chair with its mark, and two
-10-node people), measured on the dressed prefabs at 2, 4, 18 and 250 columns (172, 320, 1356 and 18524 nodes with
-everybody seated). Geometry tests count the real dressed prefabs, so a scene change cannot silently break this
-contract. Empty tabs, historical empty columns and shells are charged in full, so later state changes never need to
-buy person budget; only closing a tab frees a table's budget, and nothing shrinks tables or compacts rows. This is an
+sum of the nodes of all live table groups on a map**, every zone's together. `OfficeDeskView.node_budget(capacity)` charges
+`11 + 34 × capacity` per pod, where capacity is retained columns, not the current pane count: 8 fixed table nodes
+and 3 background nodes, plus two 16-node stations and two seat markers per column. Empty tabs, historical empty
+columns and shells are charged in full, so later state changes never need to
+buy actor budget; only closing a tab frees a table's budget, and nothing shrinks tables or compacts rows. This is an
 allocation ceiling, not a guarantee of memory bytes, GPU or frame time; replacement nodes awaiting `queue_free` are not
 part of the settled live count. The planner rejects an over-budget table before creating its per-column measurement
 coordinates. An old plan is budget-checked too, and its table widths and column coordinates must match the canonical
-measure for its capacity, so a small capacity cannot hide many surface modules. A budget change never triggers a
+measure for its capacity, so a small capacity cannot hide extra workstation slots. A budget change never triggers a
 geometry re-layout; over budget still fails and keeps the old picture.
 
 `OfficeFloorView` reuses `OfficeDeskView` by tab key. Growth and moves go through `table.resize()` / `relocate()` and
 `station.rebind()` in place; panes still in the same tab keep their station, actor and native `AnimationPlayer`, and
-keep animation progress when the pose did not change. `rebind()` positions absolutely from the click areas' original
-scene offsets and never accumulates `+=`. A seat swap finishes every binding before restoring equipment state, so a
-later empty seat cannot clear an earlier station's laptop. Contact shadows are owned by the table and drawn on Ground;
-repeated `contact_shadows()`, a background group change or a move never duplicates old shadows.
+keep animation progress when the state did not change. A pane moving between tabs on the same map transfers its
+whole station before either tab reconciles (`take_station()` / `adopt_station()`), retaining its actor and signals.
+`rebind()` positions absolutely at the new seat and never accumulates `+=`. Empty slots retain their actors too:
+vacating changes the image and annotations, not the scene tree.
 
 When the map's extent, walkways, pantry or furniture change, the shell subgroup is rebuilt; when a zone's rectangle
 changes, its partitions are made again and its sign moves; when a table group's geometry changes, its wash and tab
 label are updated. There is no per-brick diff. Changing machine or theme still rebuilds the current world; what is
 kept is the plan and the view, not the people's nodes or animation clocks across maps.
 
-## Collision and walking
+## Picking and camera framing
 
-- Collision layers: `FURNITURE` (tables and other `StaticBody2D`), `ACTORS` (people, mask = `FURNITURE`) and
-  `PICKABLE` (a station's `Target`: mask 0, not monitoring, not monitorable).
+- Production workstations have no body collision. Standing decor retains its `FURNITURE` body and footprint;
+  a station's `Target` uses `PICKABLE`, mask 0, not monitoring, not monitorable.
+- The 80×80 image target and 30×18 tag-row target are separate. The tag row selects a non-blocked agent
+  through its badge; a visible blocked chip instead opens answer mode. A shell or vacancy has no active tag
+  target. A state change under a still pointer switches the name/question tooltip without leaving an old one.
 - **The engine picks stations.** `Target` has `input_pickable` on; the viewport converts the click to world
   coordinates and delivers it. `office.gd` keeps no hit-rectangle table and does no screen/pan/origin arithmetic.
-  `PICKABLE` is its own layer so click areas never block a walking person. Event order (Godot 4.7.2): Control GUI
+  Event order (Godot 4.7.2): Control GUI
   dispatch → `_unhandled_input` → physics picking on the next physics frame; once any step marks the event handled,
   the later ones never see it. So a station under a HUD panel cannot be clicked, and the press position is already
   recorded in `OfficeCamera` when picking runs.
@@ -470,11 +439,14 @@ kept is the plan and the view, not the people's nodes or animation clocks across
   station's rectangles are global, and the floor view converts them in one place). Four answers, each an empty
   `Rect2()` for a pane with no seat on the map or a zone the plan does not place (and two for the framing a map opens
   on, below):
-  - `signal_extent(key)`: where the desk answers a click (`OfficeStation.target_rect()`: the seat's rectangle, where
-    every worker sits) merged with its chip while it shows (`chip_rect()`; a chip that draws
-    nothing, under the lens or with no wait to say, still shows). The pointer's dashed frame (`point()`, which
-    `OfficePointer` grows by `GROW` and rounds out to whole units) and the camera's reveal both take it.
-  - `arrow_target(key)`: the chip alone while it shows, else the click rectangle. What an edge arrow aims at
+  - `signal_extent(key)`: `OfficeStation.signal_rect()`, the native image plus reserved annotation rows,
+    `Rect2(-47, -70, 94, 124)` relative to the seat's foot. Its bottom is the lens plate's bottom (54), even while
+    that row is hidden. The pointer's dashed frame (`point()`, which `OfficePointer` grows by `GROW` and rounds out
+    to whole units) and the camera's reveal both take it. Fitting only the native canvas left a selected name
+    below the HUD at the minimum window; the stable reservation keeps the signal together without a pan when
+    state, hover or lens changes. It reserves the ordinary 94-unit plate width, not its optional reach into a vacant slot.
+  - `arrow_target(key)`: the actual 30×16 chip alone while it shows (`chip_rect()`), else the 80×80 native canvas
+    (`target_rect()`). What an edge arrow aims at
     (`OfficeViewMarks`). **Not the extent, and meant so**: `EdgeArrowModel.of()` keeps an arrow while the target does
     not meet the view, so a blocked desk whose seat is in view and whose chip is not still has its arrow. Never merge
     the two answers.
@@ -495,16 +467,19 @@ kept is the plan and the view, not the people's nodes or animation clocks across
 - **The camera pans by two rules, each a pure static of `OfficeCamera`, and they stay two; a map's first arrival adds a
   third on top of them.** A desk is *revealed*
   (`reveal()`: `framing()`, then `revealed()`): the least pan that shows its extent with `REVEAL_HEADROOM` (32) above
-  it, and its pod too only when the two together fit the view with that headroom (`fits()`), else the desk alone. A zone is *opened* (`open_on()`: `opened()`): its opening's top
+  it, and its pod too only when the two together fit the view with that headroom (`fits()`), else the desk alone.
+  When an expanded compact panel leaves less room, headroom gives way first; if the 124-unit signal itself is
+  too tall, its lower chip/name rows win over the image's top. Thus the question remains reachable in the
+  99-unit world above an expanded minimum-window panel. An oversized width still keeps its left edge.
+  A zone is *opened* (`open_on()`: `opened()`): its opening's top
   at the top of the world with no headroom, sideways only as far as its width needs, its left edge when it is wider
   than the view. **A map opens with its back wall in view** (S3 CAMERA, 2026-10-28; `OfficeNavigator._open()`, once
   per map per run): it is revealed on the selection's whole pod, or opened on its first zone, as before, and then
   placed (`open_with_wall()`: `with_wall()`) at the top wall's face, its top at the view's top, when the face and what
   the opening is for (the selected desk's `signal_extent()`, or the first zone's `sign_extent()`) fit the view
-  together, top to bottom; whatever lies below gives way. Since S3 BAND (the band one row) the face and the whole first
-  pod row fit at 960×480, the near seats' chips and the tab labels included (the near plates at rest are cut); at
-  480×320 (zoom4, `-min`) the face and a far desk's signal fit, so the opening shows the wall and the selected desk's
-  signal whole and the pod's near chairs give way. The face's top is taken even where the first rule's pan stood
+  together, top to bottom; whatever lies below gives way. This is decided from the current workstation envelopes
+  and the HUD's actual world rectangle, not the old rig's fit at a particular window size. The face's top is taken
+  even where the first rule's pan stood
   higher (S3 BAND: no strip above the wall, the machine plate's foot, under the bar; on a tall window the plate is
   above the opening), and sideways is the first rule's. Where
   they do not fit (a near seat or a second-row desk selected in a short view), what the opening is for wins: the
@@ -514,240 +489,39 @@ kept is the plan and the view, not the people's nodes or animation clocks across
   `_process()` clamps the pan to the map and rounds the camera's position on the next frame.
   `tools/test_desk_signal.gd` pins the answers and the three rules without an office;
   `tools/test_desk_signal_wiring.gd` pins the live office's pans, openings, pointer frames and arrows.
-- People are `CharacterBody2D`: standing, the feet collider is on and `move_and_slide()` is stopped by furniture;
-  seated, it is off.
-- **The walk graph (`OfficeWalkGraph`, `scripts/layout/`) is the one graph the layout validator checks and the people
-  walk.** Nodes are cell centres (offset `(16, 16)`, 32 apart); edges join 4-neighbours. Every obstacle is inflated by
-  the real person: walls, table footprints and standing furniture by the feet rectangle and offset of
-  `PixelPerson.footprint()`; the side walls also by the whole canvas of `PixelPerson.drawing_rect(art.people)` (32 × 48,
-  feet at `(16, 46)`), because a wall always draws behind a person, so a canvas reaching into a side wall's drawing
-  would stand in it. **The top wall draws behind a person standing in front of it** (S3 BAND, 2026-10-28): that is
-  where its face is seen, so it is inflated by the feet only, and a walker in the lane under it (feet at y 80) reaches
-  over its face up to y 34, drawn in front of the door, the windows and the pictures. A node is blocked when its centre lies inside an obstacle; an edge is blocked when the segment
-  between two centres enters an obstacle. Touching an edge does not count (`Rect2.intersects()` excludes the edges).
-  Checking edges and not only nodes is what stops a thin obstacle between two clear centres from being walked through
-  (the native `AStarGrid2D` connects those; a test keeps this regression). **Every edge has the same length, so a
-  breadth-first search finds the shortest routes.** A route is read off the search greedily: straight on while that is
-  still a shortest way, otherwise turning in the order left, right, up, down (horizontal first, like the corridors),
-  so nobody zigzags down a corridor.
-- **Graph cache.** Maps reach 131,072 cells, and a walk must not flood-fill one. A graph is built once per plan and
-  kept (`OfficeWalkGraph.of()`); the validator builds afresh every time and puts the result in the cache (a candidate
-  plan may still change between validations), and the people fetch by plan identity the very graph the validator
-  built. Searches reuse scratch arrays allocated once per graph plus a visit stamp; nothing floor-sized is allocated
-  per route.
-- **Obstacle entries.** A route may enter an obstacle only along the obstacle's own **entries** (`Obstacle.entries`,
-  pairs of end points): a table's are the far seat legs that run into its footprint; a side wall's drawing would have
-  the threshold leg, were the leg to cross one (it does not on a planned map); the pantry counter and a partition have
-  none. When a segment is checked (`clear()`), the part of it inside an obstacle must lie
-  wholly on one of that obstacle's entries. Entries are the legs of this plan, at this table's current place (a
-  straightened route that merges with a leg counts the same way: only the part inside the obstacle matters). Nothing
-  is exempt by tab name. The validator and the people use the same check, so every segment of every live route avoids
-  every obstacle except through these entries (a test checks this every frame).
-- **Lift door and threshold.** The door's foot `(door x, 84)` stands in the walking lane's cell row, 4 below its centre.
-  A fixed threshold leg runs from the door's foot to the first walkable centre in its column from that row down, the
-  lane's node `(door x, 80)`: 4 units up, entering no obstacle (the door is drawn on Ground, so a person on the leg
-  draws over it). Routes in start with the door's foot and the threshold leg; routes out end with them. The validator
-  checks reachability from the threshold leg's end (not the whole entry band, which would make "walking connectivity
-  equals the validator's" true by construction) and checks the threshold leg itself. Reachability is the door's
-  distance field: one whole-floor BFS from the threshold per graph (the validator builds it first). A route in is read
-  back from the goal along it; a ghost's route out is read from its start along it; neither searches again.
-- **The walking lane and the counter.** The entry band's one row is the walking lane (y = 80), right under the top
-  wall: every node on it from beside the counter to the main corridor is walked, the threshold among them, and the
-  first zones are entered from it (it is their aisle row). The pantry counter's footprint (64..78), inflated by the
-  feet, is the one `FIXTURE` obstacle (no entries) and ends at 82, over the lane's two leftmost nodes, which nothing
-  needs. (Before D2, 2026-10-27, a fixture row at 112 was a barrier with the pantry spots' legs as its entries, and the
-  lane was at 144; before S3 BAND, 2026-10-28, the lane was the band's second row, at 112, under the wall's drawing
-  clearance, and the counter's footprint 92..106 ended short of it.)
-- **Partitions.** Each zone's partitions (`ZonePlacement.partitions()`: bands `PARTITION_THICKNESS` (6) thick inside
-  its left, right and bottom edges) are obstacles of their own kind, `PARTITION`, inflated by the **feet only** (they
-  draw no taller than a person's legs, so the wall's drawing rule does not apply). They block the edges across them and
-  no node: the pad column inside a zone's left edge, the passage inside its right edge (beside the main corridor too)
-  and the rows just above and below its bottom edge are walked, and the edges between them and outside are not. So a
-  zone is entered from its open top, its aisle row. They have no entries.
-- **The two legs.** A table gives each column and side one approach point (a cell centre); both legs start at the
-  approach point's cell centre. The near standing spot is dx 16, dy −40 from the approach point (the far one dx 16,
-  dy 26), and nobody walks diagonally. Far side: approach → seat is one straight segment into the table's footprint
-  (rule 5), which is this
-  table's entry; approach → standing spot is an L, first along the seat's column to the standing spot's depth, then
-  across, with the corner on the seat leg. Near side: the chair is in the approach point's column, and a leg must not
-  pass through the chair, so it first walks along the near walkway to the standing spot's column, up to the standing
-  spot, and the seat leg then steps sideways into the seat (`leg_to_seat()` / `leg_to_standing()`; the near standing
-  leg is the seat leg minus its last step). Nobody stops on a standing spot: coming in and leaving use the seat leg
-  (the near one passing the standing cell to go round the chair). The validator still checks both legs of
-  every column and side with the same check and reports each blocked leg separately.
-- **Speed.** `max(96, route length / 6 s)` units per second, at most `TOP_SPEED` = 480 (5 × the walk strip's own
-  speed, `WALK_SPEED` 96): every walk finishes within `LONGEST_WALK` (6 s); longer routes walk faster, never truncated
-  or teleported. A route that would take longer than 6 s even at 480 (2880 units) is not walked: the person is placed
-  at the goal. The walk strip (4 × 0.14 s) plays at a rate scaled with speed (`PixelPerson.pace()`, speed ÷ 96); a
-  reroute never walks slower than before. Once a person stops walking (seated, standing still, placed, or set down on
-  disconnect), the step rate returns to 1.
-- **Presentation apart from observation (`OfficePresentation`, `scripts/world/`).** When an observation arrives (a
-  `ZoneModel` laid on a `FloorPlan`), plates, status badges, wait times, selection frames and click areas jump to where
-  it says at once (they are signals); the body then walks there. It is one map-level model keyed by pane key plus
-  terminal identity (`PaneModel.identity_key()`). Before reconcile it compares the last presented observation with this
-  one: a body that is leaving is first taken out of its seat and hung under `Sorted` as a ghost (renamed, no overlay,
-  no click area), so `vacate()`, `rebind()`, reuse and release cannot touch it. A body that stays with its seat
-  (sitting down, coming in, changing seats) remains that station's `Actor` and walks in
-  the station's own coordinates (the station has y-sort on, so the body sorts by its own feet); the station leaves it
-  alone while `walking` and places it on `land()`. A change of agent (both providers known and different) = leave +
-  come in; the same provider with a new terminal or session walks nothing. Each observation that changes a body's goal
-  bumps a generation; each route carries the generation and identity it started with and is dropped on mismatch, never
-  landing in a stale pose. A pane that leaves while its body is still coming in turns that same body into a ghost; the
-  same pane with the same identity returning while its ghost still walks takes the ghost back, so there is never a
-  second body. Bodies are placed along the path every frame, not with `move_and_slide()` (the validator allows routes
-  that graze furniture, where colliders would catch the feet; walls have no colliders). A frame's leftover distance
-  carries past corners, so even at 8 frames per second while minimised, a dozen units per frame, nobody leaves the
-  path.
-- **Walking while the plan changes.** If the final leg did not move (the goal's leg for someone coming in, the
-  threshold leg for a ghost) and the rest of the route is still clear in the new plan, the person carries on along the
-  old route from where they are. Everyone else reroutes from where they are: someone standing inside an obstacle (not
-  on its entry) is placed at the goal; otherwise **one** BFS from the goal's cell looks at once for the ends of the two
-  ways back onto the graph (back along the old route and forward along it; someone seated or standing has only their
-  own leg), stops when no cheaper end can still be reached, and reads the route off greedily. `route_between()` picks
-  the end with the smaller total cost.
-- **Routing budget.** Routing per observation is bounded graph work (`OfficePresentation.ROUTING_BUDGET` = 12000,
-  counted by `OfficeWalkGraph.expanded`: nodes the BFS expands and nodes a route read-off passes both count). Cheapest
-  first: people coming in (reading the door's field), ghosts (the same), then reroutes. Whoever the budget does not
-  cover is placed at the goal, as on a cold start. The budget assumes about 0.5 µs per node on a development machine:
-  the worst observation on the stress map (one pod widening the whole map, 47 people walking) routes in under
-  10 ms; the `ROUTING_BUDGET` line of `make test` prints the whole observation's handling time (including starting and
-  placing).
-- **Cold start.** A new map view (first draw, a **machine** switch, a theme change: the only paths that rebuild the
-  world; paging between zones of one map is a pan, never cold), a
-  machine that was disconnected at the last presentation (the first snapshot after reconnecting already contains every
-  change made meanwhile), or a layout problem at the last refresh (the map was not updated then): everyone is placed
-  at their goal, all ghosts are dropped, history is not replayed. Layout changes reconciled in place walk as usual.
-- **Disconnect (AGENTS.md invariant 4).** The **whole map** dims and freezes, every zone of it. All ghosts are dropped;
-  walking people freeze where they are: position, walk
-  animation, remaining route and time all stop (time counts only unfrozen delta). Observation changes during the
-  disconnect are placed, not walked, and the first observation after recovery is cold. After recovery and until the
-  first observation is presented (indefinitely, if the recovery snapshot's layout fails), walking people stay frozen.
-  Walking people do not use `VisibleOnScreenEnabler2D`.
-- **Ghost cap.** At most `OfficePresentation.MAX_GHOSTS` (32) at a time; beyond that the oldest disappears first.
-  Ghosts are not counted in `OfficeDeskView.node_budget()`.
-- **Closing a tab's last pane** closes that tab: its pod is released at once and ghosts walk out from where the
-  pod was. **Closing a workspace's last pane** closes its zone, in place on the same map: its pods are released
-  and its people walk out as ghosts, bounded like any departure (`MAX_GHOSTS` 32, `ROUTING_BUDGET`, the 2880-unit
-  route cap, and none while the machine is frozen or the pass is cold); not every departure animates (whoever is left
-  over, or stands where the new plan puts furniture, is placed: gone at once). A new workspace is a new zone whose
-  people walk in from the lift door. An empty map has no stations, so nobody walks there.
 
-## Seating and the chair asset boundary
+## Stationary lifecycle and validation
 
-- Sitting and standing are different tracks in the same pixel-people strip (`desk_*` / `stand_*`): same strip, same
-  nodes. Measured over every frame: seated, the head reaches y = −31 above the feet (a blocked worker's raised hand
-  −36); standing, the head spans −37..−25; every figure is x −8..8 (16 wide, ±12 with a raised hand). A hood is
-  headwear that hides the hair layer while worn.
-- `chair_front` / `chair_back` are one office chair from the front and from behind: armrests, a gas-lift column
-  and casters, 17 wide over rows 24–45, at a person's scale (the far one mostly hides behind its seated worker).
-  `CHAIR_OFFSET.near = 6` only keeps the front/back order; there is no large offset to dodge the person. The near
-  chair stands pushed in under the desk: its back's top (pod y −7.5) is right under the working top's near edge, and
-  the sitter in it leans over the near working plane, in front of the pod and drawn over it. Chairs
-  belong to the table family and are density 2 like the floor (painted at 2x); geometry is in units and does not
-  change with density.
-- The preview keeps a capped bystander in a terra top in front of the API zone's pod as a regression check.
+The former walking presentation, door routes, ghosts, standing spots, route budgets and actor-clearance policy are
+retired from the production office. There is no body catching up with a separately updated seat: the whole
+workstation and its annotations move together when the plan changes. A pane appearing is furnished directly;
+an agent leaving for a shell switches to the empty image; a closed pane vacates its slot or releases its pod/zone
+when that structure disappears. Provider or terminal identity changes invent no departure animation.
 
-Pose and chair-back changes happen only in the art; the depth and foot-point rules do not change.
+**Disconnected is not idle.** `OfficeFloorView.freeze()` dims the complete map and pauses each station's actor.
+Reconnecting the socket alone does not thaw it: `update_desks()` releases the hold only after a current observation
+passes the layout gate. If that layout is invalid, the previous picture stays frozen. Resuming an unchanged state
+continues its clock; a finished one-shot remains finished.
 
-## Gates
+`OfficeFloorValidation` checks bounds and budgets, zones in whole lanes, pod rows and reservations, unique pane/seat
+bindings, canonical `OfficeTable.measure()` widths, columns, feet and envelopes, and furniture footprint/drawing
+clearances. It does not build a graph, inflate obstacles by a person, or promise reachability from the door. The
+32-unit grid still reserves corridors and aisles and keeps furniture out, independent of animation.
 
-Besides the client / machine / incremental-update tests, `tools/run_tests.sh` checks:
+## Acceptance boundaries
 
-- Every node on a sort path has y-sort on, and no `z_index` is non-zero except `OVERLAY_Z`; every vertex of a lamp's
-  light lies inside the surface rectangle.
-- Laptops on both sides share x with the seated person and sit at their own edge of the desk, not by the low screen, including
-  columns added by growth. A shell's `$_` view survives growth and rebinding; starting and done agents draw no shell
-  mark.
-- The pod's near edge hangs one bracket under each desk and nothing else (no legs); near lamp light never passes the
-  working surface. The real opaque pixels of every piece a side table carries are read and stay on its top; a
-  fixed-identity rebuild, growth, state updates and theme rebuilds leave existing placements unchanged.
-- Shell bricks and the zones' carpets are all under `Ground`, standing furniture, partition pieces and zone signs all under `Sorted` (the
-  partitions in a y-sorted holder per zone, each piece sorting by its own foot); each piece's position is unchanged
-  across state changes and intersects no seat's click area, table footprint, walkway or aisle. No row wall and no row
-  wall joint is laid; the top wall's courses are drawn once per cell.
-- In every occupied column: far chair y < far person y < table y < near person y < near chair y. A near sitter's
-  shoulders are above the desk's near working edge and the figure draws over part of its laptop, in every state; the
-  near chair's top is under that edge and above the apron's foot, and covers none of a shell's laptop. The pod stands on no
-  legs: nothing under the apron but the brackets, no leg module in the pack or the contract.
-- A person is always the pixel-people family's six layers + one `AnimationPlayer`, no chest badge; all layers show the
-  same `frame` at every moment; state changes, sitting / standing and re-dressing never replace nodes. Far people face
-  the viewer; near people show their backs.
-- Plate text and badges never cover any real pixel of any frame of the person; the far rows stack plate over lens
-  over badge over the head (or raised hand), the near ones badge, lens, plate below the chair; the seat mark encloses
-  the whole person. The chip covers neither the person (raised hand included) nor the plate text, and the badge is
-  drawn over it in its left half, clear of the wait; on pods of 2 to 12 desks, the chips and their click rectangles on
-  both sides of every column intersect no seat click area and no other chip. Two rows at the 192 pitch (and a pod
-  across a passage cell) never meet, at every pulse lift, with and without a wait, with and without the lens; the
-  near badge shares no texel with the near chair at the −2 lift. The paper stack is right of the laptop and clear of
-  it, clear of its own worker as a done agent sits and of the blocked workers on either side, with its opaque pixels
-  on its side's working plane, the last column included; no texel of a near paper is behind a sitter or a chair, and
-  a seat never shows the paper and the chip together. On each side of a near sitter at least 140 texels of the lamp's
-  wedge stay in sight (248 measured; 146 on the right of a raised hand). The far laptop covers no pixel of the far
-  worker. A seat's provider mark lies inside the far laptop's rear lid face, clear of the far worker, or on opaque
-  texels of the near chair's back, which the near sitter, sorted behind the chair, covers none of in any state; it
-  shows only for an agent (on the near chair also while the agent is away), holds no texture when it shows none,
-  swaps its texture in place when the provider changes, and follows its agent through a resize, a relocation and a
-  move to another seat or side. The compact duration is at most 14 wide in
-  the chip and 18 in the lens row, measured on the Label once the face is on. A pointer over a seat shows only its
-  plate.
-- A standing person walking into a table is stopped by its footprint collider; a seated person's feet collider is
-  off.
-- The entry band is one cell deep (the threshold on the walking lane at y 80, the door's foot 4 below it); the
-  pantry counter, the only fixture,
-  appears only on maps with desks, at a position that is a pure function of plan geometry (stable under growth and
-  widening), with no spots; a band too narrow for it has none; it is the walk graph's one `FIXTURE` obstacle, with no
-  entries, against the wall and off the lane's nodes but the two in front of it at every shipped width; the validator refuses one moved out of its corner; the
-  furniture is dropped before the pantry. The door's field reaches every approach across the band; `route_between()`
-  picks the cheaper end (compared against a reference BFS every time); an entry can only be used along its own length.
-- Zones take the top-most, left-most fit in whole lanes; a removed zone leaves a gap the next fitting zone reuses; the
-  map keeps its extents; a zone grows down or right in place while the cells are free and otherwise moves alone,
-  never into a held slot; a table needing more lanes widens the map first (the main corridor and the door move, the
-  pantry stays); a new mezzanine lands below its source once, and grouping moves nothing; one invalid zone keeps the
-  whole previous map and names that zone; a pane moving between zones during a failure is never seated twice; the
-  node budget is charged on the composed map. No walk edge crosses a partition, and every approach is reached.
-- No walk-graph node is inside an obstacle and no edge enters one (including a thin obstacle between two clear
-  centres); validator and people share one graph, starting from the threshold's end; on stress maps (asked 20 and 32 cells: 18 and 28
-  wide) and after growth every approach point is reachable; each blocked leg is reported on its own, and no near leg
-  passes the chair's column.
-- Coming in, going out (ghost), changing seat or table, turning back and taking a
-  ghost back all keep the same body; a new agent walks out and in, a new session walks nothing. Cold start, freezing on
-  disconnect (position and frame asserted every frame) with a cold recovery, staying frozen when the layout fails after
-  reconnect, rerouting, placing someone who stands inside a wall or table, not leaving the path at 8 fps, no walk on a
-  stress map needing a teleport or exceeding 480 units per second, the ghost cap, clicks on a ghost or an empty seat
-  selecting nothing, and people walking between two pods sorting by their feet. Before comparing with a rebuild, a
-  test first proves someone is walking and that the walking picture differs from the settled one, then calls
-  `settle()`.
-- Routes a plan change does not touch carry on unchanged; each reroute is one search per person; routing stays within
-  budget, and whoever is over it is placed where they belong with step rate 1. A fixed-seed lifecycle fuzz test
-  (observations, disconnects, theme changes, random walking) checks at every step: body count, no `walking` without a
-  route, still people where they belong, step rate 1, frozen people not moving, every live route entering obstacles
-  only through entries.
-- Every state sits and never walks (D2, 2026-10-27): done beside the paper stack, idle beside the mug, blocked with a
-  raised hand and chip; starting agents and shells have none of them. Going from one state to another walks nobody
-  and swaps the one desk item in place; an idle seat's leaver walks out from the seat. Cold starts place directly; a
-  disconnected floor keeps its mugs and paper (not changed by clicks, `N`, or refreshes caused by another machine's
-  snapshot). An idle worker's seat selects the pane; the counter does not. The counter sorts by its foot, and people
-  on the walking lane in front of it draw in front of it. `N` visits finished agents of every zone in the order they
-  finished. A click on the chip (real input) selects and enters answer mode; a click on the seat only selects (far
-  and near). Chip, paper stack and mug only change in place and match a rebuild node by node. Every standing spot (tables 160 to 416 wide, every column, both sides) is outside the table
-  footprint and all standing furniture, and the far standing spot is beyond the far edge.
-- Illegal widths (e.g. 240, or 32 under the minimum) are rejected, repeated setup adds no nodes; growth keeps seats
-  and equipment, and rebinding never accumulates seat or chip click-area offsets.
-- The planner covers empty maps and workspaces, empty tabs, missing and conflicting layout, stable seats, gap reuse,
-  oversized tables, budget rejection and fixed-seed incremental sequences, on zones in lanes.
-- Geometry tests read each real Sprite / Label envelope, check that everything stationary (badges at every lift, chips,
-  seat marks) stays inside the measured range (`render_rect`; the plate and lens rows are transient and pinned by the
-  cross-row case), and verify moved stations through real input: a seat click emits `picked`, a chip click `asked`.
-- Where a desk's signal is and where a zone opens (`OfficeFloorView`'s four answers) are the same rectangles for both
-  seat sides seated, with a chip, idle with a mug and as a shell, wherever the world stands and with the lens
-  held; the extent and the arrow's target differ exactly while a chip shows; the pod joins a desk's framing only when
-  the two fit with the headroom, to the unit; a zone opens at its sign's top with none. The live office's pans, pointer
-  frames and arrows are pinned to recorded numbers in three windows and across a narrower-window relayout, so they also follow
-  where `hud.tscn` puts the panels.
+- Complete-image frames, empty image and generic portrait keep the authored palette, pivot and density. No rig,
+  runtime cutting, recolouring or second set of furniture is constructed by the office.
+- Both logical rows use the same front-facing art and measured click/annotation geometry. Focus underline,
+  station selection, pod selection and HUD pointing remain distinct channels.
+- Same-state refreshes and selection/name/focus changes retain the actor and its animation clock; blocked entry,
+  hold and exit and the one-shot done nod follow the manifest. Disconnects preserve the last frame until a valid
+  live observation can be shown.
+- Layout keeps stable seats and map extents, bounded allocations and atomic failure, with corridors, furniture,
+  shell, carpets and signs independent of agent state. Picking remains real engine input, with no action on a
+  vacant slot and no terminal write from an animation or refresh.
 
 Screenshots remain part of visual acceptance and must actually be opened and looked at; use the capture target in the
-Makefile, never a headless capture. The preview draws its two mock workspaces as zones (partitions, a sign, a pod with
-its tab's name under it, a side table carrying a desk piece) and keeps one bystander standing behind a pod and one in
-front of one, proving that sorting depends only on position; it also has one done person seated on each side with a
-stack of paper on the pod (one on the last desk), and blocked people with a raised hand and a chip, one with no wait
-(badge only). `test_the_showroom_stands_its_cast_in_zones` holds that cast.
+Makefile, never a headless capture. Review both 2x at 960×640 and 4x at 1920×1280, including shell seams, complete
+workstation edges, empty seats, focus/selection, annotation rows and HUD portrait crops. The retained legacy
+authoring families' rig and component contracts are not production-office acceptance criteria.

@@ -4,8 +4,8 @@
 
 Herdstead is a [Godot](https://godotengine.org) 4.7 app that draws a [herdr](https://herdr.dev) session as a pixel
 open-plan office. Each herdr machine is one office map, each workspace a zone of it, each tab a pod of desks, each pane a seat, and each
-coding agent the person sitting in it. Blocked agents raise their hands, finished ones leave a stack of paper on the desk,
-idle ones sit with a mug of coffee. You can see who needs you at a glance, and answer them from the office.
+coding agent the person sitting in it. One generic whole-image workstation shows typing, quiet idle, a reclined
+cross-legged wait with a question bubble, and a completion nod. You can see who needs you, and answer them from the office.
 
 ![A blocked agent in the bottom panel: its question on screen, Answer one key away](docs/preview.png)
 
@@ -35,8 +35,9 @@ connects to herdr.
 
 ## What it can do
 
-- **The office**: one floor at a time, with a stable grid layout that never reshuffles your tables. People walk in from the
-  lift when an agent starts and walk out when it goes. Disconnected machines dim and freeze; offline is never shown as idle.
+- **The office**: one floor at a time, with a stable grid layout and two front-facing rows of dual-monitor workstations.
+  Agents appear and disappear in place; this phase has no walking or outfit customization. Disconnected machines dim
+  and freeze; offline is never shown as idle.
 - **Top bar portrait strip**: who needs you, as faces: the blocked in the order `N` walks them with how long each has
   waited, then the done, the working and the idle, folded when they do not fit; a card's click selects, its space's
   click pans there; with several machines, a chip per machine shows its map.
@@ -52,7 +53,7 @@ connects to herdr.
 - **OVERVIEW** (`O`): one row per pane with timelines. **Lens** (hold `L`): how long everyone has been in their state.
   **Strategic view** (`S`): a diagram of the whole map.
 - **Background alerts**: `(N)` in the window title, a Dock bounce, and an optional chime.
-- **Day and night**: one pack, Studio, lit by the local clock: by night the office is darker and cooler, the desk lamps burn harder and the windows show the city at night; `T` turns the light over for a while.
+- **Day and night**: one pack, Studio, lit by the local clock: by night the office is darker and cooler and the windows show the city at night; `T` turns the light over for a while.
 - **Several machines**: every SSH machine herdr has saved becomes its own map, reached over `ssh -L`.
 
 ![The showroom: every agent state in two mock zones](docs/showroom.png)
@@ -133,8 +134,8 @@ changing the code (invariants, what to keep in sync, how to test) are in [AGENTS
 | [docs/MANUAL.md](docs/MANUAL.md) | The full user manual: every feature, key, option, theme tooling, export and CI |
 | [docs/WRITE_BOUNDARY.md](docs/WRITE_BOUNDARY.md) | What Herdstead may send to herdr, when, and how each write is checked |
 | [docs/VISUAL_LANGUAGE.md](docs/VISUAL_LANGUAGE.md) | What every thing on screen stands for in herdr |
-| [docs/WORLD_MODEL.md](docs/WORLD_MODEL.md) | Depth, collision, pod geometry, stable maps and walking |
-| [docs/ASSET_SPEC.md](docs/ASSET_SPEC.md) | Art pack format: sizes, pivots, density, palettes, pixel people |
+| [docs/WORLD_MODEL.md](docs/WORLD_MODEL.md) | Depth, picking, workstation geometry and stable maps |
+| [docs/ASSET_SPEC.md](docs/ASSET_SPEC.md) | Art pack format, whole-image workstations and legacy authoring families |
 | [docs/ARTIST_BRIEF.md](docs/ARTIST_BRIEF.md) | A brief for pixel artists who do not write code |
 | [docs/MACHINES.md](docs/MACHINES.md) | herdr machines over SSH: forwarding, cleanup, validation |
 | [AGENTS.md](AGENTS.md) | Contributor rules, for people and AI agents |

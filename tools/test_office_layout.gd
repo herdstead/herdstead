@@ -1,18 +1,16 @@
 extends "res://tools/test_base.gd"
-## Pure plans: historical seats, local growth, bounded floor coverage and paths.
+## Pure plans: historical seats, local growth and bounded stationary workstations.
 
 ## The widths a floor is first planned at in the shipped windows, narrowest to
 ## widest, and the stress floor at two of them.
 ## Z1 (2026-10-27): 24 is the default window's plan width (772 units).
 const FURNISHED_WIDTHS: Array[int] = [11, 20, 24, 32, 60]
 
-var people: PixelPeople
 ## Made on first use by _pen().
 var pen: OfficeDraw
 
 
 func _initialize() -> void:
-	people = PixelPeople.from_manifest(PixelPeople.MANIFEST)
 	run_cases()
 
 
@@ -55,8 +53,6 @@ func _rows(plan: FloorPlan) -> Array[RowPlan]:
 
 func _plan(floor_model: ZoneModel, previous: FloorPlan = null, policy: FloorLayoutPolicy = null) -> FloorPlan:
 	var rules := policy if policy != null else FloorLayoutPolicy.new()
-	rules.actor_footprint = PixelPerson.footprint()
-	rules.actor_draw_rect = PixelPerson.drawing_rect(people)
 	var result := OfficeFloorLayout.plan(MapModel.of(floor_model), previous, rules)
 	_eq(result.problems, PackedStringArray(), "valid plan: " + "; ".join(result.problems))
 	_check(result.plan != null, "plan returned")
@@ -535,12 +531,13 @@ func test_deleted_groups_leave_reusable_holes_and_rows_never_shrink() -> void:
 
 func test_oversized_growth_moves_only_owner_and_keeps_row_exclusive() -> void:
 	var rules := FloorLayoutPolicy.new()
-	rules.width_cells = 18
+	rules.width_cells = 23
 	var a := _room("a", 2)
 	var floor_model := _floor([a, _room("b", 2)])
 	var first := _plan(floor_model, null, rules)
-	# Forty panes: twenty desks, 21 cells, wider than the 14-cell bay (a pod
-	# packs a column into one cell, so twenty panes no longer outgrow it).
+	_eq(first.desk("a").row, first.desk("b").row, "both minimum pods initially share their row")
+	# Forty panes: twenty columns reserve 61 cells, outgrowing the original
+	# 19-cell zone and requiring an exclusive row on a wider map.
 	a.panes = _room("a", 40).panes
 	var wider := _plan(floor_model, first, rules)
 	_eq(wider.desk("b").origin, first.desk("b").origin, "other desk is fixed")
@@ -598,10 +595,19 @@ func test_duplicate_identity_and_budget_fail_without_mutating_old_plan() -> void
 	_eq(first.geometry_signature(), signature, "failures leave old plan untouched")
 
 
-func test_geometric_validation_detects_blocked_approaches_and_overlap() -> void:
+func test_geometric_validation_detects_forged_envelopes_seats_and_overlap() -> void:
 	var value := _plan(_floor([_room("a", 2), _room("b", 2)]))
 	value.desks[0].measure.physical_rect = value.desks[0].measure.reserved_rect
-	_check(not OfficeFloorLayout.validate(value).is_empty(), "floodfill rejects trapped approaches")
+	_check(
+		OfficeFloorLayout.validate(value).has("tab envelopes disagree with measured capacity"),
+		"a measurement cannot replace the workstation envelope"
+	)
+	value.desks[0].measure = OfficeTable.measure(value.desks[0].capacity)
+	value.desks[0].measure.far_seats[0] += Vector2(1, 0)
+	_check(
+		OfficeFloorLayout.validate(value).has("tab seats disagree with measured capacity"),
+		"the feet must agree with the measured slots"
+	)
 	var overlap := _plan(_floor([_room("a", 2), _room("b", 2)]))
 	overlap.desks[1].reserved_cells = overlap.desks[0].reserved_cells
 	_check(not OfficeFloorLayout.validate(overlap).is_empty(), "overlapping reservations rejected")
@@ -639,39 +645,24 @@ func test_seeded_incremental_sequence_preserves_unrelated_groups() -> void:
 		_eq(_plan(floor_model, previous).geometry_signature(), value.geometry_signature(), "same inputs deterministic")
 
 
-func test_actual_actor_measurements_constrain_paths_and_wall_projection() -> void:
-	var floor_model := _floor([_room("a", 2)])
-	var rules := FloorLayoutPolicy.new()
-	rules.actor_footprint = PixelPerson.footprint()
-	rules.actor_draw_rect = PixelPerson.drawing_rect(people)
-	var normal := OfficeFloorLayout.plan(MapModel.of(floor_model), null, rules)
-	_eq(normal.problems, PackedStringArray(), "real production footprint and canvas fit")
-	_check(
-		rules.actor_footprint.position.y < 0 and rules.actor_footprint.end.y == 0, "foot offset is read from the prefab"
-	)
-	rules.actor_footprint = Rect2(-100, -100, 200, 200)
-	_check(
-		not OfficeFloorLayout.plan(MapModel.of(floor_model), null, rules).problems.is_empty(),
-		"large body cannot pass narrow approach"
-	)
-	rules.actor_footprint = PixelPerson.footprint()
-	# S3 BAND (2026-10-28): the top wall draws behind a person in front of it. A
-	# canvas reaching far beside the feet cannot keep off the side walls; one
-	# however tall plans, and walks the lane right under the top wall: there only
-	# the feet are kept off.
-	rules.actor_draw_rect = Rect2(-300, -46, 316, 48)
-	_check(
-		not OfficeFloorLayout.plan(MapModel.of(floor_model), null, rules).problems.is_empty(),
-		"wide actor cannot stand in the side walls' drawing"
-	)
-	rules.actor_draw_rect = Rect2(-16, -300, 32, 302)
-	var tall := OfficeFloorLayout.plan(MapModel.of(floor_model), null, rules)
-	_eq(tall.problems, PackedStringArray(), "tall actor plans: the top wall keeps off the feet only")
-	if tall.plan != null:
-		var graph := OfficeWalkGraph.build(tall.plan, rules.actor_footprint, rules.actor_draw_rect)
-		var lane := Vector2i(tall.plan.main_corridor_cells.position.x - 1, tall.plan.entry_cells.position.y)
-		_check(graph.walkable(lane), "and walks the lane right under the top wall")
-		_check(not graph.walkable(lane - Vector2i(0, 1)), "but never the wall's own cells")
+func test_complete_workstation_measurements_need_no_person_prefab() -> void:
+	_eq(OfficeTable.CANVAS, Rect2(-37.5, -70, 80, 80), "the approved whole image and pivot")
+	for capacity: int in [2, 4, 18, 166]:
+		var measured := OfficeTable.measure(capacity)
+		var width := float(96 * capacity)
+		_eq(measured.table_width, width, "96-unit column pitch")
+		_eq(measured.reserved_rect, Rect2(0, -224, width + 32, 320), "ten-cell reservation and right passage")
+		_eq(measured.render_rect, Rect2(0, -200, width, 256), "complete stationary drawing and labels")
+		_eq(measured.physical_rect, Rect2(0, -198, width, 208), "two complete image rows")
+		for column in capacity:
+			_eq(measured.columns[column], 48.0 + column * 96, "left-anchored feet")
+			for side: String in OfficeTable.SIDES:
+				var foot := Vector2(48 + column * 96, -128 if side == "far" else 0)
+				_eq(measured.seat_position(column, side), foot, "logical rows retain distinct front-facing feet")
+				var canvas := OfficeTable.CANVAS
+				canvas.position += foot
+				_check(measured.render_rect.encloses(canvas), "whole image in drawing bounds")
+				_check(measured.physical_rect.encloses(canvas), "whole image in physical bounds")
 	var missing_entry := _plan(_floor([]))
 	missing_entry.entry_cells = Rect2i()
 	_check(not OfficeFloorLayout.validate(missing_entry).is_empty(), "empty floor still requires an entrance")
@@ -687,11 +678,11 @@ func _decoration(key: String, bounds: Rect2) -> DecorPlacement:
 	return decoration
 
 
-func test_decorations_are_validated_and_thin_obstacles_block_graph_edges() -> void:
+func test_decorations_are_validated_against_corridors_and_workstations() -> void:
 	var rules := FloorLayoutPolicy.new()
 	var value := _plan(_floor([_room("a", 2)]), null, rules)
 	var signature := value.geometry_signature()
-	# S3 BAND (2026-10-28): the band is one row: the map is 9 cells (288) deep, so the clear spot moves up from y 300.
+	# A free lane's middle column, clear of the zone and its aisles.
 	var prop := _decoration("clear", Rect2(600, 200, 12, 8))
 	value.decorations.append(prop)
 	_eq(OfficeFloorLayout.validate(value, rules), PackedStringArray(), "unobstructed decoration accepted")
@@ -704,30 +695,11 @@ func test_decorations_are_validated_and_thin_obstacles_block_graph_edges() -> vo
 	prop.footprint = value.desks[0].measure.physical_rect
 	prop.footprint.position += value.desks[0].origin
 	_check("; ".join(OfficeFloorLayout.validate(value, rules)).contains("tab footprint"), "table overlap diagnosed")
-	# A synthetic furniture-only profile isolates path geometry from labels.
-	# Four thin barriers surround one approach without covering any grid centre.
-	var trapped := _plan(_floor([_room("a", 2)]), null, rules)
-	trapped.desks[0].measure.render_rect = trapped.desks[0].measure.physical_rect
-	var target := trapped.desks[0].origin + trapped.desks[0].measure.approach_position(0, "far")
-	var bars: Array[Rect2] = [
-		Rect2(target + Vector2(-17, -17), Vector2(34, 2)),
-		Rect2(target + Vector2(-17, 15), Vector2(34, 2)),
-		Rect2(target + Vector2(-17, -15), Vector2(2, 30)),
-		Rect2(target + Vector2(15, -15), Vector2(2, 30)),
-	]
-	for index in bars.size():
-		trapped.decorations.append(_decoration("bar-%d" % index, bars[index]))
-	var problems := OfficeFloorLayout.validate(trapped, rules)
-	_check("; ".join(problems).contains("unreachable approach"), "thin between-centre obstacles really block the path")
-	for problem in problems:
-		_check(problem.begins_with("unreachable approach"), "fixture fails on connectivity, not unrelated bounds")
 
 
 func test_budget_diagnostics_reject_input_before_seat_allocation() -> void:
-	# The widest zone the 512-cell width budget allows is 101 lanes, 504 cells
-	# (Z1, 2026-10-27; 50 lanes of 9, 499 cells, before): past its pad, 503 hold
-	# a pod of at most 502 columns (capacity is even; one cell a column and the
-	# pod's passage cell). 1100 panes, 550 columns, do not.
+	# A column now costs three cells: the 504-cell zone holds at most 166
+	# columns after its pad and the pod's passage. 550 columns cannot fit.
 	var too_wide := OfficeFloorLayout.plan(MapModel.of(_floor([_room("wide", 1100)])))
 	_eq(too_wide.plan, null, "table cannot fit the measured width budget")
 	_check(
@@ -755,7 +727,8 @@ func test_empty_tabs_pay_for_real_render_allocations() -> void:
 
 func test_moving_panes_cannot_hide_retained_capacity() -> void:
 	var rules := FloorLayoutPolicy.new()
-	var first_room := _room("first", 500)
+	rules.max_desk_nodes = 2 * OfficeDeskView.node_budget(150) - 1
+	var first_room := _room("first", 300)
 	var floor_model := _floor([first_room])
 	var previous := _plan(floor_model, null, rules)
 	var signature := previous.geometry_signature()
@@ -763,29 +736,26 @@ func test_moving_panes_cannot_hide_retained_capacity() -> void:
 	destination.panes = first_room.panes
 	first_room.panes = []
 	floor_model.rooms.append(destination)
-	_eq(floor_model.pane_count(), 500, "migration does not increase the input pane count")
+	_eq(floor_model.pane_count(), 300, "migration does not increase the input pane count")
 	var rejected := OfficeFloorLayout.plan(MapModel.of(floor_model), previous, rules)
 	_check(rejected.plan == null, "both retained source columns and destination columns consume the budget")
 	_check(rejected.problems.has("map exceeds desk node budget"), "migration is rejected by render budget")
 	_eq(previous.geometry_signature(), signature, "rejection leaves the last valid geometry and seats untouched")
 	var cold := _plan(floor_model, null, rules)
 	_eq(cold.desk("first").capacity, 2, "same current input without history is small enough")
-	_eq(cold.desk("second").capacity, 250, "destination still seats every pane")
+	_eq(cold.desk("second").capacity, 150, "destination still seats every pane")
 
 
 func test_desk_node_budget_boundary_includes_fixed_cost_and_both_sides() -> void:
-	# One empty two-column pod (172) plus a four-column pod (320): 24 fixed
-	# (the lens's wash among them) and 74 a column (a chip at each seat, a
-	# stack of paper each, the lens line, the provider marks on the far lid and
-	# on each chair: D3, 2026-10-27, three more a column than 71), as the
-	# geometry suite counts them.
-	# Expected costs are independent of the implementation's accounting helper.
+	# The geometry suite counts real prefab nodes. Here the planner must charge
+	# that bound for every table, including empty retained slots, inclusively.
 	var model := _floor([_room("empty"), _room("full", 8)])
-	for limit: int in [491, 492, 493]:
+	var boundary := OfficeDeskView.node_budget(2) + OfficeDeskView.node_budget(4)
+	for limit: int in [boundary - 1, boundary, boundary + 1]:
 		var rules := FloorLayoutPolicy.new()
 		rules.max_desk_nodes = limit
 		var result := OfficeFloorLayout.plan(MapModel.of(model), null, rules)
-		_eq(result.plan != null, limit >= 492, "exact boundary is inclusive")
+		_eq(result.plan != null, limit >= boundary, "exact boundary is inclusive")
 		if result.plan != null:
 			_eq(result.plan.desk("empty").capacity, 2, "empty table reserves both pairs of seats")
 			_eq(result.plan.desk("full").capacity, 4, "occupied table has four columns, not eight")
@@ -803,9 +773,8 @@ func test_desk_node_budget_boundary_includes_fixed_cost_and_both_sides() -> void
 
 func test_repeated_migrations_retain_seats_until_cumulative_budget_is_full() -> void:
 	var rules := FloorLayoutPolicy.new()
-	# An eight-column pod costs 24 + 74 * 8 = 616: four fit (2464), five
-	# (3080) do not.
-	rules.max_desk_nodes = 2800
+	# Four retained eight-column pods fit, five do not.
+	rules.max_desk_nodes = 4 * OfficeDeskView.node_budget(8)
 	var model := _floor([])
 	var panes := _room("traveller", 16).panes
 	var previous := _plan(model, null, rules)
@@ -818,12 +787,12 @@ func test_repeated_migrations_retain_seats_until_cumulative_budget_is_full() -> 
 		var result := OfficeFloorLayout.plan(MapModel.of(model), previous, rules)
 		_eq(model.pane_count(), 16, "every step carries the same sixteen panes")
 		if step == 4:
-			_check(result.plan == null, "five retained eight-column pods cost 3080, not 2800")
+			_check(result.plan == null, "five retained eight-column pods exceed the four-pod budget")
 			_eq(result.problems, PackedStringArray(["map exceeds desk node budget"]), "cumulative refusal")
 			_eq(previous.desks.size(), 4, "failed addition never mutates previous table membership")
 			_check(previous.seat(panes[0].key) != null, "previous pane binding survives rejection")
 			continue
-		_eq(result.problems, PackedStringArray(), "four pods cost 2464 and fit")
+		_eq(result.problems, PackedStringArray(), "up to four pods fit")
 		_check(result.plan != null, "migration within budget succeeds")
 		if result.plan == null:
 			return
@@ -842,28 +811,28 @@ func test_repeated_migrations_retain_seats_until_cumulative_budget_is_full() -> 
 func test_previous_empty_capacity_is_validated_against_current_budgets() -> void:
 	var rules := FloorLayoutPolicy.new()
 	rules.max_desk_nodes = 40000
-	var model := _floor([_room("a", 500), _room("b", 500)])
+	var model := _floor([_room("a", 300), _room("b", 300)])
 	var full := _plan(model, null, rules)
 	for room in model.rooms:
 		room.panes.clear()
 	var empty := _plan(model, full, rules)
 	var signature := empty.geometry_signature()
 	_eq(empty.desks[0].seats.size() + empty.desks[1].seats.size(), 0, "no current panes remain")
-	_eq(empty.desks[0].capacity + empty.desks[1].capacity, 500, "1000 empty slots still exist")
-	# Two 250-column pods: 2 * (24 + 74 * 250).
-	for limit: int in [37047, 37048, 37049]:
+	_eq(empty.desks[0].capacity + empty.desks[1].capacity, 300, "600 empty slots still exist")
+	var boundary := 2 * OfficeDeskView.node_budget(150)
+	for limit: int in [boundary - 1, boundary, boundary + 1]:
 		rules.max_desk_nodes = limit
-		_eq(OfficeFloorLayout.validate(empty, rules).is_empty(), limit >= 37048, "old allocation boundary")
+		_eq(OfficeFloorLayout.validate(empty, rules).is_empty(), limit >= boundary, "old allocation boundary")
 		_eq(
 			OfficeFloorLayout.plan(MapModel.of(model), empty, rules).plan != null,
-			limit >= 37048,
+			limit >= boundary,
 			"old input uses same budget"
 		)
 	_eq(empty.geometry_signature(), signature, "budget changes neither shrink nor reflow previous desks")
 	rules.max_tables = 1
 	_eq(OfficeFloorLayout.validate(empty, rules), PackedStringArray(["layout exceeds tab budget"]), "old tabs bounded")
 	rules.max_tables = 1024
-	rules.max_panes = 999
+	rules.max_panes = 599
 	_eq(OfficeFloorLayout.validate(full, rules), PackedStringArray(["layout exceeds pane budget"]), "old panes bounded")
 
 
@@ -894,21 +863,19 @@ func test_previous_plan_cannot_understate_its_render_allocation() -> void:
 	_check(not OfficeFloorLayout.validate(previous).is_empty(), "extra measured columns cannot bypass capacity cost")
 
 
-## A zone of four lanes (four twelve-pane pods, 7 cells each: two lanes hold
-## one a row, so the zone takes the map's four, two to a row): pod b, at x 9 of
-## the first row, grows to twelve columns (13 cells). In place it would reach
-## x 22, past the widest zone a 25-cell width budget allows (four lanes, to
-## x 20); the left end of its row, which a's removal emptied, holds it.
+## Eight lanes hold two six-column pods a row (19 cells each). Pod b grows
+## to twelve columns (37 cells): only the vacated left end can hold it within
+## the 43-cell map width budget, without disturbing the other row.
 func test_over_budget_in_place_growth_uses_a_valid_relocation() -> void:
 	var rules := FloorLayoutPolicy.new()
-	rules.width_cells = 25
-	rules.max_width_cells = 25
+	rules.width_cells = 43
+	rules.max_width_cells = 43
 	var growing := _room("b", 12, 1)
 	var floor_model := _floor([_room("a", 12), growing, _room("c", 12, 2), _room("d", 12, 3)])
 	var previous := _plan(floor_model, null, rules)
 	# Z1 (2026-10-27): a lane is 4 cells, pitch 5, a new zone takes lanes until it stands one row; the map replans.
-	_eq(previous.zones[0].lanes, 4, "a zone of four lanes")
-	_eq(previous.desk("b").reserved_cells.position.x, 9, "b stands right of a, 8 cells into the zone")
+	_eq(previous.zones[0].lanes, 8, "a zone of eight lanes")
+	_eq(previous.desk("b").reserved_cells.position.x, 21, "b stands right of a, 20 cells into the zone")
 	floor_model.rooms.remove_at(0)
 	growing.panes = _room("b", 24).panes
 	var result := OfficeFloorLayout.plan(MapModel.of(floor_model), previous, rules)
@@ -1054,11 +1021,8 @@ func test_a_one_zone_plan_places_its_zone_over_its_rows() -> void:
 	_eq([map.rooms, map.pane_count()], [floor_model.rooms, floor_model.pane_count()], "its rooms and panes")
 	floor_model.mezzanine_of = "machine/source"
 	_eq(map.geometry_signature(), floor_model.geometry_signature(), "a mezzanine grouping is not geometry")
-	# Z1 (2026-10-27): a lane is 4 cells, pitch 5, a new zone takes lanes until it stands one row; the map replans.
-	# 416 units are 13 cells: two lanes (5 * 2 + 3 = 13 cells; 640 units, which
-	# planned one lane of 9, now plan three). Table c has 12 columns, 13 cells:
-	# three lanes' 13 inner cells hold it, two lanes' 8 do not. Its three tables
-	# (11, 7 and 13 cells) share no row even then: three pod rows.
+	# Twelve columns reserve 37 cells, requiring eight lanes (39 cells with
+	# 38 inside the pad). The other pods reserve 31 and 19: three rows in all.
 	var plan := FloorPlanCache.new().prepare(map, _pen(), 416.0)
 	_check(plan != null and _rows(plan).size() > 1, "a valid plan of several rows")
 	if plan == null:
@@ -1066,18 +1030,18 @@ func test_a_one_zone_plan_places_its_zone_over_its_rows() -> void:
 	_eq(plan.zones.size(), 1, "places one zone")
 	var zone := plan.zones[0]
 	_eq([zone.zone_key, plan.zone(floor_model.key), plan.zone("machine/other")], [plan.floor_key, zone, null], "by key")
-	_eq([zone.first_lane, zone.lanes, plan.lanes], [0, 3, 3], "three lanes wide: the map widened to three first")
-	_eq(plan.floor_cells.size.x, 18, "a map of three lanes is 5 * 3 + 3 cells wide")
+	_eq([zone.first_lane, zone.lanes, plan.lanes], [0, 8, 8], "the map widens to the widest pod's eight lanes first")
+	_eq(plan.floor_cells.size.x, 43, "a map of eight lanes is 5 * 8 + 3 cells wide")
 	var pod := OfficeZoneLayout.pod_row_cells()
 	_eq(_rows(plan).size(), 3, "a pod row for each table")
 	# D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to; the band is two cells (SEATED-Q2).
 	# Zones start a row higher: row 5 (wall 2, band 2, top aisle 1), not 6.
 	# S3 BAND (2026-10-28): the band is one row: row 3 (wall 2, band 1, the zone's aisle row the band's lane).
-	_eq(zone.cells, Rect2i(1, 3, 14, pod * _rows(plan).size()), "from row 3, 14 cells wide, whole pod rows deep")
-	_eq(zone.slot(), Rect2i(1, 2, 14, pod * _rows(plan).size() + 1), "under its aisle row")
-	_eq(zone.initial_width_cells, 14, "first laid out that wide")
+	_eq(zone.cells, Rect2i(1, 3, 39, pod * _rows(plan).size()), "from row 3, 39 cells wide, whole pod rows deep")
+	_eq(zone.slot(), Rect2i(1, 2, 39, pod * _rows(plan).size() + 1), "under its aisle row")
+	_eq(zone.initial_width_cells, 39, "first laid out that wide")
 	for index in _rows(plan).size():
-		_eq(_rows(plan)[index].band_cells, Rect2i(1, 3 + index * pod, 14, pod), "row %d is its band" % index)
+		_eq(_rows(plan)[index].band_cells, Rect2i(1, 3 + index * pod, 39, pod), "row %d is its band" % index)
 	var desks := 0
 	for row in zone.rows:
 		desks += row.desks.size()
@@ -1088,9 +1052,9 @@ func test_a_one_zone_plan_places_its_zone_over_its_rows() -> void:
 		_check(placed.reserved_cells.position.x >= zone.cells.position.x + 1, "right of the pad: %s" % placed.tab_key)
 
 
-## A lane holds the narrowest pod (2 columns, 3 cells, right of the 1-cell pad)
+## Two lanes hold the narrowest pod (2 columns, 7 cells, right of the 1-cell pad)
 ## and a new zone takes lanes, up to the map's, until its pods stand in one row.
-func test_a_lane_holds_the_narrowest_pod_and_a_zone_stands_one_row() -> void:
+func test_two_lanes_hold_the_narrowest_pod_and_a_zone_stands_one_row() -> void:
 	var policy := FloorLayoutPolicy.new()
 	_eq(
 		[policy.lane_pitch(), policy.zone_width(1), policy.zone_width(2), policy.map_width(4)],
@@ -1100,21 +1064,22 @@ func test_a_lane_holds_the_narrowest_pod_and_a_zone_stands_one_row() -> void:
 	_eq(
 		[policy.lanes_for(24), policy.lanes_for(15), policy.lanes_for(10)],
 		[4, 2, 2],
-		"the default window's 24 cells plan four lanes, the walking suites' 15 two, the 480x320 window's 10 two (FRAME-Q2)"
+		"the default window's 24 cells plan four lanes; the narrow 15- and 10-cell views plan two"
 	)
 	_eq(
-		[policy.lanes_for_inner(3), policy.lanes_for_inner(5), policy.lanes_for_inner(7), policy.lanes_for_inner(9)],
-		[1, 2, 2, 3],
-		"a pod of c columns, c + 1 cells, spans ceil((c + 3) / 5) lanes"
+		[policy.lanes_for_inner(7), policy.lanes_for_inner(13), policy.lanes_for_inner(19), policy.lanes_for_inner(25)],
+		[2, 3, 5, 6],
+		"a pod of c columns, 3c + 1 cells, spans ceil((3c + 3) / 5) lanes"
 	)
 	# D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to; the band is two cells (SEATED-Q2).
 	# S3 BAND (2026-10-28): the band is one row.
-	_eq(policy.version, 5, "the lane unit is a new plan geometry (3), the two-cell band (4), the one-row band (5)")
-	_eq(_lane_shape(1), [4, 1, 1], "one tab of two panes: a zone of one lane on the four-lane map")
-	_eq(_lane_shape(2), [4, 2, 1], "two tabs: two lanes, one row")
-	_eq(_lane_shape(3), [4, 3, 1], "three tabs: three lanes, one row")
-	_eq(_lane_shape(7), [4, 4, 2], "seven tabs: the map's four lanes, then a second row")
-	_eq(_lane_shape(1, 8), [4, 2, 1], "a pod of four columns (eight panes) takes two lanes")
+	_eq(policy.version, 6, "whole-image workstation geometry invalidates old plans")
+	_eq(OfficeZoneLayout.pod_row_cells(), 10, "the 320-unit reservation is ten cells deep")
+	_eq(_lane_shape(1), [4, 2, 1], "one tab: two lanes on the four-lane map")
+	_eq(_lane_shape(2), [4, 4, 1], "two tabs: four lanes, one row")
+	_eq(_lane_shape(3), [4, 4, 2], "three tabs: four lanes, two rows")
+	_eq(_lane_shape(7), [4, 4, 4], "seven tabs: four lanes, four rows")
+	_eq(_lane_shape(1, 8), [4, 3, 1], "a pod of four columns (eight panes) takes three lanes")
 
 
 ## The narrowest plan is two lanes (13 cells): the 480x320-unit view (340 units,
@@ -1152,13 +1117,9 @@ func _lane_shape(tabs: int, panes := 2) -> Array:
 
 ## The planners furnish a candidate before its one validation, the pantry and
 ## then the furniture: the same plan as validating the bare plan, furnishing it
-## and validating it again, with half the flood fills. Three tables of one lane
-## each stand in one row of three lanes and leave the other lanes' gaps to
-## furnish.
+## and validating it again, with half the validation work.
 func test_a_furnished_plan_is_validated_once() -> void:
 	var rules := FloorLayoutPolicy.new()
-	rules.actor_footprint = PixelPerson.footprint()
-	rules.actor_draw_rect = PixelPerson.drawing_rect(people)
 	var floor_model := _floor([_room("a", 4), _room("b", 2, 1), _room("c", 2, 2)])
 	var before := OfficeFloorValidation.validations
 	var furnished := OfficeFloorLayout.plan(
@@ -1182,10 +1143,10 @@ func test_a_furnished_plan_is_validated_once() -> void:
 	_eq(furnished.plan.geometry_signature(), bare.plan.geometry_signature(), "for the same plan")
 
 
-## Furniture is optional: a batch that would close the way to any seat is left
+## Furniture is optional: a batch that would cover a declared corridor is left
 ## out first, never a desk, and the pantry stays: the second validation is of
 ## the map with its pantry and without the furniture.
-func test_furniture_that_closes_a_path_is_left_out() -> void:
+func test_furniture_that_covers_a_corridor_is_left_out() -> void:
 	var rules := FloorLayoutPolicy.new()
 	var before := OfficeFloorValidation.validations
 	var result := OfficeFloorLayout.plan(
@@ -1239,9 +1200,8 @@ func _three_zones() -> MapModel:
 ## Every lane gap of a furnished map, at every shipped width, on the stress map
 ## and on a map of several zones, stands its pieces (every two rows from the
 ## gap's second row), and the furnished map still validates in one pass, so none
-## of it is dropped. The pieces close no walk: the only nodes they take that
-## the bare map had are in the lanes' middle columns (the top-wall run stands in
-## the wall's clearance row, which nobody walks anyway).
+## of it is dropped. Gap pieces stand in their lane's middle column, off all
+## reserved pods, partitions and corridors (the production validator's checks).
 func test_every_lane_gap_stands_furniture_and_the_map_validates_once() -> void:
 	var cases: Array[Array] = []
 	for width in FURNISHED_WIDTHS:
@@ -1259,9 +1219,6 @@ func test_every_lane_gap_stands_furniture_and_the_map_validates_once() -> void:
 		if plan == null:
 			continue
 		var rules := _real_rules(width)
-		var middles: Dictionary[int, bool] = {}
-		for lane in plan.lanes:
-			middles[rules.lane_x(lane) + floori(rules.zone_width_cells / 2.0)] = true
 		for gap in OfficeDecorPlanner.lane_gaps(plan, rules):
 			var pieces := _gap_pieces(plan, gap)
 			gaps_seen += 1
@@ -1282,17 +1239,12 @@ func test_every_lane_gap_stands_furniture_and_the_map_validates_once() -> void:
 					0,
 					"%s: %s on the gap's grid" % [what, placed.key]
 				)
-		var bare := OfficeFloorLayout.plan(_map_of(model), null, rules, null, OfficeFixturePlanner.new(_pen())).plan
-		var open := _graph_of(bare, rules)
-		var furnished := _graph_of(plan, rules)
-		for y in plan.floor_cells.size.y:
-			for x in plan.floor_cells.size.x:
-				var cell := Vector2i(x, y)
-				if not open.walkable(cell) or furnished.walkable(cell):
-					continue
 				_check(
-					middles.has(x),
-					"%s, %d cells: the furniture takes %s only in a lane's middle column" % [what, width, cell]
+					(
+						floori(placed.position.x / FloorLayoutPolicy.GRID)
+						== rules.lane_x(gap.lane) + floori(rules.zone_width_cells / 2.0)
+					),
+					"%s: %s stands in its lane's middle column" % [what, placed.key]
 				)
 	_check(gaps_seen >= 4, "the cases have lane gaps to furnish: %d" % gaps_seen)
 
@@ -1307,10 +1259,10 @@ func _map_of(model: RefCounted) -> MapModel:
 ## The top-wall run and the lane gaps stand on grids of the map itself, never
 ## on the tables: keyed by the run's grid step, or by the lane and the row, and
 ## where a zone grows the pieces that still fit keep their key and their place.
-## Z1 (2026-10-27): asked 25 cells (23 wide, the default window's map), not 32:
-## 32 now plans 28 cells, where no top-wall plant fits (the report's FRAME-Q2).
+## Five lanes leave a gap beside the four-lane zone. The top-wall run has its
+## window-gap stand-in even when no regular grid step fits.
 func test_the_top_run_and_lane_gaps_keep_their_place_when_a_zone_grows() -> void:
-	var rules := _real_rules(25)
+	var rules := _real_rules(32)
 	var decor := OfficeDecorPlanner.new(_pen())
 	var fixtures := OfficeFixturePlanner.new(_pen())
 	var first := (
@@ -1366,7 +1318,7 @@ func test_the_top_run_and_lane_gaps_keep_their_place_when_a_zone_grows() -> void
 ## Plants and side tables take turns along a lane gap by the piece's number j
 ## (a side table at an odd one, else plant_at(j / 2): the plants take turns
 ## too; test_a_lane_gap_stands_both_plants_between_its_side_tables in the map
-## suite pins a run of five), and the top-wall
+## suite pins a run of nine), and the top-wall
 ## run's plants take the plant of their grid step (plant_at()), two kinds by
 ## the place's parity. Never a state, a tab or the time: the planner reads no
 ## herdr, so the place is all there is to go by. Every piece a furnished map
@@ -1491,115 +1443,9 @@ func test_the_window_run_is_centred_between_the_pantry_and_the_door() -> void:
 	_eq(OfficeShell.window_xs(lobby, _pen()), _old_window_xs(lobby), "a floor without a pantry keeps the base run")
 
 
-# --- the walk graph (OfficeWalkGraph) ---------------------------------------------
-
-
-## No node sits inside an obstacle and no edge enters one, every obstacle
-## inflated by the real person: the feet for everything, the whole drawing for
-## the Ground walls. A thin post between two clear centres, which the native
-## AStarGrid2D steps straight through even with its points on the centres
-## (docs/WORLD_MODEL.md, "Collision and walking"), takes that edge away and leaves both nodes.
-func test_no_walk_graph_edge_enters_an_obstacle() -> void:
-	# 32 cells: five lanes (28 cells), so lane gaps stand furniture (Z1,
-	# 2026-10-27: 28 cells stand no top-wall plant; 32 planned 23 before).
-	var rules := _real_rules(32)
-	var plan := OfficeFloorLayout.plan(MapModel.of(_stress_floor()), null, rules, OfficeDecorPlanner.new(_pen())).plan
-	_check(plan != null and not plan.decorations.is_empty(), "a furnished stress floor to walk")
-	if plan == null:
-		return
-	# A post across the edge between two clear centres of the walking lane.
-	var left := Vector2i(plan.entry_cells.position.x + 3, plan.entry_cells.end.y - 1)
-	var at := OfficeWalkGraph.centre(left) + Vector2(15, -4)
-	plan.decorations.append(_decoration("post", Rect2(at, Vector2(2, 8))))
-	var graph := OfficeWalkGraph.build(plan, rules.actor_footprint, rules.actor_draw_rect)
-	_check(graph.walkable(left) and graph.walkable(left + Vector2i.RIGHT), "the post covers neither centre")
-	_check(not graph.linked(left, OfficeWalkGraph.RIGHT), "but no edge goes through it")
-	_check(not graph.linked(left + Vector2i.RIGHT, OfficeWalkGraph.LEFT), "either way")
-	var native := AStarGrid2D.new()
-	native.region = Rect2i(Vector2i.ZERO, plan.floor_cells.size)
-	native.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
-	native.update()
-	for y in plan.floor_cells.size.y:
-		for x in plan.floor_cells.size.x:
-			native.set_point_solid(Vector2i(x, y), not graph.walkable(Vector2i(x, y)))
-	_eq(native.get_id_path(left, left + Vector2i.RIGHT).size(), 2, "where the native grid steps straight through")
-	var edges := 0
-	for y in plan.floor_cells.size.y:
-		for x in plan.floor_cells.size.x:
-			var cell := Vector2i(x, y)
-			if not graph.walkable(cell):
-				continue
-			var from := OfficeWalkGraph.centre(cell)
-			for obstacle in graph.obstacles:
-				if _enters(from, from, obstacle.rect):
-					_fail("node %s is inside %s" % [cell, obstacle.rect])
-			for direction: int in [OfficeWalkGraph.RIGHT, OfficeWalkGraph.DOWN]:
-				if not graph.linked(cell, direction):
-					continue
-				edges += 1
-				var to := OfficeWalkGraph.centre(cell + OfficeWalkGraph.STEPS[direction])
-				for obstacle in graph.obstacles:
-					if _enters(from, to, obstacle.rect):
-						_fail("edge %s -> %s enters %s" % [from, to, obstacle.rect])
-	var cells := plan.floor_cells.size.x * plan.floor_cells.size.y
-	_check(edges * 2 > cells, "a floor's worth of edges was checked: %d over %d cells" % [edges, cells])
-
-
-## Planning a floor builds its walk graph once, to validate it, and whoever
-## walks that floor walks that very graph: what the validator reached is what
-## the walkers reach, from the same door.
-func test_the_validator_and_the_walkers_walk_one_graph() -> void:
-	var cache := FloorPlanCache.new()
-	var built := OfficeWalkGraph.builds
-	var plan := cache.prepare(MapModel.of(_floor([_room("a", 4), _room("b", 2, 1), _room("c", 6, 2)])), _pen(), 640.0)
-	_check(plan != null and cache.problems().is_empty(), "a valid floor")
-	_eq(OfficeWalkGraph.builds - built, 1, "planning it builds one walk graph, to validate it")
-	var feet := PixelPerson.footprint()
-	var canvas := PixelPerson.drawing_rect(_pen().art.people)
-	var walked := OfficeWalkGraph.of(plan, feet, canvas)
-	_eq(OfficeWalkGraph.builds - built, 1, "the walkers of that floor take the validator's graph")
-	_eq(OfficeWalkGraph.of(plan, feet, canvas), walked, "every time they ask")
-	var approaches := 0
-	var columns := 0
-	for placed in plan.desks:
-		columns += placed.capacity
-		for column in placed.capacity:
-			for side: String in OfficeTable.SIDES:
-				var cell := OfficeWalkGraph.cell_of(placed.origin + placed.measure.approach_position(column, side))
-				var route := walked.from_door(cell)
-				_check(
-					walked.reaches(cell) and not route.is_empty(),
-					"%s %d %s is walked to" % [placed.tab_key, column, side]
-				)
-				approaches += 1
-	_check(columns >= 8, "three tables of %d columns" % columns)
-	_eq(approaches, columns * 2, "every approach of every column, both sides")
-
-
-## The validator walks in from the lift door's threshold, as everyone does, not
-## from wherever the entry band is open: a person who cannot step through the
-## door is refused a floor even while most of the band beside it is open to them.
-func test_the_validator_walks_in_from_the_door_not_the_entry_band() -> void:
-	var lobby := _plan(_floor([]))
-	var rules := FloorLayoutPolicy.new()
-	rules.actor_footprint = PixelPerson.footprint()
-	# So wide that the side wall's drawing keeps them off the door's lane.
-	rules.actor_draw_rect = Rect2(-56, -46, 112, 48)
-	var problems := OfficeFloorLayout.validate(lobby, rules)
-	_check(
-		problems.has("the lift door has no clear threshold"), "a door nobody can walk in through fails: %s" % [problems]
-	)
-	var graph := OfficeWalkGraph.build(lobby, rules.actor_footprint, rules.actor_draw_rect)
-	var open := 0
-	for x in range(lobby.entry_cells.position.x, lobby.entry_cells.end.x):
-		open += 1 if graph.walkable(Vector2i(x, lobby.entry_cells.end.y - 1)) else 0
-	_check(open * 2 > lobby.entry_cells.size.x, "though %d of the entry band's cells are open" % open)
-
-
-## Every approach of the stress fixture's floor, asked 20 and 32 cells (18 and
-## 28 wide, three and five lanes), is walked to from the door's threshold, and
-## still is after two tables grow and the floor moves them.
-func test_every_approach_is_walked_to_on_the_stress_floor_and_after_growth() -> void:
+## Every complete workstation on the stress map is inside its pod's drawing
+## and reservation, before and after growth, without moving logical seats.
+func test_every_workstation_fits_on_the_stress_floor_and_after_growth() -> void:
 	for width: int in [20, 32]:
 		var rules := _real_rules(width)
 		var floor_model := _stress_floor()
@@ -1607,7 +1453,7 @@ func test_every_approach_is_walked_to_on_the_stress_floor_and_after_growth() -> 
 		_eq(first.problems, PackedStringArray(), "the stress floor %d cells wide is valid" % width)
 		if first.plan == null:
 			continue
-		_every_approach_walked(first.plan, rules, "stress, %d cells" % width)
+		_every_workstation_fits(first.plan, "stress, %d cells" % width)
 		for tab: int in [0, 7]:
 			for extra in 4:
 				var column := 4 + floori(extra / 2.0)
@@ -1619,102 +1465,19 @@ func test_every_approach_is_walked_to_on_the_stress_floor_and_after_growth() -> 
 		if grown.plan == null:
 			continue
 		_check(grown.plan.geometry_signature() != first.plan.geometry_signature(), "the floor really changed")
-		_every_approach_walked(grown.plan, rules, "stress, %d cells, grown" % width)
-
-
-## From a table's approach two legs go on, never diagonal: L-shaped to the spot
-## a done worker stands on, and into the seat. On the far side the standing leg
-## runs first in line with the seat, then across, and the seat leg straight in;
-## on the near side both go across first, to the spot's column, so nobody walks
-## through the chair: the seat leg is the standing leg and a sidestep into the
-## seat. The validator walks both on the same obstacles. Only the far seat leg
-## enters the table (the far seat is inside it), and only along itself: the
-## table's entries, not the table's name. A post on a leg is a problem of its
-## own, the other leg left clear; a post where a straight near leg would cut
-## through the chair blocks nothing.
-func test_the_seat_and_standing_legs_are_validated() -> void:
-	var rules := _real_rules()
-	var plan := _plan(_floor([_room("a", 2)]), null, rules)
-	var placed := plan.desks[0]
-	# A furniture-only profile: the table's drawing does not cover its legs.
-	placed.measure.render_rect = placed.measure.physical_rect
-	for side: String in OfficeTable.SIDES:
-		var near := side == "near"
-		var approach := placed.origin + placed.measure.approach_position(0, side)
-		var standing := placed.origin + placed.measure.standing_position(0, side)
-		var seat := placed.origin + placed.measure.seat_position(0, side)
-		var corner := Vector2(standing.x, approach.y) if near else Vector2(approach.x, standing.y)
-		var across := OfficeWalkGraph.leg_to_standing(approach, standing, near)
-		_eq(across, PackedVector2Array([approach, corner, standing]), side + ": an L")
-		var into := OfficeWalkGraph.leg_to_seat(approach, seat, standing, near)
-		var expected := (
-			PackedVector2Array([approach, corner, standing, seat]) if near else PackedVector2Array([approach, seat])
-		)
-		_eq(into, expected, side + (": across, up and a sidestep in" if near else ": straight in"))
-		for leg: PackedVector2Array in [across, into]:
-			for index in range(1, leg.size()):
-				var step := leg[index] - leg[index - 1]
-				_check(step.x == 0.0 or step.y == 0.0, "%s: every step is straight: %s" % [side, step])
-				if near:
-					_check(
-						not (step.x == 0.0 and leg[index].x == seat.x),
-						"%s: nothing runs up or down the chair's column: %s" % [side, leg]
-					)
-	var graph := OfficeWalkGraph.build(plan, rules.actor_footprint, rules.actor_draw_rect)
-	var far := placed.origin + placed.measure.approach_position(0, "far")
-	var far_seat := placed.origin + placed.measure.seat_position(0, "far")
-	var far_spot := placed.origin + placed.measure.standing_position(0, "far")
-	var into_far := OfficeWalkGraph.leg_to_seat(far, far_seat, far_spot, false)
-	_check(graph.clear_route(into_far), "the far seat leg enters its own table, along itself")
-	var beside := PackedVector2Array([into_far[0] + Vector2(8, 0), into_far[1] + Vector2(8, 0)])
-	_check(not graph.clear_route(beside), "and nothing else enters it, not even a step beside the leg")
-	_check(
-		not graph.clear(far, far_seat + Vector2(0, 8)),
-		"and only along its own length: not on past the seat, still inside the table"
-	)
-	_eq(OfficeFloorLayout.validate(plan, rules), PackedStringArray(), "which the validator allows")
-	# Between the corner (far standing row, -54) and the desk's far edge (-48).
-	plan.decorations.append(_decoration("post", Rect2(Vector2(far.x - 2, placed.origin.y - 52), Vector2(4, 2))))
-	_eq(
-		OfficeFloorLayout.validate(plan, rules),
-		PackedStringArray(["blocked seat leg: a column 0 far"]),
-		"a post between the corner and the table blocks the far seat leg alone"
-	)
-	plan.decorations.clear()
-	# On the step across (y -54, feet -58..-54), between the seat leg's feet
-	# (x +-6) and the standing spot's (x+10..x+22).
-	plan.decorations.append(_decoration("post", Rect2(Vector2(far.x + 7, placed.origin.y - 58), Vector2(2, 8))))
-	_eq(
-		OfficeFloorLayout.validate(plan, rules),
-		PackedStringArray(["blocked standing leg: a column 0 far"]),
-		"a post on the step across blocks the far standing leg alone"
-	)
-	var near := placed.origin + placed.measure.approach_position(0, "near")
-	plan.decorations.clear()
-	plan.decorations.append(_decoration("post", Rect2(Vector2(near.x - 2, placed.origin.y + 34), Vector2(4, 2))))
-	_eq(
-		OfficeFloorLayout.validate(plan, rules),
-		PackedStringArray(),
-		"a post in the near chair's column, where a straight leg would cut through, blocks nothing"
-	)
-	plan.decorations.clear()
-	plan.decorations.append(_decoration("post", Rect2(Vector2(near.x + 11, placed.origin.y + 44), Vector2(2, 8))))
-	_eq(
-		OfficeFloorLayout.validate(plan, rules),
-		PackedStringArray(["blocked standing leg: a column 0 near", "blocked seat leg: a column 0 near"]),
-		"a post on the near step across blocks both near legs, which share it"
-	)
+		_every_workstation_fits(grown.plan, "stress, %d cells, grown" % width)
+		for placed in first.plan.desks:
+			for seat in placed.seats:
+				_eq(
+					grown.plan.seat(seat.pane_key).geometry_signature(),
+					seat.geometry_signature(),
+					"growth keeps each existing logical seat"
+				)
 
 
 ## The lift door stands on the outer wall over the main corridor's left lane,
-## wherever the floor's width puts that corridor, and its threshold leg runs to
-## the walking lane's node in its column, 4 up from its foot: the top wall
-## draws behind a person in front of it, so only the feet keep off the wall and
-## the door's foot and the lane's node share a cell row, outside every wall
-## obstacle; the side walls keep the whole canvas off, so no leg crosses their
-## drawing. S3 BAND (2026-10-28): the top wall draws behind a person in front of
-## it (the door's foot was inside the wall's drawing clearance, the leg the one
-## way through it, and no step beside it was clear).
+## wherever the floor's width puts that corridor. It remains furniture even
+## though people no longer walk through it.
 func test_the_lift_door_stands_over_the_main_corridor() -> void:
 	for width: int in [20, 32, 45]:
 		var rules := _real_rules(width)
@@ -1722,120 +1485,13 @@ func test_the_lift_door_stands_over_the_main_corridor() -> void:
 		var corridor := plan.main_corridor_cells
 		var door := OfficeShell.door(plan)
 		_eq(door, Vector2(corridor.position.x * 32 + 16, OfficeShell.DOOR_FOOT), "%d cells: over the left lane" % width)
-		var graph := _graph_of(plan, rules)
-		_eq(graph.door, door, "%d cells: the graph walks in at it" % width)
-		_eq(graph.threshold, Vector2(door.x, 80), "%d cells: to the walking lane's node in its column" % width)
-		_eq(door.y - graph.threshold.y, 4.0, "%d cells: 4 up, in the cell row of the door's foot" % width)
-		var walls := graph.obstacles.filter(
-			func(each: OfficeWalkGraph.Obstacle) -> bool:
-				return (
-					each.kind in [OfficeWalkGraph.Kind.WALL, OfficeWalkGraph.Kind.WALL_DRAWING]
-					and Rect2(door, Vector2.ZERO).intersects(each.rect)
-				)
-		)
-		_eq(walls, [], "%d cells: the door's foot is in no wall obstacle: the top wall keeps off the feet only" % width)
-		var drawings := graph.obstacles.filter(
-			func(each: OfficeWalkGraph.Obstacle) -> bool: return each.kind == OfficeWalkGraph.Kind.WALL_DRAWING
-		)
-		_eq(drawings.size(), 2, "%d cells: the canvas is kept off two walls' drawing" % width)
-		for each: OfficeWalkGraph.Obstacle in drawings:
-			_check(each.rect.size.y > each.rect.size.x, "%d cells: a side wall's, standing: %s" % [width, each.rect])
-		_check(not graph.inside(door), "%d cells: where the threshold leg starts" % width)
-		_check(graph.clear(door, graph.threshold), "%d cells: and the leg is clear" % width)
-		for each: OfficeWalkGraph.Obstacle in graph.obstacles:
-			if each.kind != OfficeWalkGraph.Kind.TABLE:
-				_eq(each.entries, PackedVector2Array(), "%d cells: no wall needs the leg as an entry" % width)
-		var side := OfficeWalkGraph.cell_of(Vector2(48, 80))
-		_check(not graph.walkable(Vector2i(0, side.y)), "%d cells: the side wall's cell is not walked" % width)
-
-
-## route_between() walks from whichever end is cheaper in all, the lead it has
-## already walked included, not whichever is fewer steps away: an end two steps
-## from the goal that has walked 200 units already loses to one six steps away
-## that has walked none. And on a seeded run of goals, ends and leads, what it
-## finds costs exactly what a plain breadth-first search from the goal says the
-## cheapest end costs.
-func test_route_between_walks_from_the_cheaper_end() -> void:
-	var rules := _real_rules(20)
-	var plan := _plan(_floor([_room("a", 2)]), null, rules)
-	var graph := OfficeWalkGraph.build(plan, rules.actor_footprint, rules.actor_draw_rect)
-	var lane := plan.entry_cells.end.y - 1
-	var goal := Vector2i(2, lane)
-	var near := goal + Vector2i(2, 0)
-	var far := goal + Vector2i(6, 0)
-	for cell: Vector2i in [goal, near, far]:
-		_check(graph.walkable(cell), "the walking lane is open at %s" % cell)
-	var ends: Array[Vector2i] = [near, far]
-	var found := graph.route_between(
-		goal, ends, PackedFloat32Array([200.0, 0.0]), PackedInt32Array([-1, -1]), 100000, 1000
-	)
-	_eq(found.end, 1, "the end six steps away that has walked nothing beats the one two steps away that has walked 200")
-	found = graph.route_between(goal, ends, PackedFloat32Array([0.0, 0.0]), PackedInt32Array([-1, -1]), 100000, 1000)
-	_eq(found.end, 0, "with no leads the nearer end wins")
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 2026
-	var open: Array[Vector2i] = []
-	for y in graph.size.y:
-		for x in graph.size.x:
-			if graph.walkable(Vector2i(x, y)):
-				open.append(Vector2i(x, y))
-	var compared := 0
-	for trial in 40:
-		var target := open[rng.randi() % open.size()]
-		var reference := _reference_distances(graph, target)
-		var picks: Array[Vector2i] = []
-		var leads := PackedFloat32Array()
-		var headings := PackedInt32Array()
-		for index in 1 + rng.randi() % 3:
-			picks.append(open[rng.randi() % open.size()])
-			leads.append(float(rng.randi() % 400))
-			headings.append(-1)
-		var cheapest := INF
-		for index in picks.size():
-			if reference.has(picks[index]):
-				cheapest = minf(cheapest, reference[picks[index]] * 32.0 + leads[index])
-		var result := graph.route_between(target, picks, leads, headings, 1000000, 100000)
-		if cheapest == INF:
-			_eq(result.end, -1, "trial %d: no end reached, none found" % trial)
-			continue
-		_check(result.end >= 0, "trial %d: an end is found" % trial)
-		if result.end < 0:
-			continue
-		var cost: float = reference[picks[result.end]] * 32.0 + leads[result.end]
-		_eq(cost, cheapest, "trial %d: the end it walks from is a cheapest one" % trial)
-		_eq(result.points.size(), reference[picks[result.end]] + 1, "trial %d: by a shortest route" % trial)
-		compared += 1
-	_check(compared >= 30, "the search was compared %d times" % compared)
-
-
-## Steps from `goal` to every node the graph links it to: a plain BFS over
-## linked(), the reference route_between() is held to.
-static func _reference_distances(graph: OfficeWalkGraph, goal: Vector2i) -> Dictionary[Vector2i, int]:
-	var distance: Dictionary[Vector2i, int] = {goal: 0}
-	var queue: Array[Vector2i] = [goal]
-	var cursor := 0
-	while cursor < queue.size():
-		var cell := queue[cursor]
-		cursor += 1
-		for direction in 4:
-			if graph.linked(cell, direction):
-				var next: Vector2i = cell + OfficeWalkGraph.STEPS[direction]
-				if not distance.has(next):
-					distance[next] = distance[cell] + 1
-					queue.append(next)
-	return distance
+		_check(plan.render_bounds.encloses(OfficeShell.drawn(_pen(), ArtContract.PROP_DOOR, door)), "door on the map")
 
 
 func _real_rules(width := 32) -> FloorLayoutPolicy:
 	var rules := FloorLayoutPolicy.new()
 	rules.width_cells = width
-	rules.actor_footprint = PixelPerson.footprint()
-	rules.actor_draw_rect = PixelPerson.drawing_rect(people)
 	return rules
-
-
-func _graph_of(plan: FloorPlan, rules: FloorLayoutPolicy) -> OfficeWalkGraph:
-	return OfficeWalkGraph.of(plan, rules.actor_footprint, rules.actor_draw_rect)
 
 
 ## The floor of tools/gen_stress_fixture.py's snapshot_stress80: ten tabs of
@@ -1851,35 +1507,22 @@ func _stress_floor() -> ZoneModel:
 	return _floor(rooms)
 
 
-## Every approach of `plan` is walked to from its door, through the threshold.
-func _every_approach_walked(plan: FloorPlan, rules: FloorLayoutPolicy, where: String, least := 80) -> void:
-	var graph := _graph_of(plan, rules)
+## Every slot, occupied or vacant, reserves one whole 80x80 image.
+func _every_workstation_fits(plan: FloorPlan, where: String) -> void:
 	var count := 0
+	var canvases: Array[Rect2] = []
 	for placed in plan.desks:
 		for column in placed.capacity:
 			for side: String in OfficeTable.SIDES:
-				var approach := placed.origin + placed.measure.approach_position(column, side)
-				var route := graph.from_door(OfficeWalkGraph.cell_of(approach))
 				var named := "%s: %s %d %s" % [where, placed.tab_key, column, side]
-				_check(
-					route.size() >= 2 and route[0] == graph.door and route[1] == graph.threshold,
-					named + " from the door"
-				)
-				if not route.is_empty():
-					_eq(route[route.size() - 1], approach, named + " to the approach")
+				var canvas := OfficeTable.CANVAS
+				canvas.position += placed.measure.seat_position(column, side)
+				_check(placed.measure.render_rect.encloses(canvas), named + " in the drawing envelope")
+				_check(placed.measure.reserved_rect.encloses(canvas), named + " in the reservation")
+				canvas.position += placed.origin
+				_check(plan.render_bounds.encloses(canvas), named + " on the map")
+				for other in canvases:
+					_check(not other.intersects(canvas), named + " overlaps no other workstation")
+				canvases.append(canvas)
 				count += 1
-	_check(count >= least, "%s: every approach, %d of them" % [where, count])
-
-
-## Whether the segment from `from` to `to` (a point when they are equal) has a
-## point strictly inside `box`; touching its edge is not entering it.
-static func _enters(from: Vector2, to: Vector2, box: Rect2) -> bool:
-	var low := from.min(to)
-	var high := from.max(to)
-	var inside_x := low.x < box.end.x and high.x > box.position.x
-	var inside_y := low.y < box.end.y and high.y > box.position.y
-	if from.x == to.x:
-		inside_x = from.x > box.position.x and from.x < box.end.x
-	if from.y == to.y:
-		inside_y = from.y > box.position.y and from.y < box.end.y
-	return inside_x and inside_y
+	_check(count >= 80, "%s: every workstation, %d of them" % [where, count])

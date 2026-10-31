@@ -163,13 +163,15 @@ func test_the_plate_says_the_name() -> void:
 	var selected := _station(office, _pk("solo:p1"))
 	_check(_plate(selected).visible, "herdr's focus is followed: its plate shows")
 	_eq(_plate(selected).text_overrun_behavior, TextServer.OVERRUN_TRIM_ELLIPSIS_FORCE, "a long name is cut")
-	_eq(_plate(selected).size, OfficeStation.PLATE_SIZE, "in the plate's own box")
+	# The native workstation's wider row fits this full name (76 units plus
+	# one unit of padding on each side); the tag still hugs, not fills, it.
+	_eq(_plate(selected).size, Vector2(78, 10), "the complete name hugs its text inside the wider row")
+	_eq(_plate(selected).position, Vector2(-39, 32), "the shorter tag stays centered on its workstation")
 	await _parsed(_l_key(true))
 	await _frames(2)
 	for pane_id: String in names:
 		var station := _station(office, _pk(pane_id))
-		# D2 (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to:
-		# every worker is at their desk, so under L every plate shows there.
+		# Every complete-image actor stays at its desk, including idle.
 		_check(_plate(station).visible, "under L the plate of %s shows at its desk" % pane_id)
 		_eq(_plate(station).text, names[pane_id], "and says the same name")
 	await _parsed(_l_key(false))

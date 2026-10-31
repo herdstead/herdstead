@@ -146,7 +146,7 @@ static func plan(
 ## validates: the first validation takes everything; the second leaves out the
 ## furniture (or, with none, the pantry); the third and last, the pantry too.
 ## A desk is never left out. A map that validates at once, which every shipped
-## width does, is flood filled once; the second and third are the rare cases.
+## width does, is checked once; the second and third are the rare cases.
 static func _validate_furnished(next: FloorPlan, rules: FloorLayoutPolicy) -> PackedStringArray:
 	var problems := validate(next, rules)
 	if problems.is_empty() or (next.decorations.is_empty() and next.pantry == null):
@@ -160,7 +160,7 @@ static func _validate_furnished(next: FloorPlan, rules: FloorLayoutPolicy) -> Pa
 	return validate(next, rules)
 
 
-## Includes geometric clearance and reachability; no scene nodes are needed.
+## Includes geometric containment and clearance; no scene nodes are needed.
 static func validate(value: FloorPlan, policy: FloorLayoutPolicy = null) -> PackedStringArray:
 	var rules := policy if policy != null else FloorLayoutPolicy.new()
 	return OfficeFloorValidation.problems(value, rules)

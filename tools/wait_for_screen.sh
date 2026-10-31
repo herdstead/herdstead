@@ -3,7 +3,7 @@
 # that another one covers can stop drawing frames on macOS, and a capture or a
 # perf probe that waits for a frame then hangs until its watchdog kills it.
 # tools/capture.sh and tools/perf.sh call
-# it before every windowed step, and `make walk-strips` before it starts.
+# it before every windowed step, and `make workstation-strips` before it starts.
 # Headless Godot processes (tests, imports) draw nothing and are ignored.
 #
 #   tools/wait_for_screen.sh [--timeout=SECONDS]   (default 1800; 0 = only look once)

@@ -133,7 +133,7 @@ const PROP_SIDE_TABLE := &"side_table"
 ## grid of the wall itself, never a signal.
 const PROP_WALL_FRAME := &"wall_frame"
 ## The entry band's counter (docs/VISUAL_LANGUAGE.md): a corner nook, furniture
-## only. Nobody walks to it; an idle agent sits at their seat with a mug.
+## only. Agent states are complete workstation images, not destinations.
 const PROP_PANTRY := &"pantry"
 ## The sign over the pantry counter (OfficeShell.pantry_sign()): its word is
 ## the art's, furniture on the top wall, bound to nothing (docs/VISUAL_LANGUAGE.md).
@@ -145,17 +145,11 @@ const PROP_PARTITION_POST := &"partition_post"
 const PROP_PARTITION_CORNER_BL := &"partition_corner_bl"
 const PROP_PARTITION_CORNER_BR := &"partition_corner_br"
 const PROP_PARTITION_H := &"partition_h"
-## A signal, not furniture: the small stack of paper the pod puts beside the
-## laptop of a seat whose agent is done and not yet looked at
-## (OfficeTable.show_item()). Never in a pool (ITEM_GROUPS): it is placed by
-## code, by state.
+## Legacy table art retained for source/build compatibility, not placed by
+## the whole-image office. Neither standalone signal belongs in a decor pool.
 const PROP_DONE_STACK_SMALL := &"done_stack_small"
-## A signal, not furniture: the mug the pod puts beside the laptop of a seat
-## whose agent is idle (OfficeTable.show_item()), idle's own sign as the paper
-## is done's. The same picture as the `desk` pool's mug, a prop of its own so it
-## is never drawn from a pool (ITEM_GROUPS): it is placed by code, by state.
 const PROP_IDLE_MUG := &"idle_mug"
-## The desk items a state puts beside a laptop: signals, never in a pool.
+## The legacy desk signals, never in a pool.
 const DESK_SIGNALS: Array[StringName] = [PROP_DONE_STACK_SMALL, PROP_IDLE_MUG]
 const PROP_IDS: Array[StringName] = [
 	PROP_WINDOW,
@@ -233,16 +227,13 @@ const ANIMATION_STARTING := &"starting"
 ## The semantic animations a state may name. The pixel people have to map every
 ## one of them to a track in both poses (see _people_problems()).
 const ANIMATIONS: Array[StringName] = [ANIMATION_IDLE, ANIMATION_WORKING, ANIMATION_BLOCKED, ANIMATION_STARTING]
-## The track anyone walking across a floor plays (OfficePresentation), whatever
-## their state: drawn from the front, the back and the side, since a route
-## turns all four ways.
+## Retained legacy pixel-people walk track. The office constructs no walkers.
 const TRACK_WALK := &"walk"
 
 # --- the shared table -----------------------------------------------------------
 
-## The modules OfficeTable lays along a pod (its desks, apron, low screen, the
-## two short legs and a bracket per desk), and the two pieces of furniture it
-## and OfficeStation place on and beside it.
+## Legacy modular-table source/build contract; the office draws the complete
+## WorkstationArt images instead of assembling these modules and furniture.
 const TABLE_MODULES: Array[StringName] = [
 	&"desk_left",
 	&"desk_mid_a",
@@ -318,6 +309,8 @@ static func problems(pack: ArtPack) -> PackedStringArray:
 			found.append("states: %s wears %s, which is not a UI image" % [name, drawn.badge])
 	if pack.state(STATE_DONE) != null and pack.state(STATE_DONE).badge != &"unread":
 		found.append("states: done means unread, not task success")
+	if pack.workstation == null:
+		found.append("workstation: the shared whole-image family did not load")
 	found.append_array(_people_problems(pack.people))
 	found.append_array(_portrait_problems(pack.portraits))
 	found.append_array(_table_problems(pack.table))

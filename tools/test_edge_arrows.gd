@@ -88,15 +88,14 @@ func test_an_arrow_points_at_each_zone_with_blocked_desks_off_screen() -> void:
 	await _frames(2)
 	_check(not arrows.visible, "nobody blocked off screen: no arrow")
 	_check(not badge.is_in_group(StatusBadge.GROUP), "the hidden arrow's badge stops pulsing")
-	# S3 BAR-b (2026-10-27): the SPACES rail is gone; the world starts 16 in and first plans take its width.
-	# Four lanes stand 1, 1B, 4 and 5 in the first row, 1A under 1: panned down
-	# to 1A's row, 5's desk is above the view.
-	office.camera.pan = Vector2(0, 300)
+	# Complete workstations make taller zones. Show 1A's desk, leaving the
+	# original focused desk in zone 1 above the view, whatever the pod pitch.
+	office.reveal(_pane("hud:p1"))
 	await _frames(2)
-	_check(not _chip_on_screen(office, _pane("ops:p1")), "panned down to 1A's row, 5's desk is above the view")
-	_feed(office, _with(_with(fixture, "hud:p1", {"agent_status": "working"}), "ops:p1", {"agent_status": "blocked"}))
+	_check(_desk_target(office, _pane("hs:p1")).end.y < _view(office).position.y, "1's desk is above the view")
+	_feed(office, _with(_with(fixture, "hud:p1", {"agent_status": "working"}), "hs:p1", {"agent_status": "blocked"}))
 	await _frames(2)
-	_eq(_arrow_texts(office), ["↑ 5 1"], "5 starts waiting above the view: up to it")
+	_eq(_arrow_texts(office), ["↑ 1 1"], "1 starts waiting above the view: up to it")
 	_set_online(office, false)
 	await _frames(1)
 	_check(not arrows.visible, "a machine that drops counts nobody waiting: no arrow")
@@ -858,12 +857,11 @@ func test_hovering_an_arrow_outlines_its_zones_blocked_cards() -> void:
 	# In view and pointed at once: pan down until 1A's zone comes into view; its
 	# blocked desk is still below it.
 	_check(not _zone_in_view(office, _zone("hud")), "1A's zone starts out of view")
-	var steps := 0
-	while not _zone_in_view(office, _zone("hud")) and steps < 40:
-		office.camera.pan += Vector2(0, 4)
-		await _frames(2)
-		steps += 1
+	var zone_top := office.floor_view.root.to_global(office.layout_plan().zone(_zone("hud")).bounds().position)
+	office.camera.pan.y = zone_top.y - office.hud.world_rect().end.y + 4
+	await _frames(2)
 	_check(_zone_in_view(office, _zone("hud")), "panned down, 1A's zone is in view")
+	_check(not _chip_on_screen(office, _pane("hud:p1")), "its blocked desk is still below the view")
 	var shown := office.hud.edge_arrows.shown()
 	_eq(
 		shown.map(func(each: OfficeEdgeArrow) -> String: return each.zone_key()),

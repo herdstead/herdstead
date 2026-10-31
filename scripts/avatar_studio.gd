@@ -1,15 +1,14 @@
 extends Node2D
-## A small, local avatar composer. It deliberately shares ArtPack and
-## PixelPerson with the live office, so the preview is the same pixel person a
-## pane will use, at the same kind of table. The choices are the family's own
-## slots and options (skin, hair style and colour, top, legs, headwear and its
-## colour, glasses), not a list of this studio's. No network request is made
-## here.
+## Legacy local avatar authoring. The live office now draws the approved
+## generic workstation and portrait, never this rig or its saved clothes.
+## The choices remain the legacy family's own slots and options (skin, hair
+## style and colour, top, legs, headwear and its colour, glasses). No network
+## request is made here.
 ##
 ## Each slot is a row: `‹ value ›`. A row cycles through VARIES (not pinned: a
-## pane's own variation, or the provider's default, shows there) and every
-## option the family draws. The preview shows what the office would draw for a
-## pane of this agent with these pins. SAVE writes the pinned rows for the agent
+## sample key's variation, or the provider's default, shows there) and every
+## option the family draws. The preview shows only this legacy rig with these
+## pins. SAVE writes the pinned rows for the legacy agent look
 ## through AgentCatalog (schema 2, atomic; a file it could not read is kept aside
 ## and the status line says where). Per-colour picking waits for the runtime
 ## colour lookup: only the baked swatches are offered.
@@ -20,11 +19,10 @@ extends Node2D
 
 const DESIGN_SIZE := Vector2i(960, 480)
 const BADGE_ROOT := "res://assets/agent_badges/"
-## The office's own table at twice its size, with a vacant station on both
-## sides of its one column. The person sits at the far seat (front view) or the
-## near seat (back view) at a desk, or stands in front of the table. Twice, not
-## anything between: the pixel people are only ever magnified by a whole number.
-const STAGE_AT := Vector2(300, 270)
+## One legacy rig on a bare authoring stage, at a whole magnification. Never
+## layered onto the office's complete workstation image, which already owns
+## its person, furniture and pose. Desk/front/back here choose rig tracks only.
+const STAGE_AT := Vector2(460, 270)
 const STAGE_ZOOM := 2
 ## The pane key the preview's VARIES rows are picked by: one sample pane.
 const PREVIEW_KEY := "studio"
@@ -112,7 +110,7 @@ func _build_frame() -> void:
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(background)
 	pen.panel(self, Rect2(0, 0, DESIGN_SIZE.x, 32))
-	pen.label(self, "HERDSTEAD / AVATAR STUDIO", Vector2(16, 8), Vector2(300, 18), 12, ArtContract.INK)
+	pen.label(self, "LEGACY AVATAR STUDIO", Vector2(16, 8), Vector2(300, 18), 12, ArtContract.INK)
 	pen.clipped(
 		self,
 		"%d AGENTS / LOCAL ONLY" % agent_ids.size(),
@@ -165,31 +163,19 @@ func _draw_agents() -> void:
 
 func _draw_preview() -> void:
 	pen.panel(content, Rect2(252, 42, 416, 422))
-	pen.label(content, "COMPOSED PORTRAIT", Vector2(268, 52), Vector2(190, 14), 10, ArtContract.SLATE)
+	pen.label(content, "LEGACY RIG PREVIEW", Vector2(268, 52), Vector2(190, 14), 10, ArtContract.SLATE)
 	var id := _agent_id()
 	var stage := Node2D.new()
 	stage.name = "Stage"
 	stage.position = STAGE_AT
 	stage.scale = Vector2.ONE * STAGE_ZOOM
 	content.add_child(stage)
-	var ground := Node2D.new()
-	stage.add_child(ground)
-	var sorted := Node2D.new()
-	sorted.y_sort_enabled = true
-	stage.add_child(sorted)
-	var table := pen.table(sorted, ground, "Table0", Vector2.ZERO, 160.0, [80.0])
-	for side: String in OfficeTable.SIDES:
-		pen.station(sorted, table, 0, side)
 	preview = OfficeDraw.PERSON_SCENE.instantiate()
 	preview.name = "Preview"
 	preview.configure(art.people, id, _selection())
-	sorted.add_child(preview)
+	stage.add_child(preview)
 	if preview_context == AvatarLook.DESK:
-		var seat := table.seat(0, "far" if preview_orientation == AvatarLook.FRONT else "near")
-		preview.position = seat.position
-		preview.sit(seat)
-	else:
-		preview.position = Vector2(80, 34)
+		preview.sit()
 	preview.play_state(preview_animation)
 	pen.clipped(
 		content,
@@ -225,11 +211,9 @@ func _draw_preview() -> void:
 	for slot_id in AvatarLook.SLOTS:
 		if art.people.slots[slot_id].has_option(pins.slot(slot_id)):
 			pinned += 1
-	var shown := "%d of %d pinned  •  VARIES: each pane its own" % [pinned, AvatarLook.SLOTS.size()]
+	var shown := "%d of %d pinned  •  VARIES: sample look" % [pinned, AvatarLook.SLOTS.size()]
 	if not kept.is_empty():
-		shown = (
-			"%d of %d pinned, %d kept  •  VARIES: each pane its own" % [pinned, AvatarLook.SLOTS.size(), kept.size()]
-		)
+		shown = ("%d of %d pinned, %d kept  •  VARIES: sample look" % [pinned, AvatarLook.SLOTS.size(), kept.size()])
 	pen.label(content, shown, Vector2(284, 406), Vector2(352, 14), 8, ArtContract.SLATE, HORIZONTAL_ALIGNMENT_CENTER)
 	pen.label(
 		content,
@@ -242,7 +226,7 @@ func _draw_preview() -> void:
 	)
 	pen.label(
 		content,
-		"This is the same PixelPerson a pane uses.",
+		"Legacy only; office portraits stay generic.",
 		Vector2(284, 442),
 		Vector2(352, 12),
 		8,
@@ -303,7 +287,7 @@ func _draw_composer() -> void:
 	pen.box(content, save_rect, ArtContract.WORKING)
 	pen.label(
 		content,
-		"SAVE FOR THIS AGENT  /  ENTER",
+		"SAVE LEGACY LOOK  /  ENTER",
 		Vector2(708, 410),
 		Vector2(212, 12),
 		8,
@@ -336,9 +320,8 @@ func _agent_id() -> String:
 	return agent_ids[agent_index]
 
 
-## What the preview person is dressed with: the office's look for a pane of this
-## agent with the pins as edited here (not as saved), plus the pose the
-## keyboard is showing.
+## The legacy rig with the pins as edited here (not as saved), plus the pose
+## the keyboard is showing. The generic office never reads these choices.
 func _selection() -> AvatarLook:
 	var result := art.people.resolve(_agent_id(), pins, null, PREVIEW_KEY)
 	result.context = preview_context

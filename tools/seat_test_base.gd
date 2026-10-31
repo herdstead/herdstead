@@ -1,73 +1,125 @@
 extends "res://tools/test_base.gd"
-## Seat-level helpers of the office geometry suite (test_office_geometry.gd):
-## what a seat draws or answers a click with, in which rows, and its worker's
-## pixels. Split off when the suite reached gdlint's file length (S3 SEATTAGS,
-## 2026-10-27); moved as they were. No cases here.
+## Geometry-suite helpers for complete-image workstations. Every measurement
+## uses public scene nodes/properties, never the retired layered-person rig.
+## No cases here; animations use the real AnimationPlayer on a manual clock,
+## while interaction always enters through Input.parse_input_event().
 
-## A pane name longer than two slots' plate (S3 SEATTAGS).
-const LONG_NAME := "a pane name longer than two rows"
+const LONG_NAME := "a pane name longer than two complete workstation columns and their name plates"
+## The approved question bubble's isolated region within a 160x160 cell.
+const QUESTION_REGION := Rect2i(108, 12, 28, 24)
 
-
-## The four bars of `table`'s selection frame, in global coordinates.
-func _frame_bars(table: OfficeTable) -> Array[Rect2]:
-	var bars: Array[Rect2] = []
-	for bar: Node in table.get_node("Overlay/Frame").get_children():
-		var control: Control = bar
-		bars.append(control.get_global_transform() * Rect2(Vector2.ZERO, control.size))
-	return bars
+## Measured once from the authored pixels by the concrete suite's _run().
+var frame_ink: Array[Rect2] = []
+var empty_ink := Rect2()
 
 
-## Whether these are the seat marks of the two seats facing each other across
-## one desk. Those two may meet: the near worker sits over the desk's near
-## plane, a raised hand's top (pod -28) above the far mark's foot (-24), so the
-## near mark [-32, 16) and the far one [-72, -24) share pod [-32, -24). Only
-## one seat is ever selected, so the two are never drawn together; this case
-## selects every seat only to measure each mark against everything else.
-static func _facing_marks(a: OfficeStation, a_part: String, b: OfficeStation, b_part: String) -> bool:
-	return a_part == "mark" and b_part == "mark" and a.table == b.table and a.column == b.column and a.side != b.side
+func _body(station: OfficeStation) -> Sprite2D:
+	return station.get_node("Actor/Body")
 
 
-## Whether two parts of the same seat may not meet: the three rows (plate,
-## lens, tag) with each other, and the seat's rectangle with the chip's. The
-## seat mark, and a click rectangle over the rows it answers for, may.
-static func _same_seat_clash(a: String, b: String) -> bool:
-	var rows := ["plate", "lens", "badge"]
-	if a in rows and b in rows:
-		return true
-	if a in rows and b == "chip" or b in rows and a == "chip":
-		return a != "badge" and b != "badge"
-	return (a == "seat" and b == "chip rect") or (a == "chip rect" and b == "seat")
+func _badge(station: OfficeStation) -> StatusBadge:
+	return station.get_node("Overlay/Badge")
 
 
-## What a seat draws or answers a click with, by name, in global coordinates:
-## only what is shown now.
-func _seat_rows(station: OfficeStation) -> Dictionary[String, Rect2]:
-	var rows: Dictionary[String, Rect2] = {}
-	var badge: Sprite2D = station.get_node("Overlay/Badge")
-	if badge.visible:
-		rows["badge"] = badge.get_global_transform() * _opaque_local(badge)
-	var frame: NinePatchRect = station.chip().get_node("%Frame")
-	if frame.is_visible_in_tree():
-		rows["chip"] = frame.get_global_transform() * Rect2(Vector2.ZERO, frame.size)
-	for label: String in ["Lens", "Plate"]:
-		var control: Label = station.get_node("Overlay/" + label)
-		if control.is_visible_in_tree():
-			rows[label.to_lower()] = control.get_global_transform() * Rect2(Vector2.ZERO, control.size)
-	var mark: Sprite2D = station.get_node("Overlay/Selection")
-	if mark.is_visible_in_tree():
-		rows["mark"] = mark.get_global_transform() * _opaque_local(mark)
-	rows["seat"] = station.target_rect()
-	var chip: CollisionShape2D = station.get_node(OfficeStation.CHIP_TARGET)
-	if not chip.disabled:
-		rows["chip rect"] = _shape_rect(chip)
-	return rows
+func _selection(station: OfficeStation) -> Line2D:
+	return station.get_node("Overlay/Selection")
 
 
 func _plate_of(station: OfficeStation) -> Label:
 	return station.get_node("Overlay/Plate")
 
 
-## Move the real pointer to `at` (viewport pixels) and let physics picking see it.
+func _manual_player(station: OfficeStation) -> AnimationPlayer:
+	var player: AnimationPlayer = station.get_node("Actor/AnimationPlayer")
+	player.callback_mode_process = AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_MANUAL
+	return player
+
+
+func _sheet_cell(index: int, family: WorkstationArt) -> Rect2i:
+	var size := family.frame_size * family.density
+	var cell := Vector2i(index % family.columns, floori(float(index) / family.columns))
+	return Rect2i(cell * size, size)
+
+
+## Whole-image ink in global coordinates, including any actual Body offset
+## or transform. The cached used rectangles avoid reading back the 24-frame
+## texture thousands of times during pairwise row-clearance checks.
+func _drawing(station: OfficeStation) -> Rect2:
+	var family := station.art.workstation
+	var body := _body(station)
+	var used := frame_ink[body.frame] if body.texture == family.sheet_texture() else empty_ink
+	var local := Rect2((used.position + family.pivot) * family.density, used.size * family.density)
+	local.position += body.get_rect().position
+	return body.get_global_transform() * local
+
+
+func _has_question(station: OfficeStation) -> bool:
+	var body := _body(station)
+	var family := station.art.workstation
+	if body.texture != family.sheet_texture():
+		return false
+	var region := QUESTION_REGION
+	region.position += _sheet_cell(body.frame, family).position
+	return body.texture.get_image().get_region(region).get_used_rect().has_area()
+
+
+## A Line2D's envelope, stroke included, in global coordinates.
+func _line_bounds(line: Line2D) -> Rect2:
+	var bounds := Rect2(line.points[0], Vector2.ZERO)
+	for point in line.points:
+		bounds = bounds.expand(point)
+	return line.get_global_transform() * bounds.grow(line.width / 2.0)
+
+
+## The pod's four selection-frame bars in global coordinates.
+func _frame_bars(table: OfficeTable) -> Array[Rect2]:
+	var bars: Array[Rect2] = []
+	for node in table.get_node("Overlay/Frame").get_children():
+		var control: Control = node
+		bars.append(control.get_global_rect())
+	return bars
+
+
+## Same-seat intentional overlaps: the pick rectangle and selection surround
+## the image, and the badge sits over the chip's left half. Nothing else may
+## cover the image or collide with the plate/lens/badge rows. Different seats
+## have no exceptions, including the old opposite-facing selection overlap.
+static func _same_seat_clash(a: String, b: String) -> bool:
+	var rows := ["plate", "lens", "badge", "chip"]
+	if a in rows and b in rows:
+		return not ((a == "badge" and b == "chip") or (a == "chip" and b == "badge"))
+	if a == "image" and b in rows or b == "image" and a in rows:
+		return true
+	return (a == "seat" and b == "chip rect") or (a == "chip rect" and b == "seat")
+
+
+## Drawn parts and enabled input targets only, all in global coordinates.
+## Vacancies still contribute their empty image, but no name or input target.
+func _seat_rows(station: OfficeStation) -> Dictionary[String, Rect2]:
+	var rows: Dictionary[String, Rect2] = {"image": _drawing(station)}
+	var badge := _badge(station)
+	if badge.is_visible_in_tree():
+		rows["badge"] = badge.get_global_transform() * _opaque_local(badge)
+	var frame: NinePatchRect = station.chip().get_node("%Frame")
+	if frame.is_visible_in_tree():
+		rows["chip"] = frame.get_global_rect()
+	for label: String in ["Lens", "Plate"]:
+		var control: Label = station.get_node("Overlay/" + label)
+		if control.is_visible_in_tree():
+			rows[label.to_lower()] = control.get_global_rect()
+	var mark := _selection(station)
+	if mark.is_visible_in_tree():
+		rows["mark"] = _line_bounds(mark)
+	var seat: CollisionShape2D = station.get_node("Target/Seat")
+	if not seat.disabled:
+		rows["seat"] = _shape_rect(seat)
+	var chip: CollisionShape2D = station.get_node("Target/Chip")
+	if not chip.disabled:
+		rows["chip rect"] = _shape_rect(chip)
+	return rows
+
+
+## Move the real pointer and let physics picking observe it.
 func _point(at: Vector2) -> void:
 	var motion := InputEventMouseMotion.new()
 	motion.position = at
@@ -78,8 +130,29 @@ func _point(at: Vector2) -> void:
 	await physics_frame
 
 
-## Every opaque texel `sprite` draws, as texel cells (half a unit each at
-## density 2) in global coordinates, or in `into`'s.
+func _click(at: Vector2, pressed: bool) -> void:
+	await _point(at)
+	var click := InputEventMouseButton.new()
+	click.position = at
+	click.global_position = at
+	click.button_mask = MOUSE_BUTTON_MASK_LEFT if pressed else 0
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = pressed
+	Input.parse_input_event(click)
+	Input.flush_buffered_events()
+	await physics_frame
+	await physics_frame
+
+
+## Nonanimated pack sprites (badges, side-table items and partitions).
+func _opaque_local(sprite: Sprite2D) -> Rect2:
+	var used := Rect2(sprite.texture.get_image().get_used_rect())
+	used.position += sprite.get_rect().position
+	return used
+
+
+## Every opaque texel of a nonanimated pack sprite in global coordinates,
+## or in `into`'s, at the pack's half-unit texel resolution.
 func _texels(sprite: Sprite2D, into: Transform2D = Transform2D.IDENTITY) -> Dictionary[Vector2i, bool]:
 	var found: Dictionary[Vector2i, bool] = {}
 	var image := sprite.texture.get_image()
@@ -89,107 +162,17 @@ func _texels(sprite: Sprite2D, into: Transform2D = Transform2D.IDENTITY) -> Dict
 		for x in range(used.position.x, used.end.x):
 			if image.get_pixel(x, y).a <= 0.0:
 				continue
-			var middle := to_world * (sprite.offset + Vector2(x + 0.5, y + 0.5))
+			var middle := to_world * (sprite.get_rect().position + Vector2(x + 0.5, y + 0.5))
 			found[Vector2i(floori(middle.x * 2.0), floori(middle.y * 2.0))] = true
 	return found
 
 
-## Every opaque texel of the station's chair, as texel cells (see _texels()).
-func _chair_texels(station: OfficeStation, into: Transform2D = Transform2D.IDENTITY) -> Dictionary[Vector2i, bool]:
-	var chair: Sprite2D = station.get_node("Chair")
-	return _texels(chair, into)
-
-
-## Every opaque texel the station's worker draws in the track it plays, over
-## all of its frames and both layers, as texel cells (see _texels()).
-func _figure_texels(station: OfficeStation, into: Transform2D = Transform2D.IDENTITY) -> Dictionary[Vector2i, bool]:
-	var found: Dictionary[Vector2i, bool] = {}
-	var person := station.actor()
-	var people := person.people
-	var track := people.tracks[person.track]
-	for layer in PixelPeople.LAYERS:
-		var sprite: Sprite2D = person.get_node(PixelPeople.SPRITES[layer])
-		if sprite.texture == null:
-			continue
-		var image := sprite.texture.get_image()
-		for index in track.frame_count():
-			var frame := people.frame_rect(track.frame(index))
-			for y in frame.size.y:
-				for x in frame.size.x:
-					if image.get_pixel(frame.position.x + x, frame.position.y + y).a <= 0.0:
-						continue
-					var local := Vector2(x + 0.5, y + 0.5) / people.density - people.pivot
-					if sprite.flip_h:
-						local.x = -local.x
-					var middle := into * person.get_global_transform() * local
-					found[Vector2i(floori(middle.x * 2.0), floori(middle.y * 2.0))] = true
-	return found
-
-
-## Every opaque pixel the station's worker draws in the track it plays, over
-## all of its frames and both layers (mirrored where a layer is), in the
-## station's coordinates.
-func _drawn_figure(station: OfficeStation) -> Rect2:
-	var person := station.actor()
-	var people := person.people
-	var track := people.tracks[person.track]
-	var drawn := Rect2()
-	for layer in PixelPeople.LAYERS:
-		var sprite: Sprite2D = person.get_node(PixelPeople.SPRITES[layer])
-		# A layer the look leaves empty (no glasses, the hair under a hood) draws nothing.
-		if sprite.texture == null:
-			continue
-		var image := sprite.texture.get_image()
-		for index in track.frame_count():
-			var used := image.get_region(people.frame_rect(track.frame(index))).get_used_rect()
-			if used.size == Vector2i.ZERO:
-				continue
-			# Texels back to units.
-			var local := Rect2(
-				Vector2(used.position) / people.density - people.pivot, Vector2(used.size) / people.density
-			)
-			if sprite.flip_h:
-				local = Rect2(Vector2(-local.end.x, local.position.y), local.size)
-			var placed := Rect2(person.position + local.position, local.size)
-			drawn = placed if drawn.size == Vector2.ZERO else drawn.merge(placed)
-	return drawn
-
-
-## Where the plate's upper-case text is drawn, in the station's coordinates:
-## centred in the plate, from its top down to the font's baseline.
-func _plate_text(station: OfficeStation) -> Rect2:
-	var overlay: Node2D = station.get_node("Overlay")
-	var plate: Label = overlay.get_node("Plate")
-	var font := plate.get_theme_font("font")
-	var pixels := plate.get_theme_font_size("font_size")
-	var width := font.get_string_size(plate.text, HORIZONTAL_ALIGNMENT_LEFT, -1, pixels).x
-	var top_left := plate.position + Vector2((plate.size.x - width) / 2.0, 0)
-	return _in_station(station, overlay, Rect2(top_left, Vector2(width, font.get_ascent(pixels))))
-
-
-## The opaque pixels of `sprite` in its own coordinates (before its transform):
-## what get_rect() is for the pixels that are drawn.
-func _opaque_local(sprite: Sprite2D) -> Rect2:
-	var used := Rect2(sprite.texture.get_image().get_used_rect())
-	used.position += sprite.offset
-	return used
-
-
-## A collision shape's rectangle, in global coordinates.
 func _shape_rect(node: Node) -> Rect2:
 	var shape: CollisionShape2D = node
 	var box: RectangleShape2D = shape.shape
-	return Rect2(shape.global_position - box.size / 2.0, box.size)
+	return shape.get_global_transform() * Rect2(-box.size / 2.0, box.size)
 
 
-## `bounds`, given in `node`'s own coordinates, in the station's.
-func _in_station(station: OfficeStation, node: CanvasItem, bounds: Rect2) -> Rect2:
-	return station.get_global_transform().affine_inverse() * node.get_global_transform() * bounds
-
-
-## Seat a pane, named LONG_NAME, at every near seat of `stations` (one pod's,
-## column by column, far then near) and at the far ones in `far`; vacate the
-## rest; the map has few seats; widen the plates as the floor does.
 func _seat_far(stations: Array[OfficeStation], far: Array[int]) -> void:
 	for station in stations:
 		if station.side == "near" or station.column in far:
@@ -201,8 +184,55 @@ func _seat_far(stations: Array[OfficeStation], far: Array[int]) -> void:
 	OfficeFloorView.widen_plates(stations)
 
 
-## Where `station`'s plate is drawn, in its pod's coordinates.
 func _pod_plate(station: OfficeStation) -> Rect2:
-	var plate := _plate_of(station)
-	var drawn := plate.get_global_transform() * Rect2(Vector2.ZERO, plate.size)
-	return station.table.global_transform.affine_inverse() * drawn
+	return station.table.global_transform.affine_inverse() * _plate_of(station).get_global_rect()
+
+
+func _placement(tab_key: String, capacity: int) -> DeskPlacement:
+	var placed := DeskPlacement.new()
+	placed.tab_key = tab_key
+	placed.capacity = capacity
+	placed.measure = OfficeTable.measure(capacity)
+	return placed
+
+
+func _side_pane(index: int) -> PaneModel:
+	var pane := PaneModel.new()
+	pane.pane_id = "p%d" % index
+	pane.key = "side:p%d" % index
+	pane.terminal_id = "term-p%d" % index
+	pane.provider = "claude"
+	pane.state = "working"
+	return pane
+
+
+func _side_room(key: String, number: int, first: int, count: int) -> RoomModel:
+	var room := RoomModel.new()
+	room.key = key
+	room.number = number
+	room.label = key.to_upper()
+	for index in count:
+		room.panes.append(_side_pane(first + index))
+	return room
+
+
+func _side_zone(key: String, number: int, rooms: Array[RoomModel]) -> ZoneModel:
+	var zone := ZoneModel.new()
+	zone.key = key
+	zone.number = number
+	zone.label = key
+	zone.rooms = rooms
+	return zone
+
+
+func _gap_table_of(plan: FloorPlan, key := "") -> DecorPlacement:
+	for placed in plan.decorations:
+		if key.is_empty() and placed.key.begins_with("00/gap/") and placed.piece == ArtContract.PROP_SIDE_TABLE:
+			return placed
+		if not key.is_empty() and placed.key == key:
+			return placed
+	return null
+
+
+func _decor_node(floor_root: Node, key: String) -> OfficeDecor:
+	return floor_root.find_child("Decor_" + key.replace("/", "_"), true, false) as OfficeDecor

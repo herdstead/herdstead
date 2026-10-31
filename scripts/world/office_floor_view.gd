@@ -9,9 +9,8 @@ extends RefCounted
 ## (a NinePatchRect in Ground/Carpets, in its worktree group's family, resized
 ## when the zone's rectangle changes) under its sign (OfficeZoneSign, whose
 ## text follows the zone's model on every reconcile).
-## Its people walk between one observation and the next (`presentation`): in
-## at the lift door, out of it, and over to a new seat. Nobody walks to the
-## pantry counter: an idle agent sits at their seat.
+## Every workstation is a whole image. Arrivals, removals and moves reconcile
+## in place; there are no walkers or ghosts between observations.
 
 
 ## A desk on the floor: its station node and what that station shows now, so
@@ -61,15 +60,16 @@ var plan: FloorPlan
 ## the tree order, the seat index): a diagnostic, never a decision, so a test
 ## can prove that a refresh on an unchanged plan does none of it.
 var structures := 0
-## Who walks where on this floor, between the observations it is updated with.
-var presentation := OfficePresentation.new()
 ## The hover mark (OfficePointer), the floor root's last child; point() moves it.
 var pointer: OfficePointer
 var _pen: OfficeDraw
+## An outage holds frames until a valid, live observation is installed, not
+## merely until the socket connects. Invalid layout must not thaw old data.
+var _held := false
 ## The ground the shell carries past the floor's side walls, in cells to the
 ## left (x) and to the right (y) (set_apron()): the floor seen under the HUD's
-## side panels, which float over it. Drawn only: the plan, the walk graph, the
-## seats' clicks and the camera's reach never see it.
+## side panels, which float over it. Drawn only: the plan, the seats' clicks
+## and the camera's reach never see it.
 var _apron := Vector2i.ZERO
 var _apron_layer: TileMapLayer
 ## The lens is held: furnishing made while it is starts dimmed too.
@@ -139,7 +139,6 @@ func setup(
 	pointer = OfficePointer.new()
 	pointer.dress(drawing.art)
 	floor_root.add_child(pointer)
-	presentation.setup(sorted, drawing.art.people)
 
 
 ## The seat drawn for pane `key`, or null.
@@ -175,11 +174,18 @@ func update_desks(model: MapModel, active_key: String, frozen: bool) -> void:
 			var desk: Seat = seats.get(pane.key)
 			if desk == null:
 				continue
+			# A retained stale picture may still be selected, but newer facts
+			# cannot change its occupant, name, focus or state until recovery.
+			if frozen and not desk.look.is_empty():
+				desk.selected = is_selected
+				desk.node.select(is_selected)
+				continue
 			# Which tab a workspace has open moves on its own, and moves every
 			# lamp of a room at once, so the lamp is looked at before the worker.
 			var level := lamp_of(pane, room)
-			desk.lit = level
-			desk.node.light(level)
+			if level != desk.lit:
+				desk.lit = level
+				desk.node.light(level)
 			# So does its name, which the plate says on its own channel.
 			if pane.name != desk.named:
 				desk.named = pane.name
@@ -196,13 +202,12 @@ func update_desks(model: MapModel, active_key: String, frozen: bool) -> void:
 			desk.node.furnish(
 				pane.provider, StringName(pane.state), is_selected, pane.launching(), pane.pane_id, pane.machine()
 			)
-			var actor := desk.node.actor()
-			if frozen and actor != null:
-				actor.pause()
 		if room_index < tables.size():
 			tables[room_index].set_selected(table_selected)
 	_show_plates(model)
-	presentation.after(self, frozen)
+	_held = frozen
+	for key in seats:
+		seats[key].node.freeze(frozen)
 
 
 ## Whether `model`'s map has few occupied seats: at most
@@ -311,9 +316,8 @@ func furnishing() -> Array[CanvasItem]:
 
 
 ## Where pane `key`'s signal is, in the floor's own coordinates (the root's):
-## where its desk answers a click, which is the seat's own rectangle (every
-## worker sits there), together with its chip while it shows (a chip
-## that draws nothing, under the lens or with no wait to say, still shows).
+## the whole image and its reserved name, badge, chip and lens rows. Keeping
+## those rows even while hidden avoids clipping labels or jumping on a refresh.
 ## What the pointer frames (point()) and the camera brings into view
 ## (OfficeScene.reveal()). The one extent of a desk's signal: an arrow's aim
 ## is another question (arrow_target()). No area for a pane with no seat
@@ -322,11 +326,7 @@ func signal_extent(key: String) -> Rect2:
 	var desk: Seat = seats.get(key)
 	if desk == null:
 		return Rect2()
-	var bounds := desk.node.target_rect()
-	var chip := desk.node.chip_rect()
-	if chip.has_area():
-		bounds = bounds.merge(chip)
-	return _on_floor(bounds)
+	return _on_floor(desk.node.signal_rect())
 
 
 ## What an edge arrow aims at for pane `key`, in the floor's own coordinates:
@@ -423,55 +423,25 @@ func _furnishing_tint() -> Color:
 	return LENS_DIM if _lens else Color.WHITE
 
 
-## Walk this floor's people `delta` seconds further; the office calls it every frame.
-func walk(delta: float) -> void:
-	presentation.walk(delta)
-
-
-## Walk every walk on this floor to its end at once (OfficePresentation.settle()).
-func settle() -> void:
-	presentation.settle()
-
-
-## The office could not lay out this refresh's input, so the floor was not
-## updated: the next update is presented cold (OfficePresentation.lose_track()).
-func lose_track() -> void:
-	presentation.lose_track()
-
-
 ## A dropped connection keeps the floor on screen, dimmed by `tint` and frozen;
-## a live one draws it plainly and lets every worker on it move again. Never
-## dress a lost connection up as idle. Its walkers stop where they are and
-## whoever was on the way out is gone (OfficePresentation.freeze()); when the
-## machine is back they stay as they stopped, walk animation too, until the
-## next observation places them (OfficePresentation.holding()).
+## reconnecting alone cannot resume it. update_desks() releases the hold only
+## after a current observation passed the layout gate.
 func freeze(is_stale: bool, tint: Color) -> void:
-	presentation.freeze(is_stale)
-	root.modulate = tint if is_stale else Color.WHITE
-	if not root.is_inside_tree():
-		return
-	var held: Dictionary[int, bool] = {}
-	if presentation.holding():
-		for body in presentation.walkers():
-			held[body.get_instance_id()] = true
-	for person: PixelPerson in root.get_tree().get_nodes_in_group("office_actors"):
-		if not root.is_ancestor_of(person):
-			continue
-		if is_stale:
-			person.pause()
-		elif not held.has(person.get_instance_id()):
-			person.play()
+	_held = _held or is_stale
+	root.modulate = tint if _held else Color.WHITE
+	for key in seats:
+		seats[key].node.freeze(_held)
 
 
 ## Lay the floor out as `next` for `model`, keeping every table and seat that
-## is still there. The presentation takes whoever leaves out of their seat
-## first, and keeps whoever will walk where they stand; `frozen` says the
-## shown machine is stale, which walks nobody.
+## is still there. Transfer moving panes before deleting old tabs, retaining
+## the station and its complete animation rather than rebuilding a person.
 func reconcile(next: FloorPlan, model: MapModel, frozen := false) -> void:
-	presentation.before(self, next, model, frozen)
+	_held = _held or frozen
 	var wanted: Dictionary[String, RoomModel] = {}
 	for room in model.rooms:
 		wanted[room.key] = room
+	_transfer_stations(next)
 	for key: String in desks.keys():
 		if not wanted.has(key):
 			desks[key].release()
@@ -505,7 +475,25 @@ func reconcile(next: FloorPlan, model: MapModel, frozen := false) -> void:
 		_index(model)
 		_rooms_signature = rooms_key
 		structures += 1
-	presentation.placed(self)
+	for key in seats:
+		seats[key].node.freeze(_held)
+
+
+func _transfer_stations(next: FloorPlan) -> void:
+	var owners: Dictionary[String, OfficeDeskView] = {}
+	for key in desks:
+		for pane in desks[key].pane_stations:
+			owners[pane] = desks[key]
+	for placed in next.desks:
+		var destination: OfficeDeskView = desks.get(placed.tab_key)
+		if destination == null:
+			destination = OfficeDeskView.new()
+			destination.setup(_pen, ground, sorted, placed.tab_key)
+			desks[placed.tab_key] = destination
+		for binding in placed.seats:
+			var previous: OfficeDeskView = owners.get(binding.pane_key)
+			if previous != null and previous != destination:
+				destination.adopt_station(previous.take_station(binding.pane_key))
 
 
 ## The rooms in the model's order, each with its panes in order: what _order()
@@ -531,7 +519,6 @@ func _index(model: MapModel) -> void:
 		if view == null:
 			continue
 		tables.append(view.table)
-		view.table.set_night(_night)
 		for key in view.pane_stations:
 			var station := view.pane_stations[key]
 			var retained: Seat = seats.get(key)
@@ -697,8 +684,6 @@ func _outer_wall(next: FloorPlan) -> void:
 ## to the night one past the middle of a fade (a texture swap, no node rebuilt).
 func set_night(amount: float) -> void:
 	_night = amount
-	for table in tables:
-		table.set_night(amount)
 	var texture := _pen.art.sprite_texture(_pen.art.prop_sprite(_window_id()))
 	for window in _windows:
 		window.texture = texture

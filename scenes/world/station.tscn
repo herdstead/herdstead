@@ -3,33 +3,31 @@
 [ext_resource type="Script" path="res://scripts/world/station.gd" id="1_station"]
 [ext_resource type="Script" path="res://scripts/status_badge.gd" id="2_badge"]
 [ext_resource type="PackedScene" path="res://scenes/world/chip.tscn" id="3_chip"]
+[ext_resource type="PackedScene" path="res://scenes/world/workstation_actor.tscn" id="4_actor"]
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_far"]
-size = Vector2(30, 58)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_near"]
-size = Vector2(30, 56)
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_seat"]
+size = Vector2(80, 80)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_chip"]
 size = Vector2(30, 18)
 
 [node name="Station" type="Node2D"]
-y_sort_enabled = true
 script = ExtResource("1_station")
 
-[node name="Chair" type="Sprite2D" parent="."]
-centered = false
+[node name="Actor" parent="." instance=ExtResource("4_actor")]
 
-[node name="Mark" type="Sprite2D" parent="Chair"]
+[node name="Focus" type="Polygon2D" parent="."]
 visible = false
-centered = false
+polygon = PackedVector2Array(-28, 4, 34, 4, 34, 5, -28, 5)
 
 [node name="Overlay" type="Node2D" parent="."]
 
 [node name="Plate" type="Label" parent="Overlay"]
 visible = false
-offset_right = 30.0
-offset_bottom = 12.0
+offset_left = -47.0
+offset_top = 32.0
+offset_right = 47.0
+offset_bottom = 42.0
 mouse_filter = 2
 horizontal_alignment = 1
 clip_text = true
@@ -44,9 +42,10 @@ horizontal_alignment = 1
 clip_text = true
 text_overrun_behavior = 3
 
-[node name="Selection" type="Sprite2D" parent="Overlay"]
+[node name="Selection" type="Line2D" parent="Overlay"]
 visible = false
-centered = false
+points = PackedVector2Array(-36, -69, 41, -69, 41, 9, -36, 9, -36, -69)
+width = 1.0
 
 [node name="Chip" parent="Overlay" instance=ExtResource("3_chip")]
 visible = false
@@ -62,18 +61,13 @@ input_pickable = false
 monitoring = false
 monitorable = false
 
-[node name="Far" type="CollisionShape2D" parent="Target"]
-position = Vector2(0, -25)
-shape = SubResource("RectangleShape2D_far")
-disabled = true
-
-[node name="Near" type="CollisionShape2D" parent="Target"]
-position = Vector2(0, -4)
-shape = SubResource("RectangleShape2D_near")
+[node name="Seat" type="CollisionShape2D" parent="Target"]
+position = Vector2(2.5, -30)
+shape = SubResource("RectangleShape2D_seat")
 disabled = true
 
 [node name="Chip" type="CollisionShape2D" parent="Target"]
-position = Vector2(0, -45)
+position = Vector2(0, 19)
 shape = SubResource("RectangleShape2D_chip")
 disabled = true
 

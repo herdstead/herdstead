@@ -8,8 +8,8 @@ extends RefCounted
 ## a side wall at each end. Across: a side wall, `lanes` lanes of
 ## zone_width_cells with an aisle column (lane_aisle_cells) between two of
 ## them, the main corridor and the other side wall; 5L + 3 cells for L lanes
-## at the shipped values. A lane holds the narrowest pod (2 columns, 3 cells)
-## right of its zone's pad. A zone stands in one or more adjacent lanes, one
+## at the shipped values. The narrowest pod reserves seven cells and spans
+## two lanes, right of its zone's pad. A zone stands in adjacent lanes, one
 ## aisle row (zone_aisle_cells) above it, and is 5k - 1 cells wide for k lanes:
 ## the aisle columns between its lanes are its own. A new zone takes as many
 ## lanes as its pods need to stand in one row (zone_tall_rows). Its pod rows
@@ -26,22 +26,18 @@ const GRID := 32
 ## and the floors fixture's 13 seats read clear with every plate shown. What
 ## the map shows, not where anything stands, so it is in no plan's signature.
 const FEW_SEATS := 16
-var version := 5
+var version := 6
 var width_cells := 32
 var wall_cells := 2
-## One: the walking lane (OfficeShell.WALKING_LANE), right under the top wall;
-## the pantry counter stands at the band's left end against the wall, and
-## nobody stands at it. D2 (2026-10-27): idle sits with a mug; the pantry is a
-## nook nobody walks to, so its fixture row went with its people (SEATED-Q2).
-## S3 BAND (2026-10-28): the top wall draws behind a person in front of it, so
-## its drawing clearance row went too (a walker's canvas reaches over its face;
-## OfficeWalkGraph), and the map opens with the wall and the first pod row whole.
+## One corridor row right under the top wall; the pantry counter stands at
+## its left end against the wall. Stationary workstations need no actor
+## clearance row or walking lane data.
 var entry_cells := 1
 var main_corridor_cells := 2
 var outer_side_cells := 1
 ## One lane of zones, the partition's pad inside a zone's left edge, and the
-## aisle column between two lanes. Four: a pod of c columns reserves c + 1
-## cells (OfficeTable.measure()), so the narrowest (2 columns) and the pad.
+## aisle column between two lanes. A pod of c columns reserves 3c + 1 cells
+## (OfficeTable.measure()); the lane allocator spans as many lanes as it needs.
 var zone_width_cells := 4
 var zone_pad_left_cells := 1
 var lane_aisle_cells := 1
@@ -62,15 +58,10 @@ var max_panes := 4096
 var max_tables := 1024
 ## Separate, cumulative Node upper bound for live desk groups, including empty
 ## historical columns. OfficeDeskView.node_budget owns the prefab accounting.
-## 32768 bounds roughly 920 fully furnished seats, or 195 minimum-size pods;
-## this is an allocation ceiling, not a frame-time or memory guarantee. It is
+## This is an allocation ceiling, not a frame-time or memory guarantee. It is
 ## charged on the whole map, every zone's tables together.
 ## Floor tiles, shell and optional decor remain bounded by the grid limits.
 var max_desk_nodes := 32768
-## Supply production measurements for body/visual clearance. Empty rectangles
-## deliberately request point reachability only (useful for geometry tools).
-var actor_footprint := Rect2()
-var actor_draw_rect := Rect2()
 
 
 ## Width is selected only for the first plan. Viewport changes cannot reflow it.
@@ -89,9 +80,7 @@ func geometry_signature() -> String:
 			zone_aisle_cells,
 			map_top_aisle_cells,
 			zone_tall_rows,
-			min_height_cells,
-			actor_footprint,
-			actor_draw_rect
+			min_height_cells
 		]
 	)
 
@@ -114,9 +103,6 @@ func problems() -> PackedStringArray:
 		found.append("floor dimensions exceed supported TileMap coordinates")
 	if max_floor_cells < 1 or max_panes < 1 or max_tables < 1 or max_desk_nodes < 1:
 		found.append("floor, input and desk node budgets must be positive")
-	for bounds: Rect2 in [actor_footprint, actor_draw_rect]:
-		if not bounds.position.is_finite() or not bounds.size.is_finite() or bounds.size.x < 0 or bounds.size.y < 0:
-			found.append("invalid actor measurement")
 	return found
 
 
@@ -146,7 +132,7 @@ func lanes_for_width(width: int) -> int:
 
 
 ## The fewest lanes (at least one) whose zone holds a table `width` cells wide
-## right of its pad: for a pod of c columns, ceil((c + 3) / 5).
+## right of its pad: for a pod of c columns, ceil((3c + 3) / 5).
 func lanes_for_inner(width: int) -> int:
 	return lanes_for_width(width + zone_pad_left_cells)
 

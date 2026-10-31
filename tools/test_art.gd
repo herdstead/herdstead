@@ -1210,6 +1210,9 @@ func test_art_textures_as_built() -> void:
 		drawn["people/" + sheet] = art.people.texture(sheet)
 	for sheet in art.portraits.files:
 		drawn["portraits/" + sheet] = art.portraits.texture(sheet)
+	drawn["workstation/atlas"] = art.workstation.sheet_texture()
+	drawn["workstation/empty"] = art.workstation.empty_texture()
+	drawn["workstation/portrait"] = art.workstation.portrait_texture()
 	for where: String in drawn:
 		var texture := drawn[where]
 		_check(

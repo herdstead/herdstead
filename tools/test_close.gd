@@ -271,8 +271,9 @@ func test_two_clicks_close_a_shell_and_an_idle_agent_walks_out() -> void:
 	_eq(_asked("control-a", "pane.close")[1], {"pane_id": "alpha:p3"}, "its id")
 	await _until(func() -> bool: return office.frame.pane(p3) == null, "gone from the snapshot")
 	await _frames(3)
-	var ghosts := office.floor_view.presentation.ghosts()
-	_check(ghosts.size() == 1 and ghosts[0] == body, "the same worker walks out as a ghost")
+	_eq(office.floor_view.seat(p3), null, "the removed pane has no occupied workstation or click target")
+	if is_instance_valid(body):
+		_eq(body.animation, &"", "a retained empty slot no longer animates a person")
 	_eq(_list(_ctl("control-a", "stats"), "closes").size(), 2, "the fake closed both")
 
 
