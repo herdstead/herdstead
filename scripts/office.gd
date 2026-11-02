@@ -543,8 +543,6 @@ func _remember_theme(path: String) -> void:
 
 
 func _process(delta: float) -> void:
-	if floor_view != null:
-		floor_view.walk(delta)
 	_light_left -= delta
 	if _light_left <= 0.0:
 		_light_left = 1.0
@@ -880,10 +878,7 @@ func _refresh() -> void:
 		floor_view.reconcile(planned, map, _frozen())
 	if problems.is_empty():
 		floor_view.update_desks(map, navigator.active_key, _frozen())
-	else:
-		# Nothing on the map followed this input: the next update that can be
-		# laid out brings all of it at once, with nobody walking.
-		floor_view.lose_track()
+	_apply_stale()
 	_content_size = floor_view.plan.render_bounds.end + Vector2(0, PLATE_HEIGHT)
 	world.position = room.position
 	_show_plate(building, problems)
@@ -1180,13 +1175,15 @@ func _show_plate_state() -> void:
 ## frozen; its plate stays readable. Never dress a lost connection up as idle.
 func _apply_stale() -> void:
 	if floor_view != null and fleet.has(_world_machine):
-		floor_view.freeze(fleet.is_stale(_world_machine), art.stale_tint)
+		var tint := art.stale_tint if fleet.is_stale(_world_machine) else Color.WHITE
+		floor_view.freeze(_frozen(), tint)
 	_show_plate_state()
 
 
-## A worker drawn for a dropped machine starts frozen, like the rest of its map.
+## Old data stays frozen through an outage or invalid layout until a valid,
+## current observation is installed. Only an outage also dims the map.
 func _frozen() -> bool:
-	return fleet.has(_world_machine) and fleet.is_stale(_world_machine)
+	return (fleet.has(_world_machine) and fleet.is_stale(_world_machine)) or not plans.problems().is_empty()
 
 
 func _building_state(key: String) -> MachineLiveness.State:

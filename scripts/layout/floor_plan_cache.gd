@@ -3,7 +3,7 @@ extends RefCounted
 ## Every map's last valid plan, and what was last tried for it, for as long as
 ## the map exists. A map is kept under its key (the office hands in one per
 ## machine, under the machine's key), with its plan and history: a refresh plans a map again only
-## when its geometry, the art pack or the clearance policy changed. Status,
+## when its geometry, the art pack or the layout policy changed. Status,
 ## labels, focus and liveness never invalidate a plan. Not persisted: this is
 ## the run's memory.
 ##
@@ -31,9 +31,6 @@ var _failing: Dictionary[String, PackedStringArray] = {}
 ## The problems of the map prepare() was last asked for.
 var _problems := PackedStringArray()
 var _attempts := 0
-## The person prefab's feet, read once: PixelPerson.footprint() instantiates it.
-var _footprint := Rect2()
-var _footprint_read := false
 
 
 ## The plan to draw `map` with, `visible_width` units wide if it is planned for
@@ -45,8 +42,6 @@ var _footprint_read := false
 func prepare(map: MapModel, pen: OfficeDraw, visible_width: float) -> FloorPlan:
 	var policy := FloorLayoutPolicy.new()
 	policy.width_cells = maxi(1, floori(visible_width / FloorLayoutPolicy.GRID))
-	policy.actor_draw_rect = PixelPerson.drawing_rect(pen.art.people)
-	policy.actor_footprint = _actor_footprint()
 	var previous: FloorPlan = _plans.get(map.key)
 	# Budgets can change acceptance without changing the retained row geometry.
 	var input := JSON.stringify(
@@ -58,7 +53,8 @@ func prepare(map: MapModel, pen: OfficeDraw, visible_width: float) -> FloorPlan:
 			policy.max_height_cells,
 			policy.max_floor_cells,
 			policy.max_panes,
-			policy.max_tables
+			policy.max_tables,
+			policy.max_desk_nodes
 		]
 	)
 	# Width is fixed once there is a compatible plan (even an empty fallback).
@@ -149,10 +145,3 @@ func prune(map_keys: Array[String]) -> void:
 			_attempt_problems.erase(key)
 			_notes.erase(key)
 			_failing.erase(key)
-
-
-func _actor_footprint() -> Rect2:
-	if not _footprint_read:
-		_footprint = PixelPerson.footprint()
-		_footprint_read = true
-	return _footprint

@@ -3,14 +3,14 @@
 # count, draw calls and the cost of one refresh, against a fake herdr serving
 # synthetic sessions (tools/gen_stress_fixture.py). `make perf` runs it.
 #
-#   tools/perf.sh [--runs=3] [--figures] [--walks] [--hold=8] [--warmup=6]
+#   tools/perf.sh [--runs=3] [--figures] [--changes] [--hold=8] [--warmup=6]
 #   GODOT=/path/to/godot tools/perf.sh --runs=5
 #
 # Scenarios: medium (3 zones on one map, 36 panes), stress (1 zone, 10 tabs x 8
 # panes), spaces30 (30 zones of one tab on one map, 189 panes, ten of them
 # mezzanines: many signs, partitions and carpets) and overview (the stress
-# map in a 3200x1600 window at 2x, zoomed out: the
-# whole map on screen, in a window a 3456-pixel-wide laptop display still
+# map in a 3200x1600 window at 2x: a wider view of the native workstations,
+# not a promise that the enlarged map fits, in a window a 3456-pixel-wide laptop display still
 # holds; a display too small for it is said
 # on a PERF_SHRUNK line under the summary); stress+overview (the stress map
 # with the OVERVIEW open over it, `--overview=open`: 80 rows and timelines;
@@ -23,15 +23,14 @@
 # x 8 panes: the world, the world with the bottom panel on its EVENTS page,
 # `--panel=events`, so its rows stay on the measured path while the AGENT page
 # skips them, and the view over it);
-# --figures adds 80 seated pixel people on their own, every one on screen; --walks
-# adds the stress map's people walking (tools/perf_probe.gd --walk=): 80 walk
-# in at once, 40 are done at once (seated, with paper), a pod grows
-# under 80 walking in, and the window is minimized and restored mid-walk, and
-# 40 go blocked (seated under chips) or idle at once, one
-# of 40 blocked is answered again and again, and a pod grows under 40
-# blocked, each timed frame by frame from the
-# snapshot that starts it, which the probe sets through the fake herdr's
-# control socket. Every round
+# --figures adds 80 complete WorkstationActors in a 3200x1600 window at native
+# 2x density: every full canvas must fit, with no shrinking to hide draw cost.
+# --changes adds actual snapshot transitions (tools/perf_probe.gd --change=):
+# 80 shells gain agents, 40 agents finish, a tab grows, 40 go blocked or idle,
+# eight blocked agents return to work one at a time, and a tab grows with 40
+# blocked. The minimize case gains 80 agents, minimizes for 2 s, then restores.
+# The probe times every frame and each change from sending it through the fake
+# control socket to data_refreshed for that complete snapshot. Every round
 # runs each scenario twice, paced (the default) and with --fps=0 (uncapped, as
 # before the pacer), and the rounds interleave, so drift lands on both columns.
 # Each figure in the summary is the median over --runs rounds.
@@ -58,14 +57,14 @@ fi
 PYTHON="${PYTHON:-$DEFAULT_PYTHON}"
 RUNS=3
 FIGURES=0
-WALKS=0
+CHANGES=0
 HOLD=8
 WARMUP=6
 for argument in "$@"; do
 	case "$argument" in
 		--runs=*) RUNS="${argument#--runs=}" ;;
 		--figures) FIGURES=1 ;;
-		--walks) WALKS=1 ;;
+		--changes) CHANGES=1 ;;
 		--hold=*) HOLD="${argument#--hold=}" ;;
 		--warmup=*) WARMUP="${argument#--warmup=}" ;;
 		*)
@@ -82,6 +81,10 @@ for number in "$RUNS" "$HOLD" "$WARMUP"; do
 			;;
 	esac
 done
+if [ "$CHANGES" -eq 1 ] && [ "$HOLD" -lt 8 ]; then
+	echo "PERF: --changes needs --hold=8 or longer to observe all eight approvals" >&2
+	exit 2
+fi
 if [ "$(uname -s)" = "Linux" ] && [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ]; then
 	echo "PERF: needs a display; a headless run draws nothing to measure" >&2
 	exit 2
@@ -147,8 +150,12 @@ measure() {
 	local args=(--warmup="$WARMUP" --hold="$((HOLD + 1))")
 	# Engine arguments go before --script; the probe's own go after --.
 	local engine=()
-	if [ "$mode" = "walks" ]; then
-		args+=(--mode=office --walk="$name" --control="$WORK/herdr-ctl.sock")
+	if [ "$mode" = "changes" ]; then
+		args+=(--mode=office --change="$name" --control="$WORK/herdr-ctl.sock" --fixtures="$WORK/fixtures")
+	elif [ "$mode" = "actors" ]; then
+		# Complete canvases at native density, not tiny people fitted into the old grid.
+		engine+=(--resolution 3200x1600)
+		args+=(--mode=actors)
 	elif [ "$mode" = "office-overview" ]; then
 		args+=(--mode=office --overview=open)
 	elif [ "$mode" = "office-lens" ]; then
@@ -163,14 +170,14 @@ measure() {
 		# of sight renders no rows, so this is where their cost is measured).
 		args+=(--mode=office --panel=events)
 	elif [ "$mode" = "overview" ]; then
-		# The stress map in a big window at the lowest zoom (2x): the whole
-		# map on screen, as zoom 1 showed it before.
+		# A wider part of the stress map at the lowest zoom (2x). on_screen
+		# counts the complete canvases actually visible, without fitting them.
 		engine+=(--resolution 3200x1600)
 		args+=(--mode=office --zoom=2)
 	else
 		args+=(--mode="$mode")
 	fi
-	if [ "$mode" = "office" ] || [ "$mode" = "walks" ] || [ "$mode" = "overview" ] || [ "$mode" = "office-overview" ] \
+	if [ "$mode" = "office" ] || [ "$mode" = "changes" ] || [ "$mode" = "overview" ] || [ "$mode" = "office-overview" ] \
 		|| [ "$mode" = "office-lens" ] || [ "$mode" = "office-strategic" ] || [ "$mode" = "office-events" ]; then
 		start_fake "$fixture" || return 1
 		# Read-only, like every baseline before the write boundary: the agent
@@ -254,18 +261,18 @@ SCENARIOS=("medium office snapshot_medium 3 zones, 36 panes" "stress office snap
 	"stress400+events office-events snapshot_stress400 1 zone, 400 panes, the bottom panel's EVENTS page"
 	"stress400+strategic office-strategic snapshot_stress400 1 zone, 400 panes, the strategic view open")
 if [ "$FIGURES" -eq 1 ]; then
-	SCENARIOS+=("actors80 actors - 80 pixel people")
+	SCENARIOS+=("workstations80 actors - 80 whole workstations, native 2x")
 fi
-if [ "$WALKS" -eq 1 ]; then
+if [ "$CHANGES" -eq 1 ]; then
 	SCENARIOS+=(
-		"arrivals walks snapshot_stress80_shells 80 walk in at once"
-		"done40 walks snapshot_stress80_working 40 of 80 done at once, seated with paper"
-		"growth walks snapshot_stress80_shells tab 0 grows under 80 walking in"
-		"minimize walks snapshot_stress80_shells 80 walking in, minimized 2 s"
-		"blocked40 walks snapshot_stress80_working 40 of 80 go blocked at once, 40 chips"
-		"idle40 walks snapshot_stress80_working 40 of 80 go idle at once"
-		"approve walks snapshot_stress80_working one of 40 blocked answered 8 times"
-		"queuegrow walks snapshot_stress80_working tab 0 grows under 40 blocked"
+		"arrivals changes snapshot_stress80_shells 80 shells gain agents at once"
+		"done40 changes snapshot_stress80_working 40 of 80 finish at once"
+		"growth changes snapshot_stress80_shells 80 agents arrive, then tab 0 grows by 12"
+		"minimize changes snapshot_stress80_shells 80 agents arrive, then minimize for 2 s"
+		"blocked40 changes snapshot_stress80_working 40 of 80 go blocked at once"
+		"idle40 changes snapshot_stress80_working 40 of 80 go idle at once"
+		"approve changes snapshot_stress80_blocked40 8 of 40 blocked return to work, one by one"
+		"blockedgrow changes snapshot_stress80_working 40 go blocked, then tab 0 grows by 12"
 	)
 fi
 
@@ -292,7 +299,7 @@ printf '%-9s %-19s %6s %6s %10s %11s %10s %9s %9s %13s %8s %8s\n' scenario what 
 	refresh_ms cpu_paced fps_paced max_fps_paced cpu_fps0 fps_fps0
 for scenario in "${SCENARIOS[@]}"; do
 	read -r name mode _ what <<<"$scenario"
-	[ "$mode" = "walks" ] && continue
+	[ "$mode" = "changes" ] && continue
 	refresh="$(summary "$name" paced refresh_ms)"
 	case "$refresh" in -*) refresh="-" ;; esac
 	printf '%-9s %-19s %6s %6s %10s %11s %10s %8s%% %9s %13s %7s%% %8s\n' "$name" "$what" \
@@ -304,27 +311,23 @@ done
 if [ -s "$WORK/shrunk" ]; then
 	sort -u "$WORK/shrunk" | sed 's/^/PERF_SHRUNK: /'
 fi
-[ "$WALKS" -eq 1 ] || exit 0
+[ "$CHANGES" -eq 1 ] || exit 0
 
 echo
-echo "PERF walks, median of $RUNS rounds: frame times over the hold, which starts with the snapshot that starts"
-echo "the walks. live = walking then; walked / kept / placed and pass_ms = that observation's presentation pass;"
-echo "refresh_ms = frame start to the end of the office's refresh for it; step_ms = the longest process step;"
-echo "settle_s = when the last walk ended."
-printf '%-9s %-38s %4s %6s %4s %6s %7s %10s %7s %9s %9s %9s %9s %9s %9s %8s %7s\n' scenario what live walked kept \
-	placed pass_ms refresh_ms step_ms p50_paced p95_paced max_paced p50_fps0 p95_fps0 max_fps0 settle_s max_fps
+echo "PERF changes, median of $RUNS rounds: frame times over the whole hold, starting with the first snapshot change."
+echo "changes = complete snapshots confirmed by data_refreshed; latency = longest send-to-data_refreshed time (ms),"
+echo "including control, transport, debounce and refresh; step_ms = longest process step; applied_s = last snapshot drawn."
+printf '%-12s %-40s %7s %13s %12s %7s %9s %9s %9s %9s %9s %9s %9s %7s\n' scenario what changes \
+	latency_paced latency_fps0 step_ms p50_paced p95_paced max_paced p50_fps0 p95_fps0 max_fps0 applied_s max_fps
 for scenario in "${SCENARIOS[@]}"; do
 	read -r name mode _ what <<<"$scenario"
-	[ "$mode" = "walks" ] || continue
-	walk_refresh="$(summary "$name" paced walk_refresh_ms)"
-	case "$walk_refresh" in -*) walk_refresh="-" ;; esac
-	printf '%-9s %-38s %4s %6s %4s %6s %7s %10s %7s %9s %9s %9s %9s %9s %9s %8s %7s\n' "$name" "$what" \
-		"$(summary "$name" paced live)" "$(summary "$name" paced walked)" "$(summary "$name" paced kept)" \
-		"$(summary "$name" paced placed)" "$(summary "$name" paced pass_ms)" \
-		"$walk_refresh" "$(summary "$name" paced step_ms)" \
+	[ "$mode" = "changes" ] || continue
+	printf '%-12s %-40s %7s %13s %12s %7s %9s %9s %9s %9s %9s %9s %9s %7s\n' "$name" "$what" \
+		"$(summary "$name" paced changes)" "$(summary "$name" paced change_refresh_ms)" \
+		"$(summary "$name" fps0 change_refresh_ms)" "$(summary "$name" paced step_ms)" \
 		"$(summary "$name" paced p50_ms)" "$(summary "$name" paced p95_ms)" "$(summary "$name" paced max_ms)" \
 		"$(summary "$name" fps0 p50_ms)" "$(summary "$name" fps0 p95_ms)" "$(summary "$name" fps0 max_ms)" \
-		"$(summary "$name" paced settle_s)" "$(summary "$name" paced max_fps)"
+		"$(summary "$name" paced applied_s)" "$(summary "$name" paced max_fps)"
 	if [ "$name" = "minimize" ]; then
 		echo "          minimized: $(summary "$name" paced minimized_frames) frames at max_fps $(summary "$name" paced minimized_fps) (paced), $(summary "$name" fps0 minimized_frames) frames at max_fps $(summary "$name" fps0 minimized_fps) (fps0); the window calls blocked $(summary "$name" paced minimize_call_ms) ms minimizing, $(summary "$name" paced restore_call_ms) ms restoring (paced)"
 	fi

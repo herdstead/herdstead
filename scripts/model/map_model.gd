@@ -1,7 +1,7 @@
 class_name MapModel
 extends RefCounted
 ## What one office map draws: its zones, and their rooms read as one floor.
-## The floor view, the presentation, the rests and the plan cache take a map,
+## The floor view and the plan cache take a map,
 ## and the map planner (OfficeFloorLayout) lays every zone of it out at once.
 ##
 ## The office draws one map per machine (OfficeProjection.building() makes it

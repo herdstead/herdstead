@@ -24,10 +24,10 @@ const FRAMES: Dictionary[StringName, StringName] = {
 	CardPicture.FRAME_STALE: &"PortraitFrameStale",
 }
 
-## What the portrait is dressed as now: provider, pack and pane, so a theme
-## switch or another pane re-dresses it and nothing else does.
-var _portrait_look := ""
-var _portrait: PixelPortrait
+## The family currently dressing the generic portrait. A new pane or provider
+## changes the words, never the portrait's clothes or parts.
+var _portrait_art: WorkstationArt
+var _portrait: Sprite2D
 ## Whether the shown state has a note (a dropped machine's, or UNREAD's).
 var _has_note := false
 
@@ -41,14 +41,14 @@ func _ready() -> void:
 	more_list.sort_children.connect(_fit_more)
 
 
-## A pack swap is a new portraits family: the portrait is dressed again on its
+## A pack swap may supply another family: the portrait is dressed again on its
 ## next show().
 func forget_look() -> void:
-	_portrait_look = ""
+	_portrait_art = null
 
 
 ## The portrait while there is one; null before the first.
-func portrait() -> PixelPortrait:
+func portrait() -> Sprite2D:
 	return _portrait
 
 
@@ -58,7 +58,7 @@ func clear() -> void:
 
 
 ## Write `header` (CardPicture.header_of(): who sits there, in what state and
-## where, and the PANE list), with the portrait in `art`'s people.
+## where, and the PANE list), with `art`'s generic workstation portrait.
 func show_header(header: CardPicture.Header, art: ArtPack) -> void:
 	var card_name: Label = %CardName
 	var caption: Label = %Caption
@@ -131,11 +131,9 @@ static func caption_of(art: ArtPack, state: StringName) -> String:
 	return drawn.label if drawn != null else str(state).to_upper()
 
 
-## The portrait `header` names: the same person as the one at the seat (the
-## pane's key picks their looks and the portrait's extras), still, on the
-## window's warm ground, under a frame in the state's colour; the window greyed
-## on a dropped machine, under the stale frame. No person (the empty card, a
-## shell): none and no badge.
+## The generic portrait, still, on the window's warm ground, under a frame in
+## the state's colour; the window greyed on a dropped machine, under the stale
+## frame. No person (the empty card, a shell): none and no badge.
 func _show_portrait(art: ArtPack, header: CardPicture.Header) -> void:
 	var area: Control = %PortraitArea
 	var badge: StatusBadge = %Badge
@@ -147,10 +145,8 @@ func _show_portrait(art: ArtPack, header: CardPicture.Header) -> void:
 	var holder: Node2D = %PortraitHolder
 	var window: Control = %PortraitWindow
 	var frame: Control = %PortraitFrame
-	var look := JSON.stringify([header.person_provider, art.base_path, header.key])
-	if look != _portrait_look:
-		_portrait_look = look
-		# A new provider, pane or pack is new textures on the same portrait.
+	if _portrait == null or art.workstation != _portrait_art:
+		_portrait_art = art.workstation
 		_portrait = OfficeDraw.seat_portrait(holder, _portrait, art, header.person_provider, header.key)
 	frame.theme_type_variation = FRAMES.get(header.frame, &"PortraitFrameIdle")
 	var tint := art.stale_tint if header.dimmed else Color.WHITE

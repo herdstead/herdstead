@@ -72,13 +72,10 @@ func _minimized_office(screen := Vector2(SCREEN)) -> OfficeDouble:
 ## read back too), and no pane again within ten seconds. A floor that is
 ## not shown (Local's bravo, blocked too) is not read; working, done and shell
 ## panes are not; nothing is ever written. The reader keeps the asking line.
-## Z1 (2026-10-27): a lane is 4 cells, pitch 5, a new zone takes lanes until it
-## stands one row; the map replans. Alpha and bravo are one lane each and stand
-## side by side, so Local's bravo would be on screen while Local's map is shown
-## first. Local's bravo gets seven more shells (a 5-cell pod, two lanes), and a
-## 480x480 window (340x308 of the world, the narrowest map's two lanes,
-## FRAME-Q2) stands it under alpha as one lane of 9 did, under the same 308
-## units of view. bee's map stays snapshot_basic's.
+## Each native workstation pod needs two lanes. At 800x480, bee's alpha and
+## bravo stand side by side, so all three blocked chips fit. Local's bravo
+## gets seven more shells: its wider pod cannot fit beside alpha and stays
+## below the initial view, so startup cannot read Local's blocked chip.
 func test_bubbles_read_blocked_panes_on_screen_one_at_a_time() -> void:
 	_blocked_pair()
 	var wide := _raw()
@@ -93,12 +90,15 @@ func test_bubbles_read_blocked_panes_on_screen_one_at_a_time() -> void:
 	# chips on screen and read, for as long as bee's snapshot is in and Local's
 	# is not.
 	_ctl("control-b", "next", {"action": "hold", "method": "pane.read"})
-	var office := await _office_with(false, true, true, Vector2(480, 480), true)
+	var office := await _office_with(false, true, true, Vector2(800, 480), true)
 	# S3 BAR-b (2026-10-27): the SPACES rail's row went to bee's alpha in one click;
 	# bee's chip does, where the page keys would show Local's bravo on the way.
 	await _heading_pick(office, BEE)
 	await _zone_pick(office, HerdrFleet.pane_key(BEE, "alpha"))
 	await _bee_bubbles_on_screen(office)
+	var bravo_chip := _station_of(office, HerdrFleet.pane_key(BEE, "bravo:p1")).chip_rect()
+	bravo_chip.position -= office.camera.position
+	_check(office.hud.world_rect().encloses(bravo_chip), "bravo's third chip is also wholly on screen")
 	await _until(func() -> bool: return _number(_ctl("control-b", "stats"), "held_replies") == 1, "a read is held")
 	await _wait(0.6)
 	_eq(_read_panes("control-b"), ["alpha:p1"], "the longest-waiting first, and while it is out, nothing else")
@@ -111,8 +111,8 @@ func test_bubbles_read_blocked_panes_on_screen_one_at_a_time() -> void:
 		"control-b", func(_stats: Dictionary) -> bool: return _read_panes("control-b").size() >= 3, "the third read"
 	)
 	await _wait(1.5)
-	# bee's blocked bravo:p1 is another zone of the same map now, its chip on
-	# screen under alpha's: it is read too, after alpha's two, in wait order.
+	# bee's blocked bravo:p1 is another zone of the same map, beside alpha:
+	# it is read too, after alpha's two, in wait order.
 	_eq(
 		_read_panes("control-b"),
 		["alpha:p1", "alpha:p3", "bravo:p1"],
@@ -342,6 +342,17 @@ func test_hovering_a_bubble_shows_the_question_it_read() -> void:
 	await _until(func() -> bool: return office.frame.pane(p1).identity_key() != identity, "p1 has another terminal")
 	_check(office.hud.world_tip_shown(), "still blocked, still under the pointer: the tooltip stays")
 	_eq(office.hud.world_tip_text(), OfficeQuestionReader.NOT_READ_TEXT, "and drops the old session's question at once")
+	# The tag-row shape stays under the same pointer while its role changes.
+	_ctl("control-b", "status", {"pane_id": "alpha:p1", "agent_status": "working"})
+	await _until(func() -> bool: return not _station_of(office, p1).chip().visible, "the chip becomes a working badge")
+	_eq(
+		office.hud.world_tip_text(),
+		"claude session\nCLAUDE · WORKING\nalpha lab / main",
+		"without moving, the badge now names its pane and its new state"
+	)
+	_ctl("control-b", "status", {"pane_id": "alpha:p1", "agent_status": "blocked"})
+	await _until(func() -> bool: return _station_of(office, p1).chip().visible, "the same target is a question again")
+	_eq(office.hud.world_tip_text(), OfficeQuestionReader.NOT_READ_TEXT, "without moving, the old name goes")
 	await _move_pointer(at + Vector2(0, 60))
 	# 60 below the chip is the shell alpha:p2's seat, whose own tooltip names it now.
 	_eq(office.hud.world_tip_text(), "main\nSHELL\nalpha lab / main", "the pointer leaves: the bubble's tooltip goes")
@@ -541,7 +552,7 @@ func _far_agent(office: OfficeDouble) -> OfficeStation:
 ## The middle of the far tag row of `station`, in the world: where its badge is
 ## drawn at rest, and inside the chip while one shows.
 static func _badge_middle(station: OfficeStation) -> Vector2:
-	return station.global_position + OfficeStation.BADGE_AT["far"] + Vector2(0, -8)
+	return station.global_position + OfficeStation.BADGE_AT + Vector2(0, -8)
 
 
 ## The far badge answers a click in every state: on a working agent it picks

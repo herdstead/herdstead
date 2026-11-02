@@ -6,7 +6,7 @@
 #   PYTHON=python3.12      the interpreter (default: .venv/bin/python, else python3)
 #   OUT=/tmp/shots         where `make capture` writes its PNGs
 #   RUNS=5 FIGURES=1       rounds of `make perf`, and its standalone figure scenarios
-#   WALKS=1                `make perf` also times the stress floor's people walking
+#   CHANGES=1              `make perf` also times the stress floor's snapshot transitions
 #   FIXTURE=snapshot_floors  the fake session for `make preview` (preview-fixtures lists them)
 
 GODOT ?= godot
@@ -24,7 +24,7 @@ RUN_TESTS = GODOT=$(GODOT) PYTHON=$(PYTHON) bash tools/run_tests.sh
 PACKS := $(notdir $(patsubst %/manifest.json,%,$(wildcard assets/*/manifest.json)))
 
 .DEFAULT_GOAL := help
-.PHONY: help setup import imported run preview preview-fixtures people people-templates people-skins portrait-parts portrait-sheet wall-templates table-templates pixel-sources test test-art test-tools test-harness test-suite test-shard test-list check check-quick check-scripts check-packs smoke docs-check lint lint-changed fmt art capture walk-strips perf pack export clean
+.PHONY: help setup import imported run preview preview-fixtures people people-templates people-skins portrait-parts portrait-sheet wall-templates table-templates pixel-sources test test-art test-tools test-harness test-suite test-shard test-list check check-quick check-scripts check-packs smoke docs-check lint lint-changed fmt art capture workstation-strips perf pack export clean
 
 help:  ## List these targets
 	@grep -hE '^[a-z][a-z-]*:.*##' $(MAKEFILE_LIST) \
@@ -56,11 +56,12 @@ preview-fixtures:  ## List the snapshot names available to make preview
 test:  ## Every Godot test: script check, client, machines, incremental office
 	SUITES= CASE= TIER= SHARD= $(RUN_TESTS)
 
-test-art:  ## The four Python art contract tests (packs, table, pixel people, portraits)
+test-art:  ## Python art contracts (packs, table, pixel people, portraits, workstations)
 	$(PYTHON) tools/test_assets.py -v
 	$(PYTHON) tools/test_table_assets.py -v
 	$(PYTHON) tools/test_pixel_people.py -v
 	$(PYTHON) tools/test_portraits.py -v
+	$(PYTHON) tools/test_workstation_assets.py -v
 
 test-tools:  ## Developer CLI contracts: suite selection, offline preview, isolated fakes, logs and changed-file lint
 	$(PYTHON) tools/test_dev_tools.py -v
@@ -125,6 +126,7 @@ art:  ## Rebuild assets/ from art/ and prove it matches the commit
 	$(PYTHON) tools/build_table_assets.py
 	$(PYTHON) tools/build_pixel_people.py
 	$(PYTHON) tools/build_portraits.py
+	$(PYTHON) tools/build_workstation_assets.py
 	$(PYTHON) tools/check_build_clean.py assets
 
 people:  ## Open the pixel people showroom: every agent, or every frame of one look (see scripts/people_showroom.gd for flags)
@@ -162,19 +164,19 @@ capture:  ## Screenshot the showroom, office, the bottom panel's pages, machine 
 
 # Windowed, like capture: the office is fed snapshots, `--read-only`, with no
 # herdr, no saved machines and a private socket directory.
-walk-strips: OUT = build/walk-strips
-walk-strips: imported  ## Frame strips of people walking, every 0.25 s at 2x and 4x (OUT= to change)
+workstation-strips: OUT = build/workstation-strips
+workstation-strips: imported  ## Whole-image office state animations at 2x and 4x (OUT= to change)
 	@GODOT=$(GODOT) bash tools/wait_for_screen.sh
 	@work="$$(mktemp -d /tmp/herdstead-strips.XXXXXX)"; \
 	HERDR_SOCKET_PATH=/nonexistent/herdr.sock HERDR_BIN_PATH="$$work/no-herdr" HERDSTEAD_SOCKET_DIR="$$work/socks" \
-		$(GODOT) --path . --script tools/capture_walks.gd -- --out="$(abspath $(OUT))" --work="$$work" >"$$work/run.log" 2>&1; \
+		$(GODOT) --path . --script tools/capture_workstations.gd -- --out="$(abspath $(OUT))" --work="$$work" >"$$work/run.log" 2>&1; \
 	status=$$?; cat "$$work/run.log"; \
-	if grep -qE 'SCRIPT ERROR|Parse Error' "$$work/run.log"; then echo "WALK_STRIPS_FAILED: a script error"; status=1; \
-	elif ! grep -q '^WALK_STRIPS_OK' "$$work/run.log"; then echo "WALK_STRIPS_FAILED: did not finish"; status=1; fi; \
+	if grep -qE 'SCRIPT ERROR|Parse Error' "$$work/run.log"; then echo "WORKSTATION_STRIPS_FAILED: a script error"; status=1; \
+	elif ! grep -q '^WORKSTATION_STRIPS_OK' "$$work/run.log"; then echo "WORKSTATION_STRIPS_FAILED: did not finish"; status=1; fi; \
 	rm -rf "$$work"; exit "$$status"
 
-perf:  ## Windowed CPU, fps, nodes, draw calls and refresh cost vs fake herdr (RUNS=3, FIGURES=1, WALKS=1); not in check
-	GODOT=$(GODOT) PYTHON=$(PYTHON) bash tools/perf.sh --runs=$(RUNS) $(if $(FIGURES),--figures) $(if $(WALKS),--walks)
+perf:  ## Windowed CPU, fps, nodes, draw calls and refresh cost vs fake herdr (RUNS=3, FIGURES=1, CHANGES=1); not in check
+	GODOT=$(GODOT) PYTHON=$(PYTHON) bash tools/perf.sh --runs=$(RUNS) $(if $(FIGURES),--figures) $(if $(CHANGES),--changes)
 
 pack:  ## Export the PCK and check that every pack shipped in it
 	mkdir -p build && touch build/.gdignore

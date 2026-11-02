@@ -6,10 +6,15 @@ extends SceneTree
 ## The contract itself is ArtContract's, the same one tools/check_packs.gd runs
 ## in the source tree: this adds what only a package can answer — every PNG
 ## survived the import and the export filter, the font licence shipped, and a
-## worker can actually be seated at a table built from the pack.
+## complete workstation and its portrait load through the office's real scenes.
 
 
 func _initialize() -> void:
+	# The actor's AnimationPlayer needs its node paths in a live scene tree.
+	_run.call_deferred()
+
+
+func _run() -> void:
 	var manifest_path := "res://assets/daylight/manifest.json"
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--pack="):
@@ -24,9 +29,8 @@ func _initialize() -> void:
 	if not missing.is_empty():
 		_finish(missing)
 		return
-	# Presence is not enough in a PCK: a PNG is a remapped import, and a pack
-	# denser than the screen is resampled from get_image() at load, so every
-	# texture the office draws is loaded and asked for its image.
+	# Presence is not enough in a PCK: a PNG is a remapped import, so every
+	# texture is loaded and asked for its image data, without resampling it.
 	for sprite_id in art.props:
 		_drawable(art.sprite_texture(art.props[sprite_id]), "props/" + sprite_id, missing)
 	for sprite_id in art.ui:
@@ -36,6 +40,9 @@ func _initialize() -> void:
 		_drawable(art.table.module_texture(module), "table/" + module, missing)
 	for strip in art.people.files:
 		_drawable(art.people.texture(strip), "pixel_people/" + strip, missing)
+	_drawable(art.workstation.sheet_texture(), "workstation/state sheet", missing)
+	_drawable(art.workstation.empty_texture(), "workstation/empty desk", missing)
+	_drawable(art.workstation.portrait_texture(), "workstation/portrait", missing)
 	for provider in art.agent_catalog.ids():
 		if art.agent_badge(StringName(provider)) == null:
 			missing.append("agent logo loader: " + provider)
@@ -44,12 +51,13 @@ func _initialize() -> void:
 	_finish(missing)
 
 
-## Build what a populated floor builds, through the same loaders, and seat a
-## worker on both sides: a layer that failed to import shows up here and
-## nowhere else.
+## Build both logical rows through the real table/station loaders. Their
+## complete-image body is retained when a worker becomes a shell. The old
+## pixel-person layers are not the production office's runtime loader.
 func _check_office_loaders(art: ArtPack, missing: Array[String]) -> void:
 	var pen := OfficeDraw.new(art)
 	var ground := Node2D.new()
+	root.add_child(ground)
 	# The smallest pod the office builds, measured the way the office measures it.
 	var measured := OfficeTable.measure(2)
 	var table := pen.table(ground, ground, "Table0", Vector2.ZERO, measured.table_width, measured.columns)
@@ -60,26 +68,48 @@ func _check_office_loaders(art: ArtPack, missing: Array[String]) -> void:
 	for side: String in OfficeTable.SIDES:
 		var station := pen.station(ground, table, 0, side)
 		station.furnish("codex", ArtContract.STATE_WORKING)
-		var person := station.actor()
-		for layer in PixelPeople.LAYERS:
-			var sprite: Sprite2D = person.get_node(PixelPeople.SPRITES[layer]) if person != null else null
-			# A layer the look leaves empty (no glasses) has no texture on purpose.
-			var wanted := (
-				art.people.layer_texture(layer, person.look, person.shown_facing()) if person != null else null
-			)
-			if sprite == null or (wanted != null and sprite.texture == null):
-				missing.append("%s desk worker has no %s layer" % [side, layer])
-	# And one person wearing something on every layer, so each layer's sheet
-	# region is proven to load from the PCK.
-	var dressed: PixelPerson = OfficeDraw.PERSON_SCENE.instantiate()
-	ground.add_child(dressed)
-	var every := AvatarLook.with_slots({AvatarLook.GLASSES: &"round", AvatarLook.HEADWEAR: &"cap"})
-	dressed.configure(art.people, "codex", every)
-	for layer in PixelPeople.LAYERS:
-		var sprite: Sprite2D = dressed.get_node(PixelPeople.SPRITES[layer])
-		if sprite.texture == null or sprite.texture.get_image() == null:
-			missing.append("a fully dressed person has no %s layer" % layer)
+		var actor := station.actor()
+		if actor == null or actor.art != art.workstation:
+			missing.append("%s station did not load its WorkstationActor" % side)
+			continue
+		var body: Sprite2D = actor.get_node("Body")
+		_check_image(body, art.workstation, art.workstation.sheet_texture(), art.workstation.pivot, side, missing)
+		if body.hframes != art.workstation.columns or body.vframes != art.workstation.rows:
+			missing.append("%s workstation does not address the complete-image sheet" % side)
+		var player: AnimationPlayer = actor.get_node("AnimationPlayer")
+		for clip in WorkstationArt.TRACKS:
+			if not player.has_animation(clip):
+				missing.append("%s workstation has no %s animation" % [side, clip])
+		if actor.animation != ArtContract.STATE_WORKING or body.frame != art.workstation.tracks[&"working"].frames[0]:
+			missing.append("%s workstation did not draw the first working frame" % side)
+		station.furnish("", ArtContract.STATE_IDLE)
+		if station.actor() != null or actor.is_playing() or body.hframes != 1 or body.vframes != 1 or body.frame != 0:
+			missing.append("%s shell did not stop on a complete empty desk" % side)
+		_check_image(
+			body, art.workstation, art.workstation.empty_texture(), art.workstation.pivot, side + " shell", missing
+		)
+	var portrait := OfficeDraw.seat_portrait(ground, null, art, "codex", "pack-check")
+	_check_image(
+		portrait,
+		art.workstation,
+		art.workstation.portrait_texture(),
+		art.workstation.portrait_pivot,
+		"portrait",
+		missing
+	)
 	ground.free()
+
+
+static func _check_image(
+	sprite: Sprite2D, family: WorkstationArt, expected: Texture2D, pivot: Vector2, where: String, missing: Array[String]
+) -> void:
+	_drawable(sprite.texture, where, missing)
+	if sprite.texture != expected:
+		missing.append(where + " did not use the workstation family's image")
+	if sprite.scale != family.unit_scale() or sprite.offset != -pivot * family.density or sprite.centered:
+		missing.append(where + " did not keep the workstation's native density and pivot")
+	if sprite.texture_filter != family.filter:
+		missing.append(where + " did not keep the workstation's sampling")
 
 
 static func _drawable(texture: Texture2D, where: String, missing: Array[String]) -> void:
@@ -94,6 +124,6 @@ func _finish(missing: Array[String]) -> void:
 		printerr("PACK_MISSING: " + problem)
 	if missing.is_empty():
 		print(
-			"PACK_OK: art contract, font licence, table modules, pixel people strips, agent logos and runtime loaders"
+			"PACK_OK: art contract, font licence, companion art, workstation sheet/empty desk/portrait, agent logos and runtime loaders"
 		)
 	quit(1 if missing else 0)

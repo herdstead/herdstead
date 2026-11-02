@@ -11,9 +11,6 @@ extends "res://tools/office_test_base.gd"
 ## to it directly. Exits 0 when every check passes, 1 on any failure, 2 on a
 ## harness error.
 
-## Seat columns of a shared table stand one double-sided workstation apart.
-const SEAT_SPACING := OfficeTable.MODULE * 2
-
 
 func _initialize() -> void:
 	for argument in OS.get_cmdline_user_args():
@@ -80,17 +77,13 @@ func test_status_change_redraws_one_desk() -> void:
 	var desk: Node2D = office.floor_view.seats[target].node
 	_eq(_badge(desk).state, ArtContract.STATE_BLOCKED, "the changed desk shows the new badge at once")
 	_eq(_badge_state(LOCAL, "api:p4"), "blocked", "attention sees exactly one badge for the pane")
-	# A blocked agent stays at its seat, under its chip: nobody walks.
-	_eq(office.floor_view.presentation.walkers(), [], "nobody walks: a blocked agent stays seated")
+	_eq(_worker(desk).position, Vector2.ZERO, "blocked stays at its own workstation")
 	_eq(_worker(desk).animation, &"blocked", "and the worker shows the new animation at once")
 	await _same_as_rebuild(office, "after a status change")
 	_done(office)
 
 
-func test_same_look_keeps_the_worker() -> void:
-	# Three idle agents on api and three residents, all first seen idle, every one at its seat with a mug
-	# (D2, 2026-10-27: idle sits with a mug; the pantry is a nook nobody walks to). 592 wide (628 before S3
-	# PANEL-a1 dropped the drawer tab): the map is planned 568 wide, 17 cells: two lanes of 4, 13 cells.
+func test_an_unchanged_state_keeps_its_clock_and_unknown_is_not_idle() -> void:
 	var idle := _with(
 		_with(_with_residents(fixture), "api:p1", {"agent_status": "idle"}), "api:p2", {"agent_status": "idle"}
 	)
@@ -98,42 +91,25 @@ func test_same_look_keeps_the_worker() -> void:
 	var office := await _live_office(idle, Vector2(592, 480))
 	_eq(office.hud.plan_width(), 568.0, "planned 568 wide")
 	var desk: OfficeStation = office.floor_view.seats[HerdrFleet.pane_key(LOCAL, "api:p4")].node
-	_eq(
-		[desk.actor().position, desk.table.item_piece(desk.column, desk.side)],
-		[Vector2.ZERO, ArtContract.PROP_IDLE_MUG],
-		"api:p4 sits, its mug beside the laptop"
-	)
+	_eq([desk.actor().position, desk.actor().animation], [Vector2.ZERO, &"idle"], "idle in place")
 	await _frames(12)
-	var actor: PixelPerson = desk.get_node("Actor")
+	var actor := desk.actor()
 	var before := _actor_state(actor)
-	# idle -> unknown, seated: a new badge, but the worker's animation is idle
-	# either way; the mug goes (unknown is not idle).
+	_feed(office, idle)
+	_eq(_actor_state(actor), before, "unchanged state keeps its node, frame and clock")
+	_check(actor.is_playing(), "idle keeps playing")
 	_feed(office, _with(idle, "api:p4", {"agent_status": "unknown"}))
-	actor = desk.get_node("Actor")
-	_eq(_actor_state(actor), before, "the worker keeps its node and its place in the animation")
-	_check(actor.is_playing(), "and keeps playing")
+	_eq(desk.actor(), actor, "unknown keeps the permanent image")
+	_eq([actor.animation, actor.track], [&"unknown", &"unknown"], "unknown is not idle")
+	_eq(_sprite(actor, "Body").frame, 0, "unknown holds frame zero")
+	await _frames(12)
+	_eq(_sprite(actor, "Body").frame, 0, "and never animates as idle")
 	_eq(_badge(desk).state, ArtContract.STATE_UNKNOWN, "the badge turns UNKNOWN")
-	_eq(desk.table.item_piece(desk.column, desk.side), &"", "and the desk shows no mug")
-	_eq(office.floor_view.presentation.walkers(), [], "and nobody walks")
-	await _same_as_rebuild(office, "after a same-animation change")
+	await _same_as_rebuild(office, "after idle becomes unknown")
 	_done(office)
 
 
-## Nobody stands at their seat: every state sits (D2, 2026-10-27: idle sits
-## with a mug; the pantry is a nook nobody walks to), and what the desk shows
-## is OfficeStation.desk_item()'s, the paper only for done and the mug only for
-## idle, never for a pane still launching or a shell. A pane still launching
-## with a done status sits and plays starting, with no paper; a done agent sits
-## at the desk with its paper; a done shell has nobody at all.
-func test_nobody_stands_at_their_seat() -> void:
-	for state: StringName in ArtContract.STATES:
-		var want := &""
-		if state == ArtContract.STATE_DONE:
-			want = ArtContract.PROP_DONE_STACK_SMALL
-		elif state == ArtContract.STATE_IDLE:
-			want = ArtContract.PROP_IDLE_MUG
-		_eq(OfficeStation.desk_item(true, state), want, "%s shows %s at the seat" % [state, want])
-		_eq(OfficeStation.desk_item(false, state), &"", "%s while starting, or a shell, shows nothing" % state)
+func test_starting_done_and_shell_have_distinct_whole_images() -> void:
 	var office := await _live_office()
 	var launching := HerdrFleet.pane_key(LOCAL, "api:p2")
 	var shell := HerdrFleet.pane_key(LOCAL, "api:p3")
@@ -144,106 +120,36 @@ func test_nobody_stands_at_their_seat() -> void:
 	_feed(office, snapshot)
 	var station := _station(office, launching)
 	_eq(station.actor().animation, &"starting", "a launching pane plays starting")
-	_eq(str(station.actor().look.context), "desk", "seated")
+	_eq(_sprite(station.actor(), "Body").frame, 0, "starting is frame zero")
 	_eq(station.actor().global_position, station.seat.global_position, "on its seat")
-	_check(not station.table.item(station.column, station.side).visible, "with no paper")
 	_eq(_worker(_station(office, shell)), null, "a done shell has nobody")
 	var sitter := _station(office, done)
-	_eq(str(sitter.actor().look.context), "desk", "a done agent sits at the desk")
+	_eq(sitter.actor().animation, &"done", "a done agent plays completion, not idle")
 	_eq(sitter.actor().global_position, sitter.seat.global_position, "on its seat")
-	_check(sitter.table.item(sitter.column, sitter.side).visible, "with its paper")
-	_eq(office.floor_view.presentation.walkers(), [], "and nobody walks")
 	await _same_as_rebuild(office, "with a launching done pane and a done shell")
 	_done(office)
 
 
-## The table's standing spots, where a near seat's leg turns round the chair
-## (nobody stands there), are on nobody's furniture: off every
-## table's footprint, narrowest and wider, every column, both sides, and off
-## every standing piece on the floor; the far one behind the far edge.
-func test_standing_spots_are_clear() -> void:
-	var art := ArtPack.from_manifest(MANIFESTS[0])
-	var pen := OfficeDraw.new(art)
-	var holder := Node2D.new()
-	root.add_child(holder)
-	var feet := _feet_size()
-	for width: float in [160.0, 224.0, 288.0, 416.0]:
-		for count: int in [1, maxi(1, int((width - 32.0) / SEAT_SPACING))]:
-			var columns: Array = []
-			for slot in count:
-				columns.append(width / 2.0 - (count - 1) * SEAT_SPACING / 2.0 + slot * 64.0)
-			var table := pen.table(holder, holder, "Table", Vector2(100, 300), width, columns)
-			for column in columns.size():
-				for side: String in OfficeTable.SIDES:
-					var spot := table.standing(column, side).global_position
-					var where := "%s-wide table, %d columns, column %d %s" % [width, count, column, side]
-					var stands := Rect2(spot - Vector2(feet.x / 2.0, feet.y), feet)
-					_check(not stands.intersects(_table_rect(table)), where + ": off the table's footprint")
-					if side == "far":
-						_check(
-							spot.y < table.global_position.y - OfficeTable.SURFACE_DEPTH,
-							where + ": behind the far edge, so the table hides none of them"
-						)
-			holder.remove_child(table)
-			table.free()
-	root.remove_child(holder)
-	holder.free()
-	for workspace: String in ["api", "web", "infra"]:
-		var office := await _live_office(fixture, Vector2(880, 480))
-		await _visit_zone(office, HerdrFleet.pane_key(LOCAL, workspace))
-		var standing := _decor(office)
-		_check(not standing.is_empty(), "%s really has furniture to stand clear of" % workspace)
-		var checked := 0
-		for node: Node in office.world.find_children("*", "", true, false):
-			if not node is OfficeStation:
-				continue
-			var station: OfficeStation = node
-			var spot := _spot(station)
-			var stands := Rect2(spot - Vector2(feet.x / 2.0, feet.y), feet)
-			for piece in standing:
-				_check(
-					not stands.intersects(piece.footprint_rect()),
-					"%s %s: clear of the %s" % [workspace, station.name, piece.piece]
-				)
-			for table: OfficeTable in office.floor_view.tables:
-				_check(
-					not stands.intersects(_table_rect(table)),
-					"%s %s: clear of %s" % [workspace, station.name, table.name]
-				)
-			checked += 1
-		_check(checked > 0, "%s has seats to check" % workspace)
-		_done(office)
-
-
-## The plate, the badge and the selection mark hang off the seat whatever its
-## agent is doing: done and blocked sit, so nothing moves; blocked only shows
-## the chip over the head, on this side's spot, and done only the paper on the
-## table. The Overlay keeps the same nodes throughout.
+## Annotations stay below the whole image on either logical row.
 func test_labels_follow_the_pose() -> void:
 	var both_sides := _both_sides()
 	var office := await _live_office(both_sides)
 	for key: String in [HerdrFleet.pane_key(LOCAL, "api:p1"), HerdrFleet.pane_key(LOCAL, "api:p3")]:
 		var station := _station(office, key)
-		var side := station.side
 		var overlay := station.get_node("Overlay")
 		var nodes := _child_ids(overlay)
 		var seated := [
-			_plate(station).global_position,
-			_badge(station).global_position,
-			_sprite(station, "Overlay/Selection").global_position
+			_plate(station).global_position, (station.get_node("Overlay/Selection") as Line2D).global_position
 		]
 		_eq(
 			seated,
 			[
-				# Without the lens the plate hangs in its own slot (S3 SEATTAGS round 2: PLATE_REST, 2 out of the
-				# lens row's, clear of the tab label and the frame). S3 item 7: its tag hugs the name, centred.
 				(
 					station.seat.global_position
-					+ OfficeStation.PLATE_REST[side]
+					+ Vector2(-47, 32)
 					+ Vector2((OfficeStation.PLATE_SIZE.x - _plate(station).size.x) / 2.0, 0)
 				),
-				station.seat.global_position + OfficeStation.BADGE_AT[side],
-				station.seat.global_position + OfficeStation.SELECTION_AT[side]
+				station.seat.global_position
 			],
 			"%s: seated, the labels hang off the seat" % key
 		)
@@ -251,81 +157,67 @@ func test_labels_follow_the_pose() -> void:
 		for state: String in ["done", "blocked"]:
 			_feed(office, _with(both_sides, HerdrFleet.split_key(key)[1], {"agent_status": state}))
 			_eq(
-				[
-					_plate(station).global_position,
-					_badge(station).global_position,
-					_sprite(station, "Overlay/Selection").global_position
-				],
+				[_plate(station).global_position, (station.get_node("Overlay/Selection") as Line2D).global_position],
 				seated,
 				"%s %s: the labels stay where they were" % [key, state]
 			)
 			_eq(station.chip().visible, state == "blocked", "%s %s: a bubble only while blocked" % [key, state])
 			_eq(
 				station.chip().global_position,
-				station.seat.global_position + OfficeStation.CHIP_AT[side],
+				station.seat.global_position + Vector2(-15, 12),
 				"%s %s: the bubble hangs off this side's seat" % [key, state]
 			)
+			var shift := OfficeStation.CHIP_BADGE_SHIFT if station.chip().framed() else Vector2.ZERO
+			_eq(_badge(station).position, Vector2(0, 28) + shift, "badge follows the chip's frame")
 			_eq(_child_ids(overlay), nodes, "%s %s: the overlay keeps every node" % [key, state])
 		_feed(office, both_sides)
 		_eq(
-			[
-				_plate(station).global_position,
-				_badge(station).global_position,
-				_sprite(station, "Overlay/Selection").global_position
-			],
+			[_plate(station).global_position, (station.get_node("Overlay/Selection") as Line2D).global_position],
 			seated,
 			"%s: and back" % key
 		)
 	_done(office)
 
 
-## A dropped machine freezes whoever sits: a done worker keeps their seat and
-## their paper, stops moving and dims with the floor, and one that turns done
-## while the machine is away sits down with paper, frozen.
-func test_a_dropped_machine_keeps_done_seated_with_papers() -> void:
+func test_a_dropped_machine_keeps_the_last_done_frame_and_ignores_new_states() -> void:
 	var both_sides := _both_sides()
 	var done := HerdrFleet.pane_key(LOCAL, "api:p1")
 	var office := await _live_office(_with(both_sides, "api:p1", {"agent_status": "done"}))
 	var station := _station(office, done)
 	var actor := station.actor()
-	_check(actor.is_playing(), "a live done worker moves")
-	_check(station.table.item(station.column, station.side).visible, "with paper beside the laptop")
+	_eq(actor.animation, &"done", "a real completion clip")
 	_set_online(office, false)
-	actor = _station(office, done).actor()
-	_eq(str(actor.look.context), "desk", "a lost machine gets nobody up")
+	var frozen := _actor_state(actor)
 	_eq(actor.global_position, station.seat.global_position, "or moves them")
 	_check(not actor.is_playing(), "it freezes them")
-	_check(station.table.item(station.column, station.side).visible, "and keeps their paper")
 	var later := HerdrFleet.pane_key(LOCAL, "api:p3")
 	var both_done := _with(_with(both_sides, "api:p1", {"agent_status": "done"}), "api:p3", {"agent_status": "done"})
 	_feed(office, both_done, false)
 	var sitter := _station(office, later)
 	var up := sitter.actor()
-	_eq(str(up.look.context), "desk", "a worker done while stale sits")
-	_check(sitter.table.item(sitter.column, sitter.side).visible, "with paper")
+	_eq(up.animation, &"working", "no new done state applied while offline")
 	_check(not up.is_playing(), "frozen like the rest of the floor")
-	await _same_as_rebuild(office, "with done workers while stale")
+	await _frames(6)
+	_eq(_actor_state(actor), frozen, "the last done frame and clock stay exact")
+	_set_online(office, true)
+	_eq(up.animation, &"done", "fresh recovery applies the latest state")
+	await _same_as_rebuild(office, "after the done states recover")
 	_done(office)
 
 
-## A done agent's paper is the table's own node from the start: done and back
-## only shows and hides it, and idle shows the mug on the same node (D2,
-## 2026-10-27). The table keeps every node, and so does every seat.
-func test_papers_change_in_place() -> void:
+func test_state_clips_change_in_place_without_separate_equipment() -> void:
 	var office := await _live_office()
 	var key := HerdrFleet.pane_key(LOCAL, "api:p1")
 	var station := _station(office, key)
 	var table := station.table
-	var stack := table.item(station.column, station.side)
+	var actor := station.actor()
 	var nodes := _subtree_ids(table)
 	var desks := _desk_ids(office, "")
-	_check(not stack.visible, "working: no paper")
+	_eq(actor.animation, &"working", "working at first")
 	for state: String in ["done", "working", "done", "idle", "done"]:
 		_feed(office, _with(fixture, "api:p1", {"agent_status": state}))
-		_eq(stack.visible, state != "working", "%s: the item %s" % [state, "hidden" if state == "working" else "shown"])
-		var piece := table.item_piece(station.column, station.side)
-		var want := ArtContract.PROP_IDLE_MUG if state == "idle" else ArtContract.PROP_DONE_STACK_SMALL
-		_eq(piece, want if state != "working" else &"", "%s: %s" % [state, piece])
+		_eq(station.actor(), actor, state + ": same whole image")
+		_eq(actor.animation, StringName(state), state + ": real requested state")
 		_eq(_subtree_ids(table), nodes, "%s: the table keeps every node" % state)
 		_eq(_desk_ids(office, ""), desks, "%s: and every seat its nodes" % state)
 	_done(office)
@@ -599,14 +491,14 @@ func test_selection_only_moves_the_mark() -> void:
 	_eq(_desk_ids(office, from, to), others, "no other desk is touched")
 	var old_desk: Node2D = office.floor_view.seats[from].node
 	var new_desk: Node2D = office.floor_view.seats[to].node
-	_check(not _sprite(old_desk, "Overlay/Selection").visible, "the old desk loses its mark")
+	_check(not (old_desk.get_node("Overlay/Selection") as Line2D).visible, "the old desk loses its mark")
 	_eq(_child_ids(old_desk), from_ids, "and nothing else")
-	_check(_sprite(new_desk, "Overlay/Selection").visible, "the new desk gets a mark")
+	_check((new_desk.get_node("Overlay/Selection") as Line2D).visible, "the new desk gets a mark")
 	_eq(_child_ids(new_desk), to_ids, "and nothing else changes there")
 	_eq(
 		_names(new_desk),
-		["Chair", "Actor", "Overlay", "Target"],
-		"a seat is its chair, its worker, what floats over them and where it answers a click"
+		["Actor", "Focus", "Overlay", "Target"],
+		"a whole image, focus underline, annotations and click targets"
 	)
 	_eq(
 		_names(new_desk.get_node("Overlay")),
@@ -620,28 +512,28 @@ func test_selection_only_moves_the_mark() -> void:
 	_done(office)
 
 
-## A monitor is a terminal, so a seat has one exactly when herdr has a pane
-## there. A shell (a pane with nobody in the chair) keeps its screen; a seat no
-## pane uses has neither a screen nor a lamp.
-func test_monitors_follow_panes() -> void:
+## Both empty slots and shell panes use the permanent empty-workstation image;
+## only a shell has a pane identity, focus underline and active pick target.
+func test_shells_and_vacancies_keep_the_permanent_empty_image() -> void:
 	var office := await _live_office()
 	var sides := {}
 	for station in _seats(office):
-		_check(
-			station.table.monitor(station.column, station.side).visible,
-			"%s (%s) has a terminal" % [station.pane_key, station.side]
-		)
+		_check(station.get_node("Actor") is WorkstationActor, "each slot owns a permanent image")
 		sides[station.side] = true
 	_eq(sides.keys().size(), 2, "the fixture seats panes on both sides of a table")
 	var shell: OfficeStation = office.floor_view.seats[HerdrFleet.pane_key(LOCAL, "api:p3")].node
 	await _frame_table(office, shell.pane_key)
-	_check(shell.actor() == null, "api:p3 really is a shell: nobody in the chair")
-	_check(shell.table.monitor(shell.column, shell.side).visible, "and its screen is still on")
+	_check(shell.actor() == null, "api:p3 really is a shell")
+	var image := _sprite(shell, "Actor/Body")
+	_eq(image.texture, office.art.workstation.empty_texture(), "shell shows the complete empty workstation")
+	_check((shell.get_node("Target") as Area2D).input_pickable, "a shell is clickable")
 	var empty := _vacant_seat(office)
 	_check(empty != null, "the shown floor has a seat no pane uses")
-	_check(not empty.table.monitor(empty.column, empty.side).visible, "a seat with no pane has no terminal")
-	_eq(_lamp_level(empty.table, empty.column, empty.side), OfficeTable.Lamp.OFF, "and its lamp is off")
-	await _same_as_rebuild(office, "with terminals on the seats that have panes")
+	_eq(empty.actor(), null, "vacant has no person")
+	_eq(_sprite(empty, "Actor/Body").texture, image.texture, "vacant uses the same empty image")
+	_check(not (empty.get_node("Target") as Area2D).input_pickable, "vacant is not clickable")
+	_eq(_lamp_level(empty), OfficeTable.Lamp.OFF, "vacant focus underline is off")
+	await _same_as_rebuild(office, "with occupied, shell and vacant workstations")
 	_done(office)
 
 
@@ -722,7 +614,7 @@ func test_focus_move_does_not_reseat_a_blocked_desk() -> void:
 	# comparison is made once nobody is waiting (as in the wait's own case).
 	# api:p2 never left its seat: nobody walks.
 	_feed(office, _focused_on(fixture, "api:p1"))
-	_eq(office.floor_view.presentation.walkers(), [], "api:p2 was blocked at its seat: nobody walks")
+	_eq(_station(office, blocked).actor().position, Vector2.ZERO, "focus keeps the workstation anchored")
 	await _same_as_rebuild(office, "after the focus visited a blocked desk")
 	_done(office)
 
@@ -828,7 +720,7 @@ func test_blocked_seats_show_the_wait_in_the_bubble() -> void:
 	# Leaving blocked takes the number away at once, not on the next beat.
 	_feed(office, fixture)
 	_eq(_wait_text(office, blocked), "", "a seat that stopped being blocked shows no wait")
-	_eq(office.floor_view.presentation.walkers(), [], "api:p2 stays at its seat: nobody walks")
+	_eq(_station(office, blocked).actor().position, Vector2.ZERO, "state change keeps its seat")
 	await _same_as_rebuild(office, "after a wait in a bubble")
 	_done(office)
 
@@ -860,21 +752,22 @@ func test_worker_and_starting_flip() -> void:
 	var starting := HerdrFleet.pane_key(LOCAL, "api:p2")
 	var world_id: int = office.world.get_instance_id()
 	var desk: Node2D = office.floor_view.seats[shell].node
-	_eq(_names(desk), ["Chair", "Overlay", "Target"], "a shell desk has nobody")
+	var nodes := _subtree_ids(desk)
+	_eq(_names(desk), ["Actor", "Focus", "Overlay", "Target"], "permanent shell image")
+	_eq(_worker(desk), null, "but no person")
 	_check(not _sprite(desk, "Overlay/Badge").visible, "and no badge")
 	var snapshot := _with(fixture, "api:p3", {"agent": "codex"})
 	_feed(office, snapshot)
-	_eq(_names(desk), ["Chair", "Actor", "Overlay", "Target"], "a worker comes to the seat")
+	_eq(_subtree_ids(desk), nodes, "arrival replaces no nodes")
 	_check(_sprite(desk, "Overlay/Badge").visible, "with a badge")
 	_eq(_plate(desk).text, "main", "the name plate keeps the pane's name")
-	_check(desk.get_node("Actor").is_in_group("office_actors"), "the new worker is an office actor")
-	_walked(office, "as the worker comes in")
-	_check(_feet(desk).disabled, "and sits: a seated worker does not collide")
+	_eq(_worker(desk).provider, "codex", "the arrival has its provider immediately")
+	_eq(_worker(desk).position, Vector2.ZERO, "at its workstation immediately")
 	await _same_as_rebuild(office, "after a worker arrives")
 	snapshot = _with(snapshot, "api:p3", {"agent": null})
 	_feed(office, snapshot)
 	desk = office.floor_view.seats[shell].node
-	_eq(_names(desk), ["Chair", "Overlay", "Target"], "the worker leaves")
+	_eq(_worker(desk), null, "the worker leaves immediately")
 	_check(not _badge(desk).visible and not _badge(desk).is_in_group(StatusBadge.GROUP), "with the badge")
 	_eq(_plate(desk).text, "main", "and the shell is still called so")
 	world_id = office.world.get_instance_id()
@@ -884,7 +777,7 @@ func test_worker_and_starting_flip() -> void:
 	_eq(office.world.get_instance_id(), world_id, "starting begins in place")
 	_eq(_worker(starting_desk).animation, &"starting", "a launching pane shows the starting pose")
 	_check(not _badge(starting_desk).is_in_group(StatusBadge.GROUP), "and a starting badge that does not pulse")
-	_walked(office, "as the worker who left walks out")
+	_eq(_sprite(_worker(starting_desk), "Body").frame, 0, "starting holds frame zero")
 	await _same_as_rebuild(office, "while starting")
 	world_id = office.world.get_instance_id()
 	_feed(office, _with(snapshot, "api:p2", {"launch_pending": false}))
@@ -905,6 +798,7 @@ func test_worker_and_starting_flip() -> void:
 func test_stale_desks_stay_frozen() -> void:
 	var office := await _live_office()
 	_set_online(office, false)
+	var frozen := _actor_progress(office, "")
 	var world_id: int = office.world.get_instance_id()
 	var arriving := HerdrFleet.pane_key(LOCAL, "api:p3")
 	var keeping := HerdrFleet.pane_key(LOCAL, "api:p2")
@@ -912,23 +806,24 @@ func test_stale_desks_stay_frozen() -> void:
 		_with(fixture, "api:p3", {"agent": "pi", "agent_status": "blocked"}), "api:p2", {"agent_status": "done"}
 	)
 	_feed(office, snapshot, false)
-	_eq(office.world.get_instance_id(), world_id, "a stale floor still updates in place")
-	_check(not _worker(office.floor_view.seats[arriving].node).is_playing(), "a worker drawn while stale starts frozen")
+	_eq(office.world.get_instance_id(), world_id, "stale keeps the world")
+	_eq(_worker(office.floor_view.seats[arriving].node), null, "stale cannot invent an arrival")
 	_check(not _worker(office.floor_view.seats[keeping].node).is_playing(), "a kept worker stays frozen")
+	_eq(_worker(office.floor_view.seats[keeping].node).animation, &"working", "stale cannot apply a new done state")
 	_eq(office.floor_view.root.modulate, office.art.stale_tint, "the rooms stay dimmed")
 	var badge := _badge(office.floor_view.seats[arriving].node)
-	_check(badge.is_in_group(StatusBadge.GROUP), "the new badge joins the pulse group")
+	_check(not badge.visible, "no invented badge")
+	await _frames(6)
+	_eq(_actor_progress(office, ""), frozen, "every last frame and clock stays exact")
+	_set_online(office, true)
+	_eq(_worker(office.floor_view.seats[keeping].node).animation, &"done", "current recovery applies done")
+	badge = _badge(office.floor_view.seats[arriving].node)
+	_check(badge.is_in_group(StatusBadge.GROUP), "new badge joins the pulse group on recovery")
 	_eq(
 		[badge.pane_id, badge.machine, badge.state],
 		["api:p3", LOCAL, ArtContract.STATE_BLOCKED],
 		"with its pane, machine and state"
 	)
-	office.attention._pulse()
-	_eq(badge.offset, badge.rest_offset, "a stale badge rests on its pivot")
-	await _same_as_rebuild(office, "while stale")
-	_set_online(office, true)
-	_eq(_playing(office), [true], "every worker plays again on reconnect")
-	badge = _badge(office.floor_view.seats[arriving].node)
 	var lifts := {}
 	for step in 12:
 		office.attention._pulse()
@@ -1055,7 +950,8 @@ func test_structural_changes_reconcile() -> void:
 	var target := HerdrFleet.pane_key(LOCAL, "api:p4")
 	await _click_desk(office, target)
 	_eq(office.picked_key, target, "a click after an in-place update still picks the right desk")
-	_eq(office.floor_view.presentation.walkers(), [], "the done worker stays seated: nobody walks")
+	var done := _station(office, target)
+	_eq(done.actor().global_position, done.seat.global_position, "the done image stays at its measured seat")
 	await _same_as_rebuild(office, "after all of it")
 	_done(office)
 
@@ -1332,8 +1228,9 @@ func test_floor_change_rebuilds() -> void:
 	_feed(office, _with(focused, "web:p1", {"agent_status": "working"}))
 	_eq(office.world.get_instance_id(), world_id, "a status change is in place")
 	# web:p1 was blocked at its seat: it goes back to work where it sits.
-	_eq(office.floor_view.presentation.walkers(), [], "web:p1 was blocked at its seat: nobody walks")
-	_eq(_worker(office.floor_view.seats[HerdrFleet.pane_key(LOCAL, "web:p1")].node).animation, &"working", "and shows")
+	var worker := _station(office, HerdrFleet.pane_key(LOCAL, "web:p1"))
+	_eq(worker.actor().global_position, worker.seat.global_position, "web:p1 stays on its measured seat")
+	_eq(worker.actor().animation, &"working", "and requests its real state during the exit clip")
 	await _same_as_rebuild(office, "in another zone")
 	_done(office)
 
@@ -1380,42 +1277,25 @@ func test_lobby_has_no_desks() -> void:
 	_done(office)
 
 
-## A denser pack hands out nodes pre-scaled by 1/density, whatever the screen
-## shows; an in-place desk must be the same nodes, scales and offsets a rebuild
-## draws. Each family is scaled *and sampled* on its own terms: the pack's props
-## and UI, the shared table's chairs, the pixel people's layers. This fixture
-## pack declares `nearest` at density 4, so the pack and the table disagree on
-## purpose, and its linear twin at the end disagrees with the people: a node
-## that took the wrong family's density or filter shows up here.
+## The theme and whole workstation retain their own density and sampling;
+## an in-place update agrees with a rebuilt world under either theme filter.
 func test_dense_pack_matches_rebuild() -> void:
 	var office := await _live_office()
 	office.switch_theme(_dense_pack(4))
 	_eq(office.art.density, 4, "the dense pack holds 4px per unit")
 	_eq(office.art.filter, CanvasItem.TEXTURE_FILTER_NEAREST, "and asks for nearest on its own art")
 	var seat: Node2D = office.floor_view.seats[HerdrFleet.pane_key(LOCAL, "api:p1")].node
+	_eq(_sprite(seat, "Actor/Body").scale, office.art.workstation.unit_scale(), "the whole image uses its own density")
+	_check(office.art.workstation.unit_scale() != office.art.unit_scale(), "not the theme's density")
 	_eq(
-		_sprite(seat, "Chair").scale, office.art.table.unit_scale(), "the chair is scaled by the shared table's density"
-	)
-	_eq(
-		_sprite(seat, "Actor/Layers/Body").scale,
-		office.art.people.unit_scale(),
-		"a worker's layers by the pixel people's density"
-	)
-	_check(office.art.people.unit_scale() != office.art.unit_scale(), "which is the family's own, not the pack's")
-	_eq(
-		_sprite(seat, "Overlay/Selection").texture_filter,
+		_badge(seat).texture_filter,
 		CanvasItem.TEXTURE_FILTER_NEAREST,
 		"the pack's own UI samples the way the pack asked"
 	)
 	_eq(
-		_sprite(seat, "Chair").texture_filter,
-		office.art.table.filter,
-		"the shared table samples the way its own manifest says (nearest), not the pack"
-	)
-	_eq(
-		_sprite(seat, "Actor/Layers/Body").texture_filter,
+		_sprite(seat, "Actor/Body").texture_filter,
 		CanvasItem.TEXTURE_FILTER_NEAREST,
-		"and the pixel people sample nearest: at the even zooms they are never minified"
+		"the workstation remains nearest at every accepted zoom"
 	)
 	var world_id: int = office.world.get_instance_id()
 	var snapshot := _with(fixture, "api:p4", {"agent_status": "blocked"})
@@ -1426,27 +1306,20 @@ func test_dense_pack_matches_rebuild() -> void:
 	_eq(office.world.get_instance_id(), world_id, "all of it in place")
 	var badge := _badge(office.floor_view.seats[HerdrFleet.pane_key(LOCAL, "api:p3")].node)
 	_eq(badge.scale, Vector2.ONE / float(office.art.density), "the new badge is scaled back from the pack's density")
-	_walked(office, "as the new done worker comes in")
 	await _same_as_rebuild(office, "with a dense pack")
 	office.switch_theme(_dense_pack(4, "linear"))
 	seat = office.floor_view.seats[HerdrFleet.pane_key(LOCAL, "api:p1")].node
 	_eq(
-		_sprite(seat, "Overlay/Selection").texture_filter,
+		_badge(seat).texture_filter,
 		CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS,
 		"a linear pack's own UI samples through mipmaps"
 	)
 	_eq(
-		_sprite(seat, "Chair").texture_filter,
-		CanvasItem.TEXTURE_FILTER_NEAREST,
-		"while its nearest chair stays nearest"
+		[_sprite(seat, "Actor/Body").texture_filter, _sprite(seat, "Actor/Body").scale],
+		[CanvasItem.TEXTURE_FILTER_NEAREST, office.art.workstation.unit_scale()],
+		"the whole workstation retains its own sampling and density"
 	)
-	for layer in PixelPeople.LAYERS:
-		var sprite := _sprite(seat, "Actor/" + PixelPeople.SPRITES[layer])
-		_eq(
-			[sprite.texture_filter, sprite.scale],
-			[CanvasItem.TEXTURE_FILTER_NEAREST, Vector2.ONE / float(office.art.people.density)],
-			"while a worker's %s keeps the pixel people's nearest and their own density" % layer
-		)
+	await _same_as_rebuild(office, "with a linear theme and nearest workstation")
 	_done(office)
 
 
@@ -1505,11 +1378,11 @@ func test_hud_updates_in_place() -> void:
 	var nodes := _hud_nodes(office)
 	_check(nodes.size() > 40, "the HUD is a real scene, not a handful of nodes: %d" % nodes.size())
 	_eq(_label(hud.inspector, "%CardName").text, "refactor the fleet", "the inspector names the selected pane")
-	# S3 PORTRAIT P2 (2026-10-28): the card shows the seat's person as a portrait, a still, so
-	# "animating / frozen / moving again" became the window's tint (greyed while dropped).
-	var portrait: PixelPortrait = hud.inspector.portrait()
+	# The generic portrait is a retained sprite; machine liveness tints its window.
+	var portrait: Sprite2D = hud.inspector.portrait()
 	var window: Control = hud.inspector.get_node("%PortraitWindow")
 	_check(portrait != null and window.modulate == Color.WHITE, "and its portrait shows, untinted")
+	_eq(portrait.texture, office.art.workstation.portrait_texture(), "the generic whole-image portrait")
 	_feed(office, fixture)
 	office.refresh()
 	_eq(_hud_nodes(office), nodes, "a refresh with the same data creates and frees nothing")
@@ -1748,36 +1621,16 @@ func test_world_rules() -> void:
 				# is: its body sorts by the foot its own origin stands on.
 				entity == sprite
 				or entity is OfficeTable
-				or entity is PixelPerson
+				or entity is OfficeStation
 				or entity is OfficeDecor
 				or entity.name == &"Overlay"
-				# The near chair's back carries the provider's mark (D3, 2026-10-27),
-				# drawn with the chair, in front of the sitter.
-				or entity.name == &"Chair"
 			)
 			if not grouped:
 				loose.append(str(sorted.get_path_to(sprite)))
-		_eq(
-			loose,
-			[],
-			"%s: every sprite sorts by its own feet or as part of a table, worker, prop, chair or overlay" % manifest
-		)
+		_eq(loose, [], "%s: every sprite sorts by its own feet or as part of a workstation, prop or overlay" % manifest)
 		for table: OfficeTable in sorted.find_children("*", "OfficeTable", false, false):
 			_check(not table.y_sort_enabled, "%s: a table is one entity, drawn in tree order" % manifest)
-			# Table children draw over the far workers: task lights stay on the wood.
-			var surface := Rect2(0, -OfficeTable.SURFACE_DEPTH, table.width, OfficeTable.SURFACE_DEPTH).grow(0.001)
-			var lights: Array = table.get_node("TaskLights").get_children()
-			_eq(
-				lights.size(),
-				table.columns.size() * 2,
-				"%s: %s has a far and a near task light per column" % [manifest, table.name]
-			)
-			for light: Polygon2D in lights:
-				for point: Vector2 in light.polygon:
-					_check(
-						surface.has_point(light.position + point),
-						"%s: %s/%s vertex %s lies on the surface" % [manifest, table.name, light.name, point]
-					)
+			_eq(table.find_children("*", "Sprite2D", true, false), [], "pod has no separate equipment artwork")
 		var z_values := {}
 		var behind: Array = []
 		for item: CanvasItem in office.world.find_children("*", "CanvasItem", true, false):
@@ -1796,9 +1649,8 @@ func test_world_rules() -> void:
 		_done(office)
 
 
-## Depth follows position, for both packs and every occupied seat: a far
-## worker sits between their chair and the table's near edge, a near worker
-## between that edge and their chair. Seats come from the table.
+## Every complete workstation sorts at its measured foot; both rows use the
+## same front-facing artwork, never component depth or a mirrored person.
 func test_sorting_by_position() -> void:
 	for manifest: String in [MANIFESTS[0], _second_pack()]:
 		var office := await _live_office(_with(fixture, "api:p3", {"agent": "pi"}))
@@ -1811,25 +1663,13 @@ func test_sorting_by_position() -> void:
 			# and their idle agents sit at their own seats as api's do.
 			if actor == null or not key.begins_with(HerdrFleet.pane_key(LOCAL, "api:")):
 				continue
-			var table: OfficeTable = station.seat.get_parent().get_parent()
-			var chair := _sprite(station, "Chair")
-			var ys := [chair.global_position.y, actor.global_position.y, table.global_position.y]
+			var table := station.table
 			var where := "%s %s (%s)" % [manifest, key, station.side]
 			_eq(actor.global_position, station.seat.global_position, where + ": the worker sits on the table's seat")
-			if station.side == "far":
-				_check(_rising(ys), where + ": far chair < far worker < table: %s" % [ys])
-				_eq(
-					[str(actor.look.orientation), str(station.chair_view), str(actor.shown_facing())],
-					["front", "front", "front"],
-					where + ": faces the viewer"
-				)
-			else:
-				_check(_falling(ys), where + ": table < near worker < near chair: %s" % [ys])
-				_eq(
-					[str(actor.look.orientation), str(station.chair_view), str(actor.shown_facing())],
-					["back", "back", "back"],
-					where + ": shows their back"
-				)
+			_eq(actor.global_position.y - table.global_position.y, -128.0 if station.side == "far" else 0.0, where)
+			_eq(_entity_of(office.floor_view.sorted, actor), station, where + ": one entity at its foot")
+			_eq(_sprite(actor, "Body").texture, office.art.workstation.sheet_texture(), where + ": same authored sheet")
+			_check(not _sprite(actor, "Body").flip_h and not _sprite(actor, "Body").flip_v, where + ": never mirrored")
 			seen[station.side] = true
 		_eq(seen.keys().size(), 2, manifest + ": the fixture seats workers on both sides")
 		# Done and blocked workers sit, and the same seated rule orders them.
@@ -1837,151 +1677,70 @@ func test_sorting_by_position() -> void:
 			_with(_both_sides(), "api:p1", {"agent_status": "done"}), "api:p3", {"agent_status": "blocked"}
 		)
 		_feed(office, both)
-		_eq(office.floor_view.presentation.walkers(), [], manifest + ": nobody gets up")
 		var sat := {}
 		for key: String in [HerdrFleet.pane_key(LOCAL, "api:p1"), HerdrFleet.pane_key(LOCAL, "api:p3")]:
 			var station := _station(office, key)
 			var actor := station.actor()
-			var chair := _sprite(station, "Chair")
-			var ys := [chair.global_position.y, actor.global_position.y, station.table.global_position.y]
 			var where := "%s %s done or blocked (%s)" % [manifest, key, station.side]
 			_eq(actor.global_position, station.seat.global_position, where + ": on the table's seat")
-			_eq(str(actor.look.context), "desk", where + ": at the desk")
-			_check(_rising(ys) if station.side == "far" else _falling(ys), where + ": seated depth order: %s" % [ys])
+			_eq(_entity_of(office.floor_view.sorted, actor), station, where + ": same whole-image depth rule")
 			sat[station.side] = true
 		_eq(sat.keys().size(), 2, manifest + ": a done or blocked worker sits on each side")
 		_done(office)
 
 
-## One shape for every worker: the family's layers and nothing else (no chest
-## badge: at one texture pixel per unit a person has no room for a logo, so the
-## plate says who sits there), one AnimationPlayer that keeps every layer on the
-## same frame, and a new state, pose or look that changes what plays and what
-## is shown without replacing a node.
-func test_actor_rig() -> void:
+func test_the_whole_image_plays_transitions_without_replacing_nodes_or_resetting_clocks() -> void:
 	var office := await _live_office()
 	await _frames(3)
 	var station: OfficeStation = office.floor_view.seats[HerdrFleet.pane_key(LOCAL, "api:p1")].node
 	var actor := station.actor()
-	var people := office.art.people
-	var layers := actor.get_node("Layers")
-	var drawn: Array = PixelPeople.LAYERS.map(
-		func(layer: StringName) -> String: return PixelPeople.SPRITES[layer].get_file()
-	)
-	_eq(_names(layers), drawn, "the family's layers, bottom to top, and no badge among them")
+	var image := _sprite(actor, "Body")
+	_eq(_names(actor), ["Body", "AnimationPlayer"], "one image and its clock, no rig")
 	_eq(actor.find_children("*", "AnimationPlayer", true, false).size(), 1, "one AnimationPlayer")
 	var player: AnimationPlayer = actor.get_node("AnimationPlayer")
 	var ids := _subtree_ids(actor)
-	_eq(player.assigned_animation, people.track(AvatarLook.DESK, &"working"), "a working far worker types at the desk")
+	_eq(player.assigned_animation, &"working", "working clip")
 	for step: float in [0.37, 0.05, 1.21]:
 		player.advance(step)
-		var frames := _layer_frames(actor)
-		_check(_all_same(frames), "every layer shows the same frame after %ss: %s" % [step, frames])
+		_check(image.frame in office.art.workstation.tracks[&"working"].frames, "a real working frame")
+		var before := _actor_state(actor)
+		office.refresh()
+		_eq(_actor_state(actor), before, "refresh preserves the exact clock and frame")
 	actor.play_state("blocked")
-	_eq(player.assigned_animation, &"desk_blocked", "a new state plays its desk track")
-	player.advance(0.6)
-	var blocked := _layer_frames(actor)
-	_check(
-		_all_same(blocked) and _within(people.tracks[&"desk_blocked"], blocked[0]),
-		"all layers on a desk_blocked frame: %s" % [blocked]
-	)
+	_eq(actor.track, &"blocked_enter", "enter before the blocked hold")
+	player.advance(player.current_animation_length + 0.001)
+	_eq(actor.track, &"blocked", "then the blocked loop")
+	player.advance(0.2)
 	var at := player.current_animation_position
 	actor.play_state("blocked")
 	_eq(player.current_animation_position, at, "the same state again does not restart it")
-	_eq(_subtree_ids(actor), ids, "play_state replaces no node")
-	for layer in PixelPeople.LAYERS:
-		_eq(
-			_sprite(actor, PixelPeople.SPRITES[layer]).texture,
-			people.layer_texture(layer, actor.look, PixelPeople.FRONT),
-			"a far worker faces the viewer: the front strip on %s" % layer
-		)
-	actor.stand_up()
-	_check(not _shape_of(actor).disabled, "standing up collides again")
-	_eq(str(actor.look.context), "stand", "in the standing pose")
-	_eq(player.assigned_animation, &"stand_blocked", "and plays the standing track")
-	player.advance(0.2)
-	var standing := _layer_frames(actor)
-	_check(
-		_all_same(standing) and _within(people.tracks[&"stand_blocked"], standing[0]),
-		"all layers on a stand_blocked frame of the same strips: %s" % [standing]
-	)
-	actor.sit(station.seat)
-	_check(_shape_of(actor).disabled, "sitting again takes the feet off")
-	_eq(player.assigned_animation, &"desk_blocked", "and plays the desk track again")
-	_eq(_subtree_ids(actor), ids, "standing and sitting replace no node")
-	var turned := AvatarLook.with_slots({AvatarLook.HAIR_STYLE: &"long", AvatarLook.TOP: &"terra"})
-	turned.orientation = AvatarLook.BACK
-	actor.configure(people, actor.provider, turned)
-	_eq([actor.look.hair_style, actor.look.top], [&"long", &"terra"], "a new look is worn")
-	for layer in PixelPeople.LAYERS:
-		_eq(
-			_sprite(actor, PixelPeople.SPRITES[layer]).texture,
-			people.layer_texture(layer, actor.look, PixelPeople.BACK),
-			"turned round, %s shows its back strip" % layer
-		)
-	_eq(player.assigned_animation, &"desk_blocked", "still seated, still blocked")
-	_eq(_subtree_ids(actor), ids, "a new look replaces no node")
+	actor.play_state("idle")
+	_eq([actor.animation, actor.track], [&"idle", &"blocked_exit"], "exit before the requested idle loop")
+	actor.play_state("working")
+	_eq([actor.animation, actor.track], [&"working", &"blocked_exit"], "new request does not skip the exit")
+	player.advance(player.current_animation_length + 0.001)
+	_eq(actor.track, &"working", "exit reaches the latest requested state")
+	actor.pause()
+	var held := _actor_state(actor)
+	await _frames(6)
+	_eq(_actor_state(actor), held, "pause freezes exact frame and clock")
+	actor.play()
+	_check(actor.is_playing(), "play resumes")
+	_eq(_actor_state(actor), held, "without rewinding")
+	_eq(_subtree_ids(actor), ids, "all changes retain the same nodes")
 	_done(office)
-
-
-## A standing worker walked at a table with move_and_slide() stops at its
-## footprint; a seated one does not collide at all.
-func test_actor_collision() -> void:
-	var art := ArtPack.from_manifest(MANIFESTS[0])
-	var pen := OfficeDraw.new(art)
-	var floor_model := Node2D.new()
-	root.add_child(floor_model)
-	var ground := Node2D.new()
-	floor_model.add_child(ground)
-	var sorted := Node2D.new()
-	sorted.y_sort_enabled = true
-	floor_model.add_child(sorted)
-	var table := pen.table(sorted, ground, "Table0", Vector2(100, 300), 160, [80.0])
-	var far_edge := table.global_position.y - OfficeTable.SURFACE_DEPTH
-	var walker: PixelPerson = OfficeDraw.PERSON_SCENE.instantiate()
-	walker.configure(art.people, "codex", AvatarLook.facing(AvatarLook.STAND, &""))
-	walker.position = Vector2(180, far_edge - 70)
-	sorted.add_child(walker)
-	_eq(
-		[walker.collision_layer, walker.collision_mask, table.collision_layer],
-		[OfficeWorld.ACTORS, OfficeWorld.FURNITURE, OfficeWorld.FURNITURE],
-		"actors collide with furniture"
-	)
-	_check(not _shape_of(walker).disabled, "a standing worker has feet")
-	await physics_frame
-	for step in 90:
-		walker.velocity = Vector2(0, 120)
-		walker.move_and_slide()
-		await physics_frame
-	_check(walker.position.y > far_edge - 20, "the worker walked (y %s)" % walker.position.y)
-	_check(
-		absf(walker.position.y - far_edge) < 1.0,
-		"and stopped at the table's far edge %s (y %s)" % [far_edge, walker.position.y]
-	)
-	var sitter: PixelPerson = OfficeDraw.PERSON_SCENE.instantiate()
-	sitter.configure(art.people, "claude")
-	sorted.add_child(sitter)
-	sitter.sit(table.seat(0, "far"))
-	_check(_shape_of(sitter).disabled, "a seated worker's feet are off")
-	_eq(sitter.global_position, table.seat(0, "far").global_position, "snapped to the seat")
-	root.remove_child(floor_model)
-	floor_model.queue_free()
 
 
 ## The table refuses a width it cannot build out of whole modules.
 func test_table_width_is_validated() -> void:
 	var art := ArtPack.from_manifest(MANIFESTS[0])
-	for width: float in [240.0, 32.0, 150.0, 0.0]:
+	for width: float in [240.0, 32.0, 150.0, 160.0, 0.0]:
 		_check(not OfficeTable.width_error(width).is_empty(), "width %s is refused" % width)
-	for width: float in [64.0, 128.0, 160.0, 256.0, 512.0]:
+	for width: float in [192.0, 288.0, 384.0, 576.0]:
 		_eq(OfficeTable.width_error(width), "", "width %s is fine" % width)
 	var table: OfficeTable = OfficeDraw.TABLE_SCENE.instantiate()
 	_check(not table.setup(art, 240.0, [80.0]), "setup() refuses a 240-wide table")
-	_eq(
-		[table.get_node("Surface").get_child_count(), table.get_node("Seats").get_child_count()],
-		[0, 0],
-		"and builds none of it"
-	)
+	_eq(table.get_node("Seats").get_child_count(), 0, "and builds none of it")
 	table.free()
 	var pen := OfficeDraw.new(art)
 	var holder := Node2D.new()

@@ -446,7 +446,10 @@ func test_a_chip_click_switches_to_that_machine() -> void:
 	_eq(navigator.shown_key, BEE, "released: bee's map is shown")
 	_eq(office.shown_machine(), BEE, "the world is built for it")
 	_check(office.world.get_instance_id() != world, "cold: a new world")
-	_eq(office.floor_view.presentation.walkers(), [], "nobody walks")
+	for key in office.floor_view.seats:
+		var station := office.floor_view.seat(key).node
+		if station.actor() != null:
+			_eq(station.actor().global_position, station.seat.global_position, "already at its workstation")
 	_eq(navigator.nav_revision, revision + 1, "one navigation")
 	_eq(office.picked_key, picked, "nothing is picked")
 	_eq(office.plate.title_text(), "@ BEE", "the plate names bee")

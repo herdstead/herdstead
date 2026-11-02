@@ -175,13 +175,16 @@ static func framing(bounds: Rect2, beside: Rect2, room: Vector2) -> Rect2:
 
 
 ## The pan that, from `from`, moves a view of `room` just enough to hold
-## `bounds` with REVEAL_HEADROOM above it; where they cannot both fit, its
-## top-left wins. Not clamped to any map.
+## `bounds`, with as much of REVEAL_HEADROOM as fits. A short expanded panel
+## must not hide the chip/name to keep empty space above the head: when even
+## the bounds are too tall, their bottom wins. Sideways the left still wins.
+## Not clamped to any map.
 static func revealed(from: Vector2, bounds: Rect2, room: Vector2) -> Vector2:
-	var rect := bounds.grow_side(SIDE_TOP, REVEAL_HEADROOM)
+	var headroom := minf(REVEAL_HEADROOM, maxf(0.0, room.y - bounds.size.y))
+	var rect := bounds.grow_side(SIDE_TOP, headroom)
 	return Vector2(
 		minf(maxf(from.x, rect.end.x - room.x), rect.position.x),
-		minf(maxf(from.y, rect.end.y - room.y), rect.position.y)
+		maxf(minf(from.y, rect.position.y), rect.end.y - room.y)
 	)
 
 

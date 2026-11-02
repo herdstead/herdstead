@@ -128,10 +128,10 @@ func _badge_state(machine: String, pane_id: String) -> String:
 
 ## Whether the shown floor's workers play: [true], [false] or both.
 func _actors_playing(office: OfficeDouble) -> Array:
-	var rooms: Node2D = office.floor_view.root
 	var seen := {}
-	for actor: PixelPerson in get_nodes_in_group("office_actors"):
-		if rooms.is_ancestor_of(actor):
+	for key in office.floor_view.seats:
+		var actor := office.floor_view.seat(key).node.actor()
+		if actor != null:
 			seen[actor.is_playing()] = true
 	return seen.keys()
 

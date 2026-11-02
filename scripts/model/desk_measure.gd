@@ -7,16 +7,12 @@ var capacity := 0
 var table_width := 0.0
 var columns: Array[float] = []
 var physical_rect := Rect2()
-## Space reserved for furniture, labels, standing and approach clearance.
+## Space reserved for the complete images, labels and the passage beside them.
 var reserved_rect := Rect2()
 ## The complete supported stationary workstation drawing envelope.
 var render_rect := Rect2()
 var far_seats: Array[Vector2] = []
 var near_seats: Array[Vector2] = []
-var far_standing: Array[Vector2] = []
-var near_standing: Array[Vector2] = []
-var far_approaches: Array[Vector2] = []
-var near_approaches: Array[Vector2] = []
 
 
 func has_seat(column: int, side: String) -> bool:
@@ -27,15 +23,3 @@ func seat_position(column: int, side: String) -> Vector2:
 	if not has_seat(column, side):
 		return Vector2.INF
 	return far_seats[column] if side == "far" else near_seats[column]
-
-
-func standing_position(column: int, side: String) -> Vector2:
-	if not has_seat(column, side):
-		return Vector2.INF
-	return far_standing[column] if side == "far" else near_standing[column]
-
-
-func approach_position(column: int, side: String) -> Vector2:
-	if not has_seat(column, side):
-		return Vector2.INF
-	return far_approaches[column] if side == "far" else near_approaches[column]

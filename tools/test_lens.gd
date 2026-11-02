@@ -82,7 +82,6 @@ func test_holding_l_adds_the_wait_line_and_letting_go_restores_everything() -> v
 	var one := _with(crowded, "api:p1", {"agent_status": "blocked"})
 	_feed(office, one)
 	_feed(office, _with(one, "api:p4", {"agent_status": "done"}))
-	office.settle()
 	await _frames(2)
 	var signals := _signals(office)
 	var theme := office.hud.bar.theme_line()
@@ -146,7 +145,6 @@ func test_the_lens_hides_the_bubble_parts_but_not_the_blocked_seat() -> void:
 	# api:p4 is seen going blocked, so its chip has a wait to draw.
 	_feed(office, _with(first, "api:p4", {"agent_status": "blocked"}))
 	var key := _pk("api:p4")
-	office.settle()
 	await _text_tick()
 	var station := _station(office, key)
 	var bubble := station.chip()
@@ -221,7 +219,7 @@ func test_shells_have_no_wait_line_and_unknown_tracks_say_question_mark() -> voi
 ## StrategicModel.WINDOW_LOOKS): blocked, then done (UNREAD), working, idle or
 ## starting (cream), unknown (muted); a table of shells only is slate. The wash
 ## covers the cells under the pod's drawing and its title and lies first in its
-## background, under the shadows, the sign and the title. (It used to lie over a rug; the
+## background, under the workstations, the sign and the title. (It used to lie over a rug; the
 ## pods stand on the floor itself.)
 func test_each_rug_washes_in_its_tables_most_urgent_state_on_the_floors_scale() -> void:
 	var scale := {
@@ -243,18 +241,19 @@ func test_each_rug_washes_in_its_tables_most_urgent_state_on_the_floors_scale() 
 	var desk := office.floor_view.desks[main]
 	_eq(desk.background.find_children("*", "TileMapLayer", true, false), [], "no rug")
 	var grid := float(FloorLayoutPolicy.GRID)
-	# The pod's drawing and the tab's name right under it: the near row sits at
-	# the desk, so the drawing ends on a cell's edge (y 32) and the name is the
-	# next cell's.
-	var visual := desk.placement.measure.render_rect.grow_side(SIDE_BOTTOM, OfficeDraw.TAB_LABEL_HEIGHT)
+	# The whole-image envelope ends at y 56; the title clears the selection
+	# frame at y 60..68. The wash must include that title's last four units too.
+	var visual := desk.placement.measure.render_rect
+	visual.position += desk.placement.origin
+	var title_box := Rect2(desk.title.position, desk.title.size)
+	visual = visual.merge(title_box)
 	var start := (visual.position / grid).floor() * grid
 	var end := (visual.end / grid).ceil() * grid
-	var cells := Rect2(desk.placement.origin + start, end - start)
+	var cells := Rect2(start, end - start)
 	_eq(Rect2(desk.wash.position, desk.wash.size), cells, "the wash covers the cells under the pod's drawing and title")
-	_eq(cells.size.y, 160.0, "five cell rows: the far tags' row down to the near approach row")
-	var title_box := Rect2(desk.title.position, desk.title.size)
+	_eq(cells.size.y, 320.0, "ten rows enclose the complete images, annotation bands and tab title")
 	_check(cells.encloses(title_box), "the tab's name %s is on the wash %s" % [title_box, cells])
-	_eq(desk.wash.get_index(), 0, "first, under the shadows, sign and title")
+	_eq(desk.wash.get_index(), 0, "first, under the workstations, sign and title")
 	var steps: Array = [
 		[_with(fixture, "api:p2", {"agent_status": "blocked"}), main, ArtContract.BLOCKED, "blocked beats working"],
 		[_with(fixture, "api:p4", {"agent_status": "done"}), tests, ArtContract.UNREAD, "done"],
@@ -279,7 +278,6 @@ func test_each_rug_washes_in_its_tables_most_urgent_state_on_the_floors_scale() 
 	for step: Array in steps:
 		var snapshot: Dictionary = step[0]
 		_feed(office, snapshot)
-		office.settle()
 		await _frames(2)
 		_eq(_wash_tone(office, str(step[1])), step[2], str(step[3]))
 	var working := _with(fixture, "api:p4", {"agent_status": "working"})
@@ -297,12 +295,11 @@ func test_each_rug_washes_in_its_tables_most_urgent_state_on_the_floors_scale() 
 ## Held, only the furnishing steps back: the floor, walkways, walls, door,
 ## windows and framed pictures (the shell), every plant and side table (and
 ## what it carries), the pantry counter, the zones' partitions and signs, all
-## by LENS_DIM. The pods, their laptops, lamps and paper, the people, what
-## floats over them, the washes and the tab labels stay as bright as they were.
+## by LENS_DIM. The whole workstation images, their signals, the washes and
+## the tab labels stay as bright as they were.
 func test_only_furnishing_dims_while_held() -> void:
 	# Wide enough that the top wall hangs framed pictures between its windows.
 	var office := await _live_office(_with(fixture, "api:p4", {"agent_status": "done"}), Vector2(1600, 800))
-	office.settle()
 	await _frames(2)
 	var furnishing := _furnishing(office)
 	_check(furnishing.size() > 3, "the shell, decor and partitions are there: %d" % furnishing.size())
@@ -358,7 +355,6 @@ func test_both_plants_are_drawn_where_planned_and_ignore_herdr() -> void:
 	# zone takes lanes until it stands one row; the map replans: at 880 (four
 	# lanes, 23 cells) the zones stand two even rows and leave no lane gap.
 	var office := await _live_office(fixture, Vector2(1280, 720))
-	office.settle()
 	await _frames(2)
 	var planned: Dictionary[Vector2, StringName] = {}
 	var keys: Dictionary[String, StringName] = {}
@@ -387,8 +383,6 @@ func test_both_plants_are_drawn_where_planned_and_ignore_herdr() -> void:
 	changed.focused_tab_id = "api:t2"
 	for snapshot: Dictionary in [changed, fixture]:
 		_feed(office, snapshot)
-		await _frames(2)
-		office.settle()
 		await _frames(2)
 		var again: Dictionary[String, StringName] = {}
 		for placed: DecorPlacement in office.layout_plan().decorations:
@@ -420,7 +414,6 @@ func _drawn_pieces(office: OfficeDouble) -> Dictionary[Vector2, OfficeDecor]:
 ## so the pick still reads, and let go it is exactly as before.
 func test_the_picked_tables_frame_darkens_on_its_wash() -> void:
 	var office := await _live_office(_with(fixture, "api:p1", {"agent_status": "blocked"}))
-	office.settle()
 	await _frames(2)
 	var key := _pk("api:p1")
 	await _click_desk(office, key)
@@ -545,13 +538,9 @@ func test_the_lens_ticks_with_the_top_bar_and_not_at_all_released() -> void:
 	_done(office)
 
 
-## An idle agent sits at their seat: the line is on that seat's lens row,
-## centred on the seat's column and above its badge, as anyone's. D2
-## (2026-10-27): idle sits with a mug; the pantry is a nook nobody walks to (the
-## line hung over them in the pantry, away from the empty seat).
+## The idle duration is below the whole image and badge on both rows.
 func test_an_idle_worker_gets_the_line_at_the_seat() -> void:
 	var office := await _live_office()
-	office.settle()
 	await _frames(2)
 	var station := _station(office, _pk("api:p2"))
 	_eq(office.frame.pane(_pk("api:p2")).state, "idle", "api:p2 idles")
@@ -561,7 +550,7 @@ func test_an_idle_worker_gets_the_line_at_the_seat() -> void:
 	_check(line.visible, "the idle worker has a line")
 	_check(not line.text.is_empty(), "saying how long: " + line.text)
 	# S3 item 7 (2026-10-27): the line's paper tag hugs its text (CARPET-B1): centred in the seat's lens row.
-	var lens_at: Vector2 = OfficeStation.LENS_AT[station.side]
+	var lens_at := Vector2(-15, 30)
 	var row := Rect2(lens_at, OfficeStation.LENS_SIZE)
 	var tag := Rect2(line.position, line.size)
 	_check(row.encloses(tag), "on the seat's lens row: %s in %s" % [tag, row])
@@ -570,10 +559,7 @@ func test_an_idle_worker_gets_the_line_at_the_seat() -> void:
 	_check(absf(drawn.get_center().x - station.global_position.x) <= 1.0, "centred on the seat's column")
 	var badge: Sprite2D = station.get_node("Overlay/Badge")
 	var mark := badge.global_transform * badge.get_rect()
-	if station.side == "far":
-		_check(drawn.end.y <= mark.position.y, "above its badge: %s over %s" % [drawn, mark])
-	else:
-		_check(drawn.position.y >= mark.end.y, "below its badge: %s under %s" % [drawn, mark])
+	_check(drawn.position.y >= mark.end.y, "below its badge: %s under %s" % [drawn, mark])
 	await _let_go()
 	_done(office)
 
@@ -588,7 +574,6 @@ func test_hovering_a_news_item_points_at_its_desk_without_selecting() -> void:
 	var office := await _live_office()
 	var key := _pk("api:p4")
 	_feed(office, _with(fixture, "api:p4", {"agent_status": "done"}))
-	office.settle()
 	await _frames(2)
 	var item := office.hud.news.item(0)
 	_check(item.visible and not item.disabled, "the newest entry is about api:p4")
@@ -999,7 +984,6 @@ func _l_key(down: bool) -> InputEventKey:
 ## canvas's (NightLight), over carpets and badges alike.
 func test_the_carpet_dims_as_furnishing_and_the_wash_lies_over_it() -> void:
 	var office := await _live_office()
-	office.settle()
 	await _frames(2)
 	var holder := office.floor_view.ground.get_node_or_null("Carpets")
 	_check(holder != null, "the floor lays its carpets in Ground/Carpets")
@@ -1046,14 +1030,13 @@ func test_the_carpet_dims_as_furnishing_and_the_wash_lies_over_it() -> void:
 ## wears no tag.
 func test_a_seats_words_stand_on_a_paper_tag() -> void:
 	var office := await _live_office()
-	office.settle()
 	await _frames(2)
 	await _hold()
 	var paper := office.art.color(ArtContract.PAPER)
 	var tagged := 0
 	for station in _seats(office):
-		var lens_at: Vector2 = OfficeStation.LENS_AT[station.side]
-		var plate_at: Vector2 = OfficeStation.PLATE_AT[station.side]
+		var lens_at := Vector2(-15, 30)
+		var plate_at := Vector2(-47, 44)
 		# S3 SEATTAGS (2026-10-27): a plate next to a vacant seat on its side of the
 		# pod takes that seat's slot too (web:p1 here), so its row is the station's
 		# plate_row(); test_office_geometry pins that row's literals.
@@ -1116,7 +1099,6 @@ func test_a_map_with_few_seats_shows_every_plate() -> void:
 	var few := _sized(fixture, FloorLayoutPolicy.FEW_SEATS)
 	var more := _sized(fixture, FloorLayoutPolicy.FEW_SEATS + 1)
 	var office := await _live_office(few)
-	office.settle()
 	await _frames(2)
 	_check(OfficeFloorView.few_seats(office.frame.building_of(office.navigator.shown_key).map), "few seats")
 	var shown := 0
@@ -1128,7 +1110,6 @@ func test_a_map_with_few_seats_shows_every_plate() -> void:
 	var world := office.world.get_instance_id()
 	var plates := _plate_ids(office)
 	_feed(office, more)
-	office.settle()
 	await _frames(2)
 	_check(not OfficeFloorView.few_seats(office.frame.building_of(office.navigator.shown_key).map), "one more: not few")
 	_eq(office.world.get_instance_id(), world, "the same world")
@@ -1155,7 +1136,6 @@ func test_a_map_with_few_seats_shows_every_plate() -> void:
 	for station in _seats(office):
 		_eq(_plate(station).visible, station == other, "let go, only the selected plate: " + station.pane_key)
 	_feed(office, few)
-	office.settle()
 	await _frames(2)
 	for station in _all_stations(office):
 		_eq(_plate(station).visible, not station.vacant, "back to few: every taken seat's again: " + station.name)
@@ -1366,7 +1346,7 @@ func _signals(office: OfficeDouble) -> Dictionary:
 func _marks(office: OfficeDouble) -> Dictionary:
 	var shown := {}
 	for station in _seats(office):
-		shown[station.pane_key] = _sprite(station, "Overlay/Selection").visible
+		shown[station.pane_key] = (station.get_node("Overlay/Selection") as Line2D).visible
 	return shown
 
 

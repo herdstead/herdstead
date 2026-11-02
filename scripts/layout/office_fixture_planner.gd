@@ -2,10 +2,8 @@ class_name OfficeFixturePlanner
 extends RefCounted
 ## The entry band's one service fixture for a candidate map: the pantry counter
 ## at the band's left end, against the top wall: its footprint from the wall's
-## foot line (OfficeShell.COUNTER_FOOT), in the band's one row, the walking
-## lane (OfficeShell.WALKING_LANE), whose nodes in front of it it blocks: the
-## lane starts beside it. A corner nook: furniture, with no spots, and nobody
-## walks to it.
+## foot line (OfficeShell.COUNTER_FOOT), in the band's one aisle row. A corner
+## nook: furniture, with no destinations or walking animation.
 ## There is no reception.
 ##
 ## Not decor: the entry band is a walkway for the decor rules, and the counter

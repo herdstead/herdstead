@@ -1,6 +1,6 @@
 extends "res://tools/test_base.gd"
-## Pure: the entry band as the plan places it and the validator walks it
-## (OfficeFixturePlanner, OfficeFloorValidation, OfficeWalkGraph): one cell
+## Pure: the entry band as the plan places it and the validator measures it
+## (OfficeFixturePlanner, OfficeFloorValidation): one cell
 ## deep, the walking lane right under the top wall and beside the pantry
 ## counter, a corner nook against the wall nobody walks to or stands at; that every state sits at its seat (OfficeStation on
 ## a bare table, no office); and the one ranking the `N` key uses. There is no
@@ -10,7 +10,6 @@ extends "res://tools/test_base.gd"
 ## with its spots and the fixture row. S3 BAND (2026-10-28): the band is one
 ## row; the top wall draws behind a person in front of it.
 
-var people: PixelPeople
 ## Made on first use by _pen().
 var pen: OfficeDraw
 ## A bare world for the cases that furnish a station: freed after each case.
@@ -18,7 +17,6 @@ var world: Node2D
 
 
 func _initialize() -> void:
-	people = PixelPeople.from_manifest(PixelPeople.MANIFEST)
 	run_cases()
 
 
@@ -47,12 +45,9 @@ func _serviced(floor_model: ZoneModel, width := 32, previous: FloorPlan = null) 
 
 ## The entry band is one cell deep: the walking lane, right under the top wall,
 ## which is also the first zones' aisle row. A map of one zone of one pod row is
-## 2 + 1 + the pod row's cells deep (the wall, the band, the pod row: 6 cells, 9
-## in all); an empty map is still 9, and so is nothing smaller. The threshold is
-## the lane's node under the door, 4 above the door's foot, and the first zone
-## starts under the band, its slot (its aisle row) in it. The top wall keeps off
-## the feet only: the lane's row right under it is walked from beside the
-## counter to the far side wall, and the wall's own rows are not.
+## 2 + 1 + the pod row's cells deep (the wall, the band, the pod row: 10 cells,
+## 13 in all); an empty map is still 9. The first zone starts under the band,
+## its slot (its aisle row) in it. The lift remains aligned with the corridor.
 ## S3 BAND (2026-10-28): the band is one row (it was two, the wall's drawing
 ## clearance over the lane, and a top aisle row under them: 2 + 2 + 1 + 6 = 11);
 ## the top wall draws behind a person in front of it (the clearance row was not
@@ -71,15 +66,7 @@ func test_the_entry_band_is_one_cell_deep() -> void:
 	_eq(_plan(_floor([])).floor_cells.size.y, 2 + 1 + pod, "an empty workspace is one pod row deep")
 	var empty := OfficeFloorLayout.plan(MapModel.empty("machine"), null, _real_rules()).plan
 	_eq(empty.floor_cells.size.y, 9, "an empty map (a machine with no workspace) stays 9 deep")
-	var graph := _graph_of(plan, rules)
-	_eq(graph.threshold, Vector2(OfficeShell.door(plan).x, 80), "the threshold is the lane's node under the door")
-	_eq(graph.door.y - graph.threshold.y, 4.0, "4 above the door's foot, in the same cell row")
-	_eq(graph.threshold_problem(), "", "and the door reaches it")
-	var beside := OfficeWalkGraph.cell_of(Vector2(plan.pantry.footprint.end.x, 80))
-	for x in range(beside.x, plan.main_corridor_cells.end.x):
-		_check(graph.walkable(Vector2i(x, 2)), "the walking lane under the wall is open at column %d" % x)
-		for row in range(0, plan.entry_cells.position.y):
-			_check(not graph.walkable(Vector2i(x, row)), "the wall's row %d is not walked at column %d" % [row, x])
+	_eq(OfficeShell.door(plan), Vector2(plan.main_corridor_cells.position.x * 32 + 16, 84), "lift over the corridor")
 
 
 ## Where the counter stands is a pure function of the plan: at the band's left
@@ -136,11 +123,9 @@ func test_no_fixtures_without_tables() -> void:
 			_eq([fixture.key, fixture.piece], ["pantry", ArtContract.PROP_PANTRY], "its one fixture is the pantry")
 
 
-## The nook holds nobody: the placement has no spots and no approaches, the
-## walk graph no fixture row, and the only FIXTURE obstacle is the counter's
-## footprint inflated by the feet, with no entries (nobody walks into it).
+## The nook holds nobody: the placement has no spots or approaches and is
+## only furniture, not an alternative place for an idle agent.
 func test_the_nook_holds_nobody() -> void:
-	var rules := _real_rules(32)
 	var plan := _serviced(_floor([_room("a", 4), _room("b", 2, 1)]), 32)
 	_check(plan.pantry != null, "the map has its counter")
 	if plan.pantry == null:
@@ -148,17 +133,7 @@ func test_the_nook_holds_nobody() -> void:
 	for gone: String in ["spots", "approaches"]:
 		_check(not gone in plan.pantry, "a FixturePlacement has no %s" % gone)
 	_check(not plan.pantry.has_method("capacity"), "and holds nobody")
-	var graph := _graph_of(plan, rules)
-	for gone: String in ["fixture_row", "walking_lane"]:
-		_check(not gone in graph, "the walk graph has no %s" % gone)
-	var fixtures := graph.obstacles.filter(
-		func(each: OfficeWalkGraph.Obstacle) -> bool: return each.kind == OfficeWalkGraph.Kind.FIXTURE
-	)
-	_eq(fixtures.size(), 1, "one FIXTURE obstacle")
-	var feet := PixelPerson.footprint()
-	var inflated := Rect2(plan.pantry.footprint.position - feet.end, plan.pantry.footprint.size + feet.size)
-	_eq(fixtures[0].rect, inflated, "the counter's footprint inflated by the feet")
-	_eq(fixtures[0].entries, PackedVector2Array(), "with no entries: nobody walks into it")
+	_eq(plan.fixtures().size(), 1, "only the counter is furnished")
 
 
 ## A band whose bay left of the main corridor is narrower than the counter has
@@ -204,15 +179,15 @@ func test_the_validator_treats_the_counter_as_furniture() -> void:
 	var plan := _serviced(_floor([_room("a", 2)]), 20)
 	_eq(OfficeFloorLayout.validate(plan, rules), PackedStringArray(), "the serviced floor validates")
 	var placed := plan.desks[0]
-	var approach := placed.origin + placed.measure.approach_position(0, "far")
+	var seat := placed.origin + placed.measure.seat_position(0, "far")
 	var pantry := plan.pantry
 	var stands := pantry.footprint
-	pantry.footprint = Rect2(approach - Vector2(20, 8), Vector2(40, 12))
+	pantry.footprint = Rect2(seat - Vector2(20, 8), Vector2(40, 12))
 	var problems := OfficeFloorLayout.validate(plan, rules)
 	_eq(
 		problems,
 		PackedStringArray(["fixture: pantry stands outside the entry band's bay"]),
-		"a counter over an approach is refused where it stands"
+		"a counter over a workstation is refused where it stands"
 	)
 	# Grown down over the lane and past the band's end (BreakingFixtures' shape):
 	# refused the same way, and never as a spot's problem.
@@ -225,45 +200,6 @@ func test_the_validator_treats_the_counter_as_furniture() -> void:
 		_check(not problem.contains("leg") and not problem.contains("pantry approach"), "no spot problems: " + problem)
 	pantry.footprint = stands
 	_eq(OfficeFloorLayout.validate(plan, rules), PackedStringArray(), "and all is well again")
-
-
-## The lane beside the counter is walked: every node on it from beside the
-## counter to the main corridor is walkable and joined to the next; the
-## counter, against the wall in the lane's row, takes exactly the nodes in
-## front of it (its footprint grown by the feet covers their centres); and the
-## way in from the door to a table in the first lane runs along the lane.
-## S3 BAND (2026-10-28): the band is one row (the lane was the second, at 112,
-## and ran in front of the counter from the left wall).
-func test_the_lane_beside_the_counter_is_walked() -> void:
-	var rules := _real_rules(20)
-	var plan := _serviced(_floor([_room("a", 2), _room("b", 2, 1)]), 20)
-	var graph := _graph_of(plan, rules)
-	var corridor := plan.main_corridor_cells.position.x
-	var feet := PixelPerson.footprint()
-	var grown := Rect2(plan.pantry.footprint.position - feet.end, plan.pantry.footprint.size + feet.size)
-	for x in range(plan.entry_cells.position.x, corridor):
-		var cell := Vector2i(x, 2)
-		var taken := grown.has_point(OfficeWalkGraph.centre(cell))
-		_eq(
-			not graph.walkable(cell),
-			taken,
-			"the lane's node at column %d is walked unless the counter stands on it" % x
-		)
-		if not taken and x + 1 < corridor:
-			_check(graph.linked(cell, OfficeWalkGraph.RIGHT), "and joined to the next at column %d" % x)
-	_check(not graph.walkable(Vector2i(plan.entry_cells.position.x, 2)), "the counter takes the lane's first node")
-	var first := plan.desks[0]
-	for desk in plan.desks:
-		if desk.origin.x < first.origin.x:
-			first = desk
-	var approach := first.origin + first.measure.approach_position(0, "far")
-	var route := graph.from_door(OfficeWalkGraph.cell_of(approach))
-	_check(not route.is_empty(), "the door reaches the first lane's far approach")
-	var on_lane := 0
-	for point in route:
-		on_lane += int(point.y == 80.0)
-	_check(on_lane >= 2, "the way in runs along the lane: %s" % route)
-	_check(graph.clear_route(route), "and is clear")
 
 
 ## S3 BAND (2026-10-28): the band is one row, so the counter stands against the
@@ -410,22 +346,22 @@ func test_whoever_waited_longest_goes_first() -> void:
 
 ## Every state sits at the seat, through OfficeStation.furnish() on a bare
 ## table: working, starting (whatever its status), unknown, done, blocked and
-## idle all sit at the desk (AvatarLook.DESK, at the seat's own point), and
-## what the desk shows beside the laptop is the state's: the paper for done,
-## the mug for idle, nothing otherwise; a shell has nobody and nothing.
+## idle all draw a whole workstation at the seat's own point. Shell and vacant
+## slots keep the empty workstation image, with no independently composed item.
 func test_every_state_sits() -> void:
 	var table := _bare_table(4)
 	var cases := [
-		["working", ArtContract.STATE_WORKING, false, &""],
-		["starting", ArtContract.STATE_BLOCKED, true, &""],
-		["starting idle", ArtContract.STATE_IDLE, true, &""],
-		["unknown", &"unknown", false, &""],
-		["done", ArtContract.STATE_DONE, false, ArtContract.PROP_DONE_STACK_SMALL],
-		["blocked", ArtContract.STATE_BLOCKED, false, &""],
-		["idle", ArtContract.STATE_IDLE, false, ArtContract.PROP_IDLE_MUG],
+		["working", ArtContract.STATE_WORKING, false],
+		["starting", ArtContract.STATE_BLOCKED, true],
+		["starting idle", ArtContract.STATE_IDLE, true],
+		["unknown", &"unknown", false],
+		["done", ArtContract.STATE_DONE, false],
+		["blocked", ArtContract.STATE_BLOCKED, false],
+		["idle", ArtContract.STATE_IDLE, false],
 	]
 	for side: String in OfficeTable.SIDES:
 		var station := _pen().station(world, table, 1, side)
+		var body := station.get_node("Actor") as WorkstationActor
 		for each: Array in cases:
 			var what: String = "%s %s" % [side, each[0]]
 			var state: StringName = each[1]
@@ -435,54 +371,15 @@ func test_every_state_sits() -> void:
 			_check(worker != null, what + ": somebody is there")
 			if worker == null:
 				continue
-			_eq([worker.look.context, worker.position], [AvatarLook.DESK, Vector2.ZERO], what + ": at the desk")
-			_eq(table.item_piece(1, side), each[3], what + ": what the desk shows")
-			_eq(table.item(1, side).visible, each[3] != &"", what + ": shown or not")
+			_eq(worker, body, what + ": one persistent image actor")
+			_eq(worker.position, Vector2.ZERO, what + ": anchored at the seat")
+			_eq(station.position, table.position + table.geometry.seat_position(1, side), what + ": measured foot")
+			_eq(worker.animation, &"starting" if starting else state, what + ": semantic state")
 		station.furnish("", ArtContract.STATE_IDLE)
 		_eq(station.actor(), null, side + " shell: nobody in the chair")
-		_eq(table.item_piece(1, side), &"", side + " shell: nothing beside the laptop")
+		_eq(body.animation, &"", side + " shell: the empty workstation")
 		station.vacate()
-		_eq([table.item_piece(1, side), table.item(1, side).visible], [&"", false], side + " vacant: nothing")
-
-
-## The door's field reaches every approach of every table across the band,
-## and from_door() reads a route in from the door to each: on a map of
-## several zones, partitions and all, 20 and 32 cells asked. What to_lane() /
-## from_lane() proved for the pantry's walkers, every walk in from the door
-## needs.
-func test_the_doors_field_reaches_every_approach_across_the_band() -> void:
-	for width: int in [20, 32]:
-		var rules := _real_rules(width)
-		var zones: Array[ZoneModel] = [
-			_zone("machine/1", 1, [_room("a", 4), _room("b", 2, 1), _room("c", 2, 2)]),
-			_zone("machine/2", 2, [_room("d", 6)]),
-			_zone("machine/3", 3, [_room("e", 2), _room("f", 8, 1)]),
-		]
-		var result := OfficeFloorLayout.plan(
-			MapModel.of_zones("machine", zones),
-			null,
-			rules,
-			OfficeDecorPlanner.new(_pen()),
-			OfficeFixturePlanner.new(_pen())
-		)
-		_eq(result.problems, PackedStringArray(), "%d cells: a valid map of three zones" % width)
-		if result.plan == null:
-			continue
-		var plan := result.plan
-		var graph := OfficeWalkGraph.build(plan, rules.actor_footprint, rules.actor_draw_rect)
-		var count := 0
-		for placed in plan.desks:
-			for column in placed.capacity:
-				for side: String in OfficeTable.SIDES:
-					var cell := OfficeWalkGraph.cell_of(placed.origin + placed.measure.approach_position(column, side))
-					var named := "%d cells, %s %d %s" % [width, placed.tab_key, column, side]
-					var route := graph.from_door(cell)
-					_check(route.size() >= 2 and route[0] == graph.door, named + ": in from the door")
-					_check(route[1] == graph.threshold, named + ": over the threshold on the lane")
-					_check(route[route.size() - 1] == OfficeWalkGraph.centre(cell), named + ": to the approach's node")
-					_check(graph.clear_route(route), named + ": clear")
-					count += 1
-		_check(count >= 30, "%d cells: every approach: %d" % [width, count])
+		_eq([station.actor(), body.animation, station.vacant], [null, &"", true], side + " vacant: empty workstation")
 
 
 ## The `N` key visits a floor's blocked agents longest-waiting first, then its
@@ -510,20 +407,20 @@ func test_n_follows_the_wait_order() -> void:
 
 
 ## A map without the counter (a band too narrow for it) seats everyone just
-## as one with it: every state sits, the idle too, and the walk graph is the
-## same but for the counter's obstacle.
+## as one with it: every state sits, the idle too. Removing only that fixture
+## changes no workstation geometry or logical seat.
 func test_everyone_sits_with_or_without_the_counter() -> void:
 	var rules := _real_rules(20)
 	var plan := _serviced(_floor([_room("a", 4)]), 20)
-	var with_counter := OfficeWalkGraph.build(plan, rules.actor_footprint, rules.actor_draw_rect)
-	var kinds := with_counter.obstacles.map(func(each: OfficeWalkGraph.Obstacle) -> int: return each.kind)
+	var signatures: Array[String] = []
+	for placed in plan.desks:
+		signatures.append(placed.geometry_signature())
+	_eq(plan.fixtures().size(), 1, "one counter")
 	plan.pantry = null
-	var bare := OfficeWalkGraph.build(plan, rules.actor_footprint, rules.actor_draw_rect)
-	var bare_kinds := bare.obstacles.map(func(each: OfficeWalkGraph.Obstacle) -> int: return each.kind)
-	_eq(kinds.count(OfficeWalkGraph.Kind.FIXTURE), 1, "with the counter: one FIXTURE obstacle, the counter")
-	_eq(bare_kinds.count(OfficeWalkGraph.Kind.FIXTURE), 0, "without it: none, no row barrier either")
-	kinds.erase(OfficeWalkGraph.Kind.FIXTURE)
-	_eq(bare_kinds, kinds, "without the counter: the same obstacles less its one")
+	_eq(plan.fixtures().size(), 0, "without it, no fixture")
+	_eq(OfficeFloorLayout.validate(plan, rules), PackedStringArray(), "the same desks still validate")
+	for index in plan.desks.size():
+		_eq(plan.desks[index].geometry_signature(), signatures[index], "all workstation geometry and seats unchanged")
 	var table := _bare_table(4)
 	for state: StringName in [
 		ArtContract.STATE_WORKING, ArtContract.STATE_BLOCKED, ArtContract.STATE_DONE, ArtContract.STATE_IDLE
@@ -531,48 +428,11 @@ func test_everyone_sits_with_or_without_the_counter() -> void:
 		var station := _pen().station(world, table, 0, "far")
 		station.furnish("claude", state)
 		_eq(
-			[station.actor().look.context, station.actor().position],
-			[AvatarLook.DESK, Vector2.ZERO],
+			[station.actor().animation, station.actor().position],
+			[state, Vector2.ZERO],
 			"%s: seated, counter or not (no station asks the plan)" % state
 		)
 		station.free()
-
-
-## Every map with desks has the walking lane under the top wall, and the
-## threshold stands on it, whether or not the counter stands there: (the
-## door's column, 80), 4 above the door's foot. A walk along the band runs on
-## the lane from beside the counter (from the left wall without it) to the main
-## corridor. A map without desks (an empty workspace, an empty map) has no
-## counter either. S3 BAND (2026-10-28): the band is one row (the lane was at
-## 112, under the door's clearance).
-func test_the_threshold_stands_on_the_lane_with_or_without_the_counter() -> void:
-	var rules := _real_rules(32)
-	var served := _serviced(_floor([_room("a", 4), _room("b", 2, 1)]), 32)
-	var bare := _serviced(_floor([_room("a", 4), _room("b", 2, 1)]), 32)
-	bare.pantry = null
-	for plan: FloorPlan in [served, bare]:
-		var what := "with the counter" if plan.pantry != null else "without it"
-		var graph := OfficeWalkGraph.build(plan, rules.actor_footprint, rules.actor_draw_rect)
-		_eq(graph.threshold, Vector2(OfficeShell.door(plan).x, 80), what + ": the threshold on the lane")
-		_eq(graph.threshold_problem(), "", what + ": the door reaches it")
-		var first := plan.entry_cells.position.x
-		if plan.pantry != null:
-			first = OfficeWalkGraph.cell_of(Vector2(plan.pantry.footprint.end.x, 80)).x
-		for x in range(first, plan.main_corridor_cells.position.x):
-			_check(graph.walkable(Vector2i(x, 2)), "%s: the walking lane at column %d is open" % [what, x])
-		var along := graph.route_between(
-			Vector2i(first, 2),
-			[Vector2i(plan.main_corridor_cells.position.x - 1, 2)] as Array[Vector2i],
-			PackedFloat32Array([0.0]),
-			PackedInt32Array([-1]),
-			100000,
-			1000
-		)
-		_check(not along.points.is_empty(), what + ": a walk along the band")
-		for point in along.points:
-			_eq(point.y, 80.0, "%s: runs on the lane: %s" % [what, point])
-	var empty := _plan(_floor([]))
-	_eq(empty.fixtures().size(), 0, "a map without desks has no counter")
 
 
 ## At the shipped plan width (the default window's 772 units, 24 cells, and
@@ -585,50 +445,31 @@ func test_the_counter_is_the_only_fixture_at_twenty_three_cells() -> void:
 	_eq(plan.fixtures().size(), 1, "one fixture")
 	_eq([plan.pantry.key, plan.pantry.footprint.position.x], ["pantry", 32.0], "the counter from the left wall")
 	_check(plan.pantry.footprint.end.x < 640.0, "short of the main corridor")
-	var graph := _graph_of(plan, _real_rules(25))
-	var beside := OfficeWalkGraph.cell_of(Vector2(plan.pantry.footprint.end.x, 80))
-	var along := graph.from_door(beside)
-	var end := OfficeWalkGraph.centre(beside)
-	_check(not along.is_empty() and along[along.size() - 1] == end, "the door reaches the lane's end beside it")
 
 
 ## The counter keeps to its corner at every furnished width (FloorPlanCache's
 ## FURNISHED_WIDTHS as the layout suite asks them): against the top wall (its
-## footprint from the wall's foot line), in the lane's row; the lane's node
-## beside it is walked and joined both ways, the door reaches it, and the
-## threshold is on the lane. S3 BAND (2026-10-28): the band is one row (the
-## counter's grown footprint ended short of the lane at 112, the node in front
-## of it walked).
+## footprint from the wall's foot line), in the entry band and short of the
+## main corridor. Its whole drawing stays clear of every workstation image.
 func test_the_counter_keeps_its_corner_at_every_shipped_width() -> void:
-	var feet := PixelPerson.footprint()
 	for width: int in [11, 20, 24, 32, 60]:
-		var rules := _real_rules(width)
 		var plan := _serviced(_floor([_room("a", 4), _room("b", 2, 1)]), width)
 		if plan == null or plan.pantry == null:
 			_check(false, "%d cells: a counter" % width)
 			continue
 		_eq(plan.pantry.footprint.position.y, 64.0, "%d cells: against the top wall" % width)
-		var grown_end := plan.pantry.footprint.end.y + feet.end.y + feet.size.y
-		_check(grown_end <= 96.0, "%d cells: the counter and the feet end at %s, in the band" % [width, grown_end])
-		var graph := _graph_of(plan, rules)
-		var beside := OfficeWalkGraph.cell_of(Vector2(plan.pantry.footprint.end.x + 16.0, 80))
-		_check(graph.walkable(beside), "%d cells: the lane's node beside it is walked" % width)
+		_eq(plan.pantry.footprint.end.y, 78.0, "%d cells: wholly within the band's one row" % width)
 		_check(
-			graph.linked(beside, OfficeWalkGraph.LEFT) or graph.linked(beside, OfficeWalkGraph.RIGHT),
-			"%d cells: and joined along the lane" % width
+			plan.pantry.footprint.end.x < plan.main_corridor_cells.position.x * 32,
+			"%d cells: short of the main corridor" % width
 		)
-		_check(graph.reaches(beside), "%d cells: the door reaches it" % width)
-		_eq(graph.threshold.y, 80.0, "%d cells: the threshold on the lane" % width)
+		for placed in plan.desks:
+			var drawing := placed.measure.render_rect
+			drawing.position += placed.origin
+			_check(not drawing.intersects(plan.pantry.draw_rect), "%d cells: clear of every workstation" % width)
 
 
 # --- helpers --------------------------------------------------------------------
-
-
-## A room "a" holding exactly `panes`, as a plan seats them.
-func _room_of(panes: Array[PaneModel]) -> RoomModel:
-	var room := _room("a")
-	room.panes.assign(panes)
-	return room
 
 
 func _pane(key: String, x := -1, side := "far", order := -1) -> PaneModel:
@@ -659,14 +500,6 @@ func _floor(rooms: Array[RoomModel]) -> ZoneModel:
 	return floor_model
 
 
-## A workspace `key` numbered `number` with `rooms`: one zone of a map.
-func _zone(key: String, number: int, rooms: Array[RoomModel]) -> ZoneModel:
-	var zone := _floor(rooms)
-	zone.key = key
-	zone.number = number
-	return zone
-
-
 func _plan(floor_model: ZoneModel) -> FloorPlan:
 	var rules := _real_rules()
 	var result := OfficeFloorLayout.plan(MapModel.of(floor_model), null, rules)
@@ -684,13 +517,7 @@ func _pen() -> OfficeDraw:
 func _real_rules(width := 32) -> FloorLayoutPolicy:
 	var rules := FloorLayoutPolicy.new()
 	rules.width_cells = width
-	rules.actor_footprint = PixelPerson.footprint()
-	rules.actor_draw_rect = PixelPerson.drawing_rect(people)
 	return rules
-
-
-func _graph_of(plan: FloorPlan, rules: FloorLayoutPolicy) -> OfficeWalkGraph:
-	return OfficeWalkGraph.of(plan, rules.actor_footprint, rules.actor_draw_rect)
 
 
 ## Every opaque texel `sprite` draws, as half-unit cells in `into`'s coordinates.

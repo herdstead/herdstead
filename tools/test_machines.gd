@@ -1800,9 +1800,9 @@ func test_refusal_after_pane_not_found_reopens_the_stream() -> void:
 
 
 ## Each machine is one map with its own plan, world and pan (as each floor was):
-## Local (40 agents, a pod of 20 columns, 21 cells: five lanes of 4) and bee
-## (snapshot_basic, two one-lane zones) plan apart. A real click on the other machine's FLOORS row is a
-## cold switch: a new world, nobody walking. Back on Local, its same FloorPlan
+## Local (40 agents, a pod of 20 columns, 61 reserved cells: thirteen lanes)
+## and bee (snapshot_basic) plan apart. A real click on the other machine's chip is a
+## cold switch: a new world, immediately seated. Back on Local, its same FloorPlan
 ## object. Each map remembers where a real drag left it.
 func test_each_machine_keeps_its_own_map_world_and_pan() -> void:
 	var office: OfficeDouble = await _two_machine_office()
@@ -1813,7 +1813,7 @@ func test_each_machine_keeps_its_own_map_world_and_pan() -> void:
 	var bee := "socket:bee"
 	var plan_a: FloorPlan = office.layout_plan()
 	_eq([office.navigator.shown_key, plan_a.floor_key], [HerdrFleet.LOCAL, HerdrFleet.LOCAL], "Local's map")
-	_eq(plan_a.lanes, 5, "widened to five lanes for its pod (Z1, 2026-10-27: lanes of 4)")
+	_eq(plan_a.lanes, 13, "twenty 96-unit columns plus the right passage and zone pads require thirteen lanes")
 	await process_frame
 	var middle := office.hud.world_rect().get_center()
 	await _drag_world(middle, Vector2(-120, -40))
@@ -1827,7 +1827,7 @@ func test_each_machine_keeps_its_own_map_world_and_pan() -> void:
 	_check(plan_b.floor_cells.size != plan_a.floor_cells.size, "planned apart, at its own size")
 	_eq(office.layout_attempt_count(), attempts + 1, "once")
 	_check(office.world != world, "a cold switch: the world is built again")
-	_eq(office.floor_view.presentation.walkers(), [], "and nobody walks")
+	_check(not office.floor_view.seats.is_empty(), "bee's workstations are ready immediately")
 	_eq(office.navigator.pan_of(HerdrFleet.LOCAL), pan_a, "Local's map remembers where the drag left it")
 	await process_frame
 	await _drag_world(middle, Vector2(0, 30))
@@ -1838,7 +1838,7 @@ func test_each_machine_keeps_its_own_map_world_and_pan() -> void:
 	_check(office.layout_plan() == plan_a, "on its same plan object")
 	_eq(office.layout_attempt_count(), attempts + 1, "not planned again")
 	_check(office.world != world, "cold again")
-	_eq(office.floor_view.presentation.walkers(), [], "nobody walks")
+	_eq(office.floor_view.seats.size(), 40, "all forty workstation bindings are restored immediately")
 	_eq(office.navigator.pan_of(bee), pan_b, "and bee's map remembers its own drag")
 	root.remove_child(office)
 	office.free()

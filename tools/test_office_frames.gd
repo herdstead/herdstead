@@ -13,7 +13,6 @@ const WIDTHS: Array[int] = [11, 20, 32, 60]
 const FACE_TOP := 12.0
 const FACE_FOOT := 57.0
 
-var people: PixelPeople
 var art: ArtPack
 var pen: OfficeDraw
 var world: Node2D
@@ -47,7 +46,6 @@ func _run() -> void:
 	await process_frame
 	root.size = SCREEN
 	await process_frame
-	people = PixelPeople.from_manifest(PixelPeople.MANIFEST)
 	art = ArtPack.from_manifest("res://assets/daylight/manifest.json")
 	if art == null:
 		print("TEST_HARNESS_ERROR: office frames has no art pack")
@@ -112,8 +110,6 @@ func _stress_floor() -> ZoneModel:
 func _rules(width: int) -> FloorLayoutPolicy:
 	var rules := FloorLayoutPolicy.new()
 	rules.width_cells = width
-	rules.actor_footprint = PixelPerson.footprint()
-	rules.actor_draw_rect = PixelPerson.drawing_rect(people)
 	return rules
 
 
@@ -309,11 +305,11 @@ func test_a_widened_map_moves_the_frames_with_its_door() -> void:
 	var width := 32
 	var first_model := _floor([_room("a", 2)])
 	var first := _planned(first_model, width, null, false)
-	# A twelve-pane pod (7 cells) cannot share a's pod row: a new row.
+	# A twelve-pane pod (19 cells) cannot share a's pod row: a new row.
 	var taller_model := _floor([_room("a", 2), _room("b", 12, 1)])
 	var taller := _planned(taller_model, width, first, false)
-	# Z1 (2026-10-27): a lane is 4 cells, pitch 5, a new zone takes lanes until it stands one row; the map replans.
-	# 32 cells plan five lanes (28 cells): a 48-pane pod (24 columns, 25 cells) needs six; 40 panes no longer widen.
+	# 32 cells plan five lanes (28 cells): 48 panes reserve 73 cells and need
+	# fifteen lanes, widening the map without moving any existing logical seat.
 	var wide_model := _floor([_room("a", 2), _room("b", 12, 1), _room("c", 48, 2)])
 	var wide := _planned(wide_model, width, taller, false)
 	if first == null or taller == null or wide == null:

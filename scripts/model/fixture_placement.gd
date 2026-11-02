@@ -2,9 +2,8 @@ class_name FixturePlacement
 extends RefCounted
 ## A map's service fixture in its entry band, as the plan placed it: the
 ## pantry counter in the band's corner. Planned by OfficeFixturePlanner, drawn
-## by OfficeFloorView, an obstacle on the walk graph (OfficeWalkGraph). It is
-## furniture: nobody walks to it or stands at it (an idle agent sits at their
-## seat with a mug, docs/VISUAL_LANGUAGE.md). There is no reception any more.
+## by OfficeFloorView and checked against other map geometry. It is furniture,
+## never an agent's state or destination. There is no reception any more.
 
 enum Kind { PANTRY }
 

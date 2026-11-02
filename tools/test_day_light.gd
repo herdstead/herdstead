@@ -2,8 +2,8 @@ extends "res://tools/office_test_base.gd"
 ## Day and night over the one pack (DayLight): the time of day as a light on
 ## the world, never a herdr state. The pure curve; then the live office with a
 ## clock the case hands in: the world's tint on its own canvas (the HUD keeps
-## its colours), the lamps and contact shadows harder at night and redrawn
-## when the light changes, the windows' night view as a texture swap, T turning
+## its colours), the whole workstation and focus underline unchanged beneath
+## that light, the windows' night view as a texture swap, T turning
 ## the light over until the clock's own day or night turns, a held light
 ## (`--light=`), the bar's DAY / NIGHT, and night never passing for a lost
 ## connection. The live office (office_test_base) is why the suite runs
@@ -80,21 +80,28 @@ func test_the_clock_lights_the_world_and_leaves_the_hud() -> void:
 	_done(office)
 
 
-## Night draws every lamp that burns harder, and the contact shadows too; the
-## light changing redraws the lamps it touches, and the same light redraws none.
-func test_night_burns_the_lamps_harder_and_redraws_them() -> void:
+## The old lamp/contact-shadow boost is retired. Night is a canvas light,
+## never a different workstation image or a different herdr-focus signal.
+func test_night_keeps_the_whole_image_and_focus_underline() -> void:
 	var office := await _clocked_office(12 * 60.0)
-	var table := office.floor_view.tables[0]
-	var day_focus := table.lamp_color(OfficeTable.Lamp.FOCUS).a
-	var drawn := table.lamps_drawn
+	var station := _station(office, HerdrFleet.pane_key(LOCAL, "api:p1"))
+	var actor := station.actor()
+	var image := _sprite(actor, "Body")
+	var texture := image.texture
+	var underline: Polygon2D = station.get_node("Focus")
+	var focus := [station.light_level, underline.visible, underline.color, underline.polygon]
+	var nodes := _desk_ids(office, "")
 	office.clock = func() -> float: return 23 * 60.0
 	await _light_tick(office)
-	_check(table.lamp_color(OfficeTable.Lamp.FOCUS).a > day_focus, "a focus lamp burns harder at night")
-	_eq(table.night, 1.0, "the table knows it is night")
-	_check(table.lamps_drawn > drawn, "the burning lamps are drawn again")
-	var again := table.lamps_drawn
+	_eq(office.night, 1.0, "night actually falls")
+	_eq(station.actor(), actor, "same permanent actor")
+	_eq(image.texture, texture, "the authored whole image stays the same")
+	_eq([station.light_level, underline.visible, underline.color, underline.polygon], focus, "same focus signal")
+	_eq(_desk_ids(office, ""), nodes, "no workstation rebuilt")
 	await _light_tick(office)
-	_eq(table.lamps_drawn, again, "the same night redraws no lamp")
+	_eq(
+		[station.light_level, underline.visible, underline.color, underline.polygon], focus, "unchanged on another tick"
+	)
 	_done(office)
 
 
@@ -179,13 +186,17 @@ func test_night_is_never_a_lost_connection() -> void:
 	var modulate: CanvasModulate = office.get_node("NightLight")
 	var floor_view := office.floor_view
 	_eq(floor_view.root.modulate, Color.WHITE, "a live floor at night is not dimmed as stale")
-	_check(not floor_view.presentation.holding(), "and its people are not held still")
+	var actor := _station(office, HerdrFleet.pane_key(LOCAL, "api:p1")).actor()
+	_check(actor.is_playing(), "working keeps playing at night")
 	var night_live := modulate.color
 	var day_stale := office.art.stale_tint
 	_check(night_live.b - night_live.r > 0.15, "night is cool: %s" % night_live)
 	_check(absf(day_stale.b - day_stale.r) < 0.05, "a lost connection by day is grey: %s" % day_stale)
 	_set_online(office, false)
+	var held := _actor_progress(office, "")
 	await _frames(2)
+	_eq(_actor_progress(office, ""), held, "an outage, unlike night, holds every last frame and clock")
+	_eq(_playing(office), [false], "all image actors are frozen")
 	_eq(office.floor_view.root.modulate, office.art.stale_tint, "stale at night takes the stale tint")
 	_eq(modulate.color, DayLight.NIGHT_TINT, "on top of the night's")
 	var both := modulate.color * office.floor_view.root.modulate

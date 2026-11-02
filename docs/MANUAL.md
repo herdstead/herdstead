@@ -83,7 +83,7 @@ The four scenes (office, showroom, pixel people showroom, Avatar Studio) read th
 | linked worktree | a **mezzanine**: a zone of its own, placed right under its source zone the first time, numbered `3A`, `3B` |
 | tab | a pod of desks; its label is written small right under it |
 | pane | a seat at that pod |
-| agent | the pixel person in the seat; an empty `agent` is a SHELL seat with nobody in it |
+| agent | the generic person in the workstation image; an empty `agent` is a SHELL workstation with nobody in it |
 
 **One map per machine.** A map is one rectangular floor: an outer wall on top, an entry band under it with the pantry
 counter in its corner,
@@ -92,10 +92,10 @@ entry band the zones stand in lanes, each on a carpet inside low partitions open
 top-left post. Plants and side tables (each carrying a mug, a notebook, now and then a white cat) are y-sorted with everything
 else.
 
-**Stable layout.** A 32-unit grid. The map is lanes four cells wide (the narrowest pod) with a one-cell aisle between
-two; the entry band is 32 units (the walking lane under the wall, the first zones' signs over it), the main aisle 64. A zone takes whole lanes under an aisle row of its own, first as many
-as its pods need to stand in one row, and its pods stand in rows 192 units deep (a pod is one 32-unit desk per column, a
-seat on each side). A map's lanes are fixed the first time it is
+**Stable layout.** A 32-unit grid. The map has lanes four cells wide with a one-cell aisle between
+two; the entry band is 32 units (the aisle under the wall, the first zones' signs over it), the main aisle 64. A zone takes whole lanes under an aisle row of its own, first as many
+as its pods need to stand in one row. Each pod has two front-facing rows, columns 96 units apart, and a 320-unit row reservation;
+the minimum two-column pod spans two lanes. A map's lanes are fixed the first time it is
 planned; a wider window only shows more of it. New tabs fill gaps first, pods grow in place, an over-wide pod gets its
 own row (its zone taking more lanes, the map widening if it must). New zones take the top-most, left-most gap; a zone
 that must grow does so in place or moves alone. Nothing is compacted when things go away, and a map never shrinks.
@@ -111,25 +111,26 @@ no zone, and the plate's note says why.
 
 **State on the seats.**
 
-- **blocked**: seated, hand raised, a chip on the badge's row holding the badge and how long it has waited (short form,
+- **blocked**: reclined in the chair with crossed legs and a question bubble; below it, a chip holds the badge and how long it has waited (short form,
   `12m`, the card's clock). Hover the chip for an excerpt of the question; click it to select the agent and enter answer
   mode once the question shows. When the machine is offline or the start was not observed, no time and no chip frame
-  are drawn (the raised hand and badge stay; pointing and clicking there still count).
-- **done** (UNREAD: finished, not yet looked at): seated, a stack of paper next to the laptop. Done means "unread",
+  are drawn (the reclined pose, bubble and badge stay; pointing and clicking the chip area still count).
+- **done** (UNREAD: finished, not yet looked at): a single completion nod, then its final frame. Done means "unread",
   never "task passed".
-- **idle**: seated, a mug beside the laptop.
-- **working**: seated at the desk. `launch_pending` shows the starting badge. Unknown states fall back to `unknown`.
+- **idle**: seated with quiet breathing and blinking.
+- **working**: typing behind the two adjacent monitors, with slight head and shoulder movement.
+- `launch_pending` shows a still seated frame and the starting badge, not typing. Blocked wins while starting. Unknown states also hold a still frame.
 - The pantry counter, plants, side tables, partitions and carpets are furniture only: nobody walks to the pantry, and a state
   never makes anyone get up.
 
-**People walk.** When a pane gets an agent, a person walks in from the lift door to the seat; when a pane goes, they
-walk out as a ghost you cannot click. Name plate, badge, chip, paper, mug and click area change the moment herdr says so;
-the body follows within at most 6 seconds. A new workspace is a new zone its people walk into; closing one, its people
-walk out (not every departure animates). An offline machine freezes in place; reconnecting, changing machine or
-changing theme places everyone directly. Panning between zones and switching machines are instant, with no transition.
+**Whole-image workstations.** The person, chair, desk and two monitors are one authored frame. Arrivals and departures
+change the occupied image immediately; moves between tabs retain the workstation's animation clock. There is no walking
+or customizable outfit in this phase. Disconnecting freezes the last frame; a socket reconnect alone does not resume it
+until a valid current layout is installed. Panning between zones and switching machines remain instant.
 
-**Monitors and lamps.** Only seats with a pane have a monitor. The desk lamp has four levels (off / low / on / strong)
-showing herdr's focused pane and whether its tab is the one open in its workspace.
+**Monitors and focus.** An empty workstation keeps its desk, chair and two monitors, without a person. A shell is selectable;
+a vacant slot is not. A thin underline has four levels (off / low / on / strong), showing herdr's focused pane and whether
+its tab is open. It is separate from Herdstead's selection outline.
 
 **Selection.** herdr's focused pane is selected by default. Click a seat to select it yourself; when the selected pane
 disappears, selection returns to herdr's focus. Clicking a seat never changes the map or pans.
@@ -148,15 +149,12 @@ panned.
 dims it, stops the people and shows OFFLINE (with several machines, only that machine's map), and its counts drop to
 zero. It reconnects with exponential backoff from 0.5 s to 5 s.
 
-**People and looks.** Everyone in the office is a pixel person: six layers (legs < top < body < glasses < hair <
-headwear), density 2, nearest-neighbour. Clothes follow the provider; face, hair and glasses vary per pane, so several
-panes of one agent are not twins. The seat's name plate says what the pane is called (its task summary from the terminal
-title, else its label, tab or directory) and appears while the seat is hovered or selected, or while `L` is held; hovering
-the seat shows the whole name, who sits there and in what state, and where. The Avatar Studio
-(`scenes/avatar_studio.tscn`) pins each part per agent for all 23 agents in `data/agent_catalog.json` (or leaves it
-VARIES), saved to `user://herdstead_avatars.json` (schema 2). A save rereads what it will write, checks the file on disk
-was not changed by someone else, refuses any save that would lose data and says why, and keeps anything it cannot read
-as it was.
+**People and looks.** Every office agent uses the same generic image and HUD portrait, density 2, nearest-neighbour.
+The pane's name, provider words and state badges distinguish agents; clothes no longer encode identity. The seat's name
+plate says what the pane is called (its task summary from the terminal title, else its label, tab or directory). It stays
+visible on maps with at most 16 occupied seats, otherwise while hovered, selected or under `L`. Hovering shows the whole
+name, provider, state and place. Avatar Studio (`scenes/avatar_studio.tscn`) and the layered people/portrait tools remain
+legacy authoring tools; their saved outfits do not change the production office.
 
 **Fonts.** Every word the office draws is the bundled Fusion Pixel font at its native sizes: the world's labels (name
 plates, zone signs, tab labels) and the HUD's small rows in its 8px cut, the HUD's body in its 10px cut,
@@ -176,8 +174,8 @@ cream window). A dropped machine's agents have no card.
 On a window at least 400 units high (the tall top bar, 70 units) each card is a **tile**: the seat's person as a
 head-and-shoulders portrait on a cream ground, framed in the state's colour, a small mark in its corner (`!` blocked, an
 envelope for done, a green dot working, a white dot idle), and the name and the place under it; a face-only tile shows the
-middle of the portrait. On a lower window (a 32-unit bar) the cards are horizontal, the small standing person beside the
-words, with no mark.
+middle of the portrait. On a lower window (a 32-unit bar) the cards are horizontal, a native-size crop of the same generic
+portrait beside the words, with no mark.
 
 - When the agents do not fit, the strip folds them by a fixed ladder: the working and the idle into a fold
   (`+12` over `working`), then the done and the blocked into faces alone, then the done into a fold, then tallies
@@ -335,8 +333,8 @@ This is still best effort: an unfinished half-line would run together with the c
 will type the kind into this terminal and press Enter. After sending, the footer follows the launch
 (`Starting claude-2 · 4s` → `claude-2 started`; a launch that asks at once: `claude-2 asks: answer with the keys`).
 If nothing is detected after 31 seconds the office asks herdr once and says `not detected` or
-`did not start: look at the terminal`. Never retried. In the world a person walks in from the lift door with an hourglass
-overhead; until herdr detects the kind the card's seat line reads `CLAUDE-2 · api / main`.
+`did not start: look at the terminal`. Never retried. In the world a still seated person appears with an hourglass
+badge; until herdr detects the kind the card's seat line reads `CLAUDE-2 · api / main`.
 
 **NEW PANE BESIDE <agent>** (an agent seat selected, same place): `New pane →` or `New pane ↓`, the direction chosen from
 the pane's shape; refused when either side would be under 40 columns or 10 rows. herdr splits a new shell pane in the same
@@ -526,8 +524,10 @@ retired on 2026-09-29: night is to be a light over the one pack, not a second pa
 at density 2 (64×64 texels per tile, nearest-neighbour; the build doubles 1× sources into 2×2 blocks),
 standalone props (window, door, plants, a framed picture, the pantry counter, the zones' partition kit, a side table, the
 small paper stack and the idle mug), a desk-item library of 5 everyday objects and 3 white
-cats, the shared pod family (desks, low screen, apron, chair, laptop), state and UI icons (herdr's five states, starting, lost
+cats, the legacy modular pod family (retained for authoring), state and UI icons (herdr's five states, starting, lost
 and connected, the seat mark, the panels), a native TileSet, four single-image SpriteFrames (for export only), a semantic manifest and the fonts.
+The production workstation family under `art/daylight/workstation/` is separate: 24 complete 160×160 frames on one atlas,
+one empty workstation, and one 80×80 portrait, all at density 2 with their own 37-colour palette.
 The full spec is [ASSET_SPEC](ASSET_SPEC.md), the painter's brief is [ARTIST_BRIEF](ARTIST_BRIEF.md), and depth and
 collision rules are in [WORLD_MODEL](WORLD_MODEL.md).
 
@@ -549,7 +549,8 @@ make setup           # python3 -m venv .venv + tools/requirements-dev.txt
 .venv/bin/python tools/build_table_assets.py
 .venv/bin/python tools/build_pixel_people.py
 .venv/bin/python tools/build_portraits.py
-make test-art        # the four Python contract tests
+.venv/bin/python tools/build_workstation_assets.py
+make test-art        # the five Python contract suites
 
 # The contract tests can run against any pack source (default art/daylight).
 .venv/bin/python tools/test_assets.py --source /path/to/pack -v
@@ -560,7 +561,7 @@ make check-packs     # validate every pack under assets/ against scripts/art/art
 make run
 ```
 
-`make art` is those four builders plus `tools/check_build_clean.py`, the same chain CI runs: it requires the rebuild to
+`make art` is those five builders plus `tools/check_build_clean.py`, the same chain CI runs: it requires the rebuild to
 match the commit exactly (`assets/`), so it passes only after the new PNGs are committed.
 
 - `art/daylight/` is the only hand-edited source; `assets/<id>/` is a build product, and the build never writes back. Remove an entry from `pack.json` and `make art` prunes the orphan PNG (with its `.import`),
@@ -577,7 +578,7 @@ match the commit exactly (`assets/`), so it passes only after the new PNGs are c
 .venv/bin/python tools/artist_templates.py --source art/daylight --output /tmp/blank-templates --blank
 ```
 
-Pixel people have their own tools: `make people-templates OUT=/abs/new-dir` exports the painter's canvases, guide layers
+Legacy pixel people have their own tools: `make people-templates OUT=/abs/new-dir` exports the painter's canvases, guide layers
 and key-colour legend; `make people-skins` cuts or checks part skins; `make people` opens the pixel people showroom.
 Portraits too: `make portrait-parts` checks the painted parts, prints a reference to paint on (`REF=<part> OUT=<dir>`)
 or cuts a part from a pixelized picture (`CUT=<png> PART=<part> SHAPE=<option>`, `DROP=1`), and
@@ -612,7 +613,7 @@ reorder the atlas.
 
 **Day and night.** The one pack is lit by the local clock (`DayLight`, `scripts/world/day_light.gd`): day from 07:00 to
 18:00, night otherwise, fading over half an hour round each. At night the world (not the HUD, which is its own canvas
-layer) is darker and cooler through a `CanvasModulate`, the desk lamps and chair shadows draw harder, and the windows show
+layer) is darker and cooler through a `CanvasModulate`, and the windows show
 the night view (`window_night`, a texture swap). `T` turns the light over: following the clock, the other one holds until
 the clock's own day or night turns. `--light=day|night` holds it (and T then swaps it); a capture holds the day unless it
 asks, so screenshots never depend on the time they are taken. The time of day binds no herdr field: it is lighting, not a
@@ -650,7 +651,7 @@ godot --path . scenes/preview.tscn -- --overview=open --capture=/absolute/path/o
 godot --path . scenes/people_showroom.tscn -- --zoom=2 --capture=/absolute/path/people.png
 godot --path . scenes/people_showroom.tscn -- --view=options --zoom=2 --capture=/absolute/path/options.png
 
-# 28 real rendered frames, for checking typing, blinking, raised hands and pivots
+# Real rendered frames of the showroom's animations
 godot --path . scenes/preview.tscn -- --record-dir=/absolute/path/frames
 
 # Every asset, props on light and dark backgrounds to check transparent edges (--source takes any pack)
@@ -664,8 +665,8 @@ an offline machine (`spaces-*`), the agent card in answer mode, START AGENT, NEW
 progress. A missing image fails the run. Every step has a watchdog: a step that outlives its own `--wait=` plus
 `CAPTURE_MARGIN` seconds (default 60) is killed and the run fails naming that image. `CAPTURE_SET=ci` shoots only
 both showrooms, the pixel people and the live office at 2× and 4× (about half a minute on CI; the whole set takes over
-ten). `make walk-strips` renders
-frame-by-frame strips of people walking. On Linux without a desktop, use
+ten). `make workstation-strips` renders
+frame-by-frame strips of the real office's working, idle, blocked, done and empty workstation. On Linux without a desktop, use
 `xvfb-run -a godot ... --display-driver x11 --audio-driver Dummy`; `make capture` wraps itself that way when `DISPLAY` is
 unset and `xvfb` is installed.
 
@@ -675,8 +676,8 @@ Performance is also measured in a window:
 # medium (3 workspaces, 36 panes, all drawn: one map) and stress (1 workspace, 80 panes) against a fake herdr, default cap and --fps=0:
 # CPU, fps, nodes, draw calls, texture memory and refresh() time, median of 3 rounds
 make perf
-make perf RUNS=5 FIGURES=1    # more rounds, plus 80 seated working people
-make perf WALKS=1             # also people walking on the stress map
+make perf RUNS=5 FIGURES=1    # more rounds, plus standalone workstation images
+make perf CHANGES=1           # also snapshot/state transitions on the stress map
 ```
 
 Extra rows: `spaces30` (30 workspaces of one tab each on one map, 189 panes, ten of them mezzanines: many zones, signs
@@ -805,13 +806,15 @@ Screenshots are for looking at; there is no golden comparison. CI does not expor
 ## Repository layout
 
 ```text
-art/daylight/            hand-edited source pack: PNGs, pack.json, table/ (the pod family), fonts/
+art/daylight/            hand-edited source pack: PNGs, pack.json, table/ (legacy modular family), fonts/
+art/daylight/workstation/  approved whole-image atlas, empty workstation, generic portrait, manifest and provenance
 art/pixel_people/        people.json, the pixel people contract (canvas, pivot, facings, layers, tracks,
                          key colours, slots, looks), optional hand-drawn strips and skins/<facing>/
 art/portraits/           portraits.json, the portraits contract (canvas, the nine layers bound to the people's
                          look slots, the extras, the face box), optional painted parts/
 art/agent_badges/        agent logo sources and ATTRIBUTIONS.md
 assets/<id>/             runtime packs built from art/ (daylight); never edited here
+assets/daylight/workstation/  byte-copied whole-image family and manifest
 assets/pixel_people/     people_manifest.json and one packed sheet per facing
 assets/portraits/        portraits_manifest.json and the one packed sheet of portrait cells
 assets/agent_badges/     the 23 agent logos (Avatar Studio only) and ATTRIBUTIONS.md
@@ -823,7 +826,7 @@ scenes/ui/               HUD scenes: hud.tscn (layout lives here), bar (portrait
                          edge_arrows / edge_arrow, bottom_panel (its pages: inspector, the agent card;
                          history_list / history_row; event list / event row; news in its top row),
                          overview, strategic, terminal_monitor
-scenes/world/            world prefabs: table (a pod), station, decor, chip, machine_plate, zone_sign
+scenes/world/            world prefabs: table (a measured pod), station, workstation_actor, decor, chip, machine_plate, zone_sign
 scenes/people/           pixel_person.tscn, pixel_portrait.tscn and the showroom cells
 scripts/office.gd        OfficeScene, the composition root
 scripts/herdr_client.gd  read-only socket client (ping, session.snapshot, events.subscribe)
@@ -838,14 +841,14 @@ scripts/model/           typed models: HerdrSnapshot (the only reader of raw sna
                          PickFollowsWrite (pure: where the pick goes after a write the office sent),
                          DisplayName (pure: what every surface calls a pane),
                          PortraitBarModel (pure: who the top bar's strip shows, and its fold ladder)
-scripts/layout/          map and zone planning, seat planning, walk graph, validation
+scripts/layout/          map and zone planning, seat planning, validation
 scripts/world/           pods (table.gd), stations, chips, the floor view, machine plate, zone signs, shell,
-                         presentation (walking), pointer
+                         workstation_actor (one Sprite2D and AnimationPlayer), pointer
 scripts/ui/              HUD scripts: hud, theme, bar (portrait card, portrait fold, machine chip), edge arrows, bottom
                          panel (bottom_panel; inspector writes what card_picture, pure, says it shows; card_details,
                          card_words, card_actions, launch_block; history_list / history_row), monitor, NEWS, EVENTS,
                          OVERVIEW, strategic view
-scripts/art/             typed art pack models; the only readers of manifest JSON
+scripts/art/             typed art pack models, including WorkstationArt; the only readers of manifest JSON
 scripts/people/          PixelPerson and PixelPortrait prefab scripts
 tools/                   builders, contract tests, fake herdr / fake ssh, test suites (test_*.gd), capture and perf
 tools/fixtures/          snapshots, monitor screen dumps, herdr_methods.json

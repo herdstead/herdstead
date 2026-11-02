@@ -30,7 +30,7 @@
 # fail before importing or starting anything. `make test-suite S=...` is the
 # everyday spelling. TIER=quick is the quick tier,
 # QUICK_SUITES below: the art layer and the world (plans, pods, geometry,
-# people, walking, the lens), none of the HUD or the write boundary; `make
+# image states, legacy art, the lens), none of the HUD or the write boundary; `make
 # check-quick` runs it. A suite left out is not checked: the full run (`make
 # check`, CI) is still the gate before a push.
 #
@@ -74,10 +74,15 @@ MIN_CASES_CLIENT=52
 # MACHINE 34 -> 32 (S3 PANEL-a2, 2026-10-28): the two attention-record cases
 # (a socket target replaced, a roster replaced) retired with the records.
 MIN_CASES_MACHINE=32
-MIN_CASES_INCREMENTAL=54
-MIN_CASES_OFFICE_LAYOUT=53
+# Retired standing-spot and articulated-actor collision cases; states, native
+# image geometry, picking, freeze/recovery and retained clocks remain.
+MIN_CASES_INCREMENTAL=52
+# Whole-image workstations retire five walker-only graph/route cases; geometric
+# containment, overlap, stable seating, budgets and atomic fallback stay covered.
+MIN_CASES_OFFICE_LAYOUT=48
 MIN_CASES_OFFICE_MAP=25
-MIN_CASES_OFFICE_SERVICE=17
+# Three door/threshold/lane walking cases retire with office walking.
+MIN_CASES_OFFICE_SERVICE=14
 # GEOMETRY 27 -> 25: its two row-wall sign and title cases went with the row
 # walls (lane B2a); MAP's test_top_run_and_lane_gap_pieces_clear_... covers
 # the furniture's clearance on the map now. 25 -> 29: the near row sits at the
@@ -86,13 +91,20 @@ MIN_CASES_OFFICE_SERVICE=17
 # 31 -> 32: the idle mug beside the laptop (D2, 2026-10-27). 32 -> 33: a long
 # name takes a vacant neighbour's slot (S3 SEATTAGS, 2026-10-27). 33 -> 34:
 # a plate at rest stands clear of its pod's tab label and partition (round 2).
-MIN_CASES_OFFICE_GEOMETRY=34
+# Geometry 34 -> 29: ten separate-component cases retired (supports, shadows,
+# chairs/laptops/provider marks, paper/mug, walk-to-seat); four others migrated
+# in place and five complete-image transition/clock cases added.
+MIN_CASES_OFFICE_GEOMETRY=29
 MIN_CASES_OFFICE_FRAMES=6
 MIN_CASES_OFFICE_QUIET=8
 MIN_CASES_DAY_LIGHT=8
-MIN_CASES_OFFICE_RECONCILE=24
-MIN_CASES_OFFICE_WALKING=33
-MIN_CASES_OFFICE_RESTS=28
+# Retired rig-pivot clearance as a planning input; actual geometry/policy
+# invalidation and atomic fallback remain tested.
+MIN_CASES_OFFICE_RECONCILE=23
+# The 33-case walking suite retires. RESTS covers immediate arrival/removal,
+# transfer retention, flapping states, outage holding and real-input picking;
+# speeds, ghosts, routes and rig/outfit equality no longer describe the office.
+MIN_CASES_OFFICE_RESTS=36
 MIN_CASES_OFFICE_NAVIGATOR=26
 # FLOORS (22 cases, tools/test_floors.gd) was retired with the FLOORS minimap and
 # its signposts (lane B3): SPACE RAIL covered every one of its cases on the
@@ -140,7 +152,7 @@ MIN_CASES_RAW_INPUT=14
 MIN_CASES_ANSWERS=42
 MIN_CASES_BUBBLES=24
 MIN_CASES_MONITOR=36
-MIN_CASES_TOP_BAR=27
+MIN_CASES_TOP_BAR=28
 # The portrait strip that replaced the top bar's counters (S3 BAR-a); 12: an
 # unchanged strip lays nothing out (ruling 1); 15: B2's tiles on a tall bar, their
 # small state mark, the short bar's cards kept, and the right end's words (S3 TILES).
@@ -184,7 +196,8 @@ MIN_CASES_LAUNCH_NEWS=5
 # is the live office's reveal, zone opening, pointer and arrows against the
 # numbers 6413cec left, through the paths that commit already had.
 MIN_CASES_DESK_SIGNAL=13
-MIN_CASES_DESK_SIGNAL_WIRING=12
+# Complete name/lens rows stay in the smallest window after selecting either row.
+MIN_CASES_DESK_SIGNAL_WIRING=13
 MIN_CASES_PICK_FOLLOWS_WRITE=20
 
 # The quick tier (TIER=quick): every suite that an art, world or geometry
@@ -194,7 +207,7 @@ MIN_CASES_PICK_FOLLOWS_WRITE=20
 # wall-clock time with a fake herdr.
 QUICK_SUITES="test_art test_office_incremental test_office_layout test_office_map test_office_service
 test_office_navigator test_office_geometry test_office_frames test_office_quiet test_day_light
-test_office_reconcile test_office_walking test_office_rests test_lens test_pixel_people test_portraits
+test_office_reconcile test_office_rests test_lens test_pixel_people test_portraits
 test_desk_signal test_names"
 SUITES="${SUITES:-}"
 CASE="${CASE:-}"
@@ -454,8 +467,6 @@ run_suites() {
 		--socket="$WORK/day-light-nowhere.sock" --work="$WORK"
 	run_scene_suite test_office_reconcile "RECONCILE TESTS" "$MIN_CASES_OFFICE_RECONCILE" -- --read-only \
 		--socket="$WORK/reconcile-nowhere.sock" --work="$WORK"
-	run_scene_suite test_office_walking "WALKING TESTS" "$MIN_CASES_OFFICE_WALKING" -- --read-only \
-		--socket="$WORK/walking-nowhere.sock" --work="$WORK"
 	run_scene_suite test_office_rests "RESTS TESTS" "$MIN_CASES_OFFICE_RESTS" -- --read-only \
 		--socket="$WORK/rests-nowhere.sock" --work="$WORK"
 	run_scene_suite test_map_navigation "MAP NAVIGATION TESTS" "$MIN_CASES_MAP_NAVIGATION" -- --read-only \

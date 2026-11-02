@@ -6,8 +6,8 @@ extends RefCounted
 const TABLE_SCENE := preload("res://scenes/world/table.tscn")
 const DECOR_SCENE := preload("res://scenes/world/decor.tscn")
 const STATION_SCENE := preload("res://scenes/world/station.tscn")
+## Legacy authoring tools only; the office draws complete workstation images.
 const PERSON_SCENE := preload("res://scenes/people/pixel_person.tscn")
-const PORTRAIT_SCENE := preload("res://scenes/people/pixel_portrait.tscn")
 ## A tab's name on the floor under its table (tab_label()): the display face's
 ## own size, and the band it stands in.
 const TAB_LABEL_PIXELS := 8
@@ -510,11 +510,13 @@ func layer(parent: Node, at: Vector2) -> TileMapLayer:
 	return result
 
 
-## A pod of desks (OfficeTable) in `sorted` (a floor's y-sorted root) with the
-## left end of its near edge at `near_left`, seat columns at `columns` along that edge, and
-## its seats' contact shadows in `ground`. Null when the width is refused.
-## `id` names the table node, and its stations after it.
-func table(sorted: Node2D, ground: Node2D, id: String, near_left: Vector2, width: float, columns: Array) -> OfficeTable:
+## A measured pod (OfficeTable) in `sorted`, its lower row at `near_left`.
+## Stations draw their complete images, including the furniture and shadows;
+## the pod owns only seat markers and its selection outline. Null when the
+## width is refused. `ground` is kept for existing callers, never drawn into.
+func table(
+	sorted: Node2D, _ground: Node2D, id: String, near_left: Vector2, width: float, columns: Array
+) -> OfficeTable:
 	var result: OfficeTable = TABLE_SCENE.instantiate()
 	if not result.setup(art, width, columns):
 		result.free()
@@ -522,7 +524,6 @@ func table(sorted: Node2D, ground: Node2D, id: String, near_left: Vector2, width
 	result.name = id
 	result.position = near_left
 	sorted.add_child(result)
-	result.contact_shadows(ground)
 	return result
 
 
@@ -549,44 +550,27 @@ func station(sorted: Node2D, at_table: OfficeTable, column: int, side: String) -
 	return result
 
 
-## The seat's person for pane `key`, standing and facing front, in `holder`:
-## `actor` when there is one, else a new person, instanced once and kept (its
-## feet disabled: no floor holds them). The same face and hair as at the seat
-## (vary_by(key)), dressed in `pack`'s people as `provider`; re-dressing the same
-## node is new textures, never a new person. The short top bar's cards'
-## faces come from here.
-static func seat_face(holder: Node2D, actor: PixelPerson, pack: ArtPack, provider: String, key: String) -> PixelPerson:
-	var person := actor
-	if person == null:
-		person = PERSON_SCENE.instantiate()
-		holder.add_child(person)
-		var feet: CollisionShape2D = person.get_node("Feet")
-		feet.disabled = true
-	person.vary_by(key)
-	person.configure(pack.people, provider, AvatarLook.facing(AvatarLook.STAND, AvatarLook.FRONT))
-	return person
+## The same generic whole-image portrait as the tall bar and agent card.
+## The short bar's scene crops it to its face slot; no rescaling or rig.
+static func seat_face(holder: Node2D, actor: Sprite2D, pack: ArtPack, provider: String, key: String) -> Sprite2D:
+	return seat_portrait(holder, actor, pack, provider, key)
 
 
-## The seat's person for pane `key` as a portrait (PixelPortrait), in `holder`
-## at its bottom centre: `kept` when there is one, else a new one, instanced
-## once and kept. The same person as at the seat by construction (the portraits
-## resolve the look by the seat's own call, PixelPortraits.look_of()), plus the
-## portrait's own extras for the pane; re-dressing the same node is new
-## textures, never a new portrait. The agent card's portrait and the tall top
-## bar's tiles' come from here.
-static func seat_portrait(
-	holder: Node2D, kept: PixelPortrait, pack: ArtPack, provider: String, key: String
-) -> PixelPortrait:
+## One retained Sprite2D, dressed by the workstation family's own density and
+## pivot. Pane/provider arguments remain for callers, but never select clothes
+## or parts: every office portrait is the approved generic image. The scene
+## places its holder and chooses the clip; no runtime fitting is needed.
+static func seat_portrait(holder: Node2D, kept: Sprite2D, pack: ArtPack, _provider: String, _key: String) -> Sprite2D:
 	var shown := kept
 	if shown == null:
-		shown = PORTRAIT_SCENE.instantiate()
+		shown = Sprite2D.new()
 		holder.add_child(shown)
-	shown.provider = provider
-	shown.show_look(pack.portraits, pack.portraits.look_of(provider, key))
+	var family := pack.workstation
+	family.dress(shown, family.portrait_texture(), family.portrait_pivot)
 	return shown
 
 
-## A standing, front-facing person shown as a portrait at `at`, `zoom` times
+## Legacy authoring only: a standing, front-facing person at `at`, `zoom` times
 ## their world size, inside a holder node that carries the zoom (a physics body
 ## is never scaled itself). `zoom` is a whole number: the pixel people are one
 ## texture pixel per unit and are never sampled at a fraction of that. Not part

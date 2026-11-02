@@ -691,7 +691,7 @@ func _share_left() -> void:
 
 
 ## The portrait while there is one; null in the empty state.
-func portrait() -> PixelPortrait:
+func portrait() -> Sprite2D:
 	return _details().portrait()
 
 

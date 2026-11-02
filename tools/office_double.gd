@@ -56,11 +56,3 @@ func _refresh() -> void:
 	deepest_refresh = maxi(deepest_refresh, refresh_depth)
 	super()
 	refresh_depth -= 1
-
-
-## Walk every walk on the shown floor to its end, through the office's own
-## steps and landings (OfficePresentation.settle()): what a case compares with
-## a rebuild, which walks nobody, once it has seen the walk start. It lands a
-## stale machine's frozen walkers too, which the office itself never does.
-func settle() -> void:
-	floor_view.settle()

@@ -1,0 +1,13 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/workstation_actor.gd" id="1_actor"]
+
+[node name="Actor" type="Node2D"]
+script = ExtResource("1_actor")
+
+[node name="Body" type="Sprite2D" parent="."]
+centered = false
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+
+[connection signal="animation_finished" from="AnimationPlayer" to="." method="_finished"]

@@ -1,14 +1,11 @@
 class_name OfficeFloorValidation
 extends RefCounted
-## Whether a map plan can be drawn and walked: its bounds, budgets, zones in
-## their lanes, pod rows, tables and furniture, then cell-centre connectivity
-## against physical
-## obstacles, not the reservation rectangles that also contain walkable space
-## around each desk. The connectivity is OfficeWalkGraph's, the graph the
-## office's people walk, so what passes here is what they can walk.
+## Whether a map plan can be drawn safely: its bounds, budgets, zones in their
+## lanes, pod rows, measured workstations and furniture. Complete workstation
+## images do not walk; no person prefab or route graph is a planning input.
 
 ## How many plans this process has validated: a diagnostic, never a decision,
-## so a test can prove that a new floor is flood-filled once, furniture included.
+## so a test can prove that a new floor is checked once, furniture included.
 static var validations := 0
 
 
@@ -75,14 +72,19 @@ static func problems(value: FloorPlan, rules: FloorLayoutPolicy) -> PackedString
 		var measurement := placed.measure
 		if measurement.capacity != placed.capacity or measurement.columns.size() != placed.capacity:
 			found.append("tab capacity and measurement disagree")
-		# The renderer uses table_width to allocate modules. A stale/tampered
-		# measure must not buy an arbitrarily wide table with a small capacity.
+		# A stale/tampered measurement cannot understate the actual complete
+		# images or assign their feet somewhere outside the measured slots.
 		var expected := OfficeTable.measure(placed.capacity)
 		if measurement.table_width != expected.table_width or measurement.columns != expected.columns:
 			found.append("tab width or columns disagree with measured capacity")
-		for positions: Array[Vector2] in [measurement.far_approaches, measurement.near_approaches]:
-			if positions.size() != placed.capacity:
-				found.append("tab is missing measured approaches")
+		if measurement.far_seats != expected.far_seats or measurement.near_seats != expected.near_seats:
+			found.append("tab seats disagree with measured capacity")
+		if (
+			measurement.physical_rect != expected.physical_rect
+			or measurement.render_rect != expected.render_rect
+			or measurement.reserved_rect != expected.reserved_rect
+		):
+			found.append("tab envelopes disagree with measured capacity")
 		if not placed.origin.is_finite():
 			found.append("tab origin is not finite")
 		var reserved := Rect2(placed.reserved_cells.position * grid, placed.reserved_cells.size * grid)
@@ -132,9 +134,6 @@ static func problems(value: FloorPlan, rules: FloorLayoutPolicy) -> PackedString
 			found.append("corridor or aisle leaves the map")
 	found.append_array(_decor_problems(value))
 	found.append_array(_fixture_problems(value))
-	if not found.is_empty():
-		return found
-	found.append_array(_route_problems(value, rules))
 	return found
 
 
@@ -205,43 +204,6 @@ static func _zone_problems(value: FloorPlan, rules: FloorLayoutPolicy) -> Packed
 		for aisle in value.aisles:
 			if zone.cells.intersects(aisle):
 				found.append("zone %s stands on an aisle" % zone.zone_key)
-	return found
-
-
-## Whether everyone can walk in, sit down, get up and walk out, on the graph the
-## office's people walk (OfficeWalkGraph): the lift door's threshold is clear,
-## every approach of every column is reached from the threshold's end (not from
-## anywhere else in the entry band, which would prove nothing about the door),
-## and from each approach both legs are clear: the L-shaped one to where the
-## worker stands when done, and the one into the seat (straight on the far
-## side, round the chair on the near side). The only obstacle a leg may enter
-## is its own table, along that leg: the far seat is inside the footprint (the
-## graph's entries). A leg from an approach nobody reaches is not looked at.
-## The pantry counter is an obstacle like any furniture: nobody walks to it,
-## so it has no approach of its own, and one that stands in a way is reported
-## as that way's (an approach it blocks is unreachable).
-static func _route_problems(value: FloorPlan, rules: FloorLayoutPolicy) -> PackedStringArray:
-	var found := PackedStringArray()
-	var graph := OfficeWalkGraph.build(value, rules.actor_footprint, rules.actor_draw_rect)
-	var threshold := graph.threshold_problem()
-	if not threshold.is_empty():
-		found.append(threshold)
-	for placed in value.desks:
-		for column in placed.capacity:
-			for side: String in ["far", "near"]:
-				var where := "%s column %d %s" % [placed.tab_key, column, side]
-				var approach := placed.origin + placed.measure.approach_position(column, side)
-				var cell := OfficeWalkGraph.cell_of(approach)
-				if not graph.reaches(cell) or not graph.clear(OfficeWalkGraph.centre(cell), approach):
-					found.append("unreachable approach: " + where)
-					continue
-				var near := side == "near"
-				var standing := placed.origin + placed.measure.standing_position(column, side)
-				if not graph.clear_route(OfficeWalkGraph.leg_to_standing(approach, standing, near)):
-					found.append("blocked standing leg: " + where)
-				var seat := placed.origin + placed.measure.seat_position(column, side)
-				if not graph.clear_route(OfficeWalkGraph.leg_to_seat(approach, seat, standing, near)):
-					found.append("blocked seat leg: " + where)
 	return found
 
 

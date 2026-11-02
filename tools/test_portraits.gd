@@ -367,15 +367,20 @@ func test_the_contract_asks_for_every_cell() -> void:
 	_check(ArtContract.problems(art).has("portraits: the shared portraits did not load"), "and a missing family")
 
 
-# --- the node (S3 PORTRAIT P2, 2026-10-28: the card shows the seat's person as a portrait) ---
+# --- the legacy layered portrait node --------------------------------------------
 
 
-## A portrait node shown on its own, under `root`, in `art`'s portraits, freed
-## by the case.
+## The legacy authoring node, not the office's generic portrait. Instantiate it
+## directly so its layered-art contracts remain covered without an office path
+## constructing the retired rig. Freed by the case.
 func _portrait_node(art: ArtPack, provider: String, pane: String) -> PixelPortrait:
 	var holder := Node2D.new()
 	root.add_child(holder)
-	return OfficeDraw.seat_portrait(holder, null, art, provider, pane)
+	var node: PixelPortrait = (load("res://scenes/people/pixel_portrait.tscn") as PackedScene).instantiate()
+	holder.add_child(node)
+	node.provider = provider
+	node.show_look(art.portraits, art.portraits.look_of(provider, pane))
+	return node
 
 
 ## A pack whose people resolve against a fresh saved-looks file under --work, so
@@ -444,8 +449,8 @@ func test_a_new_look_swaps_textures_on_the_same_sprites() -> void:
 	var capped := node.look
 	_eq(capped.look.headwear, &"cap", "claude on p7 wears a cap")
 	_check(node.sprite_of(PixelPortraits.HAIR).texture != null, "and its hair shows under the brim")
-	var again := OfficeDraw.seat_portrait(holder, node, art, "claude", PANE_P8)
-	_eq(again, node, "the same node")
+	node.show_look(art.portraits, art.portraits.look_of("claude", PANE_P8))
+	_eq(holder.get_child(0), node, "the same node")
 	_eq(holder.get_child_count(), 1, "no second portrait")
 	var now: Array[int] = []
 	for layer in PixelPortraits.LAYERS:
@@ -460,18 +465,17 @@ func test_a_new_look_swaps_textures_on_the_same_sprites() -> void:
 		"the hood's own cell"
 	)
 	_eq(node.look.neckwear, &"headphones", "claude on p8 wears headphones")
-	OfficeDraw.seat_portrait(holder, node, art, "claude", "")
+	node.show_look(art.portraits, art.portraits.look_of("claude", ""))
 	_eq(node.look.neckwear, AvatarLook.NONE, "with no pane, no headphones")
 	_check(node.sprite_of(PixelPortraits.NECKWEAR).texture == null, "and the neckwear layer draws nothing")
 	_check(node.sprite_of(PixelPortraits.MARKS).texture == null, "nor the marks")
 	holder.free()
 
 
-## Identity: for every agent pane of the floors fixture, the person seated at its
-## station (OfficeStation's PixelPerson) and its card portrait (the same
-## seat_portrait() call the card makes) are one person on the seven slots a
-## portrait shows, and again for a provider whose look the user pinned.
-func test_the_card_portrait_and_the_seated_person_are_one_person() -> void:
+## The office's workstation and both HUD portrait forms use one generic family
+## for every provider and pane, even when the legacy catalog has saved clothes.
+## Both helpers keep one bare Sprite2D: no layered portrait, rig or resampling.
+func test_the_office_portraits_are_generic_even_with_legacy_pins() -> void:
 	var art := _pack()
 	_check(art != null, "the pack loads")
 	if art == null:
@@ -482,23 +486,20 @@ func test_the_card_portrait_and_the_seated_person_are_one_person() -> void:
 	_check(snapshot != null, "the floors fixture reads")
 	if snapshot == null:
 		return
-	var shown: Array[StringName] = [
-		AvatarLook.SKIN,
-		AvatarLook.HAIR_STYLE,
-		AvatarLook.HAIR_COLOUR,
-		AvatarLook.TOP,
-		AvatarLook.HEADWEAR,
-		AvatarLook.HEADWEAR_COLOUR,
-		AvatarLook.GLASSES,
-	]
 	var pen := OfficeDraw.new(art)
 	var ground := Node2D.new()
 	root.add_child(ground)
-	var table := pen.table(ground, ground, "Table0", Vector2.ZERO, 160.0, [80.0])
+	var measured := OfficeTable.measure(2)
+	var table := pen.table(ground, ground, "Table0", Vector2.ZERO, measured.table_width, measured.columns)
 	var station := pen.station(ground, table, 0, "far")
 	var holder := Node2D.new()
 	ground.add_child(holder)
-	var portrait: PixelPortrait = null
+	var face_holder := Node2D.new()
+	ground.add_child(face_holder)
+	var portrait: Sprite2D = null
+	var face: Sprite2D = null
+	var retained: Array[int] = []
+	var image := art.workstation.portrait_texture()
 	for pinned: bool in [false, true]:
 		if pinned:
 			_catalog_with('{"schema_version": 2, "looks": {"claude": {"top": "lilac", "glasses": "round"}}}')
@@ -513,17 +514,27 @@ func test_the_card_portrait_and_the_seated_person_are_one_person() -> void:
 			station.furnish(pane.agent, StringName(pane.agent_status))
 			var seated := station.actor()
 			portrait = OfficeDraw.seat_portrait(holder, portrait, art, pane.agent, key)
+			face = OfficeDraw.seat_face(face_holder, face, art, pane.agent, key)
 			_check(seated != null, "%s has a seated person" % pane.pane_id)
 			if seated == null:
 				continue
-			for slot in shown:
-				_eq(
-					portrait.look.look.slot(slot),
-					seated.look.slot(slot),
-					"%s%s: the portrait's %s is the seat's" % [pane.pane_id, " (pinned)" if pinned else "", slot]
-				)
+			var what := "%s%s" % [pane.pane_id, " (pinned)" if pinned else ""]
+			_eq(seated.art, art.workstation, "%s: the workstation uses the generic family" % what)
+			if retained.is_empty():
+				retained = [portrait.get_instance_id(), face.get_instance_id()]
+			_eq([portrait.get_instance_id(), face.get_instance_id()], retained, "%s: both sprites retained" % what)
+			_eq([holder.get_child_count(), face_holder.get_child_count()], [1, 1], "%s: one per holder" % what)
+			for sprite: Sprite2D in [portrait, face]:
+				_eq(sprite.texture, image, "%s: the same complete generic image" % what)
+				_eq(sprite.get_child_count(), 0, "%s: no parts or rig" % what)
+				_eq(sprite.centered, false, "%s: placed by its pivot" % what)
+				_eq(sprite.offset, -art.workstation.portrait_pivot * art.workstation.density, "%s: pivot" % what)
+				_eq(sprite.scale, art.workstation.unit_scale(), "%s: density only" % what)
+				_eq(sprite.texture_filter, art.workstation.filter, "%s: family sampling" % what)
+				_eq(sprite.hframes * sprite.vframes, 1, "%s: a whole image, not a strip" % what)
 			if pinned and pane.agent == "claude":
-				_eq([portrait.look.look.top, portrait.look.look.glasses], [&"lilac", &"round"], "the pins show")
+				var pins := art.agent_catalog.pins("claude")
+				_eq([pins.top, pins.glasses], [&"lilac", &"round"], "the legacy pins exist but change no office image")
 			compared += 1
 		_check(compared >= 9, "every agent pane of the fixture compared: %d" % compared)
 	ground.free()

@@ -1052,7 +1052,7 @@ func test_a_shell_card_offers_the_kinds_seen_on_its_machine() -> void:
 ## One click on CLAUDE over an empty prompt: one agent.start, named claude-1,
 ## with exactly name, kind and pane_id, after the re-read. Every kind waits
 ## meanwhile. The footer says it is starting, then that it started; the seat
-## fills with somebody walking in under the hourglass, named CLAUDE-1 until
+## fills immediately under the hourglass, named CLAUDE-1 until
 ## herdr detects the kind. The viewer's pick holds through it, so the new
 ## agent takes a line, and the footer then says that line's outcome.
 func test_a_kind_click_starts_the_agent_once_named_kind_n() -> void:
@@ -1069,7 +1069,9 @@ func test_a_kind_click_starts_the_agent_once_named_kind_n() -> void:
 	var hourglass := office.art.sprite_texture(office.art.ui_sprite(ArtContract.UI_STARTING))
 	await _until(func() -> bool: return _seat(card).begins_with("CLAUDE-1 · "), "the seat line names the agent")
 	_eq(_badge(station).texture, hourglass, "under the hourglass")
-	_check(not office.floor_view.presentation.walkers().is_empty(), "somebody walks in")
+	_check(station.actor() != null, "the starting agent is already seated")
+	_eq(station.actor().animation, &"starting", "starting does not impersonate working")
+	_eq(station.actor().global_position, station.seat.global_position, "at its own workstation")
 	_eq([_plate(station).text, (card.get_node("%CardName") as Label).text], ["main", "main"], "the pane's name")
 	await _until(func() -> bool: return card.outcome_text() == "claude-1 started", "it started")
 	_eq(_seat(card).get_slice(" · ", 0), "CLAUDE", "the seat line names the kind once detected")

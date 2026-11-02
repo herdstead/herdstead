@@ -39,12 +39,6 @@ func _marker() -> String:
 	return "RECONCILE TESTS"
 
 
-## Whether the stack of paper shows on `station`'s side of its table (a done agent's).
-static func _papers(station: OfficeStation) -> bool:
-	var item := station.table.item(station.column, station.side)
-	return item.visible and station.table.item_piece(station.column, station.side) == ArtContract.PROP_DONE_STACK_SMALL
-
-
 ## bee's connection drops, as _set_online(office, false) drops Local's; a
 ## fresh snapshot (_feed_bee()) brings it back.
 func _bee_drops(office: OfficeDouble) -> void:
@@ -118,7 +112,6 @@ func test_rect_sizes_rebuild_nothing() -> void:
 	_eq(_desk_looks(office), looks, "and no desk is furnished again")
 	_eq(_all_actor_ids(office), actors, "every person keeps their node")
 	_eq(_actor_progress(office, ""), progress, "and their frame and progress")
-	_eq(office.floor_view.presentation.walkers(), [], "nobody walks")
 	await _same_as_rebuild(office, "after every rect was resized")
 	_done(office)
 
@@ -163,7 +156,6 @@ func test_a_resize_that_moves_every_rect_rebuilds_nothing() -> void:
 	_eq(_desk_looks(office), looks, "and no desk is furnished again")
 	_eq(_all_actor_ids(office), actors, "every person keeps their node")
 	_eq(_actor_progress(office, ""), progress, "and their frame and progress")
-	_eq(office.floor_view.presentation.walkers(), [], "nobody walks")
 	await _same_as_rebuild(office, "after every rect moved")
 	_done(office)
 
@@ -184,9 +176,9 @@ func test_pane_growth_keeps_the_other_tab() -> void:
 	var actor_id := station.actor().get_instance_id()
 	var at := station.global_position
 	var shell := _seat_node(office, "api:p3")
-	var laptop := shell.table.monitor(shell.column, shell.side)
-	var prompt := laptop.texture
+	var empty: Sprite2D = shell.get_node("Actor/Body")
 	_check(shell.actor() == null, "growth also exercises a shell on the changed tab")
+	_eq(empty.texture, office.art.workstation.empty_texture(), "the shell shows the whole empty workstation")
 	var grown: Dictionary = fixture.duplicate(true)
 	var first: Dictionary = _list(grown, "panes")[0]
 	var extra: Dictionary = first.duplicate(true)
@@ -199,8 +191,8 @@ func test_pane_growth_keeps_the_other_tab() -> void:
 	_eq(retained.global_position, at, "growth preserves the other tab's location")
 	_check(_seat_node(office, "api:new") != null, "the added pane receives a seat")
 	_eq(_seat_node(office, "api:p3"), shell, "changed tab retains its shell station")
-	_eq(shell.table.monitor(shell.column, shell.side), laptop, "changed tab retains its shell laptop")
-	_eq(laptop.texture, prompt, "occupancy reconciliation does not erase the shell prompt")
+	_eq(shell.get_node("Actor/Body"), empty, "changed tab retains the shell's permanent image")
+	_eq(empty.texture, office.art.workstation.empty_texture(), "occupancy reconciliation preserves the empty image")
 	_done(office)
 
 
@@ -544,22 +536,16 @@ func test_the_floor_runs_on_under_the_side_panels() -> void:
 	_done(office)
 
 
-func _shadow_holder(office: OfficeScene, table: OfficeTable) -> Node2D:
-	var matches: Array[Node2D] = []
-	for node in office.world.find_children("SeatContacts", "Node2D", true, false):
-		var holder: Node2D = node
-		if holder.global_position.is_equal_approx(table.global_position):
-			matches.append(holder)
-	_eq(matches.size(), 1, "one live Ground contact holder belongs to this table")
-	return matches[0] if matches.size() == 1 else null
-
-
-func test_capacity_growth_keeps_contact_shadows_alive_after_two_frames() -> void:
+func test_capacity_growth_keeps_stations_and_seat_markers_alive_after_two_frames() -> void:
 	var office := await _live_office()
 	var station := _seat_node(office, "api:p1")
 	var table := station.table
 	var previous_columns := table.columns.size()
-	var original := _shadow_holder(office, table)
+	var actor := station.actor()
+	var original: Array[Marker2D] = []
+	for column in previous_columns:
+		for side: String in OfficeTable.SIDES:
+			original.append(table.seat(column, side))
 	var grown: Dictionary = fixture.duplicate(true)
 	var first: Dictionary = _list(grown, "panes")[0]
 	for index in 5:
@@ -569,31 +555,19 @@ func test_capacity_growth_keeps_contact_shadows_alive_after_two_frames() -> void
 	_feed(office, grown)
 	await _frames(2)
 	_check(table.columns.size() > previous_columns, "fixture really expands table capacity")
-	_check(is_instance_valid(original), "the original contact holder survives deferred deletion")
-	var retained := _shadow_holder(office, table)
-	if retained != null:
-		_eq(retained, original, "background replacement moves the owned holder")
-		_check(not retained.is_queued_for_deletion(), "reattached contact holder is not queued to die")
-		_eq(retained.get_child_count(), table.columns.size(), "one near-chair contact per capacity column")
-		for index in table.columns.size():
-			var shadow := retained.get_child(index) as Polygon2D
-			_check(shadow != null and shadow.is_inside_tree(), "each contact is a live rendered polygon")
-			if shadow == null:
-				continue
-			var center := Vector2.ZERO
-			for point in shadow.polygon:
-				center += shadow.to_global(point)
-			center /= shadow.polygon.size()
-			var near_offset: float = OfficeTable.CHAIR_OFFSET["near"]
-			_check(
-				center.is_equal_approx(table.seat(index, "near").global_position + Vector2(0, near_offset)),
-				"contact stays under its actual chair after growth and relocation"
-			)
-	_eq(_seat_node(office, "api:p1"), station, "growing shadows does not replace the existing station")
+	for column in previous_columns:
+		for side: String in OfficeTable.SIDES:
+			var marker := table.seat(column, side)
+			_check(marker in original and marker.is_inside_tree(), "surviving markers retain their identity")
+			_check(not marker.is_queued_for_deletion(), "retained marker is not queued to die")
+	_eq(_seat_node(office, "api:p1"), station, "growth does not replace the existing station")
+	_eq(station.actor(), actor, "nor its whole image")
+	_eq(actor.global_position, station.seat.global_position, "still on its marker after relocation")
+	_eq(office.world.find_children("SeatContacts", "", true, false), [], "no separate contact shadows")
 	_done(office)
 
 
-func test_column_and_side_swaps_preserve_people_and_final_equipment() -> void:
+func test_column_and_side_swaps_preserve_workstations_and_clocks() -> void:
 	var snapshot := _both_sides()
 	var office := await _live_office(snapshot)
 	var old_stations: Dictionary[String, OfficeStation] = {}
@@ -613,9 +587,9 @@ func test_column_and_side_swaps_preserve_people_and_final_equipment() -> void:
 			var rect := _dict(slot, "rect")
 			rect.x = columns[pane_id] * 80
 			rect.y = 40 if sides[pane_id] == "near" else 0
+	var progress := _actor_progress(office, "")
 	_feed(office, swapped)
-	await _frames(2)
-	_walked(office, "as the swapped workers change seats")
+	_eq(_actor_progress(office, ""), progress, "reordering retains every image frame and clock immediately")
 	var occupied: Dictionary[String, bool] = {}
 	for pane_id in columns:
 		var station := _seat_node(office, pane_id)
@@ -623,11 +597,9 @@ func test_column_and_side_swaps_preserve_people_and_final_equipment() -> void:
 		_eq(station.actor().get_instance_id(), actor_ids[pane_id], "a swapped pane retains its actor")
 		_eq(station.column, columns[pane_id], "explicit column swap reaches the intended column")
 		_eq(station.side, sides[pane_id], "explicit side swap reaches the intended side")
-		_eq(
-			station.actor().look.orientation,
-			AvatarLook.FRONT if station.side == "far" else AvatarLook.BACK,
-			"worker faces the correct side after rebinding"
-		)
+		var body := _sprite(station.actor(), "Body")
+		_eq(body.texture, office.art.workstation.sheet_texture(), "both rows use the same front-facing sheet")
+		_check(not body.flip_h and not body.flip_v, "neither row mirrors the image")
 		_eq(
 			station.actor().global_position,
 			station.table.seat(station.column, station.side).global_position,
@@ -638,13 +610,15 @@ func test_column_and_side_swaps_preserve_people_and_final_equipment() -> void:
 		_eq(planned.side, station.side, "public plan and rendered side agree")
 		occupied["%d:%s" % [station.column, station.side]] = true
 	var table := _seat_node(office, "api:p1").table
-	for column in table.columns.size():
-		for side: String in OfficeTable.SIDES:
+	for node in office.world.find_children("*", "OfficeStation", true, false):
+		var station: OfficeStation = node
+		if station.table == table:
 			_eq(
-				table.monitor(column, side).visible,
-				occupied.has("%d:%s" % [column, side]),
-				"the final occupant alone determines monitor visibility"
+				not station.vacant,
+				occupied.has("%d:%s" % [station.column, station.side]),
+				"only final occupants are bound"
 			)
+	await _same_as_rebuild(office, "after column and side swaps")
 	_done(office)
 
 
@@ -663,7 +637,8 @@ func _check_last_valid_people(office: OfficeScene, signature: String) -> void:
 	_check(first != null and first.actor() != null, "last-valid worker is reconstructed")
 	if first != null and first.actor() != null:
 		_eq(first.actor().provider, "claude", "invalid input cannot change the last-valid provider")
-		_check(not _papers(first), "invalid done state cannot put paper on the last-valid desk")
+		_eq(first.actor().animation, &"working", "invalid done state cannot change the last-valid image")
+		_check(not first.actor().is_playing(), "invalid geometry keeps the last valid frame frozen")
 		var badge: StatusBadge = first.get_node("Overlay/Badge")
 		_eq(badge.state, ArtContract.STATE_WORKING, "last-valid badge agrees with last-valid worker")
 	var texts := PackedStringArray()
@@ -726,12 +701,16 @@ func test_invalid_input_keeps_last_valid_people_across_theme_and_floor_changes()
 	_feed(office, _with(fixture, "api:p1", {"agent": "codex", "agent_status": "done"}))
 	_check(office.layout_problems().is_empty(), "corrected input clears the diagnostic")
 	_eq(_seat_node(office, "api:p1").actor().provider, "codex", "valid recovery applies the newer provider")
-	_check(_papers(_seat_node(office, "api:p1")), "valid recovery applies the newer paper")
+	_eq(_seat_node(office, "api:p1").actor().animation, &"done", "valid recovery applies the newer state image")
 	_eq(office.layout_attempt_count(), attempts + 1, "corrected geometry is attempted once")
 	_feed(office, _with(fixture, "api:p1", {"agent": "codex", "agent_status": "working"}))
 	_eq(office.layout_attempt_count(), attempts + 1, "valid status changes still hit the successful cache")
 	office.rebuild_world()
-	_check(not _papers(_seat_node(office, "api:p1")), "successful cache hits update the retained display model")
+	_eq(
+		_seat_node(office, "api:p1").actor().animation,
+		&"working",
+		"successful cache hits update the retained display model"
+	)
 	_done(office)
 
 
@@ -762,9 +741,8 @@ func test_first_budget_failure_is_cached_until_geometry_changes_or_floor_closes(
 		"panes": [],
 		"layouts": []
 	}
-	# 1014 panes need 508 paired-growth columns: their measured reserved width
-	# (a pod packs a column into one cell) plus the outer walls and corridor
-	# exceeds the 512-cell production budget.
+	# 1014 panes need 508 paired-growth columns at three cells per column:
+	# the measured pod alone exceeds the 512-cell production width budget.
 	for index in 1014:
 		_list(invalid, "panes").append({"pane_id": "wide-%d" % index, "tab_id": "wide", "workspace_id": "oversized"})
 	var oversized := HerdrFleet.pane_key(BEE, "oversized")
@@ -842,52 +820,6 @@ func test_first_budget_failure_is_cached_until_geometry_changes_or_floor_closes(
 	_done(office)
 
 
-func test_actor_clearance_changes_invalidate_failed_planning() -> void:
-	var office := await _live_office()
-	var retained := office.layout_plan()
-	var attempts := office.layout_attempt_count()
-	var pivot := office.art.people.pivot
-	# Keep the theme ID and snapshot unchanged, but change a real policy input.
-	# A canvas drawn this far left of its feet cannot keep off the left wall's
-	# drawing anywhere left of x 332, so lane 0 is cut off; it must not hit the
-	# cache. S3 BAND (2026-10-28): the top wall draws behind a person in front of
-	# it, so a canvas 300 tall no longer fails a plan (it was this case's story);
-	# the side walls keep the canvas rule, and this canvas is kept off one.
-	office.art.people.pivot = Vector2(300, pivot.y)
-	_feed(office, fixture)
-	_eq(office.layout_attempt_count(), attempts + 1, "changed actor clearance is planned once")
-	_check(not office.layout_problems().is_empty(), "the new actor clearance is actually rejected")
-	_eq(office.layout_plan(), retained, "clearance failure retains the valid plan")
-	_feed(office, fixture)
-	_eq(office.layout_attempt_count(), attempts + 1, "unchanged failed clearance is cached")
-	office.test_screen = Vector2(1400, 480)
-	_feed(office, fixture)
-	_eq(office.layout_attempt_count(), attempts + 2, "failed policy reset retries with a new initial width")
-	_check(not office.layout_problems().is_empty(), "a wider floor still cannot clear the far-reaching canvas")
-	_feed(office, fixture)
-	_eq(office.layout_attempt_count(), attempts + 2, "the failed reset is cached at its new width")
-	office.art.people.pivot = pivot
-	_feed(office, fixture)
-	_eq(office.layout_attempt_count(), attempts + 3, "restored policy measurements retry the same snapshot")
-	_check(office.layout_problems().is_empty(), "valid policy recovery clears the failure")
-	_eq(
-		office.layout_plan().initial_width_cells,
-		retained.initial_width_cells,
-		"compatible recovery keeps the fixed rows"
-	)
-	office.art.people.pivot = pivot + Vector2(0, 1)
-	_feed(office, fixture)
-	_eq(office.layout_attempt_count(), attempts + 4, "a compatible new canvas triggers one successful policy reset")
-	_check(office.layout_problems().is_empty(), "a one-pixel taller canvas still clears the walls")
-	_check(
-		office.layout_plan().initial_width_cells > retained.initial_width_cells,
-		"policy reset uses the new viewport width"
-	)
-	_feed(office, fixture)
-	_eq(office.layout_attempt_count(), attempts + 4, "a successful policy reset is immediately cached")
-	_done(office)
-
-
 func test_render_budget_failure_keeps_old_nodes_and_first_failure_is_empty() -> void:
 	var office := await _live_office()
 	var previous := office.layout_plan()
@@ -897,9 +829,14 @@ func test_render_budget_failure_keeps_old_nodes_and_first_failure_is_empty() -> 
 	# must not add, remove or replace any candidate rendering nodes.
 	var floor_root := office.world.get_node("FloorRooms")
 	var nodes := floor_root.find_children("*", "", true, false)
-	# Two hundred empty tabs: 200 minimum pods at 168 nodes each, over 32768.
+	# A measured allocation overflow, not the retired component-rich pod's count.
+	var policy := FloorLayoutPolicy.new()
+	var count := ceili(float(policy.max_desk_nodes) / OfficeDeskView.node_budget(2)) + 1
+	_check(
+		count + office.layout_plan().desks.size() < policy.max_tables, "node budget, not the table cap, refuses this"
+	)
 	var excessive: Dictionary = fixture.duplicate(true)
-	for index in 200:
+	for index in count:
 		_list(excessive, "tabs").append(
 			{"workspace_id": "api", "tab_id": "empty-%d" % index, "number": index + 10, "label": "empty"}
 		)
@@ -956,11 +893,10 @@ func test_a_new_floor_is_validated_once_decor_included() -> void:
 	_done(office)
 
 
-## Two workspaces are two zones of one map (before maps: two floors): A (one
-## tab of 40 panes, a pod of 20 columns, 21 cells: five lanes of 4, the map
-## widened for them; three of 9 before Z1) and B (2 panes) planned together, once. PageUp/PageDown between
-## them pan: the same plan object, the same zone rectangles, the same world,
-## nobody made to walk, and no replan. A drag moves the one map's pan, which
+## Two workspaces are two zones of one map: A (40 panes, 20 columns, 61
+## reserved cells in thirteen lanes) and B (2 panes) planned together, once.
+## PageUp/PageDown between them pan: the same plan object, zone rectangles
+## and world, and no replan. A drag moves the one map's pan, which
 ## the next zone pick replaces (its aisle row at the top).
 func test_zones_on_one_map_keep_their_rectangles_and_the_world_when_paged() -> void:
 	var snapshot := {
@@ -980,10 +916,9 @@ func test_zones_on_one_map_keep_their_rectangles_and_the_world_when_paged() -> v
 	var a := HerdrFleet.pane_key(LOCAL, "a")
 	var b := HerdrFleet.pane_key(LOCAL, "b")
 	var plan := office.layout_plan()
-	# Z1 (2026-10-27): a lane is 4 cells, pitch 5, a new zone takes lanes until it stands one row; the map replans.
-	_eq([plan.floor_key, plan.lanes], [LOCAL, 5], "one map, the machine's, five lanes for A's pod")
+	_eq([plan.floor_key, plan.lanes], [LOCAL, 13], "one map, widened to thirteen lanes for A's complete images")
 	var rects := [plan.zone(a).cells, plan.zone(b).cells]
-	_eq(rects[0].size, Vector2i(24, 6), "A spans the five lanes")
+	_eq(rects[0].size, Vector2i(64, 10), "A spans thirteen lanes and one ten-cell-deep pod row")
 	var middle := office.hud.world_rect().get_center()
 	await _drag(middle, middle + Vector2(-160, -60))
 	var attempts := office.layout_attempt_count()
@@ -1001,7 +936,6 @@ func test_zones_on_one_map_keep_their_rectangles_and_the_world_when_paged() -> v
 		_eq([plan.zone(a).cells, plan.zone(b).cells], rects, "both zones keep their rectangles")
 		_eq(office.layout_attempt_count(), attempts, "nothing planned again")
 		_eq(office.world.get_instance_id(), world, "the same world, not built again")
-		_eq(office.floor_view.presentation.walkers(), [], "and nobody walks")
 		var reach := office.camera.world_size.y - office.camera.free_rect().size.y
 		_eq(office.camera.pan.y, minf(_sign_top(office, zone), reach), "panned to its sign, as far as the map goes")
 	_done(office)
@@ -1015,106 +949,76 @@ func _sign_top(office: OfficeDouble, zone: String) -> float:
 	return office.world.to_local(holder.to_global(board.drawn_rect().position)).y
 
 
-## PLAN_R2 §1.10, density: 1920×960 at 2x (the 960×480 view), the bottom
-## panel docked; the first zone visited (S3 BAR-b: by the
-## page keys, not its SPACES row; herdr's focus is there already, so the view
-## is the one it opens on); the seats whose click rect (target_rect(), no chip) is wholly inside
-## world_rect() are counted. Two workspaces, each of four tabs of 8, 4, 8 and 4
-## working agents (pods of 4, 2, 4 and 2 columns: two pod rows in a lane of 9
-## before Z1, one row of four 4-cell lanes now), and again with the first two
-## tabs only (one pod row). The floors before one map per machine showed 12 in
-## the same rect.
-func test_a_zone_call_shows_the_planned_density() -> void:
+## The former 24-tiny-seat density promise is deliberately retired. The same
+## 24/48-pane fixture remains: navigation must reveal a complete selected
+## workstation without rebuilding or shrinking its authored image.
+func test_a_large_zone_keeps_every_workstation_and_reveals_the_selected_image() -> void:
+	root.size = Vector2i(960, 480)
+	await _frames(2)
 	for rows: int in [2, 1]:
 		var office := await _live_office(_density(rows), Vector2(960, 480))
-		# S3 PANEL-a2 (2026-10-28): the agent list and the attention records retire: no drawer to be closed.
 		_check(office.hud.inspector.docked(), "the panel docked")
-		# S3 BAR-b (2026-10-27): the SPACES rail is gone; the world starts 16 in and first plans take its width.
-		# S3 PANEL-a1 (2026-10-27): the docked bottom panel, the 52-unit bar band on tall screens, no drawer tab: 52
-		# bar, 151 docked panel.
-		# S3 PANEL-a1 round 2 (2026-10-28): the docked panel 116 tall (was 151), the world 35 taller: 241 -> 276, a
-		# 116 docked panel.
-		# S3 SKIN (2026-10-28): the bottom panel wears the wood frame: the docked panel 120 tall, the room 276 -> 272
-		# (the plan's density unchanged).
-		# S3 PORTRAIT P3 (2026-10-28): the tall band 70, the tile's window a 42×42 portrait: the room from under the 70
-		# band, 68 -> 86 and 272 -> 254 (this run's print; the plan's density unchanged).
 		_eq(office.hud.world_rect(), Rect2(16, 86, 936, 254), "the world's room at 1920×960, 2x")
-		var plan := office.layout_plan()
-		var a := plan.zone(HerdrFleet.pane_key(LOCAL, "a"))
-		var b := plan.zone(HerdrFleet.pane_key(LOCAL, "b"))
-		# Z1 (2026-10-27): a lane is 4 cells, pitch 5, a new zone takes lanes until it stands one row; the map replans.
-		# Four tabs (16 cells of pods) stand one row in four lanes, so b stands under a; two
-		# tabs (8 cells) one row in two lanes, side by side.
-		var lanes := [0, 4, 0, 4] if rows == 2 else [0, 2, 2, 2]
-		_eq([a.first_lane, a.lanes, b.first_lane, b.lanes], lanes, "%d: each zone one row wide" % rows)
-		_eq([a.rows.size(), b.rows.size()], [1, 1], "%d: one pod row each" % rows)
-		# S3 CAMERA (2026-10-28): a map opens with its back wall in view: the view the map opens on is
-		# lifted to the wall's face, and the pods' near seats go under the bottom panel, so it shows the
-		# 12 far seats (this run's print), not the planned density; a zone call is no longer the view the
-		# map opens on, so the case makes one: the page keys to b and back to a, which opens a at its
-		# sign as before.
-		# S3 BAND (2026-10-28): the band is one row: the wall's face and the whole first pod row fit
-		# the view, so the map opens on all 24 (this run's print).
-		var opened := _seats_in_view(office)
-		print("DENSITY %d pod row(s): %d seats wholly in view as the map opens" % [rows, opened])
-		_eq(opened, 24, "%d pod row(s): the map opens on the wall and every seat of the first row" % rows)
+		_eq(office.floor_view.seats.size(), 24 * rows, "the same fixture population, no hidden capacity limit")
+		var nodes := _desk_ids(office, "")
+		var world := office.world.get_instance_id()
 		await _visit_zone(office, HerdrFleet.pane_key(LOCAL, "b"))
 		await _visit_zone(office, HerdrFleet.pane_key(LOCAL, "a"))
-		await _frames(3)
-		var room := office.hud.world_rect()
-		var seen := _seats_in_view(office)
-		# Z1 (2026-10-27): a four-tab workspace stands its pods in one row across the map,
-		# so the second workspace stands under it; 36 was the two-lane era's target; FRAME-Q3,
-		# ruled by the orchestrator.
-		var wanted := 24
-		print("DENSITY %d pod row(s): %d seats wholly in %s (plan: %d)" % [rows, seen, room, wanted])
-		_check(seen >= wanted, "%d pod row(s): at least %d seats wholly in view, %d" % [rows, wanted, seen])
+		for pane_id: String in ["a:t0:p0", "b:t1:p3"]:
+			var key := HerdrFleet.pane_key(LOCAL, pane_id)
+			await _click_desk(office, key)
+			_eq(office.picked_key, key, "real input selects a workstation in either zone")
+			_check_selected_image(office, key)
+		_eq(_desk_ids(office, ""), nodes, "all nodes kept across visits and picks")
+		_eq(office.world.get_instance_id(), world, "same world")
 		_done(office)
+	root.size = SCREEN
+	await _frames(2)
 
 
-## S3 BAND (2026-10-28): the band is one row, so at the default window (960x480,
-## 254 deep) the density fixture opens with the top wall's face whole and all
-## 24 seats of its first pod row (the planned density) wholly in view, each desk's signal (its seat and
-## its chip: every agent here is blocked, so the near seats' chips show under
-## their chairs) enclosed by the world's room. From geometry, not pixels. Fails
-## on the two-row band (12 of 24, the near seats under the panel).
-func test_the_density_fixture_opens_with_the_wall_and_every_seat() -> void:
+func test_selected_blocked_images_and_chips_are_wholly_revealed_and_offscreen_arrows_work() -> void:
+	root.size = Vector2i(960, 480)
+	await _frames(2)
 	for rows: int in [2, 1]:
 		var snapshot := _density(rows)
 		for pane: Dictionary in _list(snapshot, "panes"):
 			pane["agent_status"] = "blocked"
 		var office := await _live_office(snapshot, Vector2(960, 480))
-		office.settle()
 		await _frames(2)
-		var room := office.hud.world_rect()
-		var to_screen := office.floor_view.root.get_global_transform()
-		var face := to_screen * office.floor_view.wall_face()
-		face.position -= office.camera.position
-		_check(room.encloses(face), "%d pod row(s): the wall's face whole: %s in %s" % [rows, face, room])
-		var seen := 0
 		var chips := 0
 		for key: String in office.floor_view.seats:
-			var desk := to_screen * office.floor_view.signal_extent(key)
-			desk.position -= office.camera.position
-			seen += int(room.encloses(desk))
 			chips += int(office.floor_view.seats[key].node.chip_rect().has_area())
-		print("DENSITY %d pod row(s): %d of %d signals wholly in view with the wall" % [rows, seen, chips])
 		_eq(office.floor_view.seats.size(), 24 * rows, "%d pod row(s): 24 seats a pod row" % rows)
 		_eq(chips, 24 * rows, "%d pod row(s): every seat shows its chip" % rows)
-		_eq(seen, 24, "%d pod row(s): every seat of the first pod row wholly in view as the map opens" % rows)
+		_check_selected_image(office, office.navigator.active_key)
+		var arrows := office.hud.edge_arrows.shown()
+		_check(not arrows.is_empty(), "offscreen blocked workstations still have arrows")
+		if not arrows.is_empty():
+			var arrow := arrows[0]
+			var aimed := arrow.pane_key()
+			var picked := office.picked_key
+			await _click_at(arrow.get_global_rect().get_center())
+			_eq(office.picked_key, picked, "an arrow only navigates")
+			_check_selected_image(office, aimed)
+			await _click_desk(office, aimed)
+			_eq(office.picked_key, aimed, "the revealed whole image is clickable")
+			_check_selected_image(office, aimed)
 		_done(office)
+	root.size = SCREEN
+	await _frames(2)
 
 
-## How many seats' click rects (target_rect(), no chip) are wholly inside the
-## world's room on screen.
-func _seats_in_view(office: OfficeDouble) -> int:
+func _check_selected_image(office: OfficeDouble, key: String) -> void:
 	var room := office.hud.world_rect()
-	var seen := 0
-	for key: String in office.floor_view.seats:
-		var rect := office.floor_view.seats[key].node.target_rect()
-		if room.encloses(Rect2(rect.position - office.camera.position, rect.size)):
-			seen += 1
-	return seen
+	var station := _station(office, key)
+	var body := _sprite(station, "Actor/Body")
+	var image := body.global_transform * body.get_rect()
+	_eq(image, station.global_transform * Rect2(-37.5, -70, 80, 80), "the rendered image uses the native full canvas")
+	_eq(image.size, Vector2(80, 80), "complete image, never scaled down to restore old density")
+	for rect: Rect2 in [image, station.target_rect(), station.chip_rect()]:
+		if rect.has_area():
+			var shown := Rect2(rect.position - office.camera.position, rect.size)
+			_check(room.encloses(shown), "whole image/target/chip %s in %s" % [shown, room])
 
 
 ## Two workspaces `a` and `b`, each with tabs of 8, 4, 8 and 4 working claude
@@ -1168,7 +1072,7 @@ func test_a_failing_zone_is_named_on_the_plate_and_the_map_stays() -> void:
 ## y-sorted holder under the sorted root; no row wall's joint is laid; its sign
 ## hangs at its post, over the aisle row, and names it; each tab's name is
 ## small text right under its table, no wider than the table, TAB_LABEL_HEIGHT
-## deep and clear of every partition piece; and a walker
+## deep and clear of every partition piece; and an arriving whole workstation
 ## inside the zone, above its bottom partition, sorts before that partition.
 func test_one_workspace_is_drawn_as_a_zone() -> void:
 	var office := await _live_office()
@@ -1225,11 +1129,11 @@ func test_one_workspace_is_drawn_as_a_zone() -> void:
 	for tab: String in view.desks:
 		var desk := view.desks[tab]
 		var placed := desk.placement
-		var under := placed.origin + Vector2(0, placed.measure.render_rect.end.y)
-		_eq(desk.title.position, under, "%s's name stands right under its table" % tab)
+		var under := placed.origin + Vector2(0, placed.measure.render_rect.end.y + 4.0)
+		_eq(desk.title.position, under, "%s's name stands clear of the pod's selection frame" % tab)
 		_eq(desk.title.size.x, placed.measure.table_width, "no wider than the table")
-		# TAB_LABEL_HEIGHT deep, so a last pod row's name ends where the bottom
-		# run's drawing starts (46 + 8 = 54 = 64 - 10 under the pod's origin).
+		# y 60..68: the title clears the frame at 56..58 and stays above
+		# the bottom partition's drawing at 86..96 under the pod's origin.
 		_eq(desk.title.size.y, OfficeDraw.TAB_LABEL_HEIGHT, "%s's name is TAB_LABEL_HEIGHT deep" % tab)
 		var box := Rect2(desk.title.position, desk.title.size)
 		for sprite in sprites:
@@ -1251,18 +1155,21 @@ func test_one_workspace_is_drawn_as_a_zone() -> void:
 	extra.agent_status = "working"
 	_list(arriving, "panes").append(extra)
 	_feed(office, arriving)
-	var body := _station(office, HerdrFleet.pane_key(LOCAL, "api:p9")).actor()
-	var inside := false
-	for frame in 600:
-		view.walk(1.0 / 30.0)
-		var at := view.sorted.to_local(body.global_position)
-		if zone.bounds().has_point(at) and at.y > bottom - 64.0:
-			inside = true
-			break
-	_check(inside, "a walker comes down inside the zone, above its bottom partition")
-	if inside and not run.is_empty():
+	var station := _station(office, HerdrFleet.pane_key(LOCAL, "api:p9"))
+	var body := station.actor()
+	var changed_zone := office.layout_plan().zone(zone.zone_key)
+	_check(
+		changed_zone.bounds().has_point(view.sorted.to_local(body.global_position)),
+		"arrival is immediately inside its zone"
+	)
+	var current_bottom := changed_zone.bounds().end.y
+	run = view.partition_sprites(zone.zone_key).filter(
+		func(each: Sprite2D) -> bool: return is_equal_approx(each.position.y, current_bottom)
+	)
+	_check(not run.is_empty(), "the current bottom partition is still drawn after the arrival")
+	if not run.is_empty():
 		var piece: Sprite2D = run[0]
-		_eq(_entity_of(view.sorted, body), body, "the walker sorts by their own feet")
+		_eq(_entity_of(view.sorted, body), station, "the whole workstation sorts at its foot")
 		_check(body.global_position.y < piece.global_position.y, "above the partition's foot: drawn before it")
 	_done(office)
 
@@ -1274,7 +1181,14 @@ func test_one_workspace_is_drawn_as_a_zone() -> void:
 ## is freed. A status change, a selection and a refresh of an unchanged map
 ## change no carpet node, place, size or texture, and lay nothing out again.
 func test_a_carpet_follows_its_zone_and_a_quiet_refresh_keeps_it() -> void:
-	var office := await _live_office()
+	# Seven lanes put notes/data beside the larger pods, leaving infra's
+	# growth row free. Api still has web beneath it and must relocate to grow.
+	# Match the double's logical viewport at the office's native 2x scale;
+	# otherwise the real viewport cannot pick the right-hand data zone.
+	root.size = Vector2i(2560, 1440)
+	await _frames(2)
+	var office := await _live_office(fixture, Vector2(1280, 720))
+	_eq(root.get_visible_rect().size, office.test_screen, "real picking covers the planned viewport")
 	var view := office.floor_view
 	var before := _carpet_marks(office)
 	_eq(before.size(), office.layout_plan().zones.size(), "one carpet per zone")
@@ -1301,7 +1215,6 @@ func test_a_carpet_follows_its_zone_and_a_quiet_refresh_keeps_it() -> void:
 	_feed(office, grown)
 	await _frames(2)
 	var now: Rect2i = office.layout_plan().zone(infra).cells
-	print("CARPET_GROWTH infra %s -> %s" % [was, now])
 	_check(now.position == was.position and now.size.y > was.size.y, "infra grew down in place: %s -> %s" % [was, now])
 	var after := _carpet_marks(office)
 	_eq(after[infra][0], before[infra][0], "infra keeps its carpet node")
@@ -1319,7 +1232,6 @@ func test_a_carpet_follows_its_zone_and_a_quiet_refresh_keeps_it() -> void:
 	_feed(office, moved)
 	await _frames(2)
 	now = office.layout_plan().zone(api).cells
-	print("CARPET_MOVE api %s -> %s" % [was, now])
 	_check(now.position != was.position, "api moved: %s -> %s" % [was, now])
 	var shifted := _carpet_marks(office)
 	_eq(shifted.size(), office.layout_plan().zones.size(), "still one carpet per zone")
@@ -1335,6 +1247,8 @@ func test_a_carpet_follows_its_zone_and_a_quiet_refresh_keeps_it() -> void:
 	_check(not is_instance_valid(gone) or not gone.is_inside_tree(), "its carpet left the tree")
 	_eq(_carpet_marks(office).size(), office.layout_plan().zones.size(), "one carpet per zone left")
 	_done(office)
+	root.size = SCREEN
+	await _frames(2)
 
 
 ## Zone key -> [its carpet's instance id, position, drawn size, texture].

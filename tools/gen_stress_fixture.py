@@ -16,8 +16,8 @@ Standard library only. Each file has the shape of tools/fixtures/*.json (a
 Every pane runs a `claude` agent; the states cycle working, idle, blocked,
 done, working, working, so a floor carries blocked and UNREAD badges too.
 
-`make perf WALKS=1` walks the stress floor's people (tools/perf_probe.gd
---walk=), from one of these to another:
+`make perf CHANGES=1` measures workstation snapshot transitions (tools/perf_probe.gd
+--change=), from one of these to another:
 
 - snapshot_stress80_shells:  the stress floor with no agents, nobody at a desk
 - snapshot_stress80_working: every pane an agent at work, nobody done

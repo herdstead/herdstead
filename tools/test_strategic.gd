@@ -487,8 +487,6 @@ func test_several_machines_title_names_the_machine() -> void:
 	_check(frame.several_machines(), "two machines")
 	var found := frame.building_of("socket:bee")
 	var rules := FloorLayoutPolicy.new()
-	rules.actor_footprint = PixelPerson.footprint()
-	rules.actor_draw_rect = PixelPerson.drawing_rect(art.people)
 	var plan := OfficeFloorLayout.plan(found.map, null, rules).plan
 	var live := StrategicModel.of(plan, found, true, MachineLiveness.State.LIVE, StateLog.new(), "", 0)
 	_eq(live.title, "@ BEE", "the machine's own label, among several")
@@ -801,18 +799,16 @@ func test_the_stress_fit_at_2x_4x_and_min() -> void:
 			_check(fit.size.x <= room.x and fit.size.y <= room.y, "fits: %s in %s" % [fit.size, room])
 		else:
 			_check(fit.size.x <= room.x and fit.size.y > room.y, "as wide as fits and taller: " + str(fit.size))
-	# The stress map as the office plans it at 2x: five lanes of 4 (S3 BAR-b,
-	# 2026-10-27: 28 cells for the 900-wide world; four lanes of 23 cells before,
-	# two of 9 before Z1), its zone as wide as all five, four pods of four desks
-	# (5 cells) to a row, three rows (the long tables took a row each, ten rows:
-	# the pure fits above keep that shape of input).
+	# The five-lane zone has 23 cells inside its pad. A four-column native
+	# workstation pod reserves 13 cells, so two cannot share a row: ten pods,
+	# ten rows. The schematic's eight-seat row input above remains unchanged.
 	var office := await _live_office(_stress(), WIDE)
 	var laid := office.layout_plan()
 	_eq([laid.lanes, laid.zones[0].lanes], [5, 5], "a zone of the map's five lanes")
 	var per_row: Array[int] = []
 	for band in laid.zones[0].rows:
 		per_row.append(band.desks.size())
-	_eq(per_row, [4, 4, 2], "three rows of pods")
+	_eq(per_row, [1, 1, 1, 1, 1, 1, 1, 1, 1, 1], "ten rows of native-size pods")
 	print("STRATEGIC stress render_bounds %s" % laid.render_bounds)
 	_done(office)
 	hud.queue_free()

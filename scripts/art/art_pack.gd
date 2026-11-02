@@ -69,6 +69,9 @@ var portraits: PixelPortraits
 ## This pack's shared table. Never null in a loaded pack; a pack that ships no
 ## table manifest gets an empty one, and cannot furnish a floor.
 var table: TablePack
+## The generic whole-image workstation and portrait, shared across themes.
+## The legacy people families remain available to the authoring showrooms.
+var workstation: WorkstationArt
 ## Herdr's agent list and the user's own avatar choices.
 var agent_catalog: AgentCatalog
 
@@ -488,6 +491,9 @@ func _read_options(manifest: Dictionary) -> String:
 ## against this pack's catalog; the shared table belongs to this pack.
 func _read_families() -> String:
 	agent_catalog = AgentCatalog.new()
+	workstation = WorkstationArt.from_manifest()
+	if workstation == null:
+		return "the shared workstation did not load"
 	people = PixelPeople.from_manifest(PixelPeople.MANIFEST)
 	if people == null:
 		return "the shared pixel people did not load"
